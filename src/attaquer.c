@@ -7,7 +7,5 @@
 
 void attaquer(personnage_t *attaquant, personnage_t *cible)
 {
-    printf("attaquer\n");
-    (void)attaquant;
-    (void)cible;
+    cible->pv -= attaquant->atk % (cible->def/100)
 }

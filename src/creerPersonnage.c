@@ -14,44 +14,59 @@ static void viderBuffer(void)
         c = getchar();
 }
 
+//affiche l'invite d'une question : "  Points de vie (0-99) › "
+static void afficherQuestion(const char *question, int min, int max)
+{
+    printf("  " GRAS "%s" RESET GRIS " (%d-%d)" RESET CYAN " › " RESET,
+        question, min, max);
+}
+
 //redemande tant que la saisie n'est pas un nombre entre min et max
 static int lireEntier(const char *question, int min, int max)
 {
     int valeur = 0;
     int ok = 0;
 
-    printf("%s\n- ", question);
+    afficherQuestion(question, min, max);
     ok = scanf("%d", &valeur);
     viderBuffer();
-    printf("\n");
     while (ok != 1 || valeur < min || valeur > max) {
-        printf("Valeur indisponible,\n%s\n- ", question);
+        printf("  " ROUGE "✗ Valeur indisponible, tape un nombre entre %d et %d"
+            RESET "\n", min, max);
+        afficherQuestion(question, min, max);
         ok = scanf("%d", &valeur);
         viderBuffer();
-        printf("\n");
     }
     return valeur;
 }
 
 int creerPersonnage(personnage_t *p)
 {
+    //en-tête
+    printf("\n" CYAN "╭" LIGNE "\n");
+    printf("│" RESET "  " GRAS "✦ Création d'un personnage" RESET "\n");
+    printf(CYAN "╰" LIGNE RESET "\n\n");
+
     //choix du nom
-    printf("Quel est le nom de ce personnage ?\n- ");
-    scanf("%29s", p->nom);
+    printf("  " GRAS "Nom" RESET CYAN " › " RESET);
+    scanf("%29s", p->name);
     viderBuffer();
     printf("\n");
 
-    //choix des points de vie
-    p->pv = lireEntier("Combien a-t-il de points de vie ? (0-99)", 0, 99);
-
-    //choix de la puissance
-    p->atk = lireEntier("Quelle est sa puissance d'attaque ? (0-99)", 0, 99);
-
-    //choix de la défense
-    p->def = lireEntier("Combien de points de défense a-t-il ? (0-99)", 0, 99);
+    //choix des statistiques
+    printf("  " GRIS "── Statistiques ──" RESET "\n");
+    p->pv = lireEntier("Points de vie", 0, 99);
+    p->atk = lireEntier("Attaque      ", 0, 99);
+    p->def = lireEntier("Défense      ", 0, 99);
+    printf("\n");
 
     //choix de la classe (1-3 saisi, l'enum commence à 0)
-    p->classe = lireEntier("Quelle classe a-t-il ? (1 - GUERRIER, 2 - MAGE, 3 - ARCHER)", 1, 3) - 1;
+    printf("  " GRIS "── Classe ──" RESET "\n");
+    printf("    " GRAS "1" RESET "  " ROUGE "Guerrier" RESET "\n");
+    printf("    " GRAS "2" RESET "  " MAGENTA "Mage" RESET "\n");
+    printf("    " GRAS "3" RESET "  " VERT "Archer" RESET "\n");
+    p->classe = lireEntier("Choix", 1, 3) - 1;
 
+    printf("\n  " VERT "✔ %s a été créé !" RESET "\n", p->name);
     return 0;
 }

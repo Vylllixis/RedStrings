@@ -13,7 +13,7 @@ typedef enum Classe {
 } Classe_t;
 
 typedef struct {
-    char nom[30];
+    char name[30];
     int pv;
     int atk;
     int def;
