@@ -1,0 +1,33 @@
+# Exécutable du projet
+/redstrings
+
+# Fichiers objets et compilation
+*.o
+*.obj
+*.a
+*.so
+*.out
+*.d
+*.gch
+*.pch
+
+# Débogage / couverture / profilage
+*.dSYM/
+vgcore.*
+core
+*.gcda
+*.gcno
+*.gcov
+gmon.out
+
+# Éditeurs / IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+\#*\#
+
+# Système
+.DS_Store
+Thumbs.db
