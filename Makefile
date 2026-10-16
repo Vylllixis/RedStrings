@@ -21,6 +21,9 @@ LIB_SRCS	=	$(wildcard $(LIB_DIR)/*.c)
 OBJS		=	$(SRCS:%.c=$(OBJ_DIR)/%.o)
 LIB_OBJS	=	$(LIB_SRCS:%.c=$(OBJ_DIR)/%.o)
 
+#un .d par .o, écrit par gcc : la liste des .h utilisés par le .c
+DEPS		=	$(OBJS:.o=.d) $(LIB_OBJS:.o=.d)
+
 # ─── Compilation ─────────────────────────────────────────────────────
 
 CC		=	gcc
@@ -29,6 +32,7 @@ RM		=	rm -rf
 
 CFLAGS		=	-W -Wall -Werror
 CPPFLAGS	=	-I./includes
+DEPFLAGS	=	-MMD -MP
 LDFLAGS		=	-L./$(LIB_DIR)
 LDLIBS		=	-lmy
 
@@ -47,7 +51,7 @@ $(LIB):	$(LIB_OBJS)
 
 $(OBJ_DIR)/%.o:	%.c
 	@mkdir -p $(dir $@)
-	$(CC) $(CFLAGS) $(CPPFLAGS) -c $< -o $@
+	$(CC) $(CFLAGS) $(CPPFLAGS) $(DEPFLAGS) -c $< -o $@
 
 #version graphique (CSFML) -> ./redstrings_csfml
 csfml:	$(LIB)
@@ -72,5 +76,7 @@ doc:
 
 doc-clean:
 	$(RM) $(DOC_DIR)
+
+-include $(DEPS)
 
 .PHONY: all lib csfml clean fclean re build doc doc-clean
