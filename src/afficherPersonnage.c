@@ -34,13 +34,15 @@ int afficherPersonnage(const personnage_t *p)
         nameClasse = "Archer";
         couleurClasse = VERT;
     }
-    printf("\n" GRIS "╭" LIGNE RESET "\n");
-    printf(GRIS "│" RESET "  " GRAS "%s" RESET GRIS "  ·  " RESET "%s%s" RESET "\n",
+    printf("\n");
+    boiteHaut(GRIS);
+    boiteLigne(GRIS, "  " GRAS "%s" RESET GRIS "  ·  " RESET "%s%s" RESET,
         p->name, couleurClasse, nameClasse);
-    printf(GRIS "├" LIGNE RESET "\n");
+    boiteSeparateur(GRIS);
     afficherStat("PV", p->pv, VERT);
     afficherStat("ATK", p->atk, ROUGE);
     afficherStat("DEF", p->def, BLEU);
-    printf(GRIS "╰" LIGNE RESET "\n\n");
+    boiteBas(GRIS);
+    printf("\n");
     return 0;
 }
