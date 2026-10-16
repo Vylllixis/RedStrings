@@ -3,48 +3,86 @@
 ## PROJET FIL ROUGE C Avancé
 ##
 
-#commande
-CC	=	gcc
-RM	=	rm -rf
+# ─── Fichiers ────────────────────────────────────────────────────────
 
-NAME	=	../redstrings_csfml
+NAME		=	../redstrings_csfml
 
-LIB_DIR	=	../lib
-LIB	=	$(LIB_DIR)/libmy.a
+LIB_DIR		=	../lib
+LIB		=	$(LIB_DIR)/libmy.a
 
-OBJ_DIR	=	obj
+OBJ_DIR		=	obj
 
-SRCS	=	$(wildcard src/*.c)
+SRCS		=	$(wildcard src/*.c)
+OBJS		=	$(SRCS:src/%.c=$(OBJ_DIR)/%.o)
+DEPS		=	$(OBJS:.o=.d)
 
-OBJS	=	$(patsubst src/%.c,$(OBJ_DIR)/%.o,$(SRCS))
+# ─── Compilation ─────────────────────────────────────────────────────
 
-#flags
-CFLAGS	=	-W -Wall -Werror -O2
+CC		=	gcc
+RM		=	rm -rf
+
+CFLAGS		=	-Wall -Wextra -Werror -O2
 CPPFLAGS	=	-I./include -I../includes
-LDFLAGS	=	-L$(LIB_DIR)
-LDLIBS	=	-lmy -lcsfml-graphics -lcsfml-window -lcsfml-system -lm
+DEPFLAGS	=	-MMD -MP
+LDFLAGS		=	-L$(LIB_DIR)
+LDLIBS		=	-lmy -lcsfml-graphics -lcsfml-window -lcsfml-system -lm
 
-all:	verifier
-	@$(MAKE) --no-print-directory $(NAME)
+# ─── Affichage (même style que le Makefile principal) ────────────────
+
+ifeq ($(V), 1)
+    Q	=
+else
+    Q	=	@
+endif
+
+MAKEFLAGS	+=	--no-print-directory
+
+C_BLEU		=	\033[1;34m
+C_VERT		=	\033[1;32m
+C_ROUGE		=	\033[1;31m
+C_GRIS		=	\033[90m
+C_RESET		=	\033[0m
+
+LOG		=	@printf "  $(C_BLEU)%-6s$(C_RESET) %s\n"
+LOG_OK		=	@printf "  $(C_VERT)✔$(C_RESET)      %s\n"
+LOG_RM		=	@printf "  $(C_GRIS)%-6s %s$(C_RESET)\n"
+
+# ─── Règles ──────────────────────────────────────────────────────────
+
+all:	verifier lib $(NAME)
+	$(LOG_OK) "./redstrings_csfml est prêt"
+
+#libmy.a est construite par le Makefile principal
+lib:
+	$(Q)$(MAKE) -C .. lib
 
 verifier:
-	@echo '#include <SFML/Graphics.h>' | $(CC) $(CPPFLAGS) -E -x c - > /dev/null 2>&1 \
-	|| (echo "CSFML est introuvable, installe-la avec : sudo apt install libcsfml-dev" \
-	&& exit 1)
+	@echo '#include <SFML/Graphics.h>' | $(CC) $(CPPFLAGS) -E -x c - \
+		> /dev/null 2>&1 || { printf "  $(C_ROUGE)✗$(C_RESET)      %s\n" \
+		"CSFML introuvable, installe-la avec : sudo apt install libcsfml-dev"; \
+		exit 1; }
 
 $(NAME):	$(OBJS) $(LIB)
-	$(CC) -o $(NAME) $(OBJS) $(LDFLAGS) $(LDLIBS)
+	$(LOG) "LD" "redstrings_csfml"
+	$(Q)$(CC) -o $(NAME) $(OBJS) $(LDFLAGS) $(LDLIBS)
 
-$(OBJ_DIR)/%.o:	src/%.c include/gui.h
+$(OBJ_DIR)/%.o:	src/%.c
+	$(LOG) "CC" "csfml/$<"
 	@mkdir -p $(OBJ_DIR)
-	$(CC) $(CFLAGS) $(CPPFLAGS) -c $< -o $@
+	$(Q)$(CC) $(CFLAGS) $(CPPFLAGS) $(DEPFLAGS) -c $< -o $@
 
 clean:
-	$(RM) $(OBJ_DIR)
+	$(LOG_RM) "RM" "csfml/$(OBJ_DIR)/"
+	$(Q)$(RM) $(OBJ_DIR)
 
 fclean:	clean
-	$(RM) $(NAME)
+	$(LOG_RM) "RM" "redstrings_csfml"
+	$(Q)$(RM) $(NAME)
 
-re:	fclean all
+re:
+	$(Q)$(MAKE) fclean
+	$(Q)$(MAKE) all
 
-.PHONY: all verifier clean fclean re
+-include $(DEPS)
+
+.PHONY: all verifier lib clean fclean re
