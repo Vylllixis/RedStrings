@@ -32,3 +32,5 @@ re: fclean all
 
 build:	fclean all
 	$(RM) $(OBJS)
+
+.PHONY: all clean fclean re build
