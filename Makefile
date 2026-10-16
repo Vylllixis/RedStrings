@@ -30,7 +30,7 @@ CC		=	gcc
 AR		=	ar rcs
 RM		=	rm -rf
 
-CFLAGS		=	-W -Wall -Werror
+CFLAGS		=	-Wall -Wextra -Werror
 CPPFLAGS	=	-I./includes
 DEPFLAGS	=	-MMD -MP
 LDFLAGS		=	-L./$(LIB_DIR)
