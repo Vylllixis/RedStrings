@@ -10,14 +10,16 @@ NAME		=	redstrings
 LIB_DIR		=	lib
 LIB		=	$(LIB_DIR)/libmy.a
 
+OBJ_DIR		=	obj
 CSFML_DIR	=	csfml
 DOC_DIR		=	docs/html
 
-SRCS		=	$(shell find ./src -name '*.c')
+SRCS		=	$(shell find src -name '*.c')
 LIB_SRCS	=	$(wildcard $(LIB_DIR)/*.c)
 
-OBJS		=	$(SRCS:.c=.o)
-LIB_OBJS	=	$(LIB_SRCS:.c=.o)
+#src/main.c -> obj/src/main.o
+OBJS		=	$(SRCS:%.c=$(OBJ_DIR)/%.o)
+LIB_OBJS	=	$(LIB_SRCS:%.c=$(OBJ_DIR)/%.o)
 
 # ─── Compilation ─────────────────────────────────────────────────────
 
@@ -43,12 +45,16 @@ lib:	$(LIB)
 $(LIB):	$(LIB_OBJS)
 	$(AR) $(LIB) $(LIB_OBJS)
 
+$(OBJ_DIR)/%.o:	%.c
+	@mkdir -p $(dir $@)
+	$(CC) $(CFLAGS) $(CPPFLAGS) -c $< -o $@
+
 #version graphique (CSFML) -> ./redstrings_csfml
 csfml:	$(LIB)
 	@$(MAKE) --no-print-directory -C $(CSFML_DIR)
 
 clean:
-	$(RM) $(OBJS) $(LIB_OBJS)
+	$(RM) $(OBJ_DIR)
 	@$(MAKE) --no-print-directory -C $(CSFML_DIR) clean
 
 fclean:	clean
@@ -58,7 +64,7 @@ fclean:	clean
 re:	fclean all
 
 build:	fclean all
-	$(RM) $(OBJS)
+	$(RM) $(OBJ_DIR)
 
 doc:
 	doxygen Doxyfile
