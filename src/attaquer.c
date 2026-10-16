@@ -7,5 +7,5 @@
 
 void attaquer(personnage_t *attaquant, personnage_t *cible)
 {
-    cible->pv -= attaquant->atk % (cible->def/100);
+    cible->pv -= attaquant->atk * (100 - cible->def) / 100;
 }
