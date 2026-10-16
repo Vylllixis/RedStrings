@@ -3,14 +3,14 @@
 ** PROJET FIL ROUGE C Avancé
 */
 
-#include <unistd.h>
-#include <stdio.h>
-#include <stdlib.h>
-#include "struct.h"
-#include "couleurs.h"
-
 #ifndef MY_H
     #define MY_H
+
+    #include <unistd.h>
+    #include <stdio.h>
+    #include <stdlib.h>
+    #include "struct.h"
+    #include "couleurs.h"
 
 int redstrings(void);
 int creerPersonnage(personnage_t *p);
