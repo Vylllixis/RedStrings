@@ -22,5 +22,6 @@ void viderBuffer(void);
 void boiteHaut(const char *couleur);
 void boiteSeparateur(const char *couleur);
 void boiteBas(const char *couleur);
+void boiteLigne(const char *couleur, const char *format, ...);
 
 #endif /* MY_H */
