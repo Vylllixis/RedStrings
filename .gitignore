@@ -31,3 +31,7 @@ gmon.out
 # Système
 .DS_Store
 Thumbs.db
+
+# Documentation générée par Doxygen (make doc)
+/docs/html/
+/docs/latex/
