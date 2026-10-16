@@ -7,6 +7,7 @@
     #define GUI_H
 
     #include <SFML/Graphics.h>
+    #include "my.h"
     #include "personnage.h"
 
     #define LARGEUR 1280
@@ -368,9 +369,5 @@ void sceneSelection(app_t *app);
 void entrerArene(app_t *app);
 void sceneArene(app_t *app);
 void sceneAuRevoir(app_t *app);
-
-/* Fonctions réutilisées du projet terminal (src/) */
-int my_strcmp(char *str1, char *str2);
-int my_strlen(char *str);
 
 #endif /* GUI_H */
