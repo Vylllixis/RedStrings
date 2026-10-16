@@ -3,7 +3,11 @@
 ** PROJET FIL ROUGE C Avancé
 */
 
-#include "my.h"
+#include <stdio.h>
+#include "boite.h"
+#include "couleurs.h"
+#include "personnage.h"
+#include "saisie.h"
 
 static void afficherQuestion(const char *question, int min, int max)
 {
