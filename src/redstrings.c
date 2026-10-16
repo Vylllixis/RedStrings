@@ -28,6 +28,7 @@ static void afficherMenu(void)
     boiteSeparateur(CYAN);
     boiteLigne(CYAN, "  " GRAS "1" RESET "  Ajouter un personnage");
     boiteLigne(CYAN, "  " GRAS "2" RESET "  Afficher un personnage");
+    boiteLigne(CYAN, "  " GRAS "3" RESET "  Combat");
     boiteLigne(CYAN, "  " GRAS "0" RESET "  Quitter");
     boiteBas(CYAN);
 }
@@ -79,6 +80,19 @@ static void menuAfficher(personnage_t *tab, int len)
         afficherPersonnage(&tab[idx]);
 }
 
+static void menuCombat(personnage_t *tab, int len)
+{
+    int idAtk = demanderPersonnage(tab, len, "Attaquant");
+    int idDef = 0;
+
+    if (idAtk == -1)
+        return;
+    idDef = demanderPersonnage(tab, len, "Défenseur");
+    if (idDef == -1)
+        return;
+    attaquer(&tab[idAtk], &tab[idDef]);
+}
+
 int redstrings(void)
 {
     personnage_t tabPersonnage[MAX_PERSONNAGES];
@@ -93,6 +107,8 @@ int redstrings(void)
             menuAjouter(tabPersonnage, &len);
         else if (choix == 2)
             menuAfficher(tabPersonnage, len);
+        else if (choix == 3)
+            menuCombat(tabPersonnage, len);
         else if (choix != 0)
             afficherErreur("Choix inconnu");
     }
