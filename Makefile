@@ -116,8 +116,10 @@ build:	re
 	$(Q)$(RM) $(OBJ_DIR)
 
 doc:
+	@test -f Doxyfile || { printf "  $(C_ROUGE)✗$(C_RESET)      %s\n" \
+		"Doxyfile introuvable, crée-le avec : doxygen -g Doxyfile"; exit 1; }
 	$(LOG) "DOC" "$(DOC_DIR)/index.html"
-	$(Q)doxygen Doxyfile
+	$(Q)doxygen Doxyfile > /dev/null
 
 doc-clean:
 	$(LOG_RM) "RM" "$(DOC_DIR)"
