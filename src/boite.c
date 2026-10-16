@@ -4,7 +4,9 @@
 */
 
 #include <stdarg.h>
-#include "my.h"
+#include <stdio.h>
+#include "boite.h"
+#include "couleurs.h"
 
 static int largeurVisible(const char *texte)
 {
