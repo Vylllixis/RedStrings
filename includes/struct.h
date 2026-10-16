@@ -7,9 +7,9 @@
     #define STRUCT_H
 
 typedef enum Classe {
-    GUERRIER,
-    MAGE,
-    ARCHER
+    GUERRIER,   /**< Affiché en rouge. */
+    MAGE,       /**< Affiché en magenta. */
+    ARCHER      /**< Affiché en vert. */
 } Classe_t;
 
 typedef struct {
