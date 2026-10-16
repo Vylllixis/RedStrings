@@ -1,5 +1,9 @@
 # Exécutable du projet
 /redstrings
+/redstrings_csfml
+
+# Objets de la version CSFML
+/csfml/obj/
 
 # Fichiers objets et compilation
 *.o
@@ -31,3 +35,7 @@ gmon.out
 # Système
 .DS_Store
 Thumbs.db
+
+# Documentation générée par Doxygen (make doc)
+/docs/html/
+/docs/latex/
