@@ -9,6 +9,9 @@ RM	=	rm -rf
 
 NAME	=	redstrings
 
+DOXYGEN	=	doxygen
+DOC_DIR	=	docs/html
+
 SRCS	=	$(shell find ./src -name '*.c')
 
 OBJS	=	$(SRCS:.c=.o)
@@ -33,4 +36,11 @@ re: fclean all
 build:	fclean all
 	$(RM) $(OBJS)
 
-.PHONY: all clean fclean re build
+doc:
+	$(DOXYGEN) Doxyfile
+	@echo "Documentation : $(DOC_DIR)/index.html"
+
+doc-clean:
+	$(RM) $(DOC_DIR)
+
+.PHONY: all clean fclean re build doc doc-clean
