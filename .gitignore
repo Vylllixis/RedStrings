@@ -40,5 +40,8 @@ Thumbs.db
 /docs/html/
 /docs/latex/
 
+# Version debug (make debug)
+/redstrings_debug
+
 # Objets (make)
 /obj/
