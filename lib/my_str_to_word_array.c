@@ -2,6 +2,7 @@
 **
 */
 
+#include <stdlib.h>
 #include "my.h"
 
 static int is_alnum(char c)

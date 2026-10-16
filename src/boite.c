@@ -4,9 +4,9 @@
 */
 
 #include <stdarg.h>
-#include "my.h"
-
-#define LARGEUR_BOITE 36
+#include <stdio.h>
+#include "boite.h"
+#include "couleurs.h"
 
 static int largeurVisible(const char *texte)
 {
