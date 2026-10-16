@@ -3,32 +3,34 @@
 ## PROJET FIL ROUGE C Avancé
 ##
 
-#commande
-CC	=	gcc
-AR	=	ar rcs
-RM	=	rm -rf
+# ─── Fichiers ────────────────────────────────────────────────────────
 
-NAME	=	redstrings
+NAME		=	redstrings
 
-LIB_DIR	=	lib
-LIB	=	$(LIB_DIR)/libmy.a
-
-DOXYGEN	=	doxygen
-DOC_DIR	=	docs/html
-
-SRCS	=	$(shell find ./src -name '*.c')
-LIB_SRCS	=	$(wildcard $(LIB_DIR)/*.c)
+LIB_DIR		=	lib
+LIB		=	$(LIB_DIR)/libmy.a
 
 CSFML_DIR	=	csfml
+DOC_DIR		=	docs/html
 
-OBJS	=	$(SRCS:.c=.o)
+SRCS		=	$(shell find ./src -name '*.c')
+LIB_SRCS	=	$(wildcard $(LIB_DIR)/*.c)
+
+OBJS		=	$(SRCS:.c=.o)
 LIB_OBJS	=	$(LIB_SRCS:.c=.o)
 
-#flags
-CFLAGS	=	-W -Wall -Werror
+# ─── Compilation ─────────────────────────────────────────────────────
+
+CC		=	gcc
+AR		=	ar rcs
+RM		=	rm -rf
+
+CFLAGS		=	-W -Wall -Werror
 CPPFLAGS	=	-I./includes
-LDFLAGS	=	-L./$(LIB_DIR)
-LDLIBS	=	-lmy
+LDFLAGS		=	-L./$(LIB_DIR)
+LDLIBS		=	-lmy
+
+# ─── Règles ──────────────────────────────────────────────────────────
 
 all:	$(NAME)
 
@@ -53,13 +55,13 @@ fclean:	clean
 	$(RM) $(NAME) $(LIB)
 	@$(MAKE) --no-print-directory -C $(CSFML_DIR) fclean
 
-re: fclean all
+re:	fclean all
 
 build:	fclean all
 	$(RM) $(OBJS)
 
 doc:
-	$(DOXYGEN) Doxyfile
+	doxygen Doxyfile
 	@echo "Documentation : $(DOC_DIR)/index.html"
 
 doc-clean:
