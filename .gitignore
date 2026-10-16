@@ -39,3 +39,6 @@ Thumbs.db
 # Documentation générée par Doxygen (make doc)
 /docs/html/
 /docs/latex/
+
+# Objets (make)
+/obj/
