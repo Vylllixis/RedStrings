@@ -14,6 +14,8 @@ DOC_DIR	=	docs/html
 
 SRCS	=	$(shell find ./src -name '*.c')
 
+CSFML_DIR	=	csfml
+
 OBJS	=	$(SRCS:.c=.o)
 
 #flags
@@ -25,11 +27,17 @@ all:	$(NAME)
 $(NAME):	$(OBJS)
 	$(CC) -o $(NAME) $(OBJS)
 
+#version graphique (CSFML) -> ./redstrings_csfml
+csfml:
+	@$(MAKE) --no-print-directory -C $(CSFML_DIR)
+
 clean:
 	$(RM) $(OBJS)
+	@$(MAKE) --no-print-directory -C $(CSFML_DIR) clean
 
 fclean:	clean
 	$(RM) $(NAME)
+	@$(MAKE) --no-print-directory -C $(CSFML_DIR) fclean
 
 re: fclean all
 
@@ -43,4 +51,4 @@ doc:
 doc-clean:
 	$(RM) $(DOC_DIR)
 
-.PHONY: all clean fclean re build doc doc-clean
+.PHONY: all csfml clean fclean re build doc doc-clean
