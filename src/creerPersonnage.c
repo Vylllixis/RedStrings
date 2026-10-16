@@ -32,9 +32,11 @@ static int lireEntier(const char *question, int min, int max)
 int creerPersonnage(personnage_t *p)
 {
     //en-tête
-    printf("\n" CYAN "╭" LIGNE "\n");
-    printf("│" RESET "  " GRAS "✦ Création d'un personnage" RESET "\n");
-    printf(CYAN "╰" LIGNE RESET "\n\n");
+    printf("\n");
+    boiteHaut(CYAN);
+    boiteLigne(CYAN, "  " GRAS "✦ Création d'un personnage" RESET);
+    boiteBas(CYAN);
+    printf("\n");
 
     //choix du nom
     printf("  " GRAS "Nom" RESET CYAN " › " RESET);
