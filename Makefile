@@ -6,6 +6,7 @@
 # ─── Fichiers ────────────────────────────────────────────────────────
 
 NAME		=	redstrings
+NAME_DEBUG	=	redstrings_debug
 
 LIB_DIR		=	lib
 LIB		=	$(LIB_DIR)/libmy.a
@@ -35,6 +36,9 @@ CPPFLAGS	=	-I./includes
 DEPFLAGS	=	-MMD -MP
 LDFLAGS		=	-L./$(LIB_DIR)
 LDLIBS		=	-lmy
+
+#make debug : symboles pour gdb + détection des erreurs mémoire
+DEBUG_FLAGS	=	-g3 -O0 -fsanitize=address,undefined
 
 # ─── Affichage ───────────────────────────────────────────────────────
 
@@ -81,6 +85,13 @@ $(OBJ_DIR)/%.o:	%.c
 	@mkdir -p $(dir $@)
 	$(Q)$(CC) $(CFLAGS) $(CPPFLAGS) $(DEPFLAGS) -c $< -o $@
 
+#tout est recompilé avec DEBUG_FLAGS, sans toucher à ./redstrings
+debug:
+	$(LOG) "DEBUG" "$(NAME_DEBUG)  ($(DEBUG_FLAGS))"
+	$(Q)$(CC) $(CFLAGS) $(DEBUG_FLAGS) $(CPPFLAGS) $(SRCS) $(LIB_SRCS) \
+		-o $(NAME_DEBUG)
+	$(LOG_OK) "./$(NAME_DEBUG)  ou  gdb ./$(NAME_DEBUG)"
+
 #version graphique (CSFML) -> ./redstrings_csfml
 csfml:	$(LIB)
 	$(Q)$(MAKE) -C $(CSFML_DIR)
@@ -91,8 +102,8 @@ clean:
 	$(Q)$(MAKE) -C $(CSFML_DIR) clean
 
 fclean:	clean
-	$(LOG_RM) "RM" "$(NAME) $(LIB)"
-	$(Q)$(RM) $(NAME) $(LIB)
+	$(LOG_RM) "RM" "$(NAME) $(NAME_DEBUG) $(LIB)"
+	$(Q)$(RM) $(NAME) $(NAME_DEBUG) $(LIB)
 	$(Q)$(MAKE) -C $(CSFML_DIR) fclean
 
 re:
@@ -114,4 +125,4 @@ doc-clean:
 
 -include $(DEPS)
 
-.PHONY: all lib csfml clean fclean re build doc doc-clean
+.PHONY: all lib debug csfml clean fclean re build doc doc-clean
