@@ -15,6 +15,4 @@
     #define MAGENTA "\033[35m"  /**< Magenta. */
     #define CYAN    "\033[36m"  /**< Cyan. */
 
-    #define LIGNE "────────────────────────────────────"
-
 #endif /* COULEURS_H */

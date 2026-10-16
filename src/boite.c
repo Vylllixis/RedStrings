@@ -6,8 +6,6 @@
 #include <stdarg.h>
 #include "my.h"
 
-#define LARGEUR_BOITE 36
-
 static int largeurVisible(const char *texte)
 {
     int largeur = 0;
