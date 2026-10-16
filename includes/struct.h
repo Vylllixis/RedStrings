@@ -13,11 +13,11 @@ typedef enum Classe {
 } Classe_t;
 
 typedef struct {
-    char name[30];
-    int pv;
-    int atk;
-    int def;
-    Classe_t classe;
+    char name[30];      /**< Nom, sans espace, sert d'identifiant. */
+    int pv;             /**< Points de vie, mort à 0. */
+    int atk;            /**< Dégâts bruts infligés. */
+    int def;            /**< Pourcentage de réduction des dégâts reçus. */
+    Classe_t classe;    /**< Classe du personnage. */
 } personnage_t;
 
 #endif /* STRUCT_H */
