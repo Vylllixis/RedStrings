@@ -9,7 +9,7 @@ RM	=	rm -rf
 
 NAME	=	redstrings
 
-SRCS	=	$(shell find . -name *.c)
+SRCS	=	$(shell find ./src -name '*.c')
 
 OBJS	=	$(SRCS:.c=.o)
 
@@ -32,3 +32,5 @@ re: fclean all
 
 build:	fclean all
 	$(RM) $(OBJS)
+
+.PHONY: all clean fclean re build
