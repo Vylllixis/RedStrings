@@ -65,9 +65,12 @@ fclean:	clean
 	$(RM) $(NAME) $(LIB)
 	@$(MAKE) --no-print-directory -C $(CSFML_DIR) fclean
 
-re:	fclean all
+re:
+	@$(MAKE) --no-print-directory fclean
+	@$(MAKE) --no-print-directory all
 
-build:	fclean all
+#comme re, mais ne garde que les exécutables
+build:	re
 	$(RM) $(OBJ_DIR)
 
 doc:
