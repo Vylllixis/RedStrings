@@ -5,14 +5,12 @@
 
 #include "my.h"
 
-//affiche l'invite d'une question : "  Points de vie (0-99) › "
 static void afficherQuestion(const char *question, int min, int max)
 {
     printf("  " GRAS "%s" RESET GRIS " (%d-%d)" RESET CYAN " › " RESET,
         question, min, max);
 }
 
-//redemande tant que la saisie n'est pas un nombre entre min et max
 static int lireEntier(const char *question, int min, int max)
 {
     int valeur = 0;
