@@ -3,8 +3,8 @@
 ** PROJET FIL ROUGE C Avancé
 */
 
-#ifndef STRUCT_H
-    #define STRUCT_H
+#ifndef PERSONNAGE_H
+    #define PERSONNAGE_H
 
 typedef enum Classe {
     GUERRIER,   /**< Affiché en rouge. */
@@ -20,4 +20,4 @@ typedef struct {
     Classe_t classe;    /**< Classe du personnage. */
 } personnage_t;
 
-#endif /* STRUCT_H */
+#endif /* PERSONNAGE_H */

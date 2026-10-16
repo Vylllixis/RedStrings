@@ -7,7 +7,7 @@
     #define GUI_H
 
     #include <SFML/Graphics.h>
-    #include "struct.h"
+    #include "personnage.h"
 
     #define LARGEUR 1280
     #define HAUTEUR 720

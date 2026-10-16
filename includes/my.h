@@ -9,7 +9,7 @@
     #include <unistd.h>
     #include <stdio.h>
     #include <stdlib.h>
-    #include "struct.h"
+    #include "personnage.h"
     #include "couleurs.h"
 
 int redstrings(void);
