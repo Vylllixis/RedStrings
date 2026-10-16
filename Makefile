@@ -36,49 +36,81 @@ DEPFLAGS	=	-MMD -MP
 LDFLAGS		=	-L./$(LIB_DIR)
 LDLIBS		=	-lmy
 
+# ─── Affichage ───────────────────────────────────────────────────────
+
+#make V=1 affiche aussi les commandes complètes
+ifeq ($(V), 1)
+    Q	=
+else
+    Q	=	@
+endif
+
+MAKEFLAGS	+=	--no-print-directory
+
+C_BLEU		=	\033[1;34m
+C_VERT		=	\033[1;32m
+C_ROUGE		=	\033[1;31m
+C_GRIS		=	\033[90m
+C_RESET		=	\033[0m
+
+#utilisation : $(LOG) ÉTIQUETTE "texte"
+LOG		=	@printf "  $(C_BLEU)%-6s$(C_RESET) %s\n"
+LOG_OK		=	@printf "  $(C_VERT)✔$(C_RESET)      %s\n"
+LOG_RM		=	@printf "  $(C_GRIS)%-6s %s$(C_RESET)\n"
+
 # ─── Règles ──────────────────────────────────────────────────────────
 
 all:	$(NAME)
+	$(LOG_OK) "./$(NAME) est prêt"
 
 $(NAME):	$(OBJS) $(LIB)
-	$(CC) -o $(NAME) $(OBJS) $(LDFLAGS) $(LDLIBS)
+	$(LOG) "LD" "$@"
+	$(Q)$(CC) -o $@ $(OBJS) $(LDFLAGS) $(LDLIBS)
 
 #bibliothèque personnelle : toutes les fonctions de lib/ dans libmy.a
 lib:	$(LIB)
+	@:
 
 $(LIB):	$(LIB_OBJS)
-	$(AR) $(LIB) $(LIB_OBJS)
+	$(LOG) "AR" "$@  ($(words $^) fonctions)"
+	$(Q)$(RM) $@
+	$(Q)$(AR) $@ $^
 
 $(OBJ_DIR)/%.o:	%.c
+	$(LOG) "CC" "$<"
 	@mkdir -p $(dir $@)
-	$(CC) $(CFLAGS) $(CPPFLAGS) $(DEPFLAGS) -c $< -o $@
+	$(Q)$(CC) $(CFLAGS) $(CPPFLAGS) $(DEPFLAGS) -c $< -o $@
 
 #version graphique (CSFML) -> ./redstrings_csfml
 csfml:	$(LIB)
-	@$(MAKE) --no-print-directory -C $(CSFML_DIR)
+	$(Q)$(MAKE) -C $(CSFML_DIR)
 
 clean:
-	$(RM) $(OBJ_DIR)
-	@$(MAKE) --no-print-directory -C $(CSFML_DIR) clean
+	$(LOG_RM) "RM" "$(OBJ_DIR)/"
+	$(Q)$(RM) $(OBJ_DIR)
+	$(Q)$(MAKE) -C $(CSFML_DIR) clean
 
 fclean:	clean
-	$(RM) $(NAME) $(LIB)
-	@$(MAKE) --no-print-directory -C $(CSFML_DIR) fclean
+	$(LOG_RM) "RM" "$(NAME) $(LIB)"
+	$(Q)$(RM) $(NAME) $(LIB)
+	$(Q)$(MAKE) -C $(CSFML_DIR) fclean
 
 re:
-	@$(MAKE) --no-print-directory fclean
-	@$(MAKE) --no-print-directory all
+	$(Q)$(MAKE) fclean
+	$(Q)$(MAKE) all
 
 #comme re, mais ne garde que les exécutables
 build:	re
-	$(RM) $(OBJ_DIR)
+	$(LOG_RM) "RM" "$(OBJ_DIR)/"
+	$(Q)$(RM) $(OBJ_DIR)
 
 doc:
-	doxygen Doxyfile
-	@echo "Documentation : $(DOC_DIR)/index.html"
+	$(LOG) "DOC" "$(DOC_DIR)/index.html"
+	$(Q)doxygen Doxyfile
 
 doc-clean:
-	$(RM) $(DOC_DIR)
+	$(LOG_RM) "RM" "$(DOC_DIR)"
+	$(Q)$(RM) $(DOC_DIR)
 
 -include $(DEPS)
 
