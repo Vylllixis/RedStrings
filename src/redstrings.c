@@ -3,7 +3,13 @@
 ** PROJET FIL ROUGE C Avancé
 */
 
+#include <stdio.h>
+#include "boite.h"
+#include "couleurs.h"
 #include "my.h"
+#include "personnage.h"
+#include "redstrings.h"
+#include "saisie.h"
 
 #define MAX_PERSONNAGES 10
 
