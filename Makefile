@@ -125,6 +125,17 @@ doc-clean:
 	$(LOG_RM) "RM" "$(DOC_DIR)"
 	$(Q)$(RM) $(DOC_DIR)
 
+help:
+	@printf "  $(C_BLEU)make$(C_RESET)            compile ./$(NAME)\n"
+	@printf "  $(C_BLEU)make lib$(C_RESET)        compile seulement $(LIB)\n"
+	@printf "  $(C_BLEU)make debug$(C_RESET)      compile ./$(NAME_DEBUG) (gdb + sanitizers)\n"
+	@printf "  $(C_BLEU)make csfml$(C_RESET)      compile la version graphique\n"
+	@printf "  $(C_BLEU)make doc$(C_RESET)        génère la documentation Doxygen\n"
+	@printf "  $(C_BLEU)make clean$(C_RESET)      supprime les .o\n"
+	@printf "  $(C_BLEU)make fclean$(C_RESET)     supprime aussi les exécutables et $(LIB)\n"
+	@printf "  $(C_BLEU)make re$(C_RESET)         fclean puis make\n"
+	@printf "  $(C_BLEU)make V=1$(C_RESET)        affiche les commandes complètes\n"
+
 -include $(DEPS)
 
-.PHONY: all lib debug csfml clean fclean re build doc doc-clean
+.PHONY: all lib debug csfml clean fclean re build doc doc-clean help
