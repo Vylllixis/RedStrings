@@ -12,9 +12,9 @@
     #include "boite.h"
     #include "couleurs.h"
     #include "personnage.h"
+    #include "redstrings.h"
     #include "saisie.h"
 
-int redstrings(void);
 int my_strlen(char *str);
 int my_strcmp(char *str1, char *str2);
 
