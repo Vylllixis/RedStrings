@@ -7,19 +7,25 @@
 
 #define LARGEUR_BARRE 20
 
-//affiche une stat sous forme de barre : PV   ██████████░░░░░░░░░░  50
+static void repeter(char *dest, const char *motif, int fois)
+{
+    int n = 0;
+
+    dest[0] = '\0';
+    for (int i = 0; i < fois; i++)
+        n += sprintf(dest + n, "%s", motif);
+}
+
 static void afficherStat(const char *nom, int valeur, const char *couleur)
 {
     int remplies = (valeur + 4) / 5;
+    char pleine[64];
+    char vide[64];
 
-    printf(GRIS "│" RESET "  %-4s ", nom);
-    printf("%s", couleur);
-    for (int i = 0; i < remplies; i++)
-        printf("█");
-    printf(GRIS);
-    for (int i = remplies; i < LARGEUR_BARRE; i++)
-        printf("░");
-    printf(RESET "  " GRAS "%2d" RESET "\n", valeur);
+    repeter(pleine, "█", remplies);
+    repeter(vide, "░", LARGEUR_BARRE - remplies);
+    boiteLigne(GRIS, "  %-4s %s%s" GRIS "%s" RESET "  " GRAS "%2d" RESET,
+        nom, couleur, pleine, vide, valeur);
 }
 
 int afficherPersonnage(const personnage_t *p)
