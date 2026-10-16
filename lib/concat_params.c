@@ -2,6 +2,7 @@
 **
 */
 
+#include <stdlib.h>
 #include "my.h"
 
 char *concat_params(int ac, char **av)
