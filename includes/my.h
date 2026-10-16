@@ -16,5 +16,6 @@ int redstrings(void);
 int creerPersonnage(personnage_t *p);
 int afficherPersonnage(const personnage_t *p);
 void attaquer(personnage_t *attaquant, personnage_t *cible);
+int my_strlen(char *str);
 
 #endif /* MY_H */
