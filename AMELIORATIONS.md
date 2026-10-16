@@ -38,10 +38,10 @@
 - [ ] **S6** 🟡 ⭐ Laisser gcc vérifier les formats de `boiteLigne()`
 
 ### 🗂️ Organisation des `.h` et rangement
-- [ ] **O1** 🔴 ⭐ Les `#include` sont **avant** le garde d'inclusion dans `my.h`
-- [ ] **O2** 🟠 ⭐ `my.h` inclut des bibliothèques jamais utilisées
-- [ ] **O3** 🟠 ⭐⭐⭐ Découper `my.h` en plusieurs headers
-- [ ] **O4** 🟡 ⭐ `findPersonage` n'a pas de prototype 🧪
+- [x] **O1** 🔴 ⭐ Les `#include` sont **avant** le garde d'inclusion dans `my.h`
+- [x] **O2** 🟠 ⭐ `my.h` inclut des bibliothèques jamais utilisées
+- [x] **O3** 🟠 ⭐⭐⭐ Découper `my.h` en plusieurs headers
+- [x] **O4** 🟡 ⭐ `findPersonage` n'a pas de prototype 🧪
 - [ ] **O5** 🟢 ⭐⭐ Ranger `src/` en sous-dossiers
 
 ### 📐 Lisibilité & conception
@@ -59,7 +59,7 @@
 - [ ] **J3** 🟢 ⭐ Séparer le calcul des dégâts de l'affichage
 
 ### 🧰 Makefile
-- [ ] **M1** 🔴 ⭐ Modifier un `.h` ne recompile rien 🧪
+- [x] **M1** 🔴 ⭐ Modifier un `.h` ne recompile rien 🧪
 - [ ] **M2** 🟠 ⭐ `make doc` plante (pas de `Doxyfile`) 🧪
 - [ ] **M3** 🟡 ⭐ Flags de compilation plus stricts + règle `debug`
 
