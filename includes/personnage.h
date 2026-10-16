@@ -3,6 +3,12 @@
 ** PROJET FIL ROUGE C Avancé
 */
 
+/**
+ * @file personnage.h
+ * @brief Types d'un personnage et fonctions qui le créent, l'affichent
+ *        et le font combattre.
+ */
+
 #ifndef PERSONNAGE_H
     #define PERSONNAGE_H
 
@@ -19,5 +25,14 @@ typedef struct {
     int def;            /**< Pourcentage de réduction des dégâts reçus. */
     Classe_t classe;    /**< Classe du personnage. */
 } personnage_t;
+
+/** Demande le nom, les stats et la classe au joueur. */
+int creerPersonnage(personnage_t *p);
+
+/** Affiche la fiche du personnage avec ses barres de stats. */
+int afficherPersonnage(const personnage_t *p);
+
+/** Retire à la cible les dégâts de l'attaquant, réduits par sa défense. */
+void attaquer(personnage_t *attaquant, personnage_t *cible);
 
 #endif /* PERSONNAGE_H */

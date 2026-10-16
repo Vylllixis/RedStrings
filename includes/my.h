@@ -13,9 +13,6 @@
     #include "couleurs.h"
 
 int redstrings(void);
-int creerPersonnage(personnage_t *p);
-int afficherPersonnage(const personnage_t *p);
-void attaquer(personnage_t *attaquant, personnage_t *cible);
 int my_strlen(char *str);
 int my_strcmp(char *str1, char *str2);
 void viderBuffer(void);
