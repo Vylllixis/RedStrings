@@ -1,5 +1,9 @@
 # Exécutable du projet
 /redstrings
+/redstrings_csfml
+
+# Objets de la version CSFML
+/csfml/obj/
 
 # Fichiers objets et compilation
 *.o
