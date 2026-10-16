@@ -17,10 +17,12 @@ OBJ_DIR	=	obj
 SRCS	=	$(wildcard src/*.c)
 
 OBJS	=	$(patsubst src/%.c,$(OBJ_DIR)/%.o,$(SRCS))
+DEPS	=	$(OBJS:.o=.d)
 
 #flags
 CFLAGS	=	-W -Wall -Werror -O2
 CPPFLAGS	=	-I./include -I../includes
+DEPFLAGS	=	-MMD -MP
 LDFLAGS	=	-L$(LIB_DIR)
 LDLIBS	=	-lmy -lcsfml-graphics -lcsfml-window -lcsfml-system -lm
 
@@ -35,9 +37,9 @@ verifier:
 $(NAME):	$(OBJS) $(LIB)
 	$(CC) -o $(NAME) $(OBJS) $(LDFLAGS) $(LDLIBS)
 
-$(OBJ_DIR)/%.o:	src/%.c include/gui.h
+$(OBJ_DIR)/%.o:	src/%.c
 	@mkdir -p $(OBJ_DIR)
-	$(CC) $(CFLAGS) $(CPPFLAGS) -c $< -o $@
+	$(CC) $(CFLAGS) $(CPPFLAGS) $(DEPFLAGS) -c $< -o $@
 
 clean:
 	$(RM) $(OBJ_DIR)
@@ -46,5 +48,7 @@ fclean:	clean
 	$(RM) $(NAME)
 
 re:	fclean all
+
+-include $(DEPS)
 
 .PHONY: all verifier clean fclean re
