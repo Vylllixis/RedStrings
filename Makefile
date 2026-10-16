@@ -9,7 +9,7 @@ RM	=	rm -rf
 
 NAME	=	redstrings
 
-SRCS	=	$(shell find . -name *.c)
+SRCS	=	$(shell find ./src -name '*.c')
 
 OBJS	=	$(SRCS:.c=.o)
 
