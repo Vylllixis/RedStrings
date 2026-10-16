@@ -13,7 +13,7 @@
 
 #define MAX_PERSONNAGES 10
 
-int findPersonage(personnage_t *tab, int size, char *name)
+static int findPersonage(personnage_t *tab, int size, char *name)
 {
     for (int i = 0; i < size; i++) {
         if (my_strcmp(tab[i].name, name) == 0)
