@@ -7,5 +7,13 @@
 
 void attaquer(personnage_t *attaquant, personnage_t *cible)
 {
-    cible->pv -= attaquant->atk * (100 - cible->def) / 100;
+    // [calcul_degats]
+    int degats = attaquant->atk * (100 - cible->def) / 100;
+
+    if (degats < 0)
+        degats = 0;
+    cible->pv -= degats;
+    if (cible->pv < 0)
+        cible->pv = 0;
+    // [calcul_degats]
 }
