@@ -3,7 +3,10 @@
 ** PROJET FIL ROUGE C Avancé
 */
 
-#include "my.h"
+#include <stdio.h>
+#include "boite.h"
+#include "couleurs.h"
+#include "personnage.h"
 
 void attaquer(personnage_t *attaquant, personnage_t *cible)
 {
