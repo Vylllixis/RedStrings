@@ -20,7 +20,7 @@ OBJS	=	$(patsubst src/%.c,$(OBJ_DIR)/%.o,$(SRCS))
 DEPS	=	$(OBJS:.o=.d)
 
 #flags
-CFLAGS	=	-W -Wall -Werror -O2
+CFLAGS	=	-Wall -Wextra -Werror -O2
 CPPFLAGS	=	-I./include -I../includes
 DEPFLAGS	=	-MMD -MP
 LDFLAGS	=	-L$(LIB_DIR)
