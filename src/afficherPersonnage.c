@@ -3,7 +3,10 @@
 ** PROJET FIL ROUGE C Avancé
 */
 
-#include "my.h"
+#include <stdio.h>
+#include "boite.h"
+#include "couleurs.h"
+#include "personnage.h"
 
 #define LARGEUR_BARRE 20
 

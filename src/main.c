@@ -3,7 +3,7 @@
 ** PROJET FIL ROUGE C Avancé
 */
 
-#include "my.h"
+#include "redstrings.h"
 
 int main(void)
 {
