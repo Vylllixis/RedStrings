@@ -112,5 +112,6 @@ int redstrings(void)
         else if (choix != 0)
             afficherErreur("Choix inconnu");
     }
+    printf("  " GRIS "À bientôt !" RESET "\n");
     return 0;
 }
