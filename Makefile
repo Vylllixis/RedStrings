@@ -31,9 +31,9 @@ CC		=	gcc
 AR		=	ar rcs
 RM		=	rm -rf
 
-CFLAGS		=	-Wall -Wextra -Werror
+CFLAGS		=	-Wall -Wextra -Werror -Werror
 CPPFLAGS	=	-I./includes
-DEPFLAGS	=	-MMD -MP
+DEPFLAGS	=	-MMD -MP # regarde les modifications des .h
 LDFLAGS		=	-L./$(LIB_DIR)
 LDLIBS		=	-lmy
 
@@ -43,6 +43,7 @@ DEBUG_FLAGS	=	-g3 -O0 -fsanitize=address,undefined
 # ─── Affichage ───────────────────────────────────────────────────────
 
 #make V=1 affiche aussi les commandes complètes
+#V = verbose "bavard" / D = Quiet "silence"
 ifeq ($(V), 1)
     Q	=
 else
