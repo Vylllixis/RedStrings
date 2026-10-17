@@ -42,12 +42,16 @@ static void afficherMenu(void)
 static int lireChoix(void)
 {
     int choix = 0;
+    int ret = scanf("%d", &choix);
 
     printf("  " GRAS "Choix" RESET CYAN " › " RESET);
-    while (scanf("%d", &choix) != 1) {
+    while (ret != 1) {
+        if (ret == EOF)
+            return 0;
         viderBuffer();
         afficherErreur("Tape un nombre entre 0 et 3");
         printf("  " GRAS "Choix" RESET CYAN " › " RESET);
+        ret = scanf("%d", &choix);
     }
     viderBuffer();
     return choix;
