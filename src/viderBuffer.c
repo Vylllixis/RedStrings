@@ -3,8 +3,7 @@
 ** PROJET FIL ROUGE C Avancé
 */
 
-#include <stdio.h>
-#include "saisie.h"
+#include "my.h"
 
 void viderBuffer(void)
 {

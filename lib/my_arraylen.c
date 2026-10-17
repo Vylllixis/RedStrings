@@ -2,7 +2,6 @@
 **
 */
 
-#include <stddef.h>
 #include "my.h"
 
 int my_arraylen(char * const *av)

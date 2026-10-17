@@ -3,10 +3,19 @@
 ** PROJET FIL ROUGE C Avancé
 */
 
-/**
- * @file my.h
- * @brief Prototypes de la bibliothèque personnelle libmy.a (dossier lib/).
- */
+#include <stddef.h>
+#include <stdbool.h>
+#include <stdarg.h>
+#include <stdio.h>
+#include <errno.h>
+#include <string.h>
+#include <stdlib.h>
+#include <unistd.h>
+#include "boite.h"
+#include "couleurs.h"
+#include "personnage.h"
+#include "redstrings.h"
+#include "saisie.h"
 
 #ifndef MY_H
     #define MY_H

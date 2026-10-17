@@ -3,13 +3,7 @@
 ** PROJET FIL ROUGE C Avancé
 */
 
-#include <stdio.h>
-#include "boite.h"
-#include "couleurs.h"
 #include "my.h"
-#include "personnage.h"
-#include "redstrings.h"
-#include "saisie.h"
 
 #define MAX_PERSONNAGES 10
 
@@ -22,7 +16,7 @@ static int findPersonage(personnage_t *tab, int size, char *name)
     return -1;
 }
 
-static void afficherErreur(const char *message)
+void afficherErreur(const char *message)
 {
     printf("  " ROUGE "✗ %s" RESET "\n\n", message);
 }
@@ -77,8 +71,8 @@ static void menuAjouter(personnage_t *tab, int *len)
         afficherErreur("Nombre maximum de personnages atteint");
         return;
     }
-    creerPersonnage(&tab[*len]);
-    (*len)++;
+    if (creerPersonnage(&tab[*len]) == 0)
+        (*len)++;
     printf("\n");
 }
 

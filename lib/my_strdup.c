@@ -2,7 +2,6 @@
 **
 */
 
-#include <stdlib.h>
 #include "my.h"
 
 char *my_strdup(char const *src)

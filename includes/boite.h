@@ -3,16 +3,6 @@
 ** PROJET FIL ROUGE C Avancé
 */
 
-/**
- * @file boite.h
- * @brief Cadres arrondis dessinés dans le terminal.
- *
- * ╭────╮  boiteHaut
- * │ .. │  boiteLigne
- * ├────┤  boiteSeparateur
- * ╰────╯  boiteBas
- */
-
 #ifndef BOITE_H
     #define BOITE_H
 

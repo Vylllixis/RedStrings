@@ -3,12 +3,6 @@
 ** PROJET FIL ROUGE C Avancé
 */
 
-/**
- * @file personnage.h
- * @brief Types d'un personnage et fonctions qui le créent, l'affichent
- *        et le font combattre.
- */
-
 #ifndef PERSONNAGE_H
     #define PERSONNAGE_H
 

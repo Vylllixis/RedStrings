@@ -2,7 +2,6 @@
 **
 */
 
-#include <stdbool.h>
 #include "my.h"
 
 char *my_strcapitalize(char *str)
