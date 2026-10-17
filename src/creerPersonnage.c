@@ -24,6 +24,8 @@ static int lireEntier(const char *question, int min, int max)
     ok = scanf("%d", &valeur);
     viderBuffer();
     while (ok != 1 || valeur < min || valeur > max) {
+        if (ok == EOF)
+            return 0;
         printf("  " ROUGE "✗ Valeur indisponible, tape un nombre entre %d et %d"
             RESET "\n", min, max);
         afficherQuestion(question, min, max);
