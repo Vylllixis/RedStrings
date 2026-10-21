@@ -7,7 +7,7 @@
 
 #define MAX_PERSONNAGES 10
 
-static int findPersonage(personnage_t *tab, int size, char *name)
+int findPersonage(personnage_t *tab, int size, char *name)
 {
     for (int i = 0; i < size; i++) {
         if (my_strcmp(tab[i].name, name) == 0)
@@ -71,7 +71,7 @@ static void menuAjouter(personnage_t *tab, int *len)
         afficherErreur("Nombre maximum de personnages atteint");
         return;
     }
-    if (creerPersonnage(&tab[*len]) == 0)
+    if (creerPersonnage(&tab[*len], tab, *len) == 0)
         (*len)++;
     printf("\n");
 }
