@@ -7,13 +7,13 @@
 
 #define LARGEUR_BARRE 20
 
-static void repeter(char *dest, const char *motif, int fois)
+static void repeter(char *dest, size_t taille, const char *motif, int fois)
 {
-    int n = 0;
+    size_t n = 0;
 
     dest[0] = '\0';
-    for (int i = 0; i < fois; i++)
-        n += sprintf(dest + n, "%s", motif);
+    for (int i = 0; i < fois && n < taille; i++)
+        n += (size_t)snprintf(dest + n, taille - n, "%s", motif);
 }
 
 static void afficherStat(const char *nom, int valeur, const char *couleur)
@@ -22,8 +22,10 @@ static void afficherStat(const char *nom, int valeur, const char *couleur)
     char pleine[64];
     char vide[64];
 
-    repeter(pleine, "█", remplies);
-    repeter(vide, "░", LARGEUR_BARRE - remplies);
+    if (remplies > LARGEUR_BARRE)
+        remplies = LARGEUR_BARRE;
+    repeter(pleine, sizeof(pleine), "█", remplies);
+    repeter(vide, sizeof(vide), "░", LARGEUR_BARRE - remplies);
     boiteLigne(GRIS, "  %-4s %s%s" GRIS "%s" RESET "  " GRAS "%2d" RESET,
         nom, couleur, pleine, vide, valeur);
 }
