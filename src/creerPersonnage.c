@@ -48,6 +48,8 @@ int lireEntier(const char *question, int min, int max, int *resultat)
 
 int creerPersonnage(personnage_t *p, personnage_t *tab, int len)
 {
+    int choix = 1;
+
     //en-tête
     printf("\n");
     boiteHaut(CYAN);
@@ -68,9 +70,9 @@ int creerPersonnage(personnage_t *p, personnage_t *tab, int len)
 
     //choix des statistiques
     printf("  " GRIS "── Statistiques ──" RESET "\n");
-    lireEntier("Points de vie", 0, 99, p->pv);
-    lireEntier("Attaque      ", 0, 99, p->atk);
-    lireEntier("Défense      ", 0, 99, p->def);
+    lireEntier("Points de vie", 0, 99, &p->pv);
+    lireEntier("Attaque      ", 0, 99, &p->atk);
+    lireEntier("Défense      ", 0, 99, &p->def);
     printf("\n");
 
     //choix de la classe (1-3 saisi, l'enum commence à 0)
@@ -78,7 +80,8 @@ int creerPersonnage(personnage_t *p, personnage_t *tab, int len)
     printf("    " GRAS "1" RESET "  " ROUGE "Guerrier" RESET "\n");
     printf("    " GRAS "2" RESET "  " MAGENTA "Mage" RESET "\n");
     printf("    " GRAS "3" RESET "  " VERT "Archer" RESET "\n");
-    lireEntier("Choix", 1, 3, p->classe) - 1;
+    lireEntier("Choix", 1, 3, &choix);
+    p->classe = (Classe_t)(choix - 1);
 
     printf("\n  " VERT "✔ %s a été créé !" RESET "\n", p->name);
     return 0;
