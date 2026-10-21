@@ -2,7 +2,9 @@
 **
 */
 
+#include <stdlib.h>
 #include "my.h"
+#include "my_string.h"
 
 static int is_alnum(char c)
 {

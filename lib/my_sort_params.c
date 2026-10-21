@@ -3,6 +3,7 @@
 */
 
 #include "my.h"
+#include "my_string.h"
 
 int my_sort_params(int ac, char **av)
 {

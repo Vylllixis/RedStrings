@@ -21,7 +21,7 @@ typedef struct {
 } personnage_t;
 
 /** Cherche un personnage par son nom, renvoie son indice ou -1. */
-int findPersonage(personnage_t *tab, int size, char *name);
+int findPersonnage(const personnage_t *tab, int size, const char *name);
 
 /** Demande le nom, les stats et la classe au joueur (nom unique dans tab). */
 int creerPersonnage(personnage_t *p, personnage_t *tab, int len);
