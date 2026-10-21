@@ -21,8 +21,10 @@ DEPS		=	$(OBJS:.o=.d)
 CC		=	gcc
 RM		=	rm -rf
 
-CFLAGS		=	-Wall -Wextra -Werror -O2
-CPPFLAGS	=	-I./include -I../includes
+CFLAGS		=	-std=c11 -Wall -Wextra -Werror -pedantic -Wshadow \
+			-Wmissing-prototypes -O2
+#readlink() est POSIX : -std=c11 seul le masque
+CPPFLAGS	=	-I./include -I../includes -D_POSIX_C_SOURCE=200809L
 DEPFLAGS	=	-MMD -MP
 LDFLAGS		=	-L$(LIB_DIR)
 LDLIBS		=	-lmy -lcsfml-graphics -lcsfml-window -lcsfml-system -lm
