@@ -7,117 +7,70 @@
 #include <stdio.h>
 #include "gui.h"
 
-#define CARTE_L 216.f
-#define CARTE_H 236.f
 #define ECART 22.f
 
-static const float LAME[] = {-0.08f, 0.3f, -0.08f, -0.72f, 0.f, -0.94f,
-    0.08f, -0.72f, 0.08f, 0.3f};
-static const float GARDE[] = {-0.34f, 0.3f, 0.34f, 0.3f, 0.34f, 0.42f,
-    -0.34f, 0.42f};
-static const float POIGNEE[] = {-0.055f, 0.42f, 0.055f, 0.42f, 0.055f, 0.74f,
-    -0.055f, 0.74f};
-static const float POINTE[] = {0.88f, -0.88f, 0.739f, -0.541f, 0.541f, -0.739f};
-static const float PLUME_A[] = {-0.378f, 0.378f, -0.236f, 0.236f, -0.215f, 0.399f,
-    -0.342f, 0.526f};
-static const float PLUME_B[] = {-0.378f, 0.378f, -0.236f, 0.236f, -0.399f, 0.215f,
-    -0.526f, 0.342f};
-
+/** Nom de la classe, pris dans la table classes[] partagée avec la console. */
 const char *nom_classe(classe_t c)
 {
-    if (c == MAGE)
-        return "Mage";
-    if (c == ARCHER)
-        return "Archer";
-    return "Guerrier";
+    return classes[c].nom;
 }
 
+/**
+ * Majuscules UTF-8 : ASCII, plus les lettres accentuées du français codées
+ * sur deux octets (à → À, é → É, ï → Ï…), pour « ÉLÉMENTALISTE » ou « PRÊTRE ».
+ */
+static void majuscules_utf8(char *s)
+{
+    unsigned char *u = (unsigned char *)s;
+
+    for (int i = 0; u[i] != '\0'; i++) {
+        if (u[i] >= 'a' && u[i] <= 'z')
+            u[i] -= 32;
+        else if (u[i] == 0xC3 && u[i + 1] >= 0xA0 && u[i + 1] <= 0xBE
+            && u[i + 1] != 0xB7)
+            u[++i] -= 0x20;
+    }
+}
+
+/** Nom en majuscules, calculé une fois par classe depuis classes[]. */
 const char *nom_classe_maj(classe_t c)
 {
-    if (c == MAGE)
-        return "MAGE";
-    if (c == ARCHER)
-        return "ARCHER";
-    return "GUERRIER";
+    static char maj[NB_CLASSES][NOM_MAX];
+
+    if (maj[c][0] == '\0') {
+        my_strncpy(maj[c], classes[c].nom, NOM_MAX - 1);
+        majuscules_utf8(maj[c]);
+    }
+    return maj[c];
 }
 
+/** Couleur, nom et abréviation de chaque statistique (mêmes partout). */
+sfColor couleur_stat(stat_t s)
+{
+    const sfColor couleurs[NB_STATS] = {C_VERT, C_ROUGE, C_BLEU, C_SOIN};
+
+    return couleurs[s];
+}
+
+const char *nom_stat(stat_t s)
+{
+    static const char *noms[NB_STATS] = {"POINTS DE VIE", "ATTAQUE", "DÉFENSE", "SOIN"};
+
+    return noms[s];
+}
+
+const char *abrege_stat(stat_t s)
+{
+    static const char *noms[NB_STATS] = {"PV", "ATQ", "DEF", "SOI"};
+
+    return noms[s];
+}
+
+/** Même couleur que dans le terminal : le RGB central de classes[]. */
 sfColor couleur_classe(classe_t c)
 {
-    if (c == MAGE)
-        return C_MAGE;
-    if (c == ARCHER)
-        return C_ARCHER;
-    return C_GUERRIER;
-}
-
-static void epee(app_t *app, sfVector2f c, float t, float angle, sfColor col)
-{
-    polygone(app, LAME, 5, c, t, angle, col);
-    polygone(app, GARDE, 4, c, t, angle, col);
-    polygone(app, POIGNEE, 4, c, t, angle, col);
-    cercle(app, (sfVector2f){c.x - 0.84f * sinf(angle) * t,
-        c.y + 0.84f * cosf(angle) * t}, 0.1f * t, col, C_TRANSPARENT, 0.f);
-}
-
-static void etoile(app_t *app, sfVector2f c, float t, float angle, sfColor col)
-{
-    float pts[16];
-    float a = 0.f;
-
-    for (int k = 0; k < 8; k++) {
-        a = k * PI / 4.f - PI / 2.f;
-        pts[2 * k] = cosf(a) * (k % 2 ? 0.3f : 1.f);
-        pts[2 * k + 1] = sinf(a) * (k % 2 ? 0.3f : 1.f);
-    }
-    polygone(app, pts, 8, c, t, angle, col);
-}
-
-static sfVector2f point(sfVector2f c, float t, float x, float y)
-{
-    return (sfVector2f){c.x + x * t, c.y + y * t};
-}
-
-static void arc(app_t *app, sfVector2f c, float t, sfColor col)
-{
-    sfVector2f bezier[24];
-    sfVector2f corde[3] = {point(c, t, 0.38f, 0.78f), point(c, t, -0.42f, 0.42f),
-        point(c, t, -0.78f, -0.38f)};
-    sfVector2f fleche[2] = {point(c, t, -0.42f, 0.42f), point(c, t, 0.66f, -0.66f)};
-    float u = 0.f;
-
-    for (int i = 0; i < 24; i++) {
-        u = i / 23.f;
-        bezier[i] = point(c, t,
-            (1 - u) * (1 - u) * 0.38f + 2 * (1 - u) * u * 0.507f + u * u * -0.78f,
-            (1 - u) * (1 - u) * 0.78f + 2 * (1 - u) * u * -0.507f + u * u * -0.38f);
-    }
-    ligne_epaisse(app, corde, 3, fmaxf(1.f, 0.035f * t), avec_alpha(col, 0.75f), 0);
-    ligne_epaisse(app, bezier, 24, 0.11f * t, col, 0);
-    ligne_epaisse(app, fleche, 2, 0.075f * t, col, 0);
-    polygone(app, POINTE, 3, c, t, 0.f, col);
-    polygone(app, PLUME_A, 4, c, t, 0.f, col);
-    polygone(app, PLUME_B, 4, c, t, 0.f, col);
-}
-
-/** Emblème vectoriel de la classe (épées, étoile, arc). */
-void embleme(app_t *app, classe_t c, sfVector2f centre, float taille,
-    sfColor couleur)
-{
-    float t = app->temps;
-
-    if (c == GUERRIER) {
-        epee(app, centre, taille, -0.72f, couleur);
-        epee(app, centre, taille, 0.72f, couleur);
-    } else if (c == MAGE) {
-        etoile(app, point(centre, taille, -0.08f, 0.08f), taille * 0.85f,
-            sinf(t * 0.8f) * 0.12f, couleur);
-        etoile(app, point(centre, taille, 0.62f, -0.6f), taille * 0.3f,
-            t * 0.9f, couleur);
-        cercle(app, point(centre, taille, -0.62f, -0.56f), 0.08f * taille,
-            avec_alpha(couleur, 0.5f + 0.5f * sinf(t * 3.f)), C_TRANSPARENT, 0.f);
-    } else {
-        arc(app, centre, taille, couleur);
-    }
+    return (sfColor){classes[c].couleur.r, classes[c].couleur.g,
+        classes[c].couleur.b, 255};
 }
 
 void avatar(app_t *app, const personnage_t *p, sfVector2f centre, float r,
@@ -127,9 +80,9 @@ void avatar(app_t *app, const personnage_t *p, sfVector2f centre, float r,
 
     lueur(app, centre, (sfVector2f){r * 2.4f, r * 2.4f},
         avec_alpha(c, 0.32f * (1.f - mort * 0.6f)));
-    cercle(app, centre, r, melanger((sfColor){16, 18, 34, 255}, c, 0.22f),
-        avec_alpha(c, 0.9f), r > 30.f ? 3.f : 2.f);
-    cercle(app, centre, r * 0.82f, C_TRANSPARENT, avec_alpha(c, 0.22f), 1.2f);
+    hexagone(app, centre, r * 1.08f, 0.f, melanger((sfColor){16, 18, 34, 255}, c, 0.22f),
+        avec_alpha(c, 0.9f));
+    hexagone(app, centre, r * 0.86f, PI / 6.f, C_TRANSPARENT, avec_alpha(c, 0.25f));
     embleme(app, p->classe, centre, r * 0.5f, melanger(c, C_BLANC, 0.55f));
 }
 
@@ -160,72 +113,71 @@ void barre_segments(app_t *app, sfFloatRect r, float segments, sfColor c)
 
 /** Fiche détaillée d'un personnage (équivalent de afficher_personnage). */
 void fiche(app_t *app, const personnage_t *p, sfFloatRect r,
-    const float segments[3])
+    const float segments[NB_STATS])
 {
-    static const char *noms[3] = {"POINTS DE VIE", "ATTAQUE", "DÉFENSE"};
-    const sfColor cs[3] = {C_VERT, C_ROUGE, C_BLEU};
-    const int vals[3] = {p->pv, p->atq, p->def};
     sfColor c = couleur_classe(p->classe);
     float cx = r.left + r.width / 2.f;
     float y = 0.f;
     char buf[64];
 
-    ombre(app, r, 28.f, 1.4f);
-    rect_arrondi_bord(app, r, 28.f, C_SURFACE, C_BORD);
+    ombre_biseau(app, r, 26.f, 1.4f);
+    panneau(app, r, 26.f, C_SURFACE_HAUTE, (sfColor){12, 14, 28, 255}, C_BORD);
+    crochets(app, (sfFloatRect){r.left - 6.f, r.top - 6.f, r.width + 12.f,
+        r.height + 12.f}, 20.f, avec_alpha(c, 0.6f));
     lueur(app, (sfVector2f){cx, r.top + 80.f}, (sfVector2f){r.width * 0.55f, 140.f},
         avec_alpha(c, 0.16f));
     rect_arrondi(app, (sfFloatRect){cx - 44.f, r.top, 88.f, 3.f}, 1.5f, c);
-    avatar(app, p, (sfVector2f){cx, r.top + 104.f}, 60.f, p->pv == 0 ? 1.f : 0.f);
+    avatar(app, p, (sfVector2f){cx, r.top + 104.f}, 60.f, est_ko(p) ? 1.f : 0.f);
     tronquer(app, POLICE_GRAS, 32, p->nom[0] ? p->nom : "Sans nom",
         r.width - 60.f, buf);
     texte(app, POLICE_GRAS, buf, 32, (sfVector2f){cx, r.top + 200.f},
         p->nom[0] ? C_TEXTE : C_TEXTE_FAIBLE, ALIGNE_CENTRE);
     pastille(app, nom_classe_maj(p->classe), (sfVector2f){cx, r.top + 244.f}, c, 0);
-    if (p->pv == 0)
+    if (est_ko(p))
         pastille(app, "K.O.", (sfVector2f){r.left + r.width - 46.f, r.top + 32.f},
             C_ROUGE, 1);
     rect_arrondi(app, (sfFloatRect){r.left + 32.f, r.top + 282.f, r.width - 64.f, 1.f},
         0.f, avec_alpha(C_BLANC, 0.07f));
-    for (int i = 0; i < 3; i++) {
-        y = r.top + 322.f + i * 60.f;
-        etiquette(app, noms[i], (sfVector2f){r.left + 32.f, y}, C_TEXTE_DOUX,
-            ALIGNE_GAUCHE);
-        snprintf(buf, sizeof(buf), "%d%s", vals[i], i == 2 ? " %" : "");
+    for (int i = 0; i < NB_STATS; i++) {
+        y = r.top + 312.f + i * 48.f;
+        etiquette(app, nom_stat((stat_t)i), (sfVector2f){r.left + 32.f, y},
+            C_TEXTE_DOUX, ALIGNE_GAUCHE);
+        snprintf(buf, sizeof(buf), "%d%s", valeur_stat(p, (stat_t)i),
+            i == STAT_DEF ? " %" : "");
         texte(app, POLICE_GRAS, buf, 20, (sfVector2f){r.left + r.width - 32.f, y},
-            cs[i], ALIGNE_DROITE);
-        barre_segments(app, (sfFloatRect){r.left + 32.f, y + 20.f, r.width - 64.f,
-            12.f}, segments[i], cs[i]);
+            couleur_stat((stat_t)i), ALIGNE_DROITE);
+        barre_segments(app, (sfFloatRect){r.left + 32.f, y + 18.f, r.width - 64.f,
+            10.f}, segments[i], couleur_stat((stat_t)i));
     }
 }
 
 static void mini_stats(app_t *app, const personnage_t *p, sfFloatRect r)
 {
-    static const char *noms[3] = {"PV", "ATK", "DEF"};
-    const sfColor cs[3] = {C_VERT, C_ROUGE, C_BLEU};
-    const int vals[3] = {p->pv, p->atq, p->def};
     float y = 0.f;
     float bw = r.width - 52.f - 48.f;
+    int v = 0;
     char buf[8];
 
-    for (int i = 0; i < 3; i++) {
-        y = r.top + 186.f + i * 16.f;
-        texte(app, POLICE_GRAS, noms[i], 11, (sfVector2f){r.left + 18.f, y},
-            C_TEXTE_FAIBLE, ALIGNE_GAUCHE);
-        rect_arrondi(app, (sfFloatRect){r.left + 52.f, y - 2.5f, bw, 5.f}, 2.5f,
+    for (int i = 0; i < NB_STATS; i++) {
+        y = r.top + 178.f + i * 14.f;
+        v = valeur_stat(p, (stat_t)i);
+        texte(app, POLICE_GRAS, abrege_stat((stat_t)i), 10, (sfVector2f){r.left + 18.f,
+            y}, C_TEXTE_FAIBLE, ALIGNE_GAUCHE);
+        rect_arrondi(app, (sfFloatRect){r.left + 52.f, y - 2.f, bw, 4.f}, 2.f,
             avec_alpha(C_BLANC, 0.07f));
-        if (vals[i] > 0)
-            rect_arrondi(app, (sfFloatRect){r.left + 52.f, y - 2.5f,
-                fmaxf(5.f, bw * vals[i] / 99.f), 5.f}, 2.5f, cs[i]);
-        snprintf(buf, sizeof(buf), "%d", vals[i]);
-        texte(app, POLICE_GRAS, buf, 13, (sfVector2f){r.left + r.width - 18.f, y},
-            cs[i], ALIGNE_DROITE);
+        if (v > 0)
+            rect_arrondi(app, (sfFloatRect){r.left + 52.f, y - 2.f,
+                fmaxf(4.f, bw * v / (float)STAT_MAX), 4.f}, 2.f, couleur_stat((stat_t)i));
+        snprintf(buf, sizeof(buf), "%d", v);
+        texte(app, POLICE_GRAS, buf, 12, (sfVector2f){r.left + r.width - 18.f, y},
+            couleur_stat((stat_t)i), ALIGNE_DROITE);
     }
 }
 
 void mini_carte(app_t *app, const personnage_t *p, sfFloatRect r,
     float survol, const marque_t *marque)
 {
-    float mort = p->pv == 0 ? 1.f : 0.f;
+    float mort = est_ko(p) ? 1.f : 0.f;
     sfColor c = griser(couleur_classe(p->classe), mort * 0.8f);
     sfColor bord = melanger(C_BORD, avec_alpha(c, 0.8f), survol);
     float cx = r.left + r.width / 2.f;
@@ -239,12 +191,15 @@ void mini_carte(app_t *app, const personnage_t *p, sfFloatRect r,
     }
     lueur(app, (sfVector2f){cx, r.top + r.height}, (sfVector2f){r.width * 0.7f, 50.f},
         avec_alpha(c, 0.3f * survol));
-    ombre(app, r, 22.f, 0.9f + 0.6f * survol);
-    rect_arrondi_bord(app, r, 22.f, melanger(C_SURFACE, C_SURFACE_HAUTE, survol * 0.7f),
-        bord);
+    ombre_biseau(app, r, 18.f, 0.9f + 0.6f * survol);
+    panneau(app, r, 18.f, melanger(C_SURFACE_HAUTE, melanger(C_SURFACE_HAUTE, c, 0.2f),
+        survol), C_SURFACE, bord);
     if (marque)
-        rect_arrondi_bord(app, (sfFloatRect){r.left + 1.5f, r.top + 1.5f, r.width - 3.f,
-            r.height - 3.f}, 20.5f, C_TRANSPARENT, avec_alpha(marque->couleur, 0.7f));
+        crochets(app, (sfFloatRect){r.left - 5.f, r.top - 5.f, r.width + 10.f,
+            r.height + 10.f}, 16.f, marque->couleur);
+    else if (survol > 0.01f)
+        crochets(app, (sfFloatRect){r.left - 5.f, r.top - 5.f, r.width + 10.f,
+            r.height + 10.f}, 14.f * survol, avec_alpha(c, survol));
     avatar(app, p, (sfVector2f){cx, r.top + 64.f}, 36.f, mort);
     tronquer(app, POLICE_GRAS, 19, p->nom, r.width - 28.f, buf);
     texte(app, POLICE_GRAS, buf, 19, (sfVector2f){cx, r.top + 122.f}, C_TEXTE,
@@ -302,7 +257,7 @@ int grille_cartes(app_t *app, grille_t *g, const int *ids, int n, float y0,
         g->survol[id] = approcher(g->survol[id], s ? 1.f : 0.f, 14.f, app->dt);
         maj_ressort(&g->lift[id], s ? -10.f : 0.f, 280.f, 18.f, app->dt);
         app->alpha = a * progression(app->t_scene, 0.15f + i * 0.05f, 0.3f);
-        mini_carte(app, &app->persos[id], (sfFloatRect){x, y + g->lift[id].x
+        mini_carte(app, &app->equipe.data[id], (sfFloatRect){x, y + g->lift[id].x
             + 40.f * (1.f - e), CARTE_L, CARTE_H}, g->survol[id],
             chercher_marque(marques, nb_marques, id));
     }

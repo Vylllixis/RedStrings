@@ -109,6 +109,13 @@ static void init_poussieres(app_t *app)
         app->poussieres[i].phase = aleatoire(0.f, 2.f * PI);
         app->poussieres[i].taille = aleatoire(1.f, 3.2f);
     }
+    for (int i = 0; i < NB_ETOILES; i++) {
+        app->etoiles[i].x = aleatoire(0.f, LARGEUR);
+        app->etoiles[i].y = aleatoire(0.f, HAUTEUR);
+        app->etoiles[i].vitesse = aleatoire(1.f, 5.f);
+        app->etoiles[i].phase = aleatoire(0.f, 2.f * PI);
+        app->etoiles[i].taille = aleatoire(1.f, 2.2f);
+    }
 }
 
 static int creer_ressources(app_t *app)
@@ -141,6 +148,7 @@ int creer_app(app_t *app)
     sfVideoMode mode = {LARGEUR, HAUTEUR, 32};
 
     memset(app, 0, sizeof(app_t));
+    roster_init(&app->equipe);
     srand(time(NULL));
     app->fenetre = sfRenderWindow_create(mode, "Redstrings",
         sfTitlebar | sfClose, &reglages);
@@ -190,6 +198,7 @@ void detruire_app(app_t *app)
         sfClock_destroy(app->horloge);
     if (app->vue)
         sfView_destroy(app->vue);
+    roster_liberer(&app->equipe);
 }
 
 static void traiter_evenement(app_t *app, sfEvent *e)

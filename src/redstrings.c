@@ -4,6 +4,7 @@
 */
 
 #include <stdio.h>
+#include "bataille_console.h"
 #include "boite.h"
 #include "couleurs.h"
 #include "personnage.h"
@@ -61,34 +62,6 @@ static void menu_afficher(const roster_t *r)
         afficher_personnage(&r->data[idx]);
 }
 
-static int demander_vivant(const roster_t *r, const char *question)
-{
-    int idx = demander_personnage(r, question);
-
-    if (idx != -1 && r->data[idx].pv == 0) {
-        afficher_erreur("Ce personnage est mort");
-        return -1;
-    }
-    return idx;
-}
-
-static void menu_combat(roster_t *r)
-{
-    int id_atq = demander_vivant(r, "Attaquant");
-    int id_def = 0;
-
-    if (id_atq == -1)
-        return;
-    id_def = demander_vivant(r, "Défenseur");
-    if (id_def == -1)
-        return;
-    if (id_atq == id_def) {
-        afficher_erreur("Un personnage ne peut pas s'attaquer lui-même");
-        return;
-    }
-    attaquer(&r->data[id_atq], &r->data[id_def]);
-}
-
 static void menu_sauvegarder(const roster_t *r)
 {
     sauvegarde_t code = sauvegarder(r, FICHIER_SAUVEGARDE);
@@ -128,7 +101,7 @@ int redstrings(void)
         else if (choix == 2)
             menu_afficher(&roster);
         else if (choix == 3)
-            menu_combat(&roster);
+            menu_bataille(&roster);
         else if (choix == 4)
             menu_sauvegarder(&roster);
         else if (choix == 5)
