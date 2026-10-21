@@ -259,7 +259,7 @@ static void puce(app_t *app, sfFloatRect r, const char *label, const char *val,
 {
     float cy = r.top + r.height / 2.f;
 
-    rect_arrondi_bord(app, r, 14.f, avec_alpha(c, 0.1f), avec_alpha(c, 0.25f));
+    panneau(app, r, 10.f, avec_alpha(c, 0.14f), avec_alpha(c, 0.05f), avec_alpha(c, 0.3f));
     etiquette(app, label, (sfVector2f){r.left + 16.f, cy}, melanger(c, C_BLANC, 0.3f),
         ALIGNE_GAUCHE);
     texte(app, POLICE_GRAS, val, 20, (sfVector2f){r.left + r.width - 16.f, cy}, C_TEXTE,
@@ -329,8 +329,11 @@ static void carte_arene(app_t *app, arene_t *ar, int slot, sfVector2f pos)
 
     lueur(app, (sfVector2f){cx, r.top + r.height / 2.f}, (sfVector2f){r.width * 0.8f,
         r.height * 0.65f}, avec_alpha(c, 0.12f));
-    ombre(app, r, 28.f, 1.4f);
-    rect_arrondi_bord(app, r, 28.f, C_SURFACE, melanger(C_BORD, avec_alpha(role, 0.6f), 0.7f));
+    ombre_biseau(app, r, 26.f, 1.4f);
+    panneau(app, r, 26.f, C_SURFACE_HAUTE, (sfColor){12, 14, 28, 255},
+        melanger(C_BORD, avec_alpha(role, 0.6f), 0.7f));
+    crochets(app, (sfFloatRect){r.left - 6.f, r.top - 6.f, r.width + 12.f,
+        r.height + 12.f}, 20.f, avec_alpha(role, 0.6f));
     lueur(app, (sfVector2f){cx, r.top + 90.f}, (sfVector2f){r.width * 0.5f, 120.f},
         avec_alpha(c, 0.15f));
     avatar(app, p, (sfVector2f){cx, r.top + 104.f}, 62.f, mort);
@@ -466,8 +469,8 @@ static void resultat(app_t *app, arene_t *ar)
         0.15f, 0.5f))));
     snprintf(vals[3], 16, "%d", ar->pv_restants);
     app->alpha = a * e;
-    ombre(app, r, 18.f, 1.f);
-    rect_arrondi_bord(app, r, 18.f, C_SURFACE, C_BORD);
+    ombre_biseau(app, r, 14.f, 1.f);
+    panneau(app, r, 14.f, C_SURFACE_HAUTE, C_SURFACE, C_BORD);
     for (int i = 0; i < 4; i++) {
         app->alpha = a * e * progression(t, 0.08f + i * 0.07f, 0.3f);
         if (i > 0)

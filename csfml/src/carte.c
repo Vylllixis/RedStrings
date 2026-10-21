@@ -130,9 +130,9 @@ void avatar(app_t *app, const personnage_t *p, sfVector2f centre, float r,
 
     lueur(app, centre, (sfVector2f){r * 2.4f, r * 2.4f},
         avec_alpha(c, 0.32f * (1.f - mort * 0.6f)));
-    cercle(app, centre, r, melanger((sfColor){16, 18, 34, 255}, c, 0.22f),
-        avec_alpha(c, 0.9f), r > 30.f ? 3.f : 2.f);
-    cercle(app, centre, r * 0.82f, C_TRANSPARENT, avec_alpha(c, 0.22f), 1.2f);
+    hexagone(app, centre, r * 1.08f, 0.f, melanger((sfColor){16, 18, 34, 255}, c, 0.22f),
+        avec_alpha(c, 0.9f));
+    hexagone(app, centre, r * 0.86f, PI / 6.f, C_TRANSPARENT, avec_alpha(c, 0.25f));
     embleme(app, p->classe, centre, r * 0.5f, melanger(c, C_BLANC, 0.55f));
 }
 
@@ -173,8 +173,10 @@ void fiche(app_t *app, const personnage_t *p, sfFloatRect r,
     float y = 0.f;
     char buf[64];
 
-    ombre(app, r, 28.f, 1.4f);
-    rect_arrondi_bord(app, r, 28.f, C_SURFACE, C_BORD);
+    ombre_biseau(app, r, 26.f, 1.4f);
+    panneau(app, r, 26.f, C_SURFACE_HAUTE, (sfColor){12, 14, 28, 255}, C_BORD);
+    crochets(app, (sfFloatRect){r.left - 6.f, r.top - 6.f, r.width + 12.f,
+        r.height + 12.f}, 20.f, avec_alpha(c, 0.6f));
     lueur(app, (sfVector2f){cx, r.top + 80.f}, (sfVector2f){r.width * 0.55f, 140.f},
         avec_alpha(c, 0.16f));
     rect_arrondi(app, (sfFloatRect){cx - 44.f, r.top, 88.f, 3.f}, 1.5f, c);
@@ -242,12 +244,15 @@ void mini_carte(app_t *app, const personnage_t *p, sfFloatRect r,
     }
     lueur(app, (sfVector2f){cx, r.top + r.height}, (sfVector2f){r.width * 0.7f, 50.f},
         avec_alpha(c, 0.3f * survol));
-    ombre(app, r, 22.f, 0.9f + 0.6f * survol);
-    rect_arrondi_bord(app, r, 22.f, melanger(C_SURFACE, C_SURFACE_HAUTE, survol * 0.7f),
-        bord);
+    ombre_biseau(app, r, 18.f, 0.9f + 0.6f * survol);
+    panneau(app, r, 18.f, melanger(C_SURFACE_HAUTE, melanger(C_SURFACE_HAUTE, c, 0.2f),
+        survol), C_SURFACE, bord);
     if (marque)
-        rect_arrondi_bord(app, (sfFloatRect){r.left + 1.5f, r.top + 1.5f, r.width - 3.f,
-            r.height - 3.f}, 20.5f, C_TRANSPARENT, avec_alpha(marque->couleur, 0.7f));
+        crochets(app, (sfFloatRect){r.left - 5.f, r.top - 5.f, r.width + 10.f,
+            r.height + 10.f}, 16.f, marque->couleur);
+    else if (survol > 0.01f)
+        crochets(app, (sfFloatRect){r.left - 5.f, r.top - 5.f, r.width + 10.f,
+            r.height + 10.f}, 14.f * survol, avec_alpha(c, survol));
     avatar(app, p, (sfVector2f){cx, r.top + 64.f}, 36.f, mort);
     tronquer(app, POLICE_GRAS, 19, p->nom, r.width - 28.f, buf);
     texte(app, POLICE_GRAS, buf, 19, (sfVector2f){cx, r.top + 122.f}, C_TEXTE,
