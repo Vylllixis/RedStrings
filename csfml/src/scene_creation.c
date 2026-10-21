@@ -13,7 +13,11 @@
 #define DUREE_SORTIE_CREATION 1.f
 
 static const char *LABELS_STATS[3] = {"Points de vie", "Attaque", "Défense"};
-static const char *DESCRIPTIONS[3] = {"Corps à corps", "Magie", "Distance"};
+static const char *DESCRIPTIONS[NB_CLASSES] = {
+    [GUERRIER] = "Corps à corps",
+    [MAGE] = "Magie",
+    [ARCHER] = "Distance",
+};
 
 void entrer_creation(app_t *app)
 {
@@ -46,31 +50,33 @@ static void erreur_nom(app_t *app, creation_t *c, const char *message)
 /** Équivalent graphique de creer_personnage(). */
 static void creer(app_t *app, creation_t *c)
 {
-    personnage_t *p = NULL;
+    personnage_t p = {0};
     char msg[96];
 
     if (c->nom.texte[0] == '\0') {
         erreur_nom(app, c, "Donne un nom à ton personnage");
         return;
     }
-    if (trouver_personnage(app->persos, app->nb_persos, c->nom.texte) != -1) {
+    if (trouver_personnage(app->equipe.data, app->equipe.len, c->nom.texte) != -1) {
         erreur_nom(app, c, "Ce nom est déjà pris");
         return;
     }
-    if (app->nb_persos >= MAX_PERSONNAGES) {
+    if (app->equipe.len >= MAX_PERSONNAGES) {
         notifier(app, "✗", "Nombre maximum de personnages atteint", C_ROUGE);
         return;
     }
-    p =&app->persos[app->nb_persos++];
-    memset(p, 0, sizeof(personnage_t));
-    my_strcpy(p->nom, c->nom.texte);
-    p->pv = c->valeurs[0];
-    p->atq = c->valeurs[1];
-    p->def = c->valeurs[2];
-    p->classe = c->classe;
-    snprintf(msg, sizeof(msg), "%s a été créé !", p->nom);
+    my_strcpy(p.nom, c->nom.texte);
+    p.pv = c->valeurs[0];
+    p.atq = c->valeurs[1];
+    p.def = c->valeurs[2];
+    p.classe = c->classe;
+    if (roster_ajouter(&app->equipe, &p) == -1) {
+        notifier(app, "✗", "Mémoire insuffisante", C_ROUGE);
+        return;
+    }
+    snprintf(msg, sizeof(msg), "%s a été créé !", p.nom);
     notifier(app, "✔", msg, C_VERT);
-    emettre(app, (sfVector2f){980.f, 205.f}, 80, couleur_classe(p->classe), 640.f, 4.5f);
+    emettre(app, (sfVector2f){980.f, 205.f}, 80, couleur_classe(p.classe), 640.f, 4.5f);
     emettre(app, (sfVector2f){980.f, 205.f}, 30, C_BLANC, 420.f, 3.f);
     c->flash = 1.f;
     c->sortie = DUREE_SORTIE_CREATION;
@@ -80,10 +86,10 @@ static void creer(app_t *app, creation_t *c)
 static void ajuster(int *v, int delta)
 {
     *v += delta;
-    if (*v < 0)
-        *v = 0;
-    if (*v > 99)
-        *v = 99;
+    if (*v < STAT_MIN)
+        *v = STAT_MIN;
+    if (*v > STAT_MAX)
+        *v = STAT_MAX;
 }
 
 static void clavier(app_t *app, creation_t *c)
@@ -104,9 +110,9 @@ static void clavier(app_t *app, creation_t *c)
     if (c->focus >= 1 && c->focus <= 3 && (k[sfKeyLeft] || k[sfKeyRight]))
         ajuster(&c->valeurs[c->focus - 1], k[sfKeyLeft] ? -pas : pas);
     if (c->focus == 4 && k[sfKeyLeft])
-        c->classe = (c->classe + 2) % 3;
+        c->classe = (c->classe + NB_CLASSES - 1) % NB_CLASSES;
     if (c->focus == 4 && k[sfKeyRight])
-        c->classe = (c->classe + 1) % 3;
+        c->classe = (c->classe + 1) % NB_CLASSES;
     if (k[sfKeyEnter])
         creer(app, c);
 }
@@ -143,12 +149,12 @@ static void dessiner_tuile(app_t *app, creation_t *c, classe_t i, sfFloatRect r)
 
 static void tuiles(app_t *app, creation_t *c, float y)
 {
-    float w = (FW - 28.f) / 3.f;
+    float w = (FW - 14.f * (NB_CLASSES - 1)) / NB_CLASSES;
     sfFloatRect r;
     classe_t i = GUERRIER;
     int s = 0;
 
-    for (int k = 0; k < 3; k++) {
+    for (int k = 0; k < NB_CLASSES; k++) {
         i = (classe_t)k;
         r = (sfFloatRect){FX + k * (w + 14.f), y, w, 80.f};
         s = survole(app, r);
@@ -206,7 +212,7 @@ static void formulaire(app_t *app, creation_t *c, float a, int actif)
     etiquette(app, "NOM", (sfVector2f){FX, 212.f + dy}, C_TEXTE_FAIBLE, ALIGNE_GAUCHE);
     c->nom.focus = c->focus == 0 && actif;
     if (champ_texte(app, &c->nom, (sfFloatRect){FX, 230.f + dy, FW, 58.f},
-        "Ex : Aragorn", 29))
+        "Ex : Aragorn", NOM_LONGUEUR))
         c->focus = 0;
     dy = apparaitre(app, a, 1);
     etiquette(app, "STATISTIQUES", (sfVector2f){FX, 322.f + dy}, C_TEXTE_FAIBLE,

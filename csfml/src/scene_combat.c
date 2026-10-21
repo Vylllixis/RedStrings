@@ -93,12 +93,12 @@ void scene_selection(app_t *app)
     } else if (app->in.touches[sfKeyEscape]) {
         changer_scene(app, SCENE_MENU);
     }
-    for (int i = 0; i < app->nb_persos; i++)
+    for (int i = 0; i < app->equipe.len; i++)
         ids[i] = i;
     en_tete(app, &s->retour, "Combat", s->etape == 0 ? "Choisis l'attaquant."
         : "Choisis maintenant le défenseur (clique à nouveau sur l'attaquant pour annuler).");
     etapes(app, s, app->alpha);
-    id = grille_cartes(app, &s->grille, ids, app->nb_persos, 204.f, marques, 2);
+    id = grille_cartes(app, &s->grille, ids, app->equipe.len, 204.f, marques, 2);
     if (id >= 0 && s->validation < 0.f)
         choisir(app, s, id);
     if (s->validation >= 0.f) {
@@ -120,12 +120,12 @@ void entrer_arene(app_t *app)
     memset(ar, 0, sizeof(arene_t));
     ar->ids[0] = app->selection.id_atq;
     ar->ids[1] = app->selection.id_def;
-    for (int i = 0; i < app->nb_persos; i++) {
-        p = &app->persos[i];
+    for (int i = 0; i < app->equipe.len; i++) {
+        p = &app->equipe.data[i];
         ar->pv_affiche[i] = p->pv;
         ar->pv_fantome[i] = p->pv;
         ar->pv_max[i] = p->pv > 0 ? p->pv : 1;
-        ar->ko[i] = p->pv == 0 ? 10.f : -1.f;
+        ar->ko[i] = est_ko(p) ? 10.f : -1.f;
     }
     ar->t_attaque = -1.f;
     ar->echange = -1.f;
@@ -133,22 +133,24 @@ void entrer_arene(app_t *app)
 
 static int peut_attaquer(app_t *app, arene_t *ar)
 {
+    const personnage_t *equipe = app->equipe.data;
+
     return ar->t_attaque < 0.f && ar->echange < 0.f
-        && app->persos[ar->ids[0]].pv > 0 && app->persos[ar->ids[1]].pv > 0;
+        && !est_ko(&equipe[ar->ids[0]]) && !est_ko(&equipe[ar->ids[1]]);
 }
 
 /** Instant du coup : même calcul que attaquer() + toute la mise en scène. */
 static void impact(app_t *app, arene_t *ar)
 {
-    personnage_t *a = &app->persos[ar->ids[0]];
-    personnage_t *d = &app->persos[ar->ids[1]];
+    personnage_t *a = &app->equipe.data[ar->ids[0]];
+    personnage_t *d = &app->equipe.data[ar->ids[1]];
     int id_d = ar->ids[1];
     sfVector2f point = {DROITE_X + 120.f, CARTE_Y + 150.f};
     char msg[96];
 
     ar->atq = a->atq;
     ar->def = d->def;
-    ar->degats = appliquer_attaque(a, d);
+    ar->degats = subir_attaque(a, d);
     ar->pv_restants = d->pv;
     ar->dernier_atq = ar->ids[0];
     ar->dernier_def = id_d;
@@ -165,7 +167,7 @@ static void impact(app_t *app, arene_t *ar)
     emettre(app, point, ar->degats > 0 ? 30 + ar->degats : 18,
         ar->degats > 0 ? couleur_classe(a->classe) : C_BLEU, 700.f, 4.5f);
     emettre(app, point, 14, C_BLANC, 500.f, 3.f);
-    if (d->pv > 0)
+    if (!est_ko(d))
         return;
     ar->ko[id_d] = 0.f;
     app->secousse = 1.f;
@@ -206,7 +208,8 @@ static void maj_arene(app_t *app, arene_t *ar)
     }
     for (int k = 0; k < 2; k++) {
         id = ar->ids[k];
-        ar->pv_affiche[id] = approcher(ar->pv_affiche[id], app->persos[id].pv, 10.f, dt);
+        ar->pv_affiche[id] = approcher(ar->pv_affiche[id], app->equipe.data[id].pv,
+            10.f, dt);
         ar->delai_fantome[id] -= dt;
         if (ar->delai_fantome[id] <= 0.f)
             ar->pv_fantome[id] = approcher(ar->pv_fantome[id], ar->pv_affiche[id], 3.5f, dt);
@@ -315,7 +318,7 @@ static void tampon_ko(app_t *app, arene_t *ar, int id, sfFloatRect r, float mort
 static void carte_arene(app_t *app, arene_t *ar, int slot, sfVector2f pos)
 {
     int id = ar->ids[slot];
-    personnage_t *p = &app->persos[id];
+    personnage_t *p = &app->equipe.data[id];
     float mort = ar->ko[id] >= 0.f ? sortie_cubique(bornerf(ar->ko[id] / 0.7f, 0.f, 1.f)) : 0.f;
     sfColor c = griser(couleur_classe(p->classe), mort * 0.85f);
     sfColor role = slot == 0 ? C_ROUGE : C_BLEU;
@@ -355,7 +358,7 @@ static void carte_arene(app_t *app, arene_t *ar, int slot, sfVector2f pos)
 /** Traînée de l'attaquant pendant la ruée. */
 static void trainee(app_t *app, arene_t *ar, sfVector2f pos)
 {
-    sfColor c = couleur_classe(app->persos[ar->ids[0]].classe);
+    sfColor c = couleur_classe(app->equipe.data[ar->ids[0]].classe);
     float t = ar->t_attaque;
     float dx = 0.f;
 
@@ -375,7 +378,7 @@ static void effet_impact(app_t *app, arene_t *ar)
     float p = sortie_cubique(progression(t, 0.f, 0.12f));
     float f = 1.f - progression(t, 0.1f, 0.3f);
     sfVector2f c = {DROITE_X + 130.f, CARTE_Y + 170.f};
-    classe_t cl = app->persos[ar->dernier_atq].classe;
+    classe_t cl = app->equipe.data[ar->dernier_atq].classe;
     sfColor col = couleur_classe(cl);
     sfVector2f l1[2] = {{c.x - 110.f * p, c.y - 110.f * p}, {c.x + 110.f * p, c.y + 110.f * p}};
     sfVector2f l2[2] = {{c.x + 100.f * p, c.y - 100.f * p}, {c.x - 100.f * p, c.y + 100.f * p}};
@@ -480,23 +483,23 @@ static void resultat(app_t *app, arene_t *ar)
 
 static void message_bas(app_t *app, arene_t *ar)
 {
-    personnage_t *a = &app->persos[ar->ids[0]];
-    personnage_t *d = &app->persos[ar->ids[1]];
+    personnage_t *a = &app->equipe.data[ar->ids[0]];
+    personnage_t *d = &app->equipe.data[ar->ids[1]];
     sfVector2f pos = {LARGEUR / 2.f, 690.f};
     char buf[128];
 
-    if (a->pv == 0)
+    if (est_ko(a))
         snprintf(buf, sizeof(buf), "%s est K.O. et ne peut plus attaquer  ·  R pour inverser",
             a->nom);
-    else if (d->pv == 0)
+    else if (est_ko(d))
         snprintf(buf, sizeof(buf), "%s est mort", d->nom);
     else if (ar->a_attaque)
         snprintf(buf, sizeof(buf), "%s a infligé %d dégât%s à %s",
-            app->persos[ar->dernier_atq].nom, ar->degats, ar->degats > 1 ? "s" : "",
-            app->persos[ar->dernier_def].nom);
+            app->equipe.data[ar->dernier_atq].nom, ar->degats, ar->degats > 1 ? "s" : "",
+            app->equipe.data[ar->dernier_def].nom);
     else
         snprintf(buf, sizeof(buf), "Dégâts = attaque × (100 - défense) / 100");
-    if (d->pv == 0 && a->pv > 0) {
+    if (est_ko(d) && !est_ko(a)) {
         texte(app, POLICE_SYMBOLES, "☠", 16, (sfVector2f){pos.x - largeur_texte(app,
             POLICE_NORMALE, buf, 15) / 2.f - 14.f, pos.y}, C_ROUGE, ALIGNE_CENTRE);
         texte(app, POLICE_NORMALE, buf, 15, pos, C_ROUGE, ALIGNE_CENTRE);

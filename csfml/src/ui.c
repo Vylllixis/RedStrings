@@ -353,7 +353,8 @@ int glissiere(app_t *app, glissiere_t *g, sfFloatRect r, const char *label,
     if (!app->in.bas)
         g->glisse = 0;
     if (g->glisse)
-        *valeur = (int)roundf(bornerf((app->in.souris.x - tx) / tw, 0.f, 1.f) * 99.f);
+        *valeur = STAT_MIN + (int)roundf(bornerf((app->in.souris.x - tx) / tw, 0.f, 1.f)
+            * (STAT_MAX - STAT_MIN));
     g->survol = approcher(g->survol, s || g->glisse ? 1.f : 0.f, 14.f, app->dt);
     g->affiche = approcher(g->affiche, *valeur, 16.f, app->dt);
     rect_arrondi(app, (sfFloatRect){r.left - 14.f, r.top, r.width + 28.f, r.height},
@@ -362,8 +363,8 @@ int glissiere(app_t *app, glissiere_t *g, sfFloatRect r, const char *label,
         rect_arrondi(app, (sfFloatRect){r.left - 14.f, cy - 11.f, 3.f, 22.f}, 1.5f, col);
     texte(app, POLICE_NORMALE, label, 17, (sfVector2f){r.left, cy},
         focus ? C_TEXTE : C_TEXTE_DOUX, ALIGNE_GAUCHE);
-    piste(app, tx, tw, cy, g->affiche / 99.f, col);
-    kx = tx + tw * g->affiche / 99.f;
+    piste(app, tx, tw, cy, (g->affiche - STAT_MIN) / (STAT_MAX - STAT_MIN), col);
+    kx = tx + tw * (g->affiche - STAT_MIN) / (STAT_MAX - STAT_MIN);
     kr = 8.f + 3.f * g->survol + 2.f * g->glisse;
     lueur(app, (sfVector2f){kx, cy}, (sfVector2f){kr * 3.2f, kr * 3.2f},
         avec_alpha(col, 0.3f + 0.35f * g->survol));

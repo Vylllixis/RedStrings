@@ -14,7 +14,13 @@ OBJ_DIR		=	obj
 
 SRCS		=	$(wildcard src/*.c)
 OBJS		=	$(SRCS:src/%.c=$(OBJ_DIR)/%.o)
-DEPS		=	$(OBJS:.o=.d)
+
+#moteur du jeu partagé avec la version console (aucun affichage dedans)
+MOTEUR_DIR	=	../src/personnage
+MOTEUR		=	personnage.c combat.c roster.c sauvegarde.c
+OBJS_MOTEUR	=	$(MOTEUR:%.c=$(OBJ_DIR)/moteur/%.o)
+
+DEPS		=	$(OBJS:.o=.d) $(OBJS_MOTEUR:.o=.d)
 
 # ─── Compilation ─────────────────────────────────────────────────────
 
@@ -64,13 +70,18 @@ verifier:
 		"CSFML introuvable, installe-la avec : sudo apt install libcsfml-dev"; \
 		exit 1; }
 
-$(NAME):	$(OBJS) $(LIB)
+$(NAME):	$(OBJS) $(OBJS_MOTEUR) $(LIB)
 	$(LOG) "LD" "redstrings_csfml"
-	$(Q)$(CC) -o $(NAME) $(OBJS) $(LDFLAGS) $(LDLIBS)
+	$(Q)$(CC) -o $(NAME) $(OBJS) $(OBJS_MOTEUR) $(LDFLAGS) $(LDLIBS)
 
 $(OBJ_DIR)/%.o:	src/%.c
 	$(LOG) "CC" "csfml/$<"
 	@mkdir -p $(OBJ_DIR)
+	$(Q)$(CC) $(CFLAGS) $(CPPFLAGS) $(DEPFLAGS) -c $< -o $@
+
+$(OBJ_DIR)/moteur/%.o:	$(MOTEUR_DIR)/%.c
+	$(LOG) "CC" "src/personnage/$(notdir $<)"
+	@mkdir -p $(OBJ_DIR)/moteur
 	$(Q)$(CC) $(CFLAGS) $(CPPFLAGS) $(DEPFLAGS) -c $< -o $@
 
 clean:

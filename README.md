@@ -243,14 +243,17 @@ stateDiagram-v2
 
 | Écran | Clavier | Souris |
 |---|---|---|
-| **Menu** | <kbd>1</kbd> <kbd>2</kbd> <kbd>3</kbd> · <kbd>0</kbd>/<kbd>Échap</kbd> pour quitter | clic sur un bouton |
+| **Menu** | <kbd>1</kbd> <kbd>2</kbd> <kbd>3</kbd> · <kbd>4</kbd> sauvegarder · <kbd>5</kbd> charger · <kbd>0</kbd>/<kbd>Échap</kbd> quitter | clic sur un bouton |
 | **Création** | <kbd>Tab</kbd> / <kbd>↑</kbd> <kbd>↓</kbd> naviguer · <kbd>←</kbd> <kbd>→</kbd> ajuster · <kbd>Maj</kbd> = ×10 · <kbd>Entrée</kbd> créer | glissières et boutons |
 | **Personnages** | taper pour rechercher · <kbd>Entrée</kbd> ouvrir · <kbd>←</kbd> <kbd>→</kbd> changer de fiche | clic sur une carte |
 | **Sélection** | <kbd>Échap</kbd> annule l'attaquant, puis revient au menu | clic : attaquant, puis défenseur |
 | **Arène** | <kbd>Espace</kbd>/<kbd>Entrée</kbd> attaquer · <kbd>R</kbd> inverser les rôles · <kbd>Échap</kbd> menu | boutons *Attaquer*, *Inverser*, *Menu* |
 
 > [!NOTE]
-> La version graphique a son propre code d'interface (`csfml/src/`), mais elle partage `personnage.h`, `my_string.h` et `libmy.a` avec la console : un personnage a exactement la même structure dans les deux. Elle garde pour l'instant une équipe de 10 personnages au maximum et n'a pas de sauvegarde (voir la [feuille de route](#%EF%B8%8F-feuille-de-route)).
+> **Un seul moteur pour deux interfaces.** `csfml/src/` ne contient que l'affichage : la version graphique compile directement `personnage.c`, `combat.c`, `roster.c` et `sauvegarde.c` depuis `src/personnage/`. Même table de classes, mêmes bornes (`STAT_MIN`, `STAT_MAX`), même calcul de dégâts (`subir_attaque`), même `roster_t`, même fichier `personnages.txt` : une équipe sauvegardée dans la console se recharge dans la fenêtre, et inversement.
+
+> [!WARNING]
+> L'écran n'a de place que pour **10 cartes** : la version graphique refuse de créer un 11ᵉ personnage, et refuse de charger un fichier qui en contient plus (l'équipe actuelle n'est alors pas touchée).
 
 <details>
 <summary><b>✨ Ce qui rend l'interface vivante</b></summary>
@@ -370,7 +373,8 @@ RedStrings/
 ├── 📁 src/
 │   ├── main.c                return redstrings();
 │   ├── redstrings.c          boucle du menu
-│   ├── 📁 personnage/         creer · afficher · attaquer · roster · sauvegarde
+│   ├── 📁 personnage/         moteur partagé : personnage · combat · roster · sauvegarde
+│   │                          affichage console : creer · afficher · attaquer
 │   └── 📁 ui/                 boite.c · saisie.c
 ├── 📁 lib/                   40 fonctions maison → libmy.a
 ├── 📁 csfml/                 version graphique (src/, include/gui.h, assets/fonts/)
@@ -390,14 +394,16 @@ flowchart TB
     perso --> ui[ui/boite.c · ui/saisie.c]
     rs --> ui
     perso & save & rs --> libmy[(libmy.a<br/>my_strcmp · my_strlen…)]
-    gui([csfml/src/*.c]) -. partage .-> ph{{personnage.h}}
+    gui([csfml/src/*.c<br/><i>affichage seul</i>]) --> roster & save & ph
+    gui --> combat[combat.c<br/><i>subir_attaque · est_ko</i>]
+    perso --> combat
     gui --> libmy
     perso --> ph
 
     classDef app fill:#0e1230,stroke:#f43f5e,color:#eceffe
     classDef lib fill:#0e1230,stroke:#fbbf24,color:#eceffe
     classDef gui fill:#0e1230,stroke:#34d399,color:#eceffe
-    class main,rs,perso,roster,save,ui app
+    class main,rs,perso,roster,save,ui,combat app
     class libmy,ph lib
     class gui gui
 ```
@@ -691,7 +697,8 @@ gitGraph
 - [x] Sauvegarde / chargement
 - [x] Tests unitaires + sanitizers
 - [ ] Documentation Doxygen (`Doxyfile`, `make doc`)
-- [ ] Version graphique : équipe illimitée et sauvegarde
+- [x] Version graphique branchée sur le moteur commun (roster, combat, classes, sauvegarde)
+- [ ] Version graphique : faire défiler les cartes pour dépasser 10 personnages
 - [x] Publier la version `v1.2.0` sur `main`
 
 <img src=".github/readme/fil-rouge.svg" width="100%" alt=""/>
