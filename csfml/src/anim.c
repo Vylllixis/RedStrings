@@ -27,18 +27,18 @@ float progression(float t, float debut, float duree)
     return bornerf((t - debut) / duree, 0.f, 1.f);
 }
 
-float sortieCubique(float t)
+float sortie_cubique(float t)
 {
     t = 1.f - t;
     return 1.f - t * t * t;
 }
 
-float entreeCubique(float t)
+float entree_cubique(float t)
 {
     return t * t * t;
 }
 
-float entreeSortieCubique(float t)
+float entree_sortie_cubique(float t)
 {
     if (t < 0.5f)
         return 4.f * t * t * t;
@@ -46,8 +46,8 @@ float entreeSortieCubique(float t)
     return 1.f - t * t * t / 2.f;
 }
 
-/** Sortie avec léger dépassement (easeOutBack). */
-float sortieRebond(float t)
+/** Sortie avec léger dépassement (ease_out_back). */
+float sortie_rebond(float t)
 {
     const float c1 = 1.70158f;
     const float c3 = c1 + 1.f;
@@ -62,7 +62,7 @@ float approcher(float actuel, float cible, float vitesse, float dt)
     return cible + (actuel - cible) * expf(-vitesse * dt);
 }
 
-void majRessort(ressort_t *r, float cible, float raideur, float amorti,
+void maj_ressort(ressort_t *r, float cible, float raideur, float amorti,
     float dt)
 {
     float acc = (cible - r->x) * raideur - r->v * amorti;
@@ -76,7 +76,7 @@ float aleatoire(float min, float max)
     return min + (max - min) * ((float)rand() / (float)RAND_MAX);
 }
 
-sfColor avecAlpha(sfColor c, float a)
+sfColor avec_alpha(sfColor c, float a)
 {
     c.a = (sfUint8)bornerf(c.a * a, 0.f, 255.f);
     return c;

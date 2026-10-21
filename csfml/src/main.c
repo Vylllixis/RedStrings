@@ -12,17 +12,17 @@ int main(void)
 
     if (app == NULL)
         return 84;
-    if (creerApp(app) != 0) {
-        detruireApp(app);
+    if (creer_app(app) != 0) {
+        detruire_app(app);
         free(app);
         return 84;
     }
     while (app->ouvert && sfRenderWindow_isOpen(app->fenetre)) {
         evenements(app);
-        majApp(app, sfTime_asSeconds(sfClock_restart(app->horloge)));
+        maj_app(app, sfTime_asSeconds(sfClock_restart(app->horloge)));
         sfRenderWindow_display(app->fenetre);
     }
-    detruireApp(app);
+    detruire_app(app);
     free(app);
     return 0;
 }

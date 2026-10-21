@@ -10,12 +10,12 @@
 #define POINTS_COIN 8
 #define MAX_POINTS_LIGNE 160
 
-void rectArrondi(app_t *app, sfFloatRect r, float rayon, sfColor fond)
+void rect_arrondi(app_t *app, sfFloatRect r, float rayon, sfColor fond)
 {
-    rectArrondiBord(app, r, rayon, fond, C_TRANSPARENT);
+    rect_arrondi_bord(app, r, rayon, fond, C_TRANSPARENT);
 }
 
-void rectArrondiBord(app_t *app, sfFloatRect r, float rayon, sfColor fond,
+void rect_arrondi_bord(app_t *app, sfFloatRect r, float rayon, sfColor fond,
     sfColor bord)
 {
     float rc = bornerf(rayon, 0.f, fminf(r.width, r.height) / 2.f);
@@ -38,8 +38,8 @@ void rectArrondiBord(app_t *app, sfFloatRect r, float rayon, sfColor fond,
                 centres[c].y + sinf(angle) * rayon});
         }
     }
-    sfConvexShape_setFillColor(app->forme, avecAlpha(fond, app->alpha));
-    sfConvexShape_setOutlineColor(app->forme, avecAlpha(bord, app->alpha));
+    sfConvexShape_setFillColor(app->forme, avec_alpha(fond, app->alpha));
+    sfConvexShape_setOutlineColor(app->forme, avec_alpha(bord, app->alpha));
     sfConvexShape_setOutlineThickness(app->forme, bord.a > 0 ? -1.5f : 0.f);
     sfRenderWindow_drawConvexShape(app->fenetre, app->forme, NULL);
 }
@@ -51,9 +51,9 @@ void ombre(app_t *app, sfFloatRect r, float rayon, float force)
 
     for (int i = 6; i >= 1; i--) {
         e = i * 3.f;
-        rectArrondi(app, (sfFloatRect){r.left - e, r.top - e + 6.f + i,
+        rect_arrondi(app, (sfFloatRect){r.left - e, r.top - e + 6.f + i,
             r.width + 2.f * e, r.height + 2.f * e}, rayon + e,
-            avecAlpha(C_NOIR, force * 0.075f * (1.f - i / 7.f)));
+            avec_alpha(C_NOIR, force * 0.075f * (1.f - i / 7.f)));
     }
 }
 
@@ -62,13 +62,13 @@ void lueur(app_t *app, sfVector2f centre, sfVector2f rayon, sfColor c)
 {
     if (c.a == 0 || app->alpha <= 0.f)
         return;
-    sfSprite_setTexture(app->sprite, app->texLueur, sfTrue);
+    sfSprite_setTexture(app->sprite, app->tex_lueur, sfTrue);
     sfSprite_setOrigin(app->sprite, (sfVector2f){64.f, 64.f});
     sfSprite_setPosition(app->sprite, centre);
     sfSprite_setRotation(app->sprite, 0.f);
     sfSprite_setScale(app->sprite, (sfVector2f){rayon.x / 64.f,
         rayon.y / 64.f});
-    sfSprite_setColor(app->sprite, avecAlpha(c, app->alpha));
+    sfSprite_setColor(app->sprite, avec_alpha(c, app->alpha));
     sfRenderWindow_drawSprite(app->fenetre, app->sprite, &app->additif);
 }
 
@@ -79,8 +79,8 @@ void cercle(app_t *app, sfVector2f centre, float r, sfColor fond,
     sfCircleShape_setPointCount(app->cercle, r > 24.f ? 64 : 32);
     sfCircleShape_setOrigin(app->cercle, (sfVector2f){r, r});
     sfCircleShape_setPosition(app->cercle, centre);
-    sfCircleShape_setFillColor(app->cercle, avecAlpha(fond, app->alpha));
-    sfCircleShape_setOutlineColor(app->cercle, avecAlpha(bord, app->alpha));
+    sfCircleShape_setFillColor(app->cercle, avec_alpha(fond, app->alpha));
+    sfCircleShape_setOutlineColor(app->cercle, avec_alpha(bord, app->alpha));
     sfCircleShape_setOutlineThickness(app->cercle, -epaisseur);
     sfRenderWindow_drawCircleShape(app->fenetre, app->cercle, NULL);
 }
@@ -98,13 +98,13 @@ void polygone(app_t *app, const float *pts, int n, sfVector2f centre,
             centre.x + (pts[2 * i] * ca - pts[2 * i + 1] * sa) * taille,
             centre.y + (pts[2 * i] * sa + pts[2 * i + 1] * ca) * taille});
     }
-    sfConvexShape_setFillColor(app->forme, avecAlpha(c, app->alpha));
+    sfConvexShape_setFillColor(app->forme, avec_alpha(c, app->alpha));
     sfConvexShape_setOutlineThickness(app->forme, 0.f);
     sfRenderWindow_drawConvexShape(app->fenetre, app->forme, NULL);
 }
 
 /** Polyligne épaisse construite en bande de triangles. */
-void ligneEpaisse(app_t *app, const sfVector2f *pts, int n, float epaisseur,
+void ligne_epaisse(app_t *app, const sfVector2f *pts, int n, float epaisseur,
     sfColor c, int additif)
 {
     sfVertex v[MAX_POINTS_LIGNE * 2];
@@ -115,7 +115,7 @@ void ligneEpaisse(app_t *app, const sfVector2f *pts, int n, float epaisseur,
 
     if (n > MAX_POINTS_LIGNE)
         n = MAX_POINTS_LIGNE;
-    c = avecAlpha(c, app->alpha);
+    c = avec_alpha(c, app->alpha);
     for (int i = 0; i < n; i++) {
         a = i > 0 ? i - 1 : i;
         b = i < n - 1 ? i + 1 : i;
@@ -131,7 +131,7 @@ void ligneEpaisse(app_t *app, const sfVector2f *pts, int n, float epaisseur,
         additif ? &app->additif : NULL);
 }
 
-static int utf8VersUtf32(const char *s, sfUint32 *dst, int max)
+static int utf8_vers_utf32(const char *s, sfUint32 *dst, int max)
 {
     const unsigned char *u = (const unsigned char *)s;
     int n = 0;
@@ -158,12 +158,12 @@ static int utf8VersUtf32(const char *s, sfUint32 *dst, int max)
     return n;
 }
 
-static void preparerTexte(app_t *app, police_t p, const char *s,
+static void preparer_texte(app_t *app, police_t p, const char *s,
     unsigned int taille)
 {
     sfUint32 buf[256];
 
-    utf8VersUtf32(s, buf, 256);
+    utf8_vers_utf32(s, buf, 256);
     sfText_setFont(app->texte, app->polices[p]);
     sfText_setCharacterSize(app->texte, taille);
     sfText_setLetterSpacing(app->texte, app->espacement > 0.f
@@ -171,17 +171,17 @@ static void preparerTexte(app_t *app, police_t p, const char *s,
     sfText_setUnicodeString(app->texte, buf);
 }
 
-float largeurTexte(app_t *app, police_t p, const char *s, unsigned int taille)
+float largeur_texte(app_t *app, police_t p, const char *s, unsigned int taille)
 {
-    preparerTexte(app, p, s, taille);
+    preparer_texte(app, p, s, taille);
     return sfText_getLocalBounds(app->texte).width;
 }
 
 /** Abscisse du caractère numéro `index` (en points de code). */
-float positionCaractere(app_t *app, police_t p, const char *s,
+float position_caractere(app_t *app, police_t p, const char *s,
     unsigned int taille, int index)
 {
-    preparerTexte(app, p, s, taille);
+    preparer_texte(app, p, s, taille);
     sfText_setPosition(app->texte, (sfVector2f){0.f, 0.f});
     sfText_setOrigin(app->texte, (sfVector2f){0.f, 0.f});
     sfText_setScale(app->texte, (sfVector2f){1.f, 1.f});
@@ -193,14 +193,14 @@ float positionCaractere(app_t *app, police_t p, const char *s,
  * Dessine un texte UTF-8. `pos.y` désigne le centre vertical des majuscules,
  * ce qui permet d'aligner proprement des textes de tailles différentes.
  */
-float texteEchelle(app_t *app, police_t p, const char *s, unsigned int taille,
+float texte_echelle(app_t *app, police_t p, const char *s, unsigned int taille,
     sfVector2f pos, sfColor c, alignement_t a, float echelle)
 {
     sfFloatRect b;
     sfGlyph h = sfFont_getGlyph(app->polices[p], 'H', taille, sfFalse, 0.f);
     float ox = 0.f;
 
-    preparerTexte(app, p, s, taille);
+    preparer_texte(app, p, s, taille);
     b = sfText_getLocalBounds(app->texte);
     if (a == ALIGNE_CENTRE)
         ox = b.left + b.width / 2.f;
@@ -211,9 +211,9 @@ float texteEchelle(app_t *app, police_t p, const char *s, unsigned int taille,
     sfText_setPosition(app->texte, pos);
     sfText_setScale(app->texte, (sfVector2f){echelle, echelle});
     sfText_setRotation(app->texte, app->rotation);
-    sfText_setFillColor(app->texte, avecAlpha(c, app->alpha));
+    sfText_setFillColor(app->texte, avec_alpha(c, app->alpha));
     sfText_setOutlineThickness(app->texte, app->contour);
-    sfText_setOutlineColor(app->texte, avecAlpha((sfColor){8, 8, 18, 220},
+    sfText_setOutlineColor(app->texte, avec_alpha((sfColor){8, 8, 18, 220},
         app->alpha * (c.a / 255.f)));
     sfRenderWindow_drawText(app->fenetre, app->texte, NULL);
     return b.width * echelle;
@@ -222,7 +222,7 @@ float texteEchelle(app_t *app, police_t p, const char *s, unsigned int taille,
 float texte(app_t *app, police_t p, const char *s, unsigned int taille,
     sfVector2f pos, sfColor c, alignement_t a)
 {
-    return texteEchelle(app, p, s, taille, pos, c, a, 1.f);
+    return texte_echelle(app, p, s, taille, pos, c, a, 1.f);
 }
 
 /** Copie `src` dans `dst` en l'abrégeant avec « … » s'il est trop large. */
@@ -232,7 +232,7 @@ void tronquer(app_t *app, police_t p, unsigned int taille, const char *src,
     int len = my_strlen(src);
 
     my_strcpy(dst, src);
-    if (largeurTexte(app, p, dst, taille) <= max)
+    if (largeur_texte(app, p, dst, taille) <= max)
         return;
     while (len > 0) {
         len--;
@@ -240,7 +240,7 @@ void tronquer(app_t *app, police_t p, unsigned int taille, const char *src,
             len--;
         memcpy(dst, src, len);
         my_strcpy(dst + len, "…");
-        if (largeurTexte(app, p, dst, taille) <= max)
+        if (largeur_texte(app, p, dst, taille) <= max)
             return;
     }
 }
@@ -277,15 +277,15 @@ static void aurores(app_t *app)
     float t = app->temps;
 
     lueur(app, (sfVector2f){340 + 180 * sinf(t * 0.13f), 220 + 90 * cosf(t * 0.17f)},
-        (sfVector2f){620, 420}, avecAlpha(C_CYAN, 0.10f));
+        (sfVector2f){620, 420}, avec_alpha(C_CYAN, 0.10f));
     lueur(app, (sfVector2f){980 + 160 * cosf(t * 0.11f), 520 + 80 * sinf(t * 0.19f)},
-        (sfVector2f){640, 440}, avecAlpha(C_MAGE, 0.08f));
+        (sfVector2f){640, 440}, avec_alpha(C_MAGE, 0.08f));
     lueur(app, (sfVector2f){700 + 260 * sinf(t * 0.07f), 380 + 60 * sinf(t * 0.23f)},
-        (sfVector2f){560, 300}, avecAlpha(C_ROUGE, 0.07f));
+        (sfVector2f){560, 300}, avec_alpha(C_ROUGE, 0.07f));
 }
 
 /** Les « fils rouges » qui ondulent en arrière-plan. */
-static void filsRouges(app_t *app)
+static void fils_rouges(app_t *app)
 {
     sfVector2f pts[90];
     float t = app->temps;
@@ -300,9 +300,9 @@ static void filsRouges(app_t *app)
                 + sinf(x * 0.0042f + t * (0.35f + f * 0.08f) + f * 2.1f) * (46.f + f * 10.f)
                 + sinf(x * 0.011f - t * 0.6f + f) * 14.f};
         }
-        ligneEpaisse(app, pts, 90, 14.f, avecAlpha(C_ROUGE, 0.035f), 1);
-        ligneEpaisse(app, pts, 90, 5.f, avecAlpha(C_ROUGE, 0.07f), 1);
-        ligneEpaisse(app, pts, 90, 1.6f, avecAlpha(C_ROUGE, 0.30f), 1);
+        ligne_epaisse(app, pts, 90, 14.f, avec_alpha(C_ROUGE, 0.035f), 1);
+        ligne_epaisse(app, pts, 90, 5.f, avec_alpha(C_ROUGE, 0.07f), 1);
+        ligne_epaisse(app, pts, 90, 1.6f, avec_alpha(C_ROUGE, 0.30f), 1);
     }
 }
 
@@ -321,18 +321,18 @@ static void poussieres(app_t *app)
         }
         scintille = 0.35f + 0.65f * (0.5f + 0.5f * sinf(app->temps * 1.7f + p->phase * 3.f));
         lueur(app, (sfVector2f){p->x, p->y}, (sfVector2f){p->taille * 3.f,
-            p->taille * 3.f}, avecAlpha(i % 3 == 0 ? C_ROUGE : C_CYAN,
+            p->taille * 3.f}, avec_alpha(i % 3 == 0 ? C_ROUGE : C_CYAN,
             0.35f * scintille));
     }
 }
 
-void dessinerFond(app_t *app)
+void dessiner_fond(app_t *app)
 {
     degrade(app);
     aurores(app);
-    filsRouges(app);
+    fils_rouges(app);
     poussieres(app);
-    sfSprite_setTexture(app->sprite, app->texVignette, sfTrue);
+    sfSprite_setTexture(app->sprite, app->tex_vignette, sfTrue);
     sfSprite_setOrigin(app->sprite, (sfVector2f){0, 0});
     sfSprite_setPosition(app->sprite, (sfVector2f){0, 0});
     sfSprite_setScale(app->sprite, (sfVector2f){LARGEUR / 256.f, HAUTEUR / 256.f});
