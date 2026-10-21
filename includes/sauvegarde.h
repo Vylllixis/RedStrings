@@ -19,7 +19,8 @@ typedef enum {
     SAUVEGARDE_ERR_MEMOIRE      /**< allocation impossible. */
 } sauvegarde_t;
 
-/** Écrit un personnage par ligne : « nom pv atq def classe ». */
+/** Écrit un personnage par ligne : « nom pv atq def classe soin ».
+ *  Les lignes sans soin (anciennes sauvegardes) restent lisibles. */
 sauvegarde_t sauvegarder(const roster_t *r, const char *chemin);
 
 /** Remplace le contenu de r par celui du fichier. En cas d'erreur, r n'est

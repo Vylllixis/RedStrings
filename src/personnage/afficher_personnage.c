@@ -48,6 +48,7 @@ void afficher_personnage(const personnage_t *p)
     afficher_stat("PV", p->pv, VERT);
     afficher_stat("ATK", p->atq, ROUGE);
     afficher_stat("DEF", p->def, BLEU);
+    afficher_stat("SOI", p->soin, CYAN);
     boite_bas(GRIS);
     printf("\n");
 }
