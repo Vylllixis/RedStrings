@@ -20,8 +20,11 @@ typedef struct {
     Classe_t classe;    /**< Classe du personnage. */
 } personnage_t;
 
-/** Demande le nom, les stats et la classe au joueur. */
-int creerPersonnage(personnage_t *p);
+/** Cherche un personnage par son nom, renvoie son indice ou -1. */
+int findPersonage(personnage_t *tab, int size, char *name);
+
+/** Demande le nom, les stats et la classe au joueur (nom unique dans tab). */
+int creerPersonnage(personnage_t *p, personnage_t *tab, int len);
 
 /** Affiche la fiche du personnage avec ses barres de stats. */
 int afficherPersonnage(const personnage_t *p);

@@ -46,7 +46,7 @@ int lireEntier(const char *question, int min, int max, int *resultat)
     }
 }
 
-int creerPersonnage(personnage_t *p)
+int creerPersonnage(personnage_t *p, personnage_t *tab, int len)
 {
     //en-tête
     printf("\n");
@@ -60,6 +60,10 @@ int creerPersonnage(personnage_t *p)
     if (scanf("%29s", p->name) != 1)
         return -1;
     viderBuffer();
+    if (findPersonage(tab, len, p->name) != -1) {
+        afficherErreur("Ce nom est déjà pris");
+        return -1;
+    }
     printf("\n");
 
     //choix des statistiques
