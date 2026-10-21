@@ -175,13 +175,13 @@ void fiche(app_t *app, const personnage_t *p, sfFloatRect r,
     lueur(app, (sfVector2f){cx, r.top + 80.f}, (sfVector2f){r.width * 0.55f, 140.f},
         avec_alpha(c, 0.16f));
     rect_arrondi(app, (sfFloatRect){cx - 44.f, r.top, 88.f, 3.f}, 1.5f, c);
-    avatar(app, p, (sfVector2f){cx, r.top + 104.f}, 60.f, p->pv == 0 ? 1.f : 0.f);
+    avatar(app, p, (sfVector2f){cx, r.top + 104.f}, 60.f, est_ko(p) ? 1.f : 0.f);
     tronquer(app, POLICE_GRAS, 32, p->nom[0] ? p->nom : "Sans nom",
         r.width - 60.f, buf);
     texte(app, POLICE_GRAS, buf, 32, (sfVector2f){cx, r.top + 200.f},
         p->nom[0] ? C_TEXTE : C_TEXTE_FAIBLE, ALIGNE_CENTRE);
     pastille(app, nom_classe_maj(p->classe), (sfVector2f){cx, r.top + 244.f}, c, 0);
-    if (p->pv == 0)
+    if (est_ko(p))
         pastille(app, "K.O.", (sfVector2f){r.left + r.width - 46.f, r.top + 32.f},
             C_ROUGE, 1);
     rect_arrondi(app, (sfFloatRect){r.left + 32.f, r.top + 282.f, r.width - 64.f, 1.f},
@@ -225,7 +225,7 @@ static void mini_stats(app_t *app, const personnage_t *p, sfFloatRect r)
 void mini_carte(app_t *app, const personnage_t *p, sfFloatRect r,
     float survol, const marque_t *marque)
 {
-    float mort = p->pv == 0 ? 1.f : 0.f;
+    float mort = est_ko(p) ? 1.f : 0.f;
     sfColor c = griser(couleur_classe(p->classe), mort * 0.8f);
     sfColor bord = melanger(C_BORD, avec_alpha(c, 0.8f), survol);
     float cx = r.left + r.width / 2.f;
@@ -302,7 +302,7 @@ int grille_cartes(app_t *app, grille_t *g, const int *ids, int n, float y0,
         g->survol[id] = approcher(g->survol[id], s ? 1.f : 0.f, 14.f, app->dt);
         maj_ressort(&g->lift[id], s ? -10.f : 0.f, 280.f, 18.f, app->dt);
         app->alpha = a * progression(app->t_scene, 0.15f + i * 0.05f, 0.3f);
-        mini_carte(app, &app->persos[id], (sfFloatRect){x, y + g->lift[id].x
+        mini_carte(app, &app->equipe.data[id], (sfFloatRect){x, y + g->lift[id].x
             + 40.f * (1.f - e), CARTE_L, CARTE_H}, g->survol[id],
             chercher_marque(marques, nb_marques, id));
     }

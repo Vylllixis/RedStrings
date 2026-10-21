@@ -141,6 +141,7 @@ int creer_app(app_t *app)
     sfVideoMode mode = {LARGEUR, HAUTEUR, 32};
 
     memset(app, 0, sizeof(app_t));
+    roster_init(&app->equipe);
     srand(time(NULL));
     app->fenetre = sfRenderWindow_create(mode, "Redstrings",
         sfTitlebar | sfClose, &reglages);
@@ -190,6 +191,7 @@ void detruire_app(app_t *app)
         sfClock_destroy(app->horloge);
     if (app->vue)
         sfView_destroy(app->vue);
+    roster_liberer(&app->equipe);
 }
 
 static void traiter_evenement(app_t *app, sfEvent *e)

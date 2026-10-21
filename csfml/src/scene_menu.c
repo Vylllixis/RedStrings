@@ -86,15 +86,15 @@ static void titre(app_t *app, float t)
 
 static void action(app_t *app, int choix)
 {
-    if (choix == 0 && app->nb_persos >= MAX_PERSONNAGES)
+    if (choix == 0 && app->equipe.len >= MAX_PERSONNAGES)
         notifier(app, "✗", "Nombre maximum de personnages atteint", C_ROUGE);
     else if (choix == 0)
         changer_scene(app, SCENE_CREATION);
-    if (choix == 1 && app->nb_persos == 0)
+    if (choix == 1 && app->equipe.len == 0)
         notifier(app, "✗", "Aucun personnage : crée-en un d'abord", C_ROUGE);
     else if (choix == 1)
         changer_scene(app, SCENE_LISTE);
-    if (choix == 2 && app->nb_persos < 2)
+    if (choix == 2 && app->equipe.len < 2)
         notifier(app, "✗", "Il faut au moins 2 personnages pour un combat", C_ROUGE);
     else if (choix == 2)
         changer_scene(app, SCENE_SELECTION);
@@ -123,15 +123,15 @@ static void boutons_menu(app_t *app, float t)
         "Afficher un personnage", "Combat", "Quitter"};
     static const char *touches[4] = {"1", "2", "3", "0"};
     const sfColor accents[4] = {C_CYAN, C_BLEU, C_ROUGE, C_TEXTE_DOUX};
-    const int actifs[4] = {app->nb_persos < MAX_PERSONNAGES, app->nb_persos > 0,
-        app->nb_persos >= 2, 1};
+    const int actifs[4] = {app->equipe.len < MAX_PERSONNAGES, app->equipe.len > 0,
+        app->equipe.len >= 2, 1};
     char infos[3][32];
     float a = app->alpha;
     float e = 0.f;
     int choix = touche_menu(app);
 
-    snprintf(infos[0], sizeof(infos[0]), "%d / %d", app->nb_persos, MAX_PERSONNAGES);
-    snprintf(infos[1], sizeof(infos[1]), "%d héros", app->nb_persos);
+    snprintf(infos[0], sizeof(infos[0]), "%d / %d", app->equipe.len, MAX_PERSONNAGES);
+    snprintf(infos[1], sizeof(infos[1]), "%d héros", app->equipe.len);
     snprintf(infos[2], sizeof(infos[2]), "1 contre 1");
     for (int i = 0; i < 4; i++) {
         e = sortie_cubique(progression(t, 0.4f + i * 0.07f, 0.55f));
@@ -165,26 +165,26 @@ static void equipe(app_t *app, float t)
     char buf[48];
 
     app->alpha = a * progression(t, 0.8f, 0.4f);
-    snprintf(buf, sizeof(buf), "ÉQUIPE  ·  %d / %d", app->nb_persos, MAX_PERSONNAGES);
+    snprintf(buf, sizeof(buf), "ÉQUIPE  ·  %d / %d", app->equipe.len, MAX_PERSONNAGES);
     etiquette(app, buf, (sfVector2f){LARGEUR / 2.f, 628.f}, C_TEXTE_FAIBLE, ALIGNE_CENTRE);
     for (int i = 0; i < MAX_PERSONNAGES; i++) {
         e = sortie_rebond(progression(t, 0.85f + i * 0.035f, 0.45f));
         c = (sfVector2f){LARGEUR / 2.f - 198.f + i * 44.f, 668.f};
-        if (i >= app->nb_persos) {
+        if (i >= app->equipe.len) {
             cercle(app, c, 15.f * e, C_TRANSPARENT, avec_alpha(C_BLANC, 0.1f), 1.5f);
             continue;
         }
         h[i] = approcher(h[i], survole(app, (sfFloatRect){c.x - 18.f, c.y - 18.f,
             36.f, 36.f}) ? 1.f : 0.f, 14.f, app->dt);
-        avatar(app, &app->persos[i], (sfVector2f){c.x, c.y - 4.f * h[i]},
-            16.f * e * (1.f + 0.15f * h[i]), app->persos[i].pv == 0);
+        avatar(app, &app->equipe.data[i], (sfVector2f){c.x, c.y - 4.f * h[i]},
+            16.f * e * (1.f + 0.15f * h[i]), est_ko(&app->equipe.data[i]));
     }
-    for (int i = 0; i < app->nb_persos; i++) {
+    for (int i = 0; i < app->equipe.len; i++) {
         if (h[i] < 0.01f)
             continue;
         app->alpha = a * h[i];
-        infobulle(app, app->persos[i].nom, (sfVector2f){LARGEUR / 2.f - 198.f + i * 44.f,
-            624.f - 6.f * h[i]});
+        infobulle(app, app->equipe.data[i].nom, (sfVector2f){LARGEUR / 2.f - 198.f
+            + i * 44.f, 624.f - 6.f * h[i]});
     }
     app->alpha = a;
 }

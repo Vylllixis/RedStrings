@@ -32,8 +32,8 @@ static int filtrer(app_t *app, const char *recherche, int *ids)
 {
     int n = 0;
 
-    for (int i = 0; i < app->nb_persos; i++) {
-        if (contient_nom(app->persos[i].nom, recherche))
+    for (int i = 0; i < app->equipe.len; i++) {
+        if (contient_nom(app->equipe.data[i].nom, recherche))
             ids[n++] = i;
     }
     return n;
@@ -50,7 +50,7 @@ static void loupe(app_t *app, sfVector2f c, sfColor col)
 /** Entrée dans la recherche : même logique que demander_personnage(). */
 static void valider(app_t *app, liste_t *l, const int *ids, int n)
 {
-    int idx = trouver_personnage(app->persos, app->nb_persos, l->recherche.texte);
+    int idx = trouver_personnage(app->equipe.data, app->equipe.len, l->recherche.texte);
 
     if (idx == -1 && n == 1)
         idx = ids[0];
@@ -64,16 +64,16 @@ static void valider(app_t *app, liste_t *l, const int *ids, int n)
 
 static void naviguer(app_t *app, liste_t *l, int sens)
 {
-    ouvrir(l, (l->ouvert + sens + app->nb_persos) % app->nb_persos);
+    ouvrir(l, (l->ouvert + sens + app->equipe.len) % app->equipe.len);
 }
 
 static void clavier_modal(app_t *app, liste_t *l)
 {
     if (app->in.touches[sfKeyEscape] || app->in.touches[sfKeyEnter])
         l->ouvert = -1;
-    else if (app->in.touches[sfKeyLeft] && app->nb_persos > 1)
+    else if (app->in.touches[sfKeyLeft] && app->equipe.len > 1)
         naviguer(app, l, -1);
-    else if (app->in.touches[sfKeyRight] && app->nb_persos > 1)
+    else if (app->in.touches[sfKeyRight] && app->equipe.len > 1)
         naviguer(app, l, 1);
 }
 
@@ -86,7 +86,7 @@ static int boutons_modal(app_t *app, liste_t *l, sfFloatRect r)
         l->ouvert = -1;
         clic = 1;
     }
-    if (app->nb_persos < 2)
+    if (app->equipe.len < 2)
         return clic;
     if (bouton_rond(app, &l->precedent, (sfVector2f){r.left - 56.f, r.top
         + r.height / 2.f}, "‹")) {
@@ -101,18 +101,27 @@ static int boutons_modal(app_t *app, liste_t *l, sfFloatRect r)
     return clic;
 }
 
+/** PV, attaque ou défense selon i (0, 1, 2), dans l'ordre de la fiche. */
+static int stat_numero(const personnage_t *p, int i)
+{
+    if (i == 0)
+        return p->pv;
+    return i == 1 ? p->atq : p->def;
+}
+
 /** Fiche plein écran : équivalent de afficher_personnage(). */
 static void modal(app_t *app, liste_t *l, float a)
 {
     int id = l->ouvert >= 0 ? l->ouvert : l->dernier;
-    const int vals[3] = {app->persos[id].pv, app->persos[id].atq, app->persos[id].def};
+    const personnage_t *p = NULL;
     float m = 0.f;
     sfFloatRect r;
     char buf[32];
 
     l->modal = approcher(l->modal, l->ouvert >= 0 ? 1.f : 0.f, 12.f, app->dt);
-    if (l->modal < 0.01f)
+    if (l->modal < 0.01f || id >= app->equipe.len)
         return;
+    p = &app->equipe.data[id];
     l->t_modal += app->dt;
     m = l->modal;
     app->alpha = a * m;
@@ -121,12 +130,12 @@ static void modal(app_t *app, liste_t *l, float a)
     r = (sfFloatRect){LARGEUR / 2.f - FICHE_L / 2.f, 92.f + 50.f * (1.f - m), FICHE_L,
         FICHE_H};
     lueur(app, (sfVector2f){LARGEUR / 2.f, r.top + r.height / 2.f}, (sfVector2f){520.f,
-        420.f}, avec_alpha(couleur_classe(app->persos[id].classe), 0.12f));
+        420.f}, avec_alpha(couleur_classe(p->classe), 0.12f));
     for (int i = 0; i < 3; i++)
-        l->segments[i] = fminf((vals[i] + 4) / 5, fmaxf(0.f, (l->t_modal - 0.15f
+        l->segments[i] = fminf((stat_numero(p, i) + 4) / 5, fmaxf(0.f, (l->t_modal - 0.15f
             - i * 0.12f) * 48.f));
-    fiche(app, &app->persos[id], r, l->segments);
-    snprintf(buf, sizeof(buf), "%d / %d", id + 1, app->nb_persos);
+    fiche(app, p, r, l->segments);
+    snprintf(buf, sizeof(buf), "%d / %d", id + 1, app->equipe.len);
     texte(app, POLICE_GRAS, buf, 14, (sfVector2f){LARGEUR / 2.f, r.top + r.height + 32.f},
         C_TEXTE_DOUX, ALIGNE_CENTRE);
     texte(app, POLICE_NORMALE, "Échap pour fermer  ·  flèches pour changer de personnage",
@@ -168,7 +177,7 @@ void scene_liste(app_t *app)
         changer_scene(app, SCENE_MENU);
     app->souris_bloquee = bloque || ouvert || l->modal > 0.05f;
     snprintf(buf, sizeof(buf), "%d personnage%s  ·  clique sur une carte pour voir sa fiche",
-        app->nb_persos, app->nb_persos > 1 ? "s" : "");
+        app->equipe.len, app->equipe.len > 1 ? "s" : "");
     en_tete(app, &l->retour, "Personnages", buf);
     recherche(app, l, a, !ouvert);
     n = filtrer(app, l->recherche.texte, ids);

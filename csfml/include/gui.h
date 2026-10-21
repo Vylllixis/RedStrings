@@ -9,9 +9,12 @@
     #include <SFML/Graphics.h>
     #include "my_string.h"
     #include "personnage.h"
+    #include "roster.h"
+    #include "sauvegarde.h"
 
     #define LARGEUR 1280
     #define HAUTEUR 720
+    /* Le roster est illimité, mais l'écran n'a de place que pour 10 cartes. */
     #define MAX_PERSONNAGES 10
     #define MAX_PARTICULES 900
     #define MAX_TOASTS 4
@@ -245,8 +248,7 @@ typedef struct {
     float rotation;     /**< Rotation (degrés) du prochain texte. */
     int souris_bloquee;
     entree_t in;
-    personnage_t persos[MAX_PERSONNAGES];
-    int nb_persos;
+    roster_t equipe;    /**< Même roster que la console (roster.c). */
     scene_t scene;
     scene_t scene_suivante;
     float t_scene;
@@ -353,7 +355,6 @@ int grille_cartes(app_t *app, grille_t *g, const int *ids, int n, float y0,
     const marque_t *marques, int nb_marques);
 
 /* jeu.c */
-int appliquer_attaque(personnage_t *attaquant, personnage_t *cible);
 int contient_nom(const char *nom, const char *recherche);
 
 /* scènes */

@@ -46,31 +46,33 @@ static void erreur_nom(app_t *app, creation_t *c, const char *message)
 /** Équivalent graphique de creer_personnage(). */
 static void creer(app_t *app, creation_t *c)
 {
-    personnage_t *p = NULL;
+    personnage_t p = {0};
     char msg[96];
 
     if (c->nom.texte[0] == '\0') {
         erreur_nom(app, c, "Donne un nom à ton personnage");
         return;
     }
-    if (trouver_personnage(app->persos, app->nb_persos, c->nom.texte) != -1) {
+    if (trouver_personnage(app->equipe.data, app->equipe.len, c->nom.texte) != -1) {
         erreur_nom(app, c, "Ce nom est déjà pris");
         return;
     }
-    if (app->nb_persos >= MAX_PERSONNAGES) {
+    if (app->equipe.len >= MAX_PERSONNAGES) {
         notifier(app, "✗", "Nombre maximum de personnages atteint", C_ROUGE);
         return;
     }
-    p =&app->persos[app->nb_persos++];
-    memset(p, 0, sizeof(personnage_t));
-    my_strcpy(p->nom, c->nom.texte);
-    p->pv = c->valeurs[0];
-    p->atq = c->valeurs[1];
-    p->def = c->valeurs[2];
-    p->classe = c->classe;
-    snprintf(msg, sizeof(msg), "%s a été créé !", p->nom);
+    my_strcpy(p.nom, c->nom.texte);
+    p.pv = c->valeurs[0];
+    p.atq = c->valeurs[1];
+    p.def = c->valeurs[2];
+    p.classe = c->classe;
+    if (roster_ajouter(&app->equipe, &p) == -1) {
+        notifier(app, "✗", "Mémoire insuffisante", C_ROUGE);
+        return;
+    }
+    snprintf(msg, sizeof(msg), "%s a été créé !", p.nom);
     notifier(app, "✔", msg, C_VERT);
-    emettre(app, (sfVector2f){980.f, 205.f}, 80, couleur_classe(p->classe), 640.f, 4.5f);
+    emettre(app, (sfVector2f){980.f, 205.f}, 80, couleur_classe(p.classe), 640.f, 4.5f);
     emettre(app, (sfVector2f){980.f, 205.f}, 30, C_BLANC, 420.f, 3.f);
     c->flash = 1.f;
     c->sortie = DUREE_SORTIE_CREATION;
