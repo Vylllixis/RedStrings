@@ -193,7 +193,7 @@ int boutonRond(app_t *app, bouton_t *b, sfVector2f centre, const char *sym)
 
 static void supprimerDernier(char *s)
 {
-    int len = strlen(s);
+    int len = my_strlen(s);
 
     if (len == 0)
         return;
@@ -240,7 +240,7 @@ static void saisir(app_t *app, champ_t *c, int max)
             continue;
         }
         n = encoderUtf8(app->in.texte[i], u);
-        len = strlen(c->texte);
+        len = my_strlen(c->texte);
         if (len + n > max) {
             c->secousse = 1.f;
             continue;
@@ -273,9 +273,9 @@ static void dessinerSaisie(app_t *app, champ_t *c, float x0, float cy)
     float xf = x0 + positionCaractere(app, POLICE_NORMALE, c->texte, 21, nb);
     float e = sortieRebond(progression(c->tape, 0.f, 0.24f));
 
-    strcpy(prefixe, c->texte);
+    my_strcpy(prefixe, c->texte);
     supprimerDernier(prefixe);
-    strcpy(dernier, c->texte + strlen(prefixe));
+    my_strcpy(dernier, c->texte + my_strlen(prefixe));
     texte(app, POLICE_NORMALE, prefixe, 21, (sfVector2f){x0, cy}, C_TEXTE,
         ALIGNE_GAUCHE);
     texteEchelle(app, POLICE_NORMALE, dernier, 21, (sfVector2f){(xd + xf) / 2.f,

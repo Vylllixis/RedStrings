@@ -6,8 +6,8 @@
 #include <errno.h>
 #include <stdio.h>
 #include <stdlib.h>
-#include <string.h>
 #include "couleurs.h"
+#include "my_string.h"
 #include "saisie.h"
 
 void viderBuffer(void)
@@ -35,7 +35,7 @@ int lireLigne(char *buf, size_t taille)
 
     if (fgets(buf, (int)taille, stdin) == NULL)
         return -1;
-    len = strlen(buf);
+    len = my_strlen(buf);
     if (len > 0 && buf[len - 1] == '\n')
         buf[len - 1] = '\0';         // on retire le '\n'
     else
