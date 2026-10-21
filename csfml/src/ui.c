@@ -42,19 +42,16 @@ int bouton(app_t *app, bouton_t *b, sfFloatRect r, const char *label,
     if (!actif)
         app->alpha *= 0.45f;
     lueur(app, (sfVector2f){rr.left + rr.width / 2.f, cy},
-        (sfVector2f){rr.width * 0.75f, rr.height * 1.6f}, avec_alpha(accent, 0.16f * h));
-    ombre(app, rr, 16.f, 0.8f);
-    rect_arrondi_bord(app, rr, 16.f, melanger(C_SURFACE, C_SURFACE_HAUTE, h),
-        melanger(C_BORD, avec_alpha(accent, 0.8f), h));
-    rect_arrondi(app, (sfFloatRect){rr.left + 1.f, cy - 13.f * h, 3.f, 26.f * h},
-        1.5f, accent);
+        (sfVector2f){rr.width * 0.75f, rr.height * 1.6f}, avec_alpha(accent, 0.14f * h));
+    ombre_biseau(app, rr, 14.f, 0.8f);
+    panneau(app, rr, 14.f, melanger(C_SURFACE_HAUTE, melanger(C_SURFACE_HAUTE, accent,
+        0.25f), h), C_SURFACE, melanger(C_BORD, avec_alpha(accent, 0.8f), h));
+    rect_arrondi(app, (sfFloatRect){rr.left, rr.top + 14.f, 3.f, rr.height - 14.f},
+        0.f, avec_alpha(accent, 0.35f + 0.65f * h));
     if (touche) {
-        lb = fmaxf(34.f, largeur_texte(app, POLICE_GRAS, touche, 15) + 20.f);
-        rect_arrondi(app, (sfFloatRect){x - 6.f, cy - 17.f, lb, 34.f}, 10.f,
-            avec_alpha(accent, 0.14f + 0.86f * h));
-        texte(app, POLICE_GRAS, touche, 15, (sfVector2f){x - 6.f + lb / 2.f, cy},
-            melanger(accent, C_FOND, h), ALIGNE_CENTRE);
-        x += lb + 10.f;
+        lb = largeur_touche(app, touche);
+        touche_clavier(app, touche, (sfVector2f){x + lb / 2.f, cy}, accent, h);
+        x += lb + 14.f;
     }
     texte(app, POLICE_GRAS, label, 19, (sfVector2f){x, cy},
         melanger(C_TEXTE_DOUX, C_TEXTE, 0.55f + 0.45f * h), ALIGNE_GAUCHE);
@@ -132,48 +129,59 @@ int bouton_plein(app_t *app, bouton_t *b, sfFloatRect r, const char *label,
     float pulse = 0.5f + 0.5f * sinf(app->temps * 3.f);
     sfFloatRect rr = {r.left, r.top - 3.f * h + 2.f * b->appui, r.width, r.height};
     sfVector2f c = {rr.left + rr.width / 2.f, rr.top + rr.height / 2.f};
-    float lt = largeur_texte(app, POLICE_GRAS, label, 21);
-    float lk = touche ? largeur_texte(app, POLICE_GRAS, touche, 12) + 18.f : 0.f;
-    float x = c.x - (lt + (touche ? lk + 14.f : 0.f)) / 2.f;
+    float lt = largeur_texte(app, POLICE_GRAS, label, 20);
+    float lk = touche ? largeur_touche(app, touche) : 0.f;
+    float x = c.x - (lt + (touche ? lk + 16.f : 0.f)) / 2.f;
+    sfColor haut = melanger(accent, C_BLANC, 0.18f + 0.12f * h);
+    sfColor bas = melanger(accent, C_NOIR, 0.28f);
 
-    if (actif)
-        lueur(app, (sfVector2f){c.x, c.y + 10.f}, (sfVector2f){rr.width * 0.72f,
-            rr.height * 1.4f}, avec_alpha(accent, 0.22f + 0.12f * pulse + 0.2f * h));
-    ombre(app, rr, 18.f, 1.f);
-    rect_arrondi_bord(app, rr, 18.f, actif ? melanger(accent, C_BLANC, 0.1f * h)
-        : melanger(C_SURFACE_HAUTE, accent, 0.15f),
-        avec_alpha(C_BLANC, actif ? 0.2f : 0.06f));
-    rect_arrondi(app, (sfFloatRect){rr.left + 3.f, rr.top + 3.f, rr.width - 6.f,
-        rr.height * 0.42f}, 15.f, avec_alpha(C_BLANC, actif ? 0.09f : 0.02f));
-    if (actif)
-        reflet(app, rr, 18.f);
-    texte(app, POLICE_GRAS, label, 21, (sfVector2f){x, c.y},
-        actif ? C_BLANC : C_TEXTE_FAIBLE, ALIGNE_GAUCHE);
-    if (touche) {
-        rect_arrondi(app, (sfFloatRect){x + lt + 14.f, c.y - 12.f, lk, 24.f}, 8.f,
-            avec_alpha(C_BLANC, actif ? 0.2f : 0.05f));
-        texte(app, POLICE_GRAS, touche, 12, (sfVector2f){x + lt + 14.f + lk / 2.f, c.y},
-            avec_alpha(C_BLANC, actif ? 0.92f : 0.3f), ALIGNE_CENTRE);
+    if (!actif) {
+        haut = melanger(C_SURFACE_HAUTE, accent, 0.12f);
+        bas = C_SURFACE;
     }
+    if (actif)
+        lueur(app, (sfVector2f){c.x, c.y + 8.f}, (sfVector2f){rr.width * 0.7f,
+            rr.height * 1.5f}, avec_alpha(accent, 0.20f + 0.10f * pulse + 0.2f * h));
+    ombre_biseau(app, rr, 18.f, 1.f);
+    panneau(app, rr, 18.f, haut, bas, avec_alpha(actif ? melanger(accent, C_BLANC, 0.5f)
+        : C_BORD, actif ? 0.9f : 1.f));
+    panneau(app, (sfFloatRect){rr.left + 18.f, rr.top + 2.f, rr.width - 36.f, 2.f}, 0.f,
+        avec_alpha(C_BLANC, actif ? 0.35f : 0.06f), avec_alpha(C_BLANC, 0.f),
+        C_TRANSPARENT);
+    if (actif) {
+        crochets(app, (sfFloatRect){rr.left - 5.f, rr.top - 5.f, rr.width + 10.f,
+            rr.height + 10.f}, 12.f + 6.f * h, avec_alpha(melanger(accent, C_BLANC, 0.4f),
+            0.5f + 0.5f * h));
+        reflet(app, rr, 18.f);
+    }
+    app->espacement = 1.25f;
+    texte(app, POLICE_GRAS, label, 20, (sfVector2f){x, c.y},
+        actif ? C_BLANC : C_TEXTE_FAIBLE, ALIGNE_GAUCHE);
+    app->espacement = 0.f;
+    if (touche)
+        touche_clavier(app, touche, (sfVector2f){x + lt + 16.f + lk / 2.f, c.y},
+            actif ? C_BLANC : C_TEXTE_FAIBLE, actif ? 0.85f : 0.f);
     return clic;
 }
 
 int bouton_retour(app_t *app, bouton_t *b, sfVector2f pos)
 {
-    sfFloatRect r = {pos.x, pos.y, 126.f, 42.f};
+    sfFloatRect r = {pos.x, pos.y, 126.f, 40.f};
     int clic = interaction(app, b, r, 1);
     float h = b->survol;
     sfFloatRect rr = {r.left - 4.f * h, r.top, r.width, r.height};
     float cy = rr.top + rr.height / 2.f;
 
-    rect_arrondi_bord(app, rr, 21.f, melanger(avec_alpha(C_SURFACE, 0.6f),
-        C_SURFACE_HAUTE, h), melanger(C_BORD, avec_alpha(C_CYAN, 0.6f), h));
-    texte(app, POLICE_GRAS, "‹", 26, (sfVector2f){rr.left + 24.f - 3.f * h, cy - 2.f},
+    panneau(app, rr, 10.f, melanger(avec_alpha(C_SURFACE_HAUTE, 0.7f), C_SURFACE_HAUTE, h),
+        avec_alpha(C_SURFACE, 0.7f), melanger(C_BORD, avec_alpha(C_CYAN, 0.7f), h));
+    texte(app, POLICE_GRAS, "‹", 26, (sfVector2f){rr.left + 22.f - 3.f * h, cy - 2.f},
         melanger(C_TEXTE_DOUX, C_CYAN, h), ALIGNE_CENTRE);
-    texte(app, POLICE_NORMALE, "Retour", 16, (sfVector2f){rr.left + 42.f, cy},
+    app->espacement = 1.6f;
+    texte(app, POLICE_GRAS, "RETOUR", 13, (sfVector2f){rr.left + 40.f, cy},
         melanger(C_TEXTE_DOUX, C_TEXTE, h), ALIGNE_GAUCHE);
-    texte(app, POLICE_NORMALE, "Échap", 13, (sfVector2f){r.left + r.width + 16.f, cy},
-        avec_alpha(C_TEXTE_FAIBLE, 0.8f), ALIGNE_GAUCHE);
+    app->espacement = 0.f;
+    touche_clavier(app, "Échap", (sfVector2f){r.left + r.width + 34.f, cy},
+        C_CYAN, 0.f);
     return clic;
 }
 
@@ -304,10 +312,14 @@ int champ_texte(app_t *app, champ_t *c, sfFloatRect r, const char *aide,
     dx = sinf(app->temps * 60.f) * 9.f * c->secousse;
     x0 = r.left + dx + (c->marge > 0.f ? c->marge : 20.f);
     lueur(app, (sfVector2f){r.left + r.width / 2.f, cy}, (sfVector2f){r.width * 0.6f,
-        r.height * 1.6f}, avec_alpha(C_CYAN, 0.12f * c->focus_anim));
-    rect_arrondi_bord(app, (sfFloatRect){r.left + dx, r.top, r.width, r.height}, 14.f,
-        C_CHAMP, melanger(melanger(C_BORD, avec_alpha(C_CYAN, 0.85f), c->focus_anim),
+        r.height * 1.6f}, avec_alpha(C_CYAN, 0.10f * c->focus_anim));
+    panneau(app, (sfFloatRect){r.left + dx, r.top, r.width, r.height}, 12.f,
+        melanger(C_CHAMP, (sfColor){18, 30, 52, 245}, c->focus_anim), C_CHAMP,
+        melanger(melanger(C_BORD, avec_alpha(C_CYAN, 0.85f), c->focus_anim),
         C_ROUGE, c->secousse * 1.5f));
+    rect_arrondi(app, (sfFloatRect){r.left + dx + 12.f, r.top + r.height - 2.f,
+        (r.width - 24.f) * sortie_cubique(c->focus_anim), 2.f}, 0.f,
+        avec_alpha(C_CYAN, 0.9f * c->focus_anim));
     if (c->texte[0] == '\0') {
         texte(app, POLICE_NORMALE, aide, 19, (sfVector2f){x0, cy}, C_TEXTE_FAIBLE,
             ALIGNE_GAUCHE);
@@ -324,26 +336,47 @@ int champ_texte(app_t *app, champ_t *c, sfFloatRect r, const char *aide,
     return s && app->in.clic;
 }
 
+#define GL_LABEL 168.f
+#define GL_VALEUR 96.f
+#define GL_CASES 20
+
+/** Piste en 20 cases (comme les barres de la fiche), remplie jusqu'à `f`. */
 static void piste(app_t *app, float tx, float tw, float cy, float f, sfColor col)
 {
-    rect_arrondi(app, (sfFloatRect){tx, cy - 3.f, tw, 6.f}, 3.f, avec_alpha(C_BLANC, 0.08f));
-    for (int k = 1; k < 4; k++)
-        cercle(app, (sfVector2f){tx + tw * k / 4.f, cy}, 1.5f,
-            avec_alpha(C_BLANC, 0.18f), C_TRANSPARENT, 0.f);
+    float cw = (tw - (GL_CASES - 1) * 3.f) / GL_CASES;
+    float rempli = 0.f;
+    float x = 0.f;
+
+    for (int k = 0; k < GL_CASES; k++) {
+        x = tx + k * (cw + 3.f);
+        rempli = bornerf(f * GL_CASES - k, 0.f, 1.f);
+        panneau(app, (sfFloatRect){x, cy - 5.f, cw, 10.f}, 3.f,
+            avec_alpha(C_BLANC, 0.07f), avec_alpha(C_BLANC, 0.04f), C_TRANSPARENT);
+        if (rempli > 0.f)
+            panneau(app, (sfFloatRect){x, cy - 5.f, cw * rempli, 10.f}, 3.f * rempli,
+                melanger(col, C_BLANC, 0.25f), col, C_TRANSPARENT);
+    }
     lueur(app, (sfVector2f){tx + tw * f / 2.f, cy}, (sfVector2f){tw * f / 2.f + 24.f,
-        16.f}, avec_alpha(col, 0.22f));
-    rect_arrondi(app, (sfFloatRect){tx, cy - 3.f, fmaxf(6.f, tw * f), 6.f}, 3.f, col);
+        18.f}, avec_alpha(col, 0.16f));
 }
 
+/**
+ * Glissière d'une statistique : libellé, piste en cases avec un curseur en
+ * losange, puis valeur dans un cadran. Se manipule à la souris ou au
+ * clavier (géré par l'écran appelant).
+ */
 int glissiere(app_t *app, glissiere_t *g, sfFloatRect r, const char *label,
     int *valeur, sfColor col, int focus)
 {
     float cy = r.top + r.height / 2.f;
-    float tx = r.left + 168.f;
-    float tw = r.width - 168.f - 64.f;
+    float tx = r.left + GL_LABEL;
+    float tw = r.width - GL_LABEL - GL_VALEUR;
     int s = survole(app, r);
+    float f = 0.f;
     float kx = 0.f;
-    float kr = 0.f;
+    float act = 0.f;
+    sfFloatRect cadran = {r.left + r.width - GL_VALEUR + 18.f, cy - 18.f,
+        GL_VALEUR - 18.f, 36.f};
     char buf[8];
 
     if (s)
@@ -355,23 +388,35 @@ int glissiere(app_t *app, glissiere_t *g, sfFloatRect r, const char *label,
     if (g->glisse)
         *valeur = STAT_MIN + (int)roundf(bornerf((app->in.souris.x - tx) / tw, 0.f, 1.f)
             * (STAT_MAX - STAT_MIN));
-    g->survol = approcher(g->survol, s || g->glisse ? 1.f : 0.f, 14.f, app->dt);
+    g->survol = approcher(g->survol, s || g->glisse || focus ? 1.f : 0.f, 14.f, app->dt);
     g->affiche = approcher(g->affiche, *valeur, 16.f, app->dt);
-    rect_arrondi(app, (sfFloatRect){r.left - 14.f, r.top, r.width + 28.f, r.height},
-        14.f, avec_alpha(C_BLANC, 0.025f * g->survol + (focus ? 0.045f : 0.f)));
+    act = g->survol;
+    f = (g->affiche - STAT_MIN) / (STAT_MAX - STAT_MIN);
+    panneau(app, (sfFloatRect){r.left - 14.f, r.top, r.width + 28.f, r.height}, 10.f,
+        avec_alpha(col, 0.07f * act), avec_alpha(C_BLANC, 0.015f * act),
+        avec_alpha(col, focus ? 0.35f : 0.f));
     if (focus)
-        rect_arrondi(app, (sfFloatRect){r.left - 14.f, cy - 11.f, 3.f, 22.f}, 1.5f, col);
-    texte(app, POLICE_NORMALE, label, 17, (sfVector2f){r.left, cy},
-        focus ? C_TEXTE : C_TEXTE_DOUX, ALIGNE_GAUCHE);
-    piste(app, tx, tw, cy, (g->affiche - STAT_MIN) / (STAT_MAX - STAT_MIN), col);
-    kx = tx + tw * (g->affiche - STAT_MIN) / (STAT_MAX - STAT_MIN);
-    kr = 8.f + 3.f * g->survol + 2.f * g->glisse;
-    lueur(app, (sfVector2f){kx, cy}, (sfVector2f){kr * 3.2f, kr * 3.2f},
-        avec_alpha(col, 0.3f + 0.35f * g->survol));
-    cercle(app, (sfVector2f){kx, cy}, kr, C_BLANC, col, 3.f);
+        rect_arrondi(app, (sfFloatRect){r.left - 14.f, r.top + 10.f, 3.f,
+            r.height - 10.f}, 0.f, col);
+    texte(app, POLICE_NORMALE, label, 17, (sfVector2f){r.left + 6.f * act, cy},
+        melanger(C_TEXTE_DOUX, C_TEXTE, act), ALIGNE_GAUCHE);
+    piste(app, tx, tw, cy, f, col);
+    kx = tx + tw * f;
+    lueur(app, (sfVector2f){kx, cy}, (sfVector2f){34.f + 10.f * act, 34.f + 10.f * act},
+        avec_alpha(col, 0.35f + 0.35f * act));
+    losange(app, (sfVector2f){kx, cy}, 10.f + 2.f * act + 2.f * g->glisse,
+        melanger(col, C_BLANC, 0.85f));
+    losange(app, (sfVector2f){kx, cy}, 5.f, col);
+    panneau(app, cadran, 8.f, melanger(C_SURFACE_HAUTE, col, 0.10f + 0.12f * act),
+        C_CHAMP, avec_alpha(col, 0.25f + 0.45f * act));
     snprintf(buf, sizeof(buf), "%d", (int)roundf(g->affiche));
-    texte_echelle(app, POLICE_GRAS, buf, 26, (sfVector2f){r.left + r.width, cy}, col,
-        ALIGNE_DROITE, 1.f + 0.1f * g->glisse);
+    texte_echelle(app, POLICE_GRAS, buf, 22, (sfVector2f){cadran.left + 38.f, cy},
+        melanger(col, C_BLANC, 0.15f), ALIGNE_DROITE, 1.f + 0.1f * g->glisse);
+    texte(app, POLICE_NORMALE, "/99", 12, (sfVector2f){cadran.left + 42.f, cy + 2.f},
+        C_TEXTE_FAIBLE, ALIGNE_GAUCHE);
+    if (focus)
+        texte(app, POLICE_GRAS, "‹ ›", 15, (sfVector2f){cadran.left - 22.f, cy - 1.f},
+            avec_alpha(col, 0.5f + 0.5f * sinf(app->temps * 5.f)), ALIGNE_CENTRE);
     return s && app->in.clic;
 }
 
@@ -411,9 +456,9 @@ static void dessiner_toast(app_t *app, toast_t *t)
     float cy = r.top + r.height / 2.f;
 
     app->alpha = fminf(progression(t->t, 0.f, 0.2f), f);
-    ombre(app, r, 23.f, 1.2f);
-    rect_arrondi_bord(app, r, 23.f, (sfColor){20, 24, 44, 250},
-        avec_alpha(t->couleur, 0.45f));
+    ombre_biseau(app, r, 12.f, 1.2f);
+    panneau(app, r, 12.f, melanger((sfColor){24, 28, 50, 250}, t->couleur, 0.12f),
+        (sfColor){16, 19, 36, 250}, avec_alpha(t->couleur, 0.55f));
     lueur(app, (sfVector2f){r.left + 26.f, cy}, (sfVector2f){40.f, 40.f},
         avec_alpha(t->couleur, 0.3f));
     cercle(app, (sfVector2f){r.left + 26.f, cy}, 14.f, avec_alpha(t->couleur, 0.2f),
@@ -422,9 +467,9 @@ static void dessiner_toast(app_t *app, toast_t *t)
         t->couleur, ALIGNE_CENTRE);
     texte(app, POLICE_NORMALE, t->message, 16, (sfVector2f){r.left + 50.f, cy},
         C_TEXTE, ALIGNE_GAUCHE);
-    rect_arrondi(app, (sfFloatRect){r.left + 23.f, r.top + r.height - 3.f,
-        (w - 46.f) * (1.f - t->t / DUREE_TOAST), 2.f}, 1.f,
-        avec_alpha(t->couleur, 0.6f));
+    rect_arrondi(app, (sfFloatRect){r.left + 12.f, r.top + r.height - 2.f,
+        (w - 24.f) * (1.f - t->t / DUREE_TOAST), 2.f}, 0.f,
+        avec_alpha(t->couleur, 0.8f));
     app->alpha = 1.f;
 }
 
@@ -446,24 +491,43 @@ void dessiner_toasts(app_t *app)
     }
 }
 
-/** Bouton retour, titre et sous-titre communs aux écrans secondaires. */
-void en_tete(app_t *app, bouton_t *retour, const char *titre,
-    const char *sous_titre)
+/**
+ * Bouton retour, surtitre (facultatif), titre et sous-titre communs aux
+ * écrans secondaires. Le surtitre porte une information de contexte réelle
+ * (ex. « RECRUE 03 / 10 »).
+ */
+void en_tete_surtitre(app_t *app, bouton_t *retour, const char *surtitre,
+    const char *titre, const char *sous_titre)
 {
     float t = app->t_scene;
     float e1 = sortie_cubique(progression(t, 0.f, 0.5f));
     float e2 = sortie_cubique(progression(t, 0.08f, 0.5f));
     float e3 = sortie_cubique(progression(t, 0.16f, 0.5f));
     float a = app->alpha;
+    float lt = 0.f;
 
     app->alpha = a * e1;
-    if (bouton_retour(app, retour, (sfVector2f){64.f - 20.f * (1.f - e1), 36.f}))
+    if (bouton_retour(app, retour, (sfVector2f){64.f - 20.f * (1.f - e1), 30.f}))
         changer_scene(app, SCENE_MENU);
     app->alpha = a * e2;
-    texte(app, POLICE_GRAS, titre, 40, (sfVector2f){64.f, 118.f + 16.f * (1.f - e2)},
+    if (surtitre) {
+        losange(app, (sfVector2f){68.f, 98.f}, 4.f, C_ROUGE);
+        etiquette(app, surtitre, (sfVector2f){82.f, 98.f}, C_ROUGE, ALIGNE_GAUCHE);
+    }
+    app->espacement = 0.6f;
+    lt = texte(app, POLICE_GRAS, titre, 36, (sfVector2f){64.f, 130.f + 16.f * (1.f - e2)},
         C_TEXTE, ALIGNE_GAUCHE);
+    app->espacement = 0.f;
+    rect_arrondi(app, (sfFloatRect){64.f + lt + 16.f, 128.f + 16.f * (1.f - e2),
+        120.f * e2, 2.f}, 0.f, avec_alpha(C_ROUGE, 0.6f));
     app->alpha = a * e3;
-    texte(app, POLICE_NORMALE, sous_titre, 17, (sfVector2f){64.f,
-        160.f + 16.f * (1.f - e3)}, C_TEXTE_DOUX, ALIGNE_GAUCHE);
+    texte(app, POLICE_NORMALE, sous_titre, 15, (sfVector2f){64.f,
+        164.f + 16.f * (1.f - e3)}, C_TEXTE_DOUX, ALIGNE_GAUCHE);
     app->alpha = a;
+}
+
+void en_tete(app_t *app, bouton_t *retour, const char *titre,
+    const char *sous_titre)
+{
+    en_tete_surtitre(app, retour, NULL, titre, sous_titre);
 }
