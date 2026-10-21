@@ -4,6 +4,7 @@
 */
 
 #include "couleurs.h"
+#include "my_string.h"
 #include "personnage.h"
 
 const info_classe_t classes[NB_CLASSES] = {
@@ -11,3 +12,12 @@ const info_classe_t classes[NB_CLASSES] = {
     [MAGE]     = { "Mage",     MAGENTA },
     [ARCHER]   = { "Archer",   VERT    },
 };
+
+int trouver_personnage(const personnage_t *tab, int size, const char *nom)
+{
+    for (int i = 0; i < size; i++) {
+        if (my_strcmp(tab[i].nom, nom) == 0)
+            return i;
+    }
+    return -1;
+}
