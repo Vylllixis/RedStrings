@@ -44,3 +44,6 @@ Thumbs.db
 
 *.md
 !README.md
+
+# Sauvegarde du jeu (menu 4)
+/personnages.txt
