@@ -13,90 +13,105 @@
 
 #define MAX_PERSONNAGES 10
 
-int findPersonnage(const personnage_t *tab, int size, const char *name)
+int trouver_personnage(const personnage_t *tab, int size, const char *nom)
 {
     for (int i = 0; i < size; i++) {
-        if (my_strcmp(tab[i].name, name) == 0)
+        if (my_strcmp(tab[i].nom, nom) == 0)
             return i;
     }
     return -1;
 }
 
-static void afficherMenu(void)
+static void afficher_menu(void)
 {
-    boiteHaut(CYAN);
-    boiteLigne(CYAN, "  " GRAS "✦ Menu principal" RESET);
-    boiteSeparateur(CYAN);
-    boiteLigne(CYAN, "  " GRAS "1" RESET "  Ajouter un personnage");
-    boiteLigne(CYAN, "  " GRAS "2" RESET "  Afficher un personnage");
-    boiteLigne(CYAN, "  " GRAS "3" RESET "  Combat");
-    boiteLigne(CYAN, "  " GRAS "0" RESET "  Quitter");
-    boiteBas(CYAN);
+    boite_haut(CYAN);
+    boite_ligne(CYAN, "  " GRAS "✦ Menu principal" RESET);
+    boite_separateur(CYAN);
+    boite_ligne(CYAN, "  " GRAS "1" RESET "  Ajouter un personnage");
+    boite_ligne(CYAN, "  " GRAS "2" RESET "  Afficher un personnage");
+    boite_ligne(CYAN, "  " GRAS "3" RESET "  Combat");
+    boite_ligne(CYAN, "  " GRAS "0" RESET "  Quitter");
+    boite_bas(CYAN);
 }
 
-static int demanderPersonnage(personnage_t *tab, int len, const char *question)
+static int demander_personnage(personnage_t *tab, int len, const char *question)
 {
-    char nom[30];
+    char nom[30] = "";
     int idx = 0;
 
     printf("  " GRAS "%s" RESET CYAN " › " RESET, question);
-    scanf("%29s", nom);
-    viderBuffer();
-    idx = findPersonnage(tab, len, nom);
+    if (scanf("%29s", nom) != 1) {
+        afficher_erreur("Saisie interrompue");
+        return -1;
+    }
+    vider_buffer();
+    idx = trouver_personnage(tab, len, nom);
     if (idx == -1)
-        afficherErreur("Personnage introuvable");
+        afficher_erreur("Personnage introuvable");
     return idx;
 }
 
-static void menuAjouter(personnage_t *tab, int *len)
+static void menu_ajouter(personnage_t *tab, int *len)
 {
     if (*len >= MAX_PERSONNAGES) {
-        afficherErreur("Nombre maximum de personnages atteint");
+        afficher_erreur("Nombre maximum de personnages atteint");
         return;
     }
-    if (creerPersonnage(&tab[*len], tab, *len) == 0)
+    if (creer_personnage(&tab[*len], tab, *len) == 0)
         (*len)++;
     printf("\n");
 }
 
-static void menuAfficher(personnage_t *tab, int len)
+static void menu_afficher(personnage_t *tab, int len)
 {
-    int idx = demanderPersonnage(tab, len, "Nom du personnage");
+    int idx = demander_personnage(tab, len, "Nom du personnage");
 
     if (idx != -1)
-        afficherPersonnage(&tab[idx]);
+        afficher_personnage(&tab[idx]);
 }
 
-static void menuCombat(personnage_t *tab, int len)
+static void menu_combat(personnage_t *tab, int len)
 {
-    int idAtk = demanderPersonnage(tab, len, "Attaquant");
-    int idDef = 0;
+    int id_atq = demander_personnage(tab, len, "Attaquant");
+    int id_def = 0;
 
-    if (idAtk == -1)
+    if (id_atq == -1)
         return;
-    idDef = demanderPersonnage(tab, len, "Défenseur");
-    if (idDef == -1)
+    if (tab[id_atq].pv == 0) {
+        afficher_erreur("Ce personnage est mort");
         return;
-    attaquer(&tab[idAtk], &tab[idDef]);
+    }
+    id_def = demander_personnage(tab, len, "Défenseur");
+    if (id_def == -1)
+        return;
+    if (tab[id_def].pv == 0) {
+        afficher_erreur("Ce personnage est mort");
+        return;
+    }
+    if (id_atq == id_def) {
+    afficher_erreur("Un personnage ne peut pas s'attaquer lui-même");
+        return;
+    }
+    attaquer(&tab[id_atq], &tab[id_def]);
 }
 
 int redstrings(void)
 {
-    personnage_t tabPersonnage[MAX_PERSONNAGES];
+    personnage_t tab_personnage[MAX_PERSONNAGES];
     int len = 0;
     int choix = -1;
 
     while (choix != 0) {
-        afficherMenu();
-        if (lireEntier("Choix", 0, 3, &choix) == -1)
+        afficher_menu();
+        if (lire_entier("Choix", 0, 3, &choix) == -1)
             choix = 0;
         printf("\n");
         if (choix == 1)
-            menuAjouter(tabPersonnage, &len);
+            menu_ajouter(tab_personnage, &len);
         else if (choix == 2)
-            menuAfficher(tabPersonnage, len);
+            menu_afficher(tab_personnage, len);
         else if (choix == 3)
-            menuCombat(tabPersonnage, len);
+            menu_combat(tab_personnage, len);
     }
     printf("  " GRIS "À bientôt !" RESET "\n");
     return 0;
