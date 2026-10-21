@@ -39,9 +39,7 @@
     #define C_VERT          ((sfColor){52, 211, 153, 255})
     #define C_BLEU          ((sfColor){96, 165, 250, 255})
     #define C_OR            ((sfColor){251, 191, 36, 255})
-    #define C_GUERRIER      ((sfColor){239, 68, 68, 255})
-    #define C_MAGE          ((sfColor){217, 70, 239, 255})
-    #define C_ARCHER        ((sfColor){34, 197, 94, 255})
+    #define C_VIOLET        ((sfColor){217, 70, 239, 255})
 
 typedef enum {
     POLICE_GRAS,
@@ -165,6 +163,7 @@ typedef struct {
     glissiere_t stats[3];
     int valeurs[3];
     classe_t classe;
+    bouton_t onglets[NB_CATEGORIES];
     bouton_t tuiles[NB_CLASSES];
     ressort_t lift[NB_CLASSES];
     bouton_t creer;
@@ -376,8 +375,12 @@ void en_tete(app_t *app, bouton_t *retour, const char *titre,
 const char *nom_classe(classe_t c);
 const char *nom_classe_maj(classe_t c);
 sfColor couleur_classe(classe_t c);
+
+/* emblemes.c */
 void embleme(app_t *app, classe_t c, sfVector2f centre, float taille,
     sfColor couleur);
+
+/* carte.c */
 void avatar(app_t *app, const personnage_t *p, sfVector2f centre, float r,
     float mort);
 void barre_segments(app_t *app, sfFloatRect r, float segments, sfColor c);
