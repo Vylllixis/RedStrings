@@ -17,7 +17,7 @@ OBJS		=	$(SRCS:src/%.c=$(OBJ_DIR)/%.o)
 
 #moteur du jeu partagé avec la version console (aucun affichage dedans)
 MOTEUR_DIR	=	../src/personnage
-MOTEUR		=	personnage.c combat.c roster.c sauvegarde.c
+MOTEUR		=	personnage.c combat.c bataille.c roster.c sauvegarde.c
 OBJS_MOTEUR	=	$(MOTEUR:%.c=$(OBJ_DIR)/moteur/%.o)
 
 DEPS		=	$(OBJS:.o=.d) $(OBJS_MOTEUR:.o=.d)

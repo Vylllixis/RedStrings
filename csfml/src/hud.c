@@ -193,44 +193,47 @@ void ellipse(app_t *app, sfVector2f centre, sfVector2f rayon, float epaisseur,
 
 static sfVector2f sommet_radar(sfVector2f c, float r, int i)
 {
-    float a = -PI / 2.f + i * 2.f * PI / 3.f;
+    float a = -PI / 2.f + i * 2.f * PI / NB_STATS;
 
     return (sfVector2f){c.x + cosf(a) * r, c.y + sinf(a) * r};
 }
 
 /**
- * Radar triangulaire des trois statistiques (PV en haut, attaque à droite,
- * défense à gauche). `v` contient des valeurs entre 0 et 1.
+ * Radar des statistiques : un axe par statistique (PV en haut, puis dans le
+ * sens des aiguilles d'une montre). `v` contient des valeurs entre 0 et 1.
  */
-void radar_stats(app_t *app, sfVector2f centre, float rayon, const float v[3],
-    sfColor c)
+void radar_stats(app_t *app, sfVector2f centre, float rayon,
+    const float v[NB_STATS], sfColor c)
 {
-    const sfColor axes[3] = {C_VERT, C_ROUGE, C_BLEU};
-    sfVector2f pts[4];
-    sfVertex fond[5];
+    sfVector2f pts[NB_STATS + 1];
+    sfVertex fond[NB_STATS + 2];
     float k = 0.f;
 
     for (int n = 1; n <= 4; n++) {
         k = rayon * n / 4.f;
-        for (int i = 0; i < 4; i++)
-            pts[i] = sommet_radar(centre, k, i % 3);
-        ligne_epaisse(app, pts, 4, 1.f, avec_alpha(C_BLANC, n == 4 ? 0.16f : 0.06f), 0);
+        for (int i = 0; i <= NB_STATS; i++)
+            pts[i] = sommet_radar(centre, k, i % NB_STATS);
+        ligne_epaisse(app, pts, NB_STATS + 1, 1.f, avec_alpha(C_BLANC, n == 4 ? 0.16f
+            : 0.06f), 0);
     }
-    for (int i = 0; i < 3; i++) {
+    for (int i = 0; i < NB_STATS; i++) {
         pts[0] = centre;
         pts[1] = sommet_radar(centre, rayon, i);
-        ligne_epaisse(app, pts, 2, 1.f, avec_alpha(axes[i], 0.25f), 0);
+        ligne_epaisse(app, pts, 2, 1.f, avec_alpha(couleur_stat((stat_t)i), 0.25f), 0);
     }
     fond[0] = (sfVertex){centre, avec_alpha(c, 0.10f * app->alpha), {0, 0}};
-    for (int i = 0; i < 4; i++) {
-        pts[i] = sommet_radar(centre, rayon * bornerf(v[i % 3], 0.04f, 1.f), i % 3);
+    for (int i = 0; i <= NB_STATS; i++) {
+        pts[i] = sommet_radar(centre, rayon * bornerf(v[i % NB_STATS], 0.04f, 1.f),
+            i % NB_STATS);
         fond[i + 1] = (sfVertex){pts[i], avec_alpha(c, 0.42f * app->alpha), {0, 0}};
     }
-    sfRenderWindow_drawPrimitives(app->fenetre, fond, 5, sfTriangleFan, NULL);
-    ligne_epaisse(app, pts, 4, 2.f, melanger(c, C_BLANC, 0.25f), 0);
-    for (int i = 0; i < 3; i++) {
-        lueur(app, pts[i], (sfVector2f){16.f, 16.f}, avec_alpha(axes[i], 0.6f));
-        losange(app, pts[i], 4.f, melanger(axes[i], C_BLANC, 0.35f));
+    sfRenderWindow_drawPrimitives(app->fenetre, fond, NB_STATS + 2, sfTriangleFan,
+        NULL);
+    ligne_epaisse(app, pts, NB_STATS + 1, 2.f, melanger(c, C_BLANC, 0.25f), 0);
+    for (int i = 0; i < NB_STATS; i++) {
+        lueur(app, pts[i], (sfVector2f){16.f, 16.f}, avec_alpha(couleur_stat((stat_t)i),
+            0.6f));
+        losange(app, pts[i], 4.f, melanger(couleur_stat((stat_t)i), C_BLANC, 0.35f));
     }
 }
 

@@ -101,14 +101,6 @@ static int boutons_modal(app_t *app, liste_t *l, sfFloatRect r)
     return clic;
 }
 
-/** PV, attaque ou défense selon i (0, 1, 2), dans l'ordre de la fiche. */
-static int stat_numero(const personnage_t *p, int i)
-{
-    if (i == 0)
-        return p->pv;
-    return i == 1 ? p->atq : p->def;
-}
-
 /** Fiche plein écran : équivalent de afficher_personnage(). */
 static void modal(app_t *app, liste_t *l, float a)
 {
@@ -131,8 +123,8 @@ static void modal(app_t *app, liste_t *l, float a)
         FICHE_H};
     lueur(app, (sfVector2f){LARGEUR / 2.f, r.top + r.height / 2.f}, (sfVector2f){520.f,
         420.f}, avec_alpha(couleur_classe(p->classe), 0.12f));
-    for (int i = 0; i < 3; i++)
-        l->segments[i] = fminf((stat_numero(p, i) + 4) / 5, fmaxf(0.f, (l->t_modal - 0.15f
+    for (int i = 0; i < NB_STATS; i++)
+        l->segments[i] = fminf((valeur_stat(p, (stat_t)i) + 4) / 5, fmaxf(0.f, (l->t_modal - 0.15f
             - i * 0.12f) * 48.f));
     fiche(app, p, r, l->segments);
     snprintf(buf, sizeof(buf), "%d / %d", id + 1, app->equipe.len);

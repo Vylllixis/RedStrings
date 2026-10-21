@@ -11,11 +11,15 @@
     #include "personnage.h"
     #include "roster.h"
     #include "sauvegarde.h"
+    #include "bataille.h"
 
     #define LARGEUR 1280
     #define HAUTEUR 720
     /* Le roster est illimité, mais l'écran n'a de place que pour 10 cartes. */
     #define MAX_PERSONNAGES 10
+    /* Cartes de personnage des grilles (liste, composition des équipes). */
+    #define CARTE_L 216.f
+    #define CARTE_H 236.f
     #define MAX_PARTICULES 900
     #define MAX_TOASTS 4
     #define NB_POUSSIERES 70
@@ -40,6 +44,7 @@
     #define C_BLEU          ((sfColor){96, 165, 250, 255})
     #define C_OR            ((sfColor){251, 191, 36, 255})
     #define C_VIOLET        ((sfColor){217, 70, 239, 255})
+    #define C_SOIN          ((sfColor){103, 232, 249, 255})
 
 typedef enum {
     POLICE_GRAS,
@@ -160,17 +165,17 @@ typedef struct {
 
 typedef struct {
     champ_t nom;
-    glissiere_t stats[3];
-    int valeurs[3];
+    glissiere_t stats[NB_STATS];
+    int valeurs[NB_STATS];
     classe_t classe;
     bouton_t onglets[NB_CATEGORIES];
     bouton_t tuiles[NB_CLASSES];
     ressort_t lift[NB_CLASSES];
     bouton_t creer;
     bouton_t retour;
-    float segments[3];
-    float affiche[3];   /**< Statistiques affichées dans l'aperçu (animées). */
-    int focus;          /**< 0 nom, 1-3 stats, 4 classe, 5 bouton. */
+    float segments[NB_STATS];
+    float affiche[NB_STATS];   /**< Statistiques affichées dans l'aperçu (animées). */
+    int focus;          /**< Nom, glissières, classe ou bouton (FOCUS_* de la création). */
     float sortie;       /**< Compte à rebours après création, -1 sinon. */
     float flash;
     classe_t classe_vue;    /**< Classe affichée à l'image précédente. */
@@ -189,45 +194,89 @@ typedef struct {
     int dernier;
     float modal;
     float t_modal;
-    float segments[3];
+    float segments[NB_STATS];
 } liste_t;
 
+/** Composition des deux équipes avant un combat. */
 typedef struct {
     grille_t grille;
     bouton_t retour;
-    int etape;          /**< 0 attaquant, 1 défenseur. */
-    int id_atq;
-    int id_def;
-    float validation;
+    bouton_t valider;
+    int etape;                      /**< 0 : ton équipe, 1 : équipe adverse. */
+    int ids[NB_EQUIPES][TAILLE_EQUIPE_MAX];     /**< Indices dans app->equipe. */
+    int nb[NB_EQUIPES];
+    int curseur;                    /**< Carte choisie au clavier. */
     float etape_anim;
+    float depart;                   /**< Compte à rebours avant l'arène, -1 sinon. */
 } selection_t;
 
+/** États de l'écran de combat : seuls CHOIX_* acceptent une commande. */
+typedef enum {
+    VUE_INTRO,
+    VUE_CHOIX_ACTION,
+    VUE_CHOIX_CIBLE,
+    VUE_ANIMATION,
+    VUE_ORDINATEUR,
+    VUE_FIN
+} etat_vue_t;
+
+/**
+ * Ce que l'écran MONTRE d'un combattant. Le moteur a déjà appliqué l'action ;
+ * ces valeurs rattrapent son état au rythme des animations (au moment de
+ * l'impact), sans jamais recalculer ni modifier les PV réels.
+ */
 typedef struct {
-    int ids[2];         /**< 0 : attaquant (gauche), 1 : défenseur (droite). */
-    float pv_affiche[MAX_PERSONNAGES];
-    float pv_fantome[MAX_PERSONNAGES];
-    float delai_fantome[MAX_PERSONNAGES];
-    float pv_max[MAX_PERSONNAGES];
-    float flash[MAX_PERSONNAGES];
-    float recul[MAX_PERSONNAGES];
-    float ko[MAX_PERSONNAGES];  /**< Temps depuis le K.O., -1 si vivant. */
-    float t_attaque;     /**< -1 si aucune attaque en cours. */
-    int impact;
-    float echange;      /**< -1 si aucune inversion en cours. */
-    int tour;
-    int a_attaque;
-    float t_resultat;
-    int atq;
-    int def;
-    int degats;
-    int pv_restants;
-    int dernier_atq;
-    int dernier_def;
-    float t_pop;
-    float vs;
-    bouton_t attaquer;
-    bouton_t inverser;
-    bouton_t retour;
+    int pv_vis;             /**< PV affichés (mis à jour à l'impact). */
+    float pv_barre;         /**< Barre de PV animée. */
+    float pv_fantome;       /**< Trace des PV perdus, qui suit avec retard. */
+    float delai_fantome;
+    int ko_vis;
+    float t_ko;
+    int garde_vis;
+    float garde_anim;       /**< 0..1 : apparition du bouclier. */
+    float garde_choc;       /**< Éclat du bouclier quand il absorbe un coup. */
+    float flash;
+    float secousse;
+    float lueur_soin;
+    sfVector2f elan;        /**< Décalage pendant une attaque. */
+    sfVector2f pos;         /**< Centre du personnage (calculé à chaque image). */
+    sfVector2f sol;         /**< Point au sol, sous le personnage. */
+    float rayon;
+} visuel_t;
+
+    #define MAX_POPUPS 12
+
+/** Nombre qui s'envole au-dessus d'un combattant (« -24 », « +30 »). */
+typedef struct {
+    char texte[24];
+    sfColor couleur;
+    sfVector2f pos;
+    float t;
+    int actif;
+} popup_t;
+
+typedef struct {
+    bataille_t bataille;                /**< État réel du combat (moteur). */
+    personnage_t equipes[NB_EQUIPES][TAILLE_EQUIPE_MAX];   /**< Pour rejouer. */
+    int tailles[NB_EQUIPES];
+    visuel_t vis[NB_EQUIPES][TAILLE_EQUIPE_MAX];
+    etat_vue_t etat;
+    float t_etat;
+    int action;                         /**< Action en cours de choix. */
+    ref_t cibles[NB_EQUIPES * TAILLE_EQUIPE_MAX];
+    int nb_cibles;
+    int cible;                          /**< Indice dans cibles[]. */
+    evenement_t file[MAX_EVENEMENTS];   /**< Événements à jouer, dans l'ordre. */
+    int nb_file;
+    int i_file;
+    float t_evt;
+    int impact_fait;                    /**< L'impact de l'événement courant a eu lieu. */
+    popup_t popups[MAX_POPUPS];
+    float t_tour;
+    int journal_vu;                     /**< Lignes du journal déjà révélées. */
+    bouton_t boutons[NB_ACTIONS];
+    bouton_t rejouer;
+    bouton_t quitter;
 } arene_t;
 
 typedef struct {
@@ -337,8 +386,8 @@ void graduations(app_t *app, sfVector2f centre, float rayon, int n,
     float longueur, float rotation, sfColor c);
 void ellipse(app_t *app, sfVector2f centre, sfVector2f rayon, float epaisseur,
     sfColor c);
-void radar_stats(app_t *app, sfVector2f centre, float rayon, const float v[3],
-    sfColor c);
+void radar_stats(app_t *app, sfVector2f centre, float rayon,
+    const float v[NB_STATS], sfColor c);
 float largeur_touche(app_t *app, const char *s);
 float touche_clavier(app_t *app, const char *s, sfVector2f centre, sfColor c,
     float allume);
@@ -384,8 +433,11 @@ void embleme(app_t *app, classe_t c, sfVector2f centre, float taille,
 void avatar(app_t *app, const personnage_t *p, sfVector2f centre, float r,
     float mort);
 void barre_segments(app_t *app, sfFloatRect r, float segments, sfColor c);
+sfColor couleur_stat(stat_t s);
+const char *nom_stat(stat_t s);
+const char *abrege_stat(stat_t s);
 void fiche(app_t *app, const personnage_t *p, sfFloatRect r,
-    const float segments[3]);
+    const float segments[NB_STATS]);
 void mini_carte(app_t *app, const personnage_t *p, sfFloatRect r,
     float survol, const marque_t *marque);
 int grille_cartes(app_t *app, grille_t *g, const int *ids, int n, float y0,
