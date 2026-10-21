@@ -46,6 +46,9 @@ int creer_personnage(personnage_t *p, personnage_t *tab, int len);
 /** Affiche la fiche du personnage avec ses barres de stats. */
 void afficher_personnage(const personnage_t *p);
 
+/** Dégâts que l'attaquant inflige à la cible, jamais négatifs. */
+int calculer_degats(const personnage_t *attaquant, const personnage_t *cible);
+
 /** Retire à la cible les dégâts de l'attaquant, réduits par sa défense. */
 void attaquer(personnage_t *attaquant, personnage_t *cible);
 
