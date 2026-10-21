@@ -10,7 +10,7 @@
 #include "my_string.h"
 #include "saisie.h"
 
-void viderBuffer(void)
+void vider_buffer(void)
 {
     int c = getchar();
 
@@ -18,18 +18,18 @@ void viderBuffer(void)
         c = getchar();
 }
 
-void afficherErreur(const char *message)
+void afficher_erreur(const char *message)
 {
     printf("  " ROUGE "✗ %s" RESET "\n\n", message);
 }
 
-static void afficherQuestion(const char *question, int min, int max)
+static void afficher_question(const char *question, int min, int max)
 {
     printf("  " GRAS "%s" RESET GRIS " (%d-%d)" RESET CYAN " › " RESET,
         question, min, max);
 }
 
-int lireLigne(char *buf, size_t taille)
+int lire_ligne(char *buf, size_t taille)
 {
     size_t len = 0;
 
@@ -39,19 +39,19 @@ int lireLigne(char *buf, size_t taille)
     if (len > 0 && buf[len - 1] == '\n')
         buf[len - 1] = '\0';         // on retire le '\n'
     else
-        viderBuffer();               // ligne trop longue : on jette la fin
+        vider_buffer();               // ligne trop longue : on jette la fin
     return 0;
 }
 
-int lireEntier(const char *question, int min, int max, int *resultat)
+int lire_entier(const char *question, int min, int max, int *resultat)
 {
     char buf[32];
     char *fin = NULL;
     long valeur = 0;
 
     while (1) {
-        afficherQuestion(question, min, max);
-        if (lireLigne(buf, sizeof(buf)) == -1)
+        afficher_question(question, min, max);
+        if (lire_ligne(buf, sizeof(buf)) == -1)
             return -1;
         errno = 0;
         valeur = strtol(buf, &fin, 10);
@@ -60,6 +60,6 @@ int lireEntier(const char *question, int min, int max, int *resultat)
             *resultat = (int)valeur;
             return 0;
         }
-        afficherErreur("Valeur invalide");
+        afficher_erreur("Valeur invalide");
     }
 }
