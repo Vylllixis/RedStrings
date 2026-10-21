@@ -64,9 +64,9 @@
 - [x] **M3** 🟡 ⭐ Flags de compilation plus stricts + règle `debug`
 
 ### 🚀 Pour aller plus loin
-- [ ] **B1** 🟢 ⭐⭐⭐ Allocation dynamique (`malloc` / `realloc`)
-- [ ] **B2** 🟢 ⭐⭐ Sauvegarder / charger les personnages dans un fichier
-- [ ] **B3** 🟢 ⭐⭐ Tests unitaires avec `assert`
+- [x] **B1** 🟢 ⭐⭐⭐ Allocation dynamique (`malloc` / `realloc`)
+- [x] **B2** 🟢 ⭐⭐ Sauvegarder / charger les personnages dans un fichier
+- [x] **B3** 🟢 ⭐⭐ Tests unitaires avec `assert`
 
 ---
 
