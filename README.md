@@ -244,7 +244,7 @@ stateDiagram-v2
 | Écran | Clavier | Souris |
 |---|---|---|
 | **Menu** | <kbd>↑</kbd> <kbd>↓</kbd> choisir · <kbd>Entrée</kbd> valider · <kbd>1</kbd> <kbd>2</kbd> <kbd>3</kbd> raccourcis · <kbd>4</kbd> sauvegarder · <kbd>5</kbd> charger · <kbd>0</kbd>/<kbd>Échap</kbd> quitter | survol pour choisir, clic pour valider |
-| **Création** | <kbd>Tab</kbd> / <kbd>↑</kbd> <kbd>↓</kbd> naviguer · <kbd>←</kbd> <kbd>→</kbd> ajuster · <kbd>Maj</kbd> = ×10 · <kbd>Entrée</kbd> créer | glissières, cartes de classe, bouton |
+| **Création** | <kbd>Tab</kbd> / <kbd>↑</kbd> <kbd>↓</kbd> naviguer · <kbd>←</kbd> <kbd>→</kbd> ajuster, ou changer de classe · <kbd>Maj</kbd> = ×10, ou catégorie suivante · <kbd>Entrée</kbd> créer | glissières, onglets de catégorie, grille de classes, bouton |
 | **Personnages** | taper pour rechercher · <kbd>Entrée</kbd> ouvrir · <kbd>←</kbd> <kbd>→</kbd> changer de fiche | clic sur une carte |
 | **Sélection** | <kbd>Échap</kbd> annule l'attaquant, puis revient au menu | clic : attaquant, puis défenseur |
 | **Arène** | <kbd>Espace</kbd>/<kbd>Entrée</kbd> attaquer · <kbd>R</kbd> inverser les rôles · <kbd>Échap</kbd> menu | boutons *Attaquer*, *Inverser*, *Menu* |
@@ -265,9 +265,9 @@ stateDiagram-v2
 | Effet | Où | Comment |
 |---|---|---|
 | Profondeur du fond | tous les écrans | étoiles lointaines, halos, sol quadrillé en perspective, fils rouges parcourus d'impulsions |
-| Hologramme de classe | aperçu de la création | socle, cône de projection, anneaux, aura propre à la classe (lames, orbite d'astres, réticule) |
+| Hologramme de classe | aperçu de la création | socle, cône de projection, anneaux, aura propre à la catégorie (lames, orbite d'astres, réticule, croix de soutien) |
 | Radar des statistiques | aperçu de la création | triangle PV / attaque / défense, animé avec les vraies valeurs |
-| Cartes de classe | création | médaillon, motif propre (lames, constellation, cible), changement de classe avec onde de choc |
+| Catalogue de classes | création | 4 onglets de catégorie, grille de tuiles colorées, 20 emblèmes vectoriels (`emblemes.c`), onde de choc et fondu de couleur au changement de classe |
 | Mouvements organiques | boutons, cartes | ressorts amortis (`ressort_t`) |
 | Courbes d'animation | entrées / sorties de scène | `sortie_cubique`, `entree_cubique`, `sortie_rebond` |
 | Particules | création, impacts, K.O. | jusqu'à 900 particules avec gravité |
@@ -300,23 +300,84 @@ $$
 | 99 | 0 | aucune réduction | 🟥 99 |
 | 60 | 99 | 60 × 1 / 100 = 0,6 → **0** | ⬜ 0 |
 
-| Classe | Couleur | Rôle |
-|---|:---:|---|
-| 🔴 **Guerrier** | rouge | corps à corps |
-| 🟣 **Mage** | magenta | magie |
-| 🟢 **Archer** | vert | distance |
+### 🧬 Les 28 classes
+
+Chaque classe vient d'**une seule ligne** de la table `classes[]` ([`personnage.c`](src/personnage/personnage.c)) : nom, description, catégorie, couleur RGB, modificateurs et emblème. La console (couleur ANSI 24 bits), la fenêtre CSFML et la logique de jeu lisent toutes cette même table.
+
+> [!NOTE]
+> **Les modificateurs s'ajoutent aux statistiques de base choisies**, une seule fois à la création, bornés entre 0 et 99. Leur somme vaut toujours 0 : une classe gagne d'un côté ce qu'elle perd de l'autre (vérifié par `make tests`). Le combat lui-même ne change pas : il utilise les statistiques finales.
+
+<details open>
+<summary><b>⚔️ Corps à corps — 8 classes</b></summary>
+
+| Id | Classe | Couleur | PV | ATQ | DEF | Description |
+|:---:|---|:---:|:---:|:---:|:---:|---|
+| 0 | **Guerrier** | ![](https://img.shields.io/badge/-%20%20%20%20-ef4444?style=flat-square) `#ef4444` | ±0 | ±0 | ±0 | Combattant polyvalent |
+| 3 | **Paladin** | ![](https://img.shields.io/badge/-%20%20%20%20-eee527?style=flat-square) `#eee527` | **+10** | −15 | **+5** | Rempart sacré en armure lourde |
+| 4 | **Berserker** | ![](https://img.shields.io/badge/-%20%20%20%20-cb285b?style=flat-square) `#cb285b` | **+5** | **+15** | −20 | Rage aveugle, frappe sans garde |
+| 5 | **Chevalier noir** | ![](https://img.shields.io/badge/-%20%20%20%20-8657f1?style=flat-square) `#8657f1` | −10 | **+5** | **+5** | Lame maudite, armure d'ombre |
+| 6 | **Samouraï** | ![](https://img.shields.io/badge/-%20%20%20%20-fb6e0f?style=flat-square) `#fb6e0f` | −5 | **+10** | −5 | Maître du sabre, coup décisif |
+| 7 | **Duelliste** | ![](https://img.shields.io/badge/-%20%20%20%20-e47f85?style=flat-square) `#e47f85` | −10 | **+10** | ±0 | Escrime vive et précise |
+| 8 | **Lancier** | ![](https://img.shields.io/badge/-%20%20%20%20-edf3fc?style=flat-square) `#edf3fc` | ±0 | **+5** | −5 | Allonge et charge brutale |
+| 9 | **Gladiateur** | ![](https://img.shields.io/badge/-%20%20%20%20-a1774b?style=flat-square) `#a1774b` | **+10** | **+5** | −15 | Champion de l'arène |
+
+</details>
+
+<details>
+<summary><b>✨ Magie — 8 classes</b></summary>
+
+| Id | Classe | Couleur | PV | ATQ | DEF | Description |
+|:---:|---|:---:|:---:|:---:|:---:|---|
+| 1 | **Mage** | ![](https://img.shields.io/badge/-%20%20%20%20-d946ef?style=flat-square) `#d946ef` | −10 | **+15** | −5 | Arcanes offensives |
+| 10 | **Archimage** | ![](https://img.shields.io/badge/-%20%20%20%20-2964d8?style=flat-square) `#2964d8` | −15 | **+20** | −5 | Maîtrise absolue des arcanes |
+| 11 | **Élémentaliste** | ![](https://img.shields.io/badge/-%20%20%20%20-16d8f4?style=flat-square) `#16d8f4` | −5 | **+15** | −10 | Feu, glace et foudre |
+| 12 | **Nécromancien** | ![](https://img.shields.io/badge/-%20%20%20%20-9afb5f?style=flat-square) `#9afb5f` | **+5** | **+5** | −10 | Draine la vie des vivants |
+| 13 | **Invocateur** | ![](https://img.shields.io/badge/-%20%20%20%20-9996eb?style=flat-square) `#9996eb` | **+5** | ±0 | −5 | Appelle des esprits alliés |
+| 14 | **Druide** | ![](https://img.shields.io/badge/-%20%20%20%20-44862a?style=flat-square) `#44862a` | **+5** | −5 | ±0 | Force de la nature |
+| 15 | **Illusionniste** | ![](https://img.shields.io/badge/-%20%20%20%20-fab3ec?style=flat-square) `#fab3ec` | −5 | ±0 | **+5** | Trompe l'œil et l'esprit |
+| 16 | **Chronomancien** | ![](https://img.shields.io/badge/-%20%20%20%20-97b7de?style=flat-square) `#97b7de` | −10 | **+5** | **+5** | Plie le cours du temps |
+
+</details>
+
+<details>
+<summary><b>🏹 Distance — 6 classes</b></summary>
+
+| Id | Classe | Couleur | PV | ATQ | DEF | Description |
+|:---:|---|:---:|:---:|:---:|:---:|---|
+| 2 | **Archer** | ![](https://img.shields.io/badge/-%20%20%20%20-22c55e?style=flat-square) `#22c55e` | −5 | **+10** | −5 | Tir rapide à distance |
+| 17 | **Chasseur** | ![](https://img.shields.io/badge/-%20%20%20%20-91922d?style=flat-square) `#91922d` | ±0 | **+10** | −10 | Pisteur des terres sauvages |
+| 18 | **Tireur d'élite** | ![](https://img.shields.io/badge/-%20%20%20%20-dde37c?style=flat-square) `#dde37c` | −15 | **+20** | −5 | Un tir, une cible |
+| 19 | **Assassin** | ![](https://img.shields.io/badge/-%20%20%20%20-787279?style=flat-square) `#787279` | −20 | **+20** | ±0 | Frappe dans l'ombre |
+| 20 | **Ombrelame** | ![](https://img.shields.io/badge/-%20%20%20%20-a616fe?style=flat-square) `#a616fe` | −5 | **+5** | ±0 | Lame tissée d'ombre |
+| 21 | **Corsaire** | ![](https://img.shields.io/badge/-%20%20%20%20-07aafa?style=flat-square) `#07aafa` | **+10** | ±0 | −10 | Pirate des mers lointaines |
+
+</details>
+
+<details>
+<summary><b>🛡️ Soutien — 6 classes</b></summary>
+
+| Id | Classe | Couleur | PV | ATQ | DEF | Description |
+|:---:|---|:---:|:---:|:---:|:---:|---|
+| 22 | **Prêtre** | ![](https://img.shields.io/badge/-%20%20%20%20-efdcae?style=flat-square) `#efdcae` | **+15** | −15 | ±0 | Foi inébranlable |
+| 23 | **Barde** | ![](https://img.shields.io/badge/-%20%20%20%20-c5529c?style=flat-square) `#c5529c` | ±0 | −5 | **+5** | Chants qui galvanisent |
+| 24 | **Alchimiste** | ![](https://img.shields.io/badge/-%20%20%20%20-71f4d9?style=flat-square) `#71f4d9` | **+10** | −5 | −5 | Potions et mixtures |
+| 25 | **Ingénieur** | ![](https://img.shields.io/badge/-%20%20%20%20-f4b269?style=flat-square) `#f4b269` | −5 | −5 | **+10** | Machines et tourelles |
+| 26 | **Gardien** | ![](https://img.shields.io/badge/-%20%20%20%20-32719e?style=flat-square) `#32719e` | **+5** | −20 | **+15** | Mur vivant, défense ultime |
+| 27 | **Moine** | ![](https://img.shields.io/badge/-%20%20%20%20-f0b11d?style=flat-square) `#f0b11d` | **+5** | **+10** | −15 | Corps et esprit en harmonie |
+
+</details>
+
+> [!TIP]
+> **Ajouter une classe** : une valeur juste avant `NB_CLASSES` dans l'`enum` (jamais au milieu : l'identifiant est écrit dans les sauvegardes), puis une ligne dans `classes[]`. Les listes de la console, les onglets et la grille de la fenêtre, l'aperçu et les tests la prennent en compte sans autre modification.
 
 > [!IMPORTANT]
 > **Trois règles protègent le combat :** un personnage ne peut pas s'attaquer lui-même, un personnage K.O. (0 PV) ne peut ni attaquer ni être attaqué, et les PV ne descendent jamais sous 0.
-
-> [!NOTE]
-> La classe ne change pas les dégâts : elle donne l'identité visuelle (nom, couleur). Elle vient d'une **table de données** (`classes[]` dans `personnage.c`) : ajouter une classe, c'est une ligne dans l'`enum` et une ligne dans la table, et les menus se mettent à jour tout seuls.
 
 <img src=".github/readme/fil-rouge.svg" width="100%" alt=""/>
 
 ## 💾 Sauvegarde
 
-Un personnage par ligne, au format texte (`nom pv attaque défense classe`, la classe allant de 0 à 2) :
+Un personnage par ligne, au format texte (`nom pv attaque défense classe`, la classe étant l'identifiant de 0 à 27 du tableau ci-dessus) :
 
 ```text
 Aragorn 80 60 30 0
@@ -436,14 +497,19 @@ classDiagram
     }
     class classe_t {
         <<enumeration>>
-        GUERRIER
-        MAGE
-        ARCHER
-        NB_CLASSES
+        GUERRIER = 0
+        MAGE = 1
+        ARCHER = 2
+        PALADIN ... MOINE
+        NB_CLASSES = 28
     }
     class info_classe_t {
         const char *nom
-        const char *couleur
+        const char *description
+        categorie_t categorie
+        rgb_t couleur
+        int mods[NB_STATS]
+        embleme_t embleme
     }
     roster_t "1" o-- "0..*" personnage_t
     personnage_t --> classe_t
@@ -558,6 +624,9 @@ make tests
 | Domaine | Ce qui est vérifié |
 |---|---|
 | `my_strcmp` | égalité, différence, préfixe, chaînes vides |
+| Catalogue | ≥ 20 classes, noms uniques, descriptions courtes, catégories et emblèmes valides, modificateurs bornés de somme nulle, couleurs distinctes deux à deux |
+| Modificateurs | Berserker 50/50/50 → 55/65/30, bornes 0 et 99 respectées |
+| Compatibilité | une sauvegarde à 3 classes se relit, un identifiant hors catalogue est refusé |
 | `calculer_degats` | 40 × 50 % = 20 · défense 100 → 0 dégât |
 | `attaquer` | les PV diminuent et ne passent **jamais sous 0** |
 | `trouver_personnage` | trouvé, absent, sensible à la casse, tableau vide |
