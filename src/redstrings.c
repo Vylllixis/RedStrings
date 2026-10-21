@@ -34,24 +34,6 @@ static void afficherMenu(void)
     boiteBas(CYAN);
 }
 
-static int lireChoix(void)
-{
-    int choix = 0;
-    int ret = scanf("%d", &choix);
-
-    printf("  " GRAS "Choix" RESET CYAN " › " RESET);
-    while (ret != 1) {
-        if (ret == EOF)
-            return 0;
-        viderBuffer();
-        afficherErreur("Tape un nombre entre 0 et 3");
-        printf("  " GRAS "Choix" RESET CYAN " › " RESET);
-        ret = scanf("%d", &choix);
-    }
-    viderBuffer();
-    return choix;
-}
-
 static int demanderPersonnage(personnage_t *tab, int len, const char *question)
 {
     char nom[30];
@@ -106,7 +88,8 @@ int redstrings(void)
 
     while (choix != 0) {
         afficherMenu();
-        choix = lireChoix();
+        if (lireEntier("Choix", 0, 3, &choix) == -1)
+            choix = 0;
         printf("\n");
         if (choix == 1)
             menuAjouter(tabPersonnage, &len);
@@ -114,8 +97,6 @@ int redstrings(void)
             menuAfficher(tabPersonnage, len);
         else if (choix == 3)
             menuCombat(tabPersonnage, len);
-        else if (choix != 0)
-            afficherErreur("Choix inconnu");
     }
     printf("  " GRIS "À bientôt !" RESET "\n");
     return 0;
