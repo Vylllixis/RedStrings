@@ -303,7 +303,8 @@ static void tampon_ko(app_t *app, arene_t *ar, int id, sfFloatRect r, float mort
     float a = app->alpha;
     sfVector2f c = {r.left + r.width / 2.f, r.top + r.height * 0.42f};
 
-    rect_arrondi(app, r, 28.f, avec_alpha((sfColor){6, 6, 14, 255}, 0.5f * mort));
+    panneau(app, r, 26.f, avec_alpha((sfColor){6, 6, 14, 255}, 0.5f * mort),
+        avec_alpha((sfColor){6, 6, 14, 255}, 0.5f * mort), C_TRANSPARENT);
     app->alpha = a * progression(s, 0.05f, 0.15f);
     lueur(app, c, (sfVector2f){200.f, 110.f}, avec_alpha(C_ROUGE, 0.3f));
     app->rotation = -12.f;
@@ -352,7 +353,8 @@ static void carte_arene(app_t *app, arene_t *ar, int slot, sfVector2f pos)
     snprintf(buf, sizeof(buf), "%d %%", p->def);
     puce(app, (sfFloatRect){r.left + 44.f + pw, r.top + 344.f, pw, 46.f}, "DÉFENSE", buf,
         C_BLEU);
-    rect_arrondi(app, r, 28.f, avec_alpha(C_BLANC, 0.6f * ar->flash[id]));
+    panneau(app, r, 26.f, avec_alpha(C_BLANC, 0.6f * ar->flash[id]),
+        avec_alpha(C_BLANC, 0.6f * ar->flash[id]), C_TRANSPARENT);
     if (mort > 0.f)
         tampon_ko(app, ar, id, r, mort);
     pastille(app, slot == 0 ? "ATTAQUANT" : "DÉFENSEUR", (sfVector2f){cx, r.top}, role, 1);
@@ -374,34 +376,73 @@ static void trainee(app_t *app, arene_t *ar, sfVector2f pos)
     }
 }
 
-/** Effet propre à la classe de l'attaquant au moment de l'impact. */
-static void effet_impact(app_t *app, arene_t *ar)
+/* Effets d'impact, un par catégorie de classe de l'attaquant. */
+typedef void (*effet_t)(app_t *app, sfVector2f c, sfColor col, float t);
+
+static void impact_corps_a_corps(app_t *app, sfVector2f c, sfColor col, float t)
 {
-    float t = ar->t_pop;
     float p = sortie_cubique(progression(t, 0.f, 0.12f));
     float f = 1.f - progression(t, 0.1f, 0.3f);
-    sfVector2f c = {DROITE_X + 130.f, CARTE_Y + 170.f};
-    classe_t cl = app->equipe.data[ar->dernier_atq].classe;
-    sfColor col = couleur_classe(cl);
     sfVector2f l1[2] = {{c.x - 110.f * p, c.y - 110.f * p}, {c.x + 110.f * p, c.y + 110.f * p}};
     sfVector2f l2[2] = {{c.x + 100.f * p, c.y - 100.f * p}, {c.x - 100.f * p, c.y + 100.f * p}};
+
+    ligne_epaisse(app, l1, 2, 26.f, avec_alpha(col, 0.35f * f), 1);
+    ligne_epaisse(app, l1, 2, 5.f, avec_alpha(C_BLANC, f), 1);
+    ligne_epaisse(app, l2, 2, 22.f, avec_alpha(col, 0.3f * f), 1);
+    ligne_epaisse(app, l2, 2, 4.f, avec_alpha(C_BLANC, f), 1);
+}
+
+static void impact_magie(app_t *app, sfVector2f c, sfColor col, float t)
+{
+    float p = sortie_cubique(progression(t, 0.f, 0.12f));
+    float f = 1.f - progression(t, 0.1f, 0.3f);
+
+    cercle(app, c, 30.f + 150.f * sortie_cubique(progression(t, 0.f, 0.4f)),
+        C_TRANSPARENT, avec_alpha(col, f), 5.f * f + 1.f);
+    lueur(app, c, (sfVector2f){200.f * p, 200.f * p}, avec_alpha(col, 0.5f * f));
+}
+
+static void impact_distance(app_t *app, sfVector2f c, sfColor col, float t)
+{
+    float p = sortie_cubique(progression(t, 0.f, 0.12f));
+    float f = 1.f - progression(t, 0.1f, 0.3f);
     sfVector2f fl[2] = {{c.x - 520.f + 400.f * p, c.y}, {c.x, c.y}};
 
-    if (!ar->a_attaque || f <= 0.f)
+    ligne_epaisse(app, fl, 2, 18.f, avec_alpha(col, 0.35f * f), 1);
+    ligne_epaisse(app, fl, 2, 3.f, avec_alpha(C_BLANC, f), 1);
+}
+
+/** Soutien : éclat en croix et halo qui s'élargit. */
+static void impact_soutien(app_t *app, sfVector2f c, sfColor col, float t)
+{
+    float p = sortie_cubique(progression(t, 0.f, 0.18f));
+    float f = 1.f - progression(t, 0.1f, 0.35f);
+    sfVector2f v[2] = {{c.x, c.y - 130.f * p}, {c.x, c.y + 130.f * p}};
+    sfVector2f h[2] = {{c.x - 130.f * p, c.y}, {c.x + 130.f * p, c.y}};
+
+    lueur(app, c, (sfVector2f){240.f * p, 240.f * p}, avec_alpha(col, 0.45f * f));
+    ligne_epaisse(app, v, 2, 16.f, avec_alpha(col, 0.4f * f), 1);
+    ligne_epaisse(app, h, 2, 16.f, avec_alpha(col, 0.4f * f), 1);
+    ligne_epaisse(app, v, 2, 3.f, avec_alpha(C_BLANC, f), 1);
+    ligne_epaisse(app, h, 2, 3.f, avec_alpha(C_BLANC, f), 1);
+}
+
+static const effet_t EFFETS_IMPACT[NB_CATEGORIES] = {
+    [CAT_CORPS_A_CORPS] = impact_corps_a_corps,
+    [CAT_MAGIE] = impact_magie,
+    [CAT_DISTANCE] = impact_distance,
+    [CAT_SOUTIEN] = impact_soutien,
+};
+
+/** Effet propre à la catégorie de l'attaquant au moment de l'impact. */
+static void effet_impact(app_t *app, arene_t *ar)
+{
+    classe_t cl = app->equipe.data[ar->dernier_atq].classe;
+
+    if (!ar->a_attaque || ar->t_pop > 0.45f)
         return;
-    if (cl == GUERRIER) {
-        ligne_epaisse(app, l1, 2, 26.f, avec_alpha(col, 0.35f * f), 1);
-        ligne_epaisse(app, l1, 2, 5.f, avec_alpha(C_BLANC, f), 1);
-        ligne_epaisse(app, l2, 2, 22.f, avec_alpha(col, 0.3f * f), 1);
-        ligne_epaisse(app, l2, 2, 4.f, avec_alpha(C_BLANC, f), 1);
-    } else if (cl == MAGE) {
-        cercle(app, c, 30.f + 150.f * sortie_cubique(progression(t, 0.f, 0.4f)),
-            C_TRANSPARENT, avec_alpha(col, f), 5.f * f + 1.f);
-        lueur(app, c, (sfVector2f){200.f * p, 200.f * p}, avec_alpha(col, 0.5f * f));
-    } else {
-        ligne_epaisse(app, fl, 2, 18.f, avec_alpha(col, 0.35f * f), 1);
-        ligne_epaisse(app, fl, 2, 3.f, avec_alpha(C_BLANC, f), 1);
-    }
+    EFFETS_IMPACT[classes[cl].categorie](app, (sfVector2f){DROITE_X + 130.f,
+        CARTE_Y + 170.f}, couleur_classe(cl), ar->t_pop);
 }
 
 static void pop_degats(app_t *app, arene_t *ar)
