@@ -15,6 +15,7 @@ void boiteSeparateur(const char *couleur);
 void boiteBas(const char *couleur);
 
 /** Affiche une ligne au format printf, bordure droite alignée. */
-void boiteLigne(const char *couleur, const char *format, ...);
+void boiteLigne(const char *couleur, const char *format, ...)
+    __attribute__((format(printf, 2, 3)));
 
 #endif /* BOITE_H */
