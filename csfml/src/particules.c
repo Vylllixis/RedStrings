@@ -22,8 +22,8 @@ void emettre(app_t *app, sfVector2f pos, int n, sfColor c, float vitesse,
         v = vitesse * aleatoire(0.25f, 1.f);
         p->pos = pos;
         p->vit = (sfVector2f){cosf(angle) * v, sinf(angle) * v - vitesse * 0.15f};
-        p->vieMax = aleatoire(0.45f, 1.1f);
-        p->vie = p->vieMax;
+        p->vie_max = aleatoire(0.45f, 1.1f);
+        p->vie = p->vie_max;
         p->taille = taille * aleatoire(0.5f, 1.2f);
         p->gravite = aleatoire(120.f, 420.f);
         p->couleur = c;
@@ -31,24 +31,24 @@ void emettre(app_t *app, sfVector2f pos, int n, sfColor c, float vitesse,
     }
 }
 
-void majParticules(app_t *app)
+void maj_particules(app_t *app)
 {
     particule_t *p = NULL;
-    float frein = expf(-3.2f * app->dtJeu);
+    float frein = expf(-3.2f * app->dt_jeu);
 
     for (int i = 0; i < MAX_PARTICULES; i++) {
         p = &app->particules[i];
         if (p->vie <= 0.f)
             continue;
         p->vit.x *= frein;
-        p->vit.y = p->vit.y * frein + p->gravite * app->dtJeu;
-        p->pos.x += p->vit.x * app->dtJeu;
-        p->pos.y += p->vit.y * app->dtJeu;
-        p->vie -= app->dtJeu;
+        p->vit.y = p->vit.y * frein + p->gravite * app->dt_jeu;
+        p->pos.x += p->vit.x * app->dt_jeu;
+        p->pos.y += p->vit.y * app->dt_jeu;
+        p->vie -= app->dt_jeu;
     }
 }
 
-void dessinerParticules(app_t *app)
+void dessiner_particules(app_t *app)
 {
     particule_t *p = NULL;
     float t = 0.f;
@@ -58,11 +58,11 @@ void dessinerParticules(app_t *app)
         p = &app->particules[i];
         if (p->vie <= 0.f)
             continue;
-        t = p->vie / p->vieMax;
+        t = p->vie / p->vie_max;
         s = p->taille * (0.3f + 0.7f * t);
         lueur(app, p->pos, (sfVector2f){s * 4.f, s * 4.f},
-            avecAlpha(p->couleur, 0.55f * t));
+            avec_alpha(p->couleur, 0.55f * t));
         lueur(app, p->pos, (sfVector2f){s * 1.3f, s * 1.3f},
-            avecAlpha(melanger(p->couleur, C_BLANC, 0.6f), t));
+            avec_alpha(melanger(p->couleur, C_BLANC, 0.6f), t));
     }
 }
