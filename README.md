@@ -1,67 +1,76 @@
 <div align="center">
 
-<img src=".github/readme/banniere.svg" alt="RedStrings — Crée tes personnages, puis fais-les s'affronter." width="100%"/>
+<img src=".github/readme/banniere.svg" alt="RedStrings : crée tes personnages, compose tes équipes, affronte l'ordinateur au tour par tour" width="100%"/>
 
 <br/>
 
-[![C11](https://img.shields.io/badge/C-11-38bdf8?style=for-the-badge&logo=c&logoColor=white&labelColor=0e1230)](#%EF%B8%8F-architecture)
-[![Makefile](https://img.shields.io/badge/build-Makefile-f43f5e?style=for-the-badge&logo=gnu&logoColor=white&labelColor=0e1230)](#-le-makefile)
-[![CSFML](https://img.shields.io/badge/GUI-CSFML-34d399?style=for-the-badge&logo=sfml&logoColor=white&labelColor=0e1230)](#%EF%B8%8F-la-version-graphique-csfml)
-[![Tests](https://img.shields.io/badge/tests-assert%20%2B%20ASan-fbbf24?style=for-the-badge&labelColor=0e1230)](#-tests)
-[![ESGI](https://img.shields.io/badge/ESGI-C%20avanc%C3%A9-d946ef?style=for-the-badge&labelColor=0e1230)](#)
+[![C11](https://img.shields.io/badge/C-11-38bdf8?style=for-the-badge&logo=c&logoColor=white&labelColor=0e1230)](#architecture)
+[![CSFML](https://img.shields.io/badge/GUI-CSFML%202.6-34d399?style=for-the-badge&logo=sfml&logoColor=white&labelColor=0e1230)](#csfml)
+[![Classes](https://img.shields.io/badge/classes-28-f43f5e?style=for-the-badge&labelColor=0e1230)](#personnages)
+[![Tests](https://img.shields.io/badge/tests-assert%20%2B%20ASan-fbbf24?style=for-the-badge&labelColor=0e1230)](#tests)
+[![ESGI](https://img.shields.io/badge/ESGI-C%20avanc%C3%A9-d946ef?style=for-the-badge&labelColor=0e1230)](#concept)
 
-**Un jeu de combat au tour par tour, écrit en C pur.**<br/>
-<sub>Deux interfaces · un même moteur · zéro fuite mémoire · une bibliothèque maison <code>libmy.a</code></sub>
+**Un jeu de combat tactique en équipe, au tour par tour, écrit en C pur.**<br/>
+<sub>Un moteur sans affichage · deux interfaces (terminal et fenêtre CSFML) · 28 classes · une bibliothèque maison <code>libmy.a</code></sub>
 
 <br/>
 
-[**Démarrage**](#-démarrage-en-30-secondes) ·
-[**Jouer**](#-jouer-version-console) ·
-[**Combat**](#%EF%B8%8F-les-règles-du-combat) ·
-[**Architecture**](#%EF%B8%8F-architecture) ·
-[**Makefile**](#-le-makefile) ·
-[**Tests**](#-tests) ·
-[**Sécurité**](#-robustesse--sécurité) ·
-[**Conventions**](#-conventions)
+[**Concept**](#concept) ·
+[**Identité**](#identite) ·
+[**Personnages**](#personnages) ·
+[**Combat**](#combat) ·
+[**Mécaniques**](#mecaniques) ·
+[**Choix techniques**](#choix-techniques) ·
+[**Architecture**](#architecture) ·
+[**Installer**](#installer) ·
+[**Contribuer**](#contribuer)
 
 </div>
+
+> [!NOTE]
+> **Comment lire les images de cette page.** Les images marquées 🎥 **capture réelle** ont été enregistrées image par image depuis `./redstrings_csfml`, sans retouche. Les images marquées ✏️ **illustration** sont des animations SVG générées par [`generer_svg.py`](.github/readme/outils/generer_svg.py) : elles **lisent** le catalogue dans `src/personnage/personnage.c`, et leurs nombres viennent des tests unitaires ou d'une vraie session. Ce sont des schémas, pas des captures du jeu.
 
 <img src=".github/readme/fil-rouge.svg" width="100%" alt=""/>
 
-## 🎬 Le projet en une image
+<a id="concept"></a>
+
+## 01 · Le concept
+
+**RedStrings** est le projet fil rouge du module *Langage C avancé* (ESGI, 2ᵉ année). On crée des personnages (nom, PV, attaque, défense, soin, et une classe parmi 28), on compose **deux équipes de 1 à 4**, puis on affronte l'ordinateur au tour par tour : chaque combattant **attaque**, **soigne** un allié ou **se met en garde**.
 
 <div align="center">
-<img src=".github/readme/demo-terminal.svg" alt="Démo : make, création de Merlin, fiche du personnage, puis combat contre Aragorn" width="100%"/>
-<sub><i>Session rejouée à l'identique : compilation → création → fiche → combat. Les valeurs sont celles que le programme affiche vraiment.</i></sub>
+<img src=".github/readme/captures/arene.webp" alt="Capture réelle de l'arène CSFML : 3 contre 2, Kaelen attaque Varek, Varek riposte, Elara soigne, Nyx met Sylas K.O., puis l'équipe contre-attaque" width="100%"/>
+<sub>🎥 <b>Capture réelle</b>, <code>./redstrings_csfml</code>, 1280×720 réduit à 800 px. Ton équipe au premier plan à gauche, l'adversaire plus petit et plus loin en haut à droite. On y voit, dans l'ordre : une attaque, la riposte de l'ordinateur, un soin, un K.O., puis la contre-attaque.</sub>
 </div>
 
 <br/>
-
-**RedStrings** est le projet fil rouge du module *Langage C avancé* (ESGI 2ᵉ année).
-On crée des personnages (nom, points de vie, attaque, défense, classe), on consulte leur fiche,
-puis on les fait s'affronter. La défense réduit les dégâts en pourcentage, et un personnage à 0 PV est K.O.
 
 <table>
 <tr>
 <td width="50%" valign="top">
 
-### 🖥️ Version console &nbsp;`./redstrings`
-- Menu coloré dessiné en boîtes Unicode
-- Combats en équipe (jusqu'à 4 contre 4) contre l'ordinateur
+### 🖥️ Dans le terminal &nbsp;`./redstrings`
+
+- Menu coloré, dessiné en boîtes Unicode
+- Fiches de personnage avec la couleur de la classe (ANSI 24 bits)
+- Combat en équipe : plateau, barres de PV, garde, journal
 - Personnages **illimités** (tableau dynamique `realloc`)
 - **Sauvegarde / chargement** dans `personnages.txt`
-- Chaque saisie est **vérifiée** (Ctrl+D, `12abc`, débordement…)
-- Testée avec `assert` + AddressSanitizer
+- Chaque saisie est **vérifiée** (<kbd>Ctrl</kbd>+<kbd>D</kbd>, `12abc`, débordement…)
 
 </td>
 <td width="50%" valign="top">
 
-### 🎨 Version graphique &nbsp;`./redstrings_csfml`
-- Fenêtre 1280×720, VSync, souris + clavier
-- Aperçu **en direct** pendant la création
-- Recherche par nom, cartes, fiches en modale
-- Arène en profondeur : ton équipe au premier plan, l'adversaire au loin, attaques, soins, gardes et K.O. animés
-- Même formule de dégâts que la console
+<a id="csfml"></a>
+
+### 🎨 Dans la fenêtre &nbsp;`./redstrings_csfml`
+
+- 1280×720, VSync, souris et clavier
+- Création avec **aperçu en direct** (hologramme, radar 4 axes)
+- Composition des équipes sur des cartes
+- **Arène** en perspective : impacts, soins, gardes et K.O. animés
+- Ordre des tours, journal et PV mis à jour **à l'impact**
+- Même moteur, même fichier de sauvegarde que la console
 
 </td>
 </tr>
@@ -69,59 +78,256 @@ puis on les fait s'affronter. La défense réduit les dégâts en pourcentage, e
 
 <img src=".github/readme/fil-rouge.svg" width="100%" alt=""/>
 
-## 🚀 Démarrage en 30 secondes
+<a id="identite"></a>
 
-```bash
-git clone https://github.com/Vylllixis/RedStrings.git
-cd RedStrings
-make            # compile ./redstrings (et lib/libmy.a au passage)
-./redstrings    # c'est parti
-```
+## 02 · L'identité visuelle
 
-<details>
-<summary><b>🎨 Lancer la version graphique (CSFML)</b></summary>
+Le nom **RedStrings** vient d'une image : des **fils rouges** qui relient les personnages entre eux. On les retrouve partout, dans le fond de la fenêtre, sous le logo et dans les diagrammes de cette page.
 
-<br/>
-
-La version graphique a besoin de la bibliothèque **CSFML** (le binding C de SFML).
-
-| Système | Commande |
-|---|---|
-| 🐧 Debian / Ubuntu | `sudo apt install libcsfml-dev` |
-| 🎩 Fedora | `sudo dnf install CSFML-devel` |
-| 🏔️ Arch | `sudo pacman -S csfml` |
-
-```bash
-make csfml            # compile ./redstrings_csfml
-./redstrings_csfml
-```
-
-> [!TIP]
-> Si CSFML manque, `make csfml` s'arrête tout de suite avec un message clair au lieu d'une erreur de compilation :
-> `✗ CSFML introuvable, installe-la avec : sudo apt install libcsfml-dev`
-
-> [!NOTE]
-> Les polices (Noto Sans, DejaVu Sans) sont cherchées à côté de l'exécutable, puis depuis le dossier courant : tu peux lancer le jeu depuis n'importe où dans le projet.
-
-</details>
-
-<details>
-<summary><b>🧰 Prérequis</b></summary>
+<div align="center">
+<img src=".github/readme/captures/menu.webp" alt="Capture réelle du menu de la version CSFML : logo REDSTRINGS, commandes à gauche, équipe de 5 personnages à droite" width="100%"/>
+<sub>🎥 <b>Capture réelle</b> du menu, juste après le chargement de <code>personnages.txt</code>.</sub>
+</div>
 
 <br/>
 
-| Outil | Pourquoi | Vérifier |
+| Couleur | Rôle | Constante (`csfml/include/gui.h`) |
 |---|---|---|
-| `gcc` (C11) | compilation | `gcc --version` |
-| `make` | construction | `make --version` |
-| `ar` | archive `libmy.a` | `ar --version` |
-| CSFML *(optionnel)* | version graphique | `ls /usr/include/SFML/Graphics.h` |
+| ![](https://img.shields.io/badge/-%20%20%20%20-f43f5e?style=flat-square) `#f43f5e` | la marque, les fils, l'adversaire, l'attaque | `C_ROUGE` |
+| ![](https://img.shields.io/badge/-%20%20%20%20-38bdf8?style=flat-square) `#38bdf8` | ton équipe, les actions, le focus | `C_CYAN` |
+| ![](https://img.shields.io/badge/-%20%20%20%20-34d399?style=flat-square) `#34d399` | les points de vie | `C_VERT` |
+| ![](https://img.shields.io/badge/-%20%20%20%20-60a5fa?style=flat-square) `#60a5fa` | la défense et la garde | `C_BLEU` |
+| ![](https://img.shields.io/badge/-%20%20%20%20-67e8f9?style=flat-square) `#67e8f9` | le soin | `C_SOIN` |
+| ![](https://img.shields.io/badge/-%20%20%20%20-090b18?style=flat-square) `#090b18` | le fond, un bleu nuit presque noir | `C_FOND` |
+
+**Une seule silhouette.** Toutes les surfaces ont deux coins coupés (haut-gauche, bas-droite) et des crochets lumineux sur les deux autres. Les composants communs vivent dans `csfml/src/hud.c` : `panneau`, `crochets`, `titre_section`, `hexagone`, `radar_stats`, `touche_clavier`…
+
+<details>
+<summary><b>✨ Ce qui rend l'interface vivante</b></summary>
+
+<br/>
+
+| Effet | Où | Comment |
+|---|---|---|
+| Profondeur du fond | tous les écrans | 160 étoiles lointaines, halos, sol quadrillé en perspective, fils rouges parcourus d'impulsions |
+| Hologramme de classe | aperçu de la création | socle, cône de projection, anneaux, aura propre à la catégorie |
+| Radar des statistiques | aperçu de la création | losange PV / ATQ / DEF / SOIN, animé avec les vraies valeurs finales |
+| Catalogue | création | 4 onglets de catégorie, grille de tuiles colorées, 20 emblèmes vectoriels (`emblemes.c`) |
+| Mouvements organiques | boutons, cartes | ressorts amortis (`ressort_t`) |
+| Courbes d'animation | entrées et sorties de scène | `sortie_cubique`, `entree_cubique`, `sortie_rebond` |
+| Particules | création, impacts, K.O. | jusqu'à 900 particules (`MAX_PARTICULES`), avec gravité |
+| Poussière d'ambiance | fond | 70 grains qui flottent (`NB_POUSSIERES`) |
+| Notifications | haut de l'écran | toasts empilables |
 
 </details>
 
 <img src=".github/readme/fil-rouge.svg" width="100%" alt=""/>
 
-## 🎮 Jouer (version console)
+<a id="personnages"></a>
+
+## 03 · Les personnages et les 28 classes
+
+Chaque classe tient sur **une seule ligne** de la table `classes[]` ([`personnage.c`](src/personnage/personnage.c)) : nom, description, catégorie, couleur RGB, quatre modificateurs et un emblème. La console, la fenêtre et le moteur lisent cette même table.
+
+<div align="center">
+<img src=".github/readme/classes.svg" alt="Illustration : les 28 classes rangées en 4 catégories, avec leur couleur et leurs modificateurs PV, ATQ, DEF, SOIN" width="100%"/>
+<sub>✏️ <b>Illustration</b> générée à partir de <code>classes[]</code> : couleurs, descriptions et barres de modificateurs sont celles du code.</sub>
+</div>
+
+<br/>
+
+Les modificateurs s'ajoutent **une seule fois**, à la création, aux quatre statistiques de base choisies, puis le résultat est borné entre 0 et 99. Leur somme vaut toujours 0 : une classe gagne d'un côté ce qu'elle perd de l'autre (vérifié par `make tests`).
+
+<div align="center">
+<img src=".github/readme/profils.svg" alt="Illustration : radar animé qui passe d'une classe à l'autre, avec les statistiques finales de 8 classes pour la base 50/30/20/20" width="100%"/>
+<sub>✏️ <b>Illustration.</b> Statistiques finales pour la base par défaut de l'écran de création (50 PV, 30 ATQ, 20 DEF, 20 SOIN) : par exemple Paladin 50 + 0 = 50 PV, 30 − 10 = 20 ATQ.</sub>
+</div>
+
+<br/>
+
+<div align="center">
+<img src=".github/readme/captures/creation.webp" alt="Capture réelle de l'écran de création : saisie du nom Aelith, réglage des statistiques, changement de catégorie et de classe, puis création" width="100%"/>
+<sub>🎥 <b>Capture réelle</b> de l'écran de création : nom, glissières, onglets de catégorie, grille de classes, aperçu en direct, puis validation.</sub>
+</div>
+
+<details>
+<summary><b>⚔️ Corps à corps · 8 classes</b></summary>
+
+| Id | Classe | Couleur | PV | ATQ | DEF | SOIN | Description |
+|:---:|---|:---:|:---:|:---:|:---:|:---:|---|
+| 0 | **Guerrier** | ![](https://img.shields.io/badge/-%20%20%20%20-ef4444?style=flat-square) `#ef4444` | ±0 | **+5** | **+5** | −10 | Combattant polyvalent |
+| 3 | **Paladin** | ![](https://img.shields.io/badge/-%20%20%20%20-eee527?style=flat-square) `#eee527` | ±0 | −10 | **+5** | **+5** | Rempart sacré en armure lourde |
+| 4 | **Berserker** | ![](https://img.shields.io/badge/-%20%20%20%20-cb285b?style=flat-square) `#cb285b` | **+5** | **+15** | −5 | −15 | Rage aveugle, frappe sans garde |
+| 5 | **Chevalier noir** | ![](https://img.shields.io/badge/-%20%20%20%20-8657f1?style=flat-square) `#8657f1` | −5 | **+5** | **+10** | −10 | Lame maudite, armure d'ombre |
+| 6 | **Samouraï** | ![](https://img.shields.io/badge/-%20%20%20%20-fb6e0f?style=flat-square) `#fb6e0f` | −5 | **+10** | ±0 | −5 | Maître du sabre, coup décisif |
+| 7 | **Duelliste** | ![](https://img.shields.io/badge/-%20%20%20%20-e47f85?style=flat-square) `#e47f85` | −10 | **+10** | **+5** | −5 | Escrime vive et précise |
+| 8 | **Lancier** | ![](https://img.shields.io/badge/-%20%20%20%20-edf3fc?style=flat-square) `#edf3fc` | ±0 | **+10** | −5 | −5 | Allonge et charge brutale |
+| 9 | **Gladiateur** | ![](https://img.shields.io/badge/-%20%20%20%20-a1774b?style=flat-square) `#a1774b` | **+10** | **+5** | −5 | −10 | Champion de l'arène |
+
+</details>
+
+<details>
+<summary><b>✨ Magie · 8 classes</b></summary>
+
+| Id | Classe | Couleur | PV | ATQ | DEF | SOIN | Description |
+|:---:|---|:---:|:---:|:---:|:---:|:---:|---|
+| 1 | **Mage** | ![](https://img.shields.io/badge/-%20%20%20%20-d946ef?style=flat-square) `#d946ef` | −10 | **+15** | ±0 | −5 | Arcanes offensives |
+| 10 | **Archimage** | ![](https://img.shields.io/badge/-%20%20%20%20-2964d8?style=flat-square) `#2964d8` | −15 | **+20** | −5 | ±0 | Maîtrise absolue des arcanes |
+| 11 | **Élémentaliste** | ![](https://img.shields.io/badge/-%20%20%20%20-16d8f4?style=flat-square) `#16d8f4` | −5 | **+15** | −5 | −5 | Feu, glace et foudre |
+| 12 | **Nécromancien** | ![](https://img.shields.io/badge/-%20%20%20%20-9afb5f?style=flat-square) `#9afb5f` | **+5** | **+5** | −10 | ±0 | Draine la vie des vivants |
+| 13 | **Invocateur** | ![](https://img.shields.io/badge/-%20%20%20%20-9996eb?style=flat-square) `#9996eb` | **+5** | ±0 | −5 | ±0 | Appelle des esprits alliés |
+| 14 | **Druide** | ![](https://img.shields.io/badge/-%20%20%20%20-44862a?style=flat-square) `#44862a` | ±0 | −5 | −5 | **+10** | Force de la nature |
+| 15 | **Illusionniste** | ![](https://img.shields.io/badge/-%20%20%20%20-fab3ec?style=flat-square) `#fab3ec` | −5 | ±0 | **+5** | ±0 | Trompe l'œil et l'esprit |
+| 16 | **Chronomancien** | ![](https://img.shields.io/badge/-%20%20%20%20-97b7de?style=flat-square) `#97b7de` | −10 | **+5** | **+5** | ±0 | Plie le cours du temps |
+
+</details>
+
+<details>
+<summary><b>🏹 Distance · 6 classes</b></summary>
+
+| Id | Classe | Couleur | PV | ATQ | DEF | SOIN | Description |
+|:---:|---|:---:|:---:|:---:|:---:|:---:|---|
+| 2 | **Archer** | ![](https://img.shields.io/badge/-%20%20%20%20-22c55e?style=flat-square) `#22c55e` | −5 | **+10** | −5 | ±0 | Tir rapide à distance |
+| 17 | **Chasseur** | ![](https://img.shields.io/badge/-%20%20%20%20-91922d?style=flat-square) `#91922d` | ±0 | **+10** | −5 | −5 | Pisteur des terres sauvages |
+| 18 | **Tireur d'élite** | ![](https://img.shields.io/badge/-%20%20%20%20-dde37c?style=flat-square) `#dde37c` | −15 | **+20** | −5 | ±0 | Un tir, une cible |
+| 19 | **Assassin** | ![](https://img.shields.io/badge/-%20%20%20%20-787279?style=flat-square) `#787279` | −20 | **+20** | **+5** | −5 | Frappe dans l'ombre |
+| 20 | **Ombrelame** | ![](https://img.shields.io/badge/-%20%20%20%20-a616fe?style=flat-square) `#a616fe` | −5 | **+5** | **+5** | −5 | Lame tissée d'ombre |
+| 21 | **Corsaire** | ![](https://img.shields.io/badge/-%20%20%20%20-07aafa?style=flat-square) `#07aafa` | **+10** | **+5** | −10 | −5 | Pirate des mers lointaines |
+
+</details>
+
+<details>
+<summary><b>🛡️ Soutien · 6 classes</b></summary>
+
+| Id | Classe | Couleur | PV | ATQ | DEF | SOIN | Description |
+|:---:|---|:---:|:---:|:---:|:---:|:---:|---|
+| 22 | **Prêtre** | ![](https://img.shields.io/badge/-%20%20%20%20-efdcae?style=flat-square) `#efdcae` | **+5** | −15 | −5 | **+15** | Foi inébranlable |
+| 23 | **Barde** | ![](https://img.shields.io/badge/-%20%20%20%20-c5529c?style=flat-square) `#c5529c` | ±0 | −5 | ±0 | **+5** | Chants qui galvanisent |
+| 24 | **Alchimiste** | ![](https://img.shields.io/badge/-%20%20%20%20-71f4d9?style=flat-square) `#71f4d9` | **+5** | −5 | −10 | **+10** | Potions et mixtures |
+| 25 | **Ingénieur** | ![](https://img.shields.io/badge/-%20%20%20%20-f4b269?style=flat-square) `#f4b269` | −5 | −5 | **+10** | ±0 | Machines et tourelles |
+| 26 | **Gardien** | ![](https://img.shields.io/badge/-%20%20%20%20-32719e?style=flat-square) `#32719e` | **+5** | −20 | **+15** | ±0 | Mur vivant, défense ultime |
+| 27 | **Moine** | ![](https://img.shields.io/badge/-%20%20%20%20-f0b11d?style=flat-square) `#f0b11d` | **+5** | **+5** | −15 | **+5** | Corps et esprit en harmonie |
+
+</details>
+
+<img src=".github/readme/fil-rouge.svg" width="100%" alt=""/>
+
+<a id="combat"></a>
+
+## 04 · Le combat
+
+### Composer les équipes
+
+Tu choisis d'abord **ton équipe**, puis **celle de l'ordinateur**, de 1 à 4 personnages chacune (`TAILLE_EQUIPE_MAX`). Un personnage K.O. ou déjà engagé ne peut pas être choisi.
+
+<div align="center">
+<img src=".github/readme/captures/selection.webp" alt="Capture réelle de l'écran de composition : 3 alliés (Kaelen, Elara, Sylas) et 2 adversaires (Varek, Nyx), bouton Lancer le combat" width="100%"/>
+<sub>🎥 <b>Capture réelle</b> : 3 alliés en cyan, 2 adversaires en rouge, prêts pour l'arène.</sub>
+</div>
+
+### Trois actions
+
+<div align="center">
+<img src=".github/readme/actions.svg" alt="Illustration : Attaquer (40 d'attaque contre 50 % de défense, 20 dégâts), Soigner (40 sur 100 PV passent à 75), Défendre (un coup de 40 n'en inflige que 20)" width="100%"/>
+<sub>✏️ <b>Illustration.</b> Les trois exemples sont ceux de <code>tests/tests.c</code> : 40 × 50 % = 20, soin 40 → 75, garde 40 → 20.</sub>
+</div>
+
+| Action | Cible | Effet |
+|---|---|---|
+| ⚔️ **Attaquer** | un ennemi vivant | dégâts calculés ci-dessous ; à 0 PV, la cible est vaincue |
+| ✚ **Soigner** | un allié vivant blessé, soi compris | rend `soin` PV sans dépasser les PV max ; impossible si personne n'est blessé ou si le soin vaut 0 |
+| 🛡️ **Défendre** | soi-même | garde : −50 % sur les dégâts reçus jusqu'au **début de son prochain tour** |
+
+### Les dégâts
+
+La défense est un **pourcentage de réduction**. Le calcul se fait en entiers (la division tronque), la garde divise encore par deux, et une attaque inflige **au moins 1** dégât :
+
+$$
+\text{dégâts} = \max\left(1,\ \left\lfloor \frac{\text{attaque} \times (100 - \text{défense})}{100} \right\rfloor \times g\right)
+\qquad g = \begin{cases} 0{,}5 & \text{en garde} \\ 1 & \text{sinon} \end{cases}
+\qquad
+\text{PV}_{\text{cible}} = \max(0,\ \text{PV}_{\text{cible}} - \text{dégâts})
+$$
+
+<div align="center">
+<img src=".github/readme/combat.svg" alt="Illustration du calcul : 85 d'attaque contre 30 % de défense donnent 59 dégâts, les PV passent de 80 à 21" width="85%"/>
+<sub>✏️ <b>Illustration</b> de la formule : 85 × (100 − 30) / 100 = 59,5, tronqué à 59.</sub>
+</div>
+
+| Attaque | Défense | Calcul | Dégâts |
+|:---:|:---:|---|:---:|
+| 85 | 30 | 85 × 70 / 100 = 59,5 → **59** | 🟥 59 |
+| 40 | 50 | 40 × 50 / 100 | 🟧 20 |
+| 40 | 0, en garde | 40 × 50 % | 🟨 20 |
+| 60 | 99 | 60 × 1 / 100 = 0,6 → 0 → **minimum 1** | ⬜ 1 |
+
+### L'ordre des tours
+
+<div align="center">
+<img src=".github/readme/tours.svg" alt="Illustration : les équipes alternent rang par rang ; Nyx est mis K.O. pendant la manche 1 et son tour est sauté à la manche 2" width="100%"/>
+<sub>✏️ <b>Illustration</b> de l'ordre déterministe : J1, A1, J2, A2, J3… Un personnage vaincu est sauté.</sub>
+</div>
+
+Le combat s'arrête dès qu'une équipe n'a plus personne debout. Il travaille sur des **copies** des personnages : les PV perdus et les gardes disparaissent à la fin, le roster n'est jamais modifié.
+
+**L'ordinateur** ([`bataille_ia`](src/personnage/bataille.c)) suit trois règles simples et prévisibles : soigner l'allié le plus blessé s'il est sous la moitié de ses PV, se mettre en garde sous le quart de ses PV, sinon attaquer l'ennemi qui a le moins de PV.
+
+### Le même combat, dans le terminal
+
+<div align="center">
+<img src=".github/readme/demo-terminal.svg" alt="Illustration du terminal : make, menu, composition des équipes, puis Kaelen et Elara contre Varek jusqu'à la victoire" width="100%"/>
+<sub>✏️ <b>Illustration</b> rejouant une vraie session, condensée : les messages, les PV (Varek 75 → 34 → 0, Elara 55 → 3 → K.O.) et la mise en page des lignes sont ceux du programme. La compilation montrée est raccourcie (un vrai <code>make</code> compile aussi les 40 fichiers de <code>lib/</code>).</sub>
+</div>
+
+<details>
+<summary><b>📜 Le texte brut de cette session</b></summary>
+
+<br/>
+
+```text
+  Choix (0-5) › 3
+  Ton équipe (1 à 4, ligne vide pour terminer)
+  1. › Kaelen
+  2. › Elara
+  3. ›
+  Équipe adverse (jouée par l'ordinateur) (1 à 4, ligne vide pour terminer)
+  1. › Varek
+
+  ── Équipe adverse ──
+   1 Varek          Berserker       ■■■■■■■■■■■■  75/75
+  ── Ton équipe ──
+  ▶1 Kaelen         Guerrier        ■■■■■■■■■■■■  60/60
+   2 Elara          Prêtre          ■■■■■■■■■■■■  55/55
+
+  Tour de Kaelen
+    1  Attaquer
+    2  Soigner
+    3  Défendre
+  Action (1-3) › 3
+  » Kaelen adopte une posture défensive.
+  » Varek attaque Elara et inflige 52 dégâts.
+  …
+  Action (1-3) › 1
+    1  Varek          -40 PV
+    0  Retour
+  Cible (0-1) › 1
+  » Kaelen attaque Varek et inflige 40 dégâts.
+  » Varek est vaincu.
+  » L'équipe adverse a été vaincue.
+
+  ✔ Victoire !
+```
+<sub>Extrait d'une vraie session (couleurs retirées).</sub>
+
+</details>
+
+<img src=".github/readme/fil-rouge.svg" width="100%" alt=""/>
+
+<a id="mecaniques"></a>
+
+## 05 · Les mécaniques
+
+### Le menu de la console
 
 ```
 ╭────────────────────────────────────╮
@@ -139,69 +345,12 @@ make csfml            # compile ./redstrings_csfml
 
 | Touche | Action | Ce qui se passe |
 |:---:|---|---|
-| <kbd>1</kbd> | **Ajouter** | Nom → PV → Attaque → Défense → Classe. Le nom doit être unique. |
-| <kbd>2</kbd> | **Afficher** | Fiche avec barres de stats colorées. |
-| <kbd>3</kbd> | **Combat** | Compose ton équipe puis celle de l'ordinateur (1 à 4 chacune), puis combat au tour par tour : Attaquer, Soigner ou Défendre. |
+| <kbd>1</kbd> | **Ajouter** | Nom → PV → Attaque → Défense → Soin → Classe. Le nom doit être unique. |
+| <kbd>2</kbd> | **Afficher** | Fiche avec barres de statistiques et couleur de la classe. |
+| <kbd>3</kbd> | **Combat** | Ton équipe, puis celle de l'ordinateur, puis le combat au tour par tour. |
 | <kbd>4</kbd> | **Sauvegarder** | Écrit tous les personnages dans `personnages.txt`. |
 | <kbd>5</kbd> | **Charger** | Remplace l'équipe par le contenu de `personnages.txt`. |
 | <kbd>0</kbd> ou <kbd>Ctrl</kbd>+<kbd>D</kbd> | **Quitter** | Libère la mémoire, puis « À bientôt ! ». |
-
-<details>
-<summary><b>📋 Ce que le jeu accepte (et refuse)</b></summary>
-
-<br/>
-
-| Saisie | Règle | Si c'est faux |
-|---|---|---|
-| Nom | 1 mot, 29 caractères max, **unique** | `✗ Ce nom est déjà pris` |
-| PV / Attaque / Défense / Soin | entier de **0 à 99** (statistiques de base, avant la classe) | `✗ Valeur invalide`, puis la question est reposée |
-| Classe | de 1 à 28, listées par catégorie | `✗ Valeur invalide` |
-| `12abc`, `abc`, `99999999999` | refusés : `strtol` contrôle **toute** la ligne | `✗ Valeur invalide` |
-| <kbd>Ctrl</kbd>+<kbd>D</kbd> pendant une création | la création est annulée | `✗ Saisie interrompue` |
-
-</details>
-
-<details>
-<summary><b>🎥 Une partie complète, pas à pas</b></summary>
-
-<br/>
-
-```text
-  Choix (0-5) › 3
-  Ton équipe (1 à 4, ligne vide pour terminer)
-  1. › Kaelen
-  2. › Elara
-  3. ›
-  Équipe adverse (jouée par l'ordinateur) (1 à 4, ligne vide pour terminer)
-  1. › Varek
-
-  ── Équipe adverse ──
-   1 Varek         Berserker       ■■■■■■■■■■■■  75/75
-  ── Ton équipe ──
-  ▶1 Kaelen        Guerrier        ■■■■■■■■■■■■  60/60
-   2 Elara         Prêtre          ■■■■■■■■■■■■  55/55
-  Tour de Kaelen
-    1  Attaquer
-    2  Soigner
-    3  Défendre
-  Action (1-3) › 3
-  » Kaelen adopte une posture défensive.
-  » Varek attaque Elara et inflige 52 dégâts.
-  …
-  Action (1-3) › 1
-    1  Varek          -40 PV
-    0  Retour
-  Cible (0-1) › 1
-  » Kaelen attaque Varek et inflige 40 dégâts.
-  » Varek est vaincu.
-  » L'équipe adverse a été vaincue.
-  ✔ Victoire !
-```
-<sub>Extrait d'une vraie session (couleurs retirées). Les PV perdus pendant le combat ne sont pas reportés dans le roster.</sub>
-
-</details>
-
-### 🧭 Le menu, vu comme une machine à états
 
 ```mermaid
 stateDiagram-v2
@@ -227,9 +376,22 @@ stateDiagram-v2
     end note
 ```
 
-<img src=".github/readme/fil-rouge.svg" width="100%" alt=""/>
+<details>
+<summary><b>📋 Ce que le jeu accepte (et refuse)</b></summary>
 
-## 🖼️ La version graphique (CSFML)
+<br/>
+
+| Saisie | Règle | Si c'est faux |
+|---|---|---|
+| Nom | 1 mot, 29 caractères max, **unique** | `✗ Ce nom est déjà pris` |
+| PV / Attaque / Défense / Soin | entier de **0 à 99** (statistiques de base, avant la classe) | `✗ Valeur invalide`, puis la question est reposée |
+| Classe | de 1 à 28, listées par catégorie | `✗ Valeur invalide` |
+| `12abc`, `abc`, `99999999999` | refusés : `strtol` contrôle **toute** la ligne | `✗ Valeur invalide` |
+| <kbd>Ctrl</kbd>+<kbd>D</kbd> pendant une création | la création est annulée | `✗ Saisie interrompue` |
+
+</details>
+
+### Les commandes de la fenêtre
 
 ```mermaid
 stateDiagram-v2
@@ -255,162 +417,12 @@ stateDiagram-v2
 | **Composition** | <kbd>←</kbd> <kbd>→</kbd> <kbd>↑</kbd> <kbd>↓</kbd> choisir une carte · <kbd>Espace</kbd> ajouter / retirer · <kbd>Entrée</kbd> valider l'équipe · <kbd>Échap</kbd> étape précédente | clic sur une carte, bouton *Valider* / *Lancer le combat* |
 | **Arène** | <kbd>1</kbd> <kbd>2</kbd> <kbd>3</kbd> ou <kbd>←</kbd> <kbd>→</kbd> + <kbd>Entrée</kbd> action · <kbd>←</kbd> <kbd>→</kbd> cible · <kbd>Entrée</kbd> confirmer · <kbd>Échap</kbd> retour · fin : <kbd>Entrée</kbd>/<kbd>R</kbd> rejouer, <kbd>Échap</kbd> menu | boutons d'action, survol / clic sur une cible |
 
-> [!NOTE]
-> **Un seul moteur pour deux interfaces.** `csfml/src/` ne contient que l'affichage : la version graphique compile directement `personnage.c`, `combat.c`, `roster.c` et `sauvegarde.c` depuis `src/personnage/`. Même table de classes, mêmes bornes (`STAT_MIN`, `STAT_MAX`), même calcul de dégâts (`subir_attaque`), même `roster_t`, même fichier `personnages.txt` : une équipe sauvegardée dans la console se recharge dans la fenêtre, et inversement.
-
 > [!WARNING]
-> L'écran n'a de place que pour **10 cartes** : la version graphique refuse de créer un 11ᵉ personnage, et refuse de charger un fichier qui en contient plus (l'équipe actuelle n'est alors pas touchée).
+> L'écran n'a de place que pour **10 cartes** (`MAX_PERSONNAGES`) : la fenêtre refuse de créer un 11ᵉ personnage, et refuse de charger un fichier qui en contient plus (l'équipe actuelle n'est alors pas touchée). La console, elle, n'a pas de limite.
 
-<details>
-<summary><b>✨ Ce qui rend l'interface vivante</b></summary>
+### La sauvegarde
 
-<br/>
-
-**Direction artistique.** Toutes les surfaces partagent la même silhouette : deux coins coupés (haut-gauche, bas-droite) et des crochets lumineux sur les deux autres. Le rouge porte la marque et le combat, le cyan les actions, le vert les PV, le bleu la défense. Les composants communs sont dans `csfml/src/hud.c` (`panneau`, `crochets`, `titre_section`, `hexagone`, `radar_stats`, `touche_clavier`…).
-
-| Effet | Où | Comment |
-|---|---|---|
-| Profondeur du fond | tous les écrans | étoiles lointaines, halos, sol quadrillé en perspective, fils rouges parcourus d'impulsions |
-| Hologramme de classe | aperçu de la création | socle, cône de projection, anneaux, aura propre à la catégorie (lames, orbite d'astres, réticule, croix de soutien) |
-| Radar des statistiques | aperçu de la création | triangle PV / attaque / défense, animé avec les vraies valeurs |
-| Catalogue de classes | création | 4 onglets de catégorie, grille de tuiles colorées, 20 emblèmes vectoriels (`emblemes.c`), onde de choc et fondu de couleur au changement de classe |
-| Mouvements organiques | boutons, cartes | ressorts amortis (`ressort_t`) |
-| Courbes d'animation | entrées / sorties de scène | `sortie_cubique`, `entree_cubique`, `sortie_rebond` |
-| Particules | création, impacts, K.O. | jusqu'à 900 particules avec gravité |
-| Poussière d'ambiance | fond | 70 grains qui flottent, 160 étoiles qui scintillent |
-| Notifications | coin de l'écran | toasts empilables (4 max) |
-| Halo lumineux | cartes, titres | texture de dégradé radial générée au lancement |
-
-</details>
-
-<img src=".github/readme/fil-rouge.svg" width="100%" alt=""/>
-
-## ⚔️ Les règles du combat
-
-Deux équipes de **1 à 4 personnages** (`TAILLE_EQUIPE_MAX`) s'affrontent au tour par tour. Tout est décidé par le moteur [`bataille.c`](src/personnage/bataille.c), commun à la console et à la fenêtre ; le combat travaille sur des **copies** des personnages : PV perdus et gardes disparaissent à la fin, le roster n'est jamais modifié.
-
-<div align="center">
-<img src=".github/readme/combat.svg" alt="Animation du calcul : 85 d'attaque, 30 % de défense, 59 dégâts, Aragorn passe de 80 à 21 PV" width="100%"/>
-</div>
-
-| Action | Cible | Effet |
-|---|---|---|
-| ⚔️ **Attaquer** | un ennemi vivant | dégâts ci-dessous ; à 0 PV, la cible est vaincue |
-| ✚ **Soigner** | un allié vivant blessé (soi compris) | rend `soin` PV, sans dépasser les PV max ; indisponible si personne n'est blessé ou si le soin vaut 0 |
-| 🛡️ **Défendre** | soi-même | garde : −50 % sur tous les dégâts reçus jusqu'au **début de son prochain tour** |
-
-La défense est un **pourcentage de réduction**. Le calcul est fait en entiers (la division tronque), la garde divise encore par deux, et une attaque inflige **au moins 1** dégât :
-
-$$
-\text{dégâts} = \max\left(1,\ \left\lfloor \frac{\text{attaque} \times (100 - \text{défense})}{100} \right\rfloor \times g\right)
-\qquad g = \begin{cases} 0{,}5 & \text{en garde} \\ 1 & \text{sinon} \end{cases}
-\qquad
-\text{PV}_{\text{cible}} = \max(0,\ \text{PV}_{\text{cible}} - \text{dégâts})
-$$
-
-| Attaque | Défense | Calcul | Dégâts |
-|:---:|:---:|---|:---:|
-| 85 | 30 | 85 × 70 / 100 = 59,5 → **59** | 🟥 59 |
-| 40 | 50 | 40 × 50 / 100 | 🟧 20 |
-| 40 | 0, en garde | 40 × 50 % | 🟨 20 |
-| 60 | 99 | 60 × 1 / 100 = 0,6 → 0 → **minimum 1** | ⬜ 1 |
-
-**Ordre des tours** (déterministe) : les équipes alternent rang par rang — J1, A1, J2, A2… — et un personnage vaincu est sauté. Le combat s'arrête dès qu'une équipe n'a plus personne debout.
-
-**L'adversaire** est joué par l'ordinateur ([`bataille_ia`](src/personnage/bataille.c)), avec des règles simples et prévisibles : soigner l'allié le plus blessé s'il est sous la moitié de ses PV, se mettre en garde sous le quart de ses PV, sinon attaquer l'ennemi qui a le moins de PV.
-
-```mermaid
-sequenceDiagram
-    participant UI as Console / CSFML
-    participant M as bataille.c
-    UI->>M: bataille_agir(Attaquer, Varek)
-    M->>M: valide la cible, calcule, met à jour les PV
-    M->>M: tour suivant · fait expirer la garde
-    M-->>UI: événements [ATTAQUE −24] [KO Varek] [GARDE_FIN Elara]
-    UI->>UI: joue les animations, puis affiche le journal
-```
-
-> [!IMPORTANT]
-> Les animations **ne décident jamais** du résultat : le moteur renvoie des événements déjà résolus (dégâts, PV après, garde utilisée, K.O., victoire). L'écran les joue dans le temps et met à jour les PV affichés et le journal **au moment de l'impact**, sans rien recalculer ni réappliquer.
-
-### 🧬 Les 28 classes
-
-Chaque classe vient d'**une seule ligne** de la table `classes[]` ([`personnage.c`](src/personnage/personnage.c)) : nom, description, catégorie, couleur RGB, modificateurs et emblème. La console (couleur ANSI 24 bits), la fenêtre CSFML et la logique de jeu lisent toutes cette même table.
-
-> [!NOTE]
-> **Les modificateurs s'ajoutent aux quatre statistiques de base choisies** (PV, attaque, défense, soin), une seule fois à la création, bornés entre 0 et 99. Leur somme vaut toujours 0 : une classe gagne d'un côté ce qu'elle perd de l'autre (vérifié par `make tests`). Le combat lui-même ne change pas : il utilise les statistiques finales.
-
-<details open>
-<summary><b>⚔️ Corps à corps — 8 classes</b></summary>
-
-| Id | Classe | Couleur | PV | ATQ | DEF | SOIN | Description |
-|:---:|---|:---:|:---:|:---:|:---:|:---:|---|
-| 0 | **Guerrier** | ![](https://img.shields.io/badge/-%20%20%20%20-ef4444?style=flat-square) `#ef4444` | ±0 | **+5** | **+5** | −10 | Combattant polyvalent |
-| 3 | **Paladin** | ![](https://img.shields.io/badge/-%20%20%20%20-eee527?style=flat-square) `#eee527` | ±0 | −10 | **+5** | **+5** | Rempart sacré en armure lourde |
-| 4 | **Berserker** | ![](https://img.shields.io/badge/-%20%20%20%20-cb285b?style=flat-square) `#cb285b` | **+5** | **+15** | −5 | −15 | Rage aveugle, frappe sans garde |
-| 5 | **Chevalier noir** | ![](https://img.shields.io/badge/-%20%20%20%20-8657f1?style=flat-square) `#8657f1` | −5 | **+5** | **+10** | −10 | Lame maudite, armure d'ombre |
-| 6 | **Samouraï** | ![](https://img.shields.io/badge/-%20%20%20%20-fb6e0f?style=flat-square) `#fb6e0f` | −5 | **+10** | ±0 | −5 | Maître du sabre, coup décisif |
-| 7 | **Duelliste** | ![](https://img.shields.io/badge/-%20%20%20%20-e47f85?style=flat-square) `#e47f85` | −10 | **+10** | **+5** | −5 | Escrime vive et précise |
-| 8 | **Lancier** | ![](https://img.shields.io/badge/-%20%20%20%20-edf3fc?style=flat-square) `#edf3fc` | ±0 | **+10** | −5 | −5 | Allonge et charge brutale |
-| 9 | **Gladiateur** | ![](https://img.shields.io/badge/-%20%20%20%20-a1774b?style=flat-square) `#a1774b` | **+10** | **+5** | −5 | −10 | Champion de l'arène |
-
-</details>
-
-<details>
-<summary><b>✨ Magie — 8 classes</b></summary>
-
-| Id | Classe | Couleur | PV | ATQ | DEF | SOIN | Description |
-|:---:|---|:---:|:---:|:---:|:---:|:---:|---|
-| 1 | **Mage** | ![](https://img.shields.io/badge/-%20%20%20%20-d946ef?style=flat-square) `#d946ef` | −10 | **+15** | ±0 | −5 | Arcanes offensives |
-| 10 | **Archimage** | ![](https://img.shields.io/badge/-%20%20%20%20-2964d8?style=flat-square) `#2964d8` | −15 | **+20** | −5 | ±0 | Maîtrise absolue des arcanes |
-| 11 | **Élémentaliste** | ![](https://img.shields.io/badge/-%20%20%20%20-16d8f4?style=flat-square) `#16d8f4` | −5 | **+15** | −5 | −5 | Feu, glace et foudre |
-| 12 | **Nécromancien** | ![](https://img.shields.io/badge/-%20%20%20%20-9afb5f?style=flat-square) `#9afb5f` | **+5** | **+5** | −10 | ±0 | Draine la vie des vivants |
-| 13 | **Invocateur** | ![](https://img.shields.io/badge/-%20%20%20%20-9996eb?style=flat-square) `#9996eb` | **+5** | ±0 | −5 | ±0 | Appelle des esprits alliés |
-| 14 | **Druide** | ![](https://img.shields.io/badge/-%20%20%20%20-44862a?style=flat-square) `#44862a` | ±0 | −5 | −5 | **+10** | Force de la nature |
-| 15 | **Illusionniste** | ![](https://img.shields.io/badge/-%20%20%20%20-fab3ec?style=flat-square) `#fab3ec` | −5 | ±0 | **+5** | ±0 | Trompe l'œil et l'esprit |
-| 16 | **Chronomancien** | ![](https://img.shields.io/badge/-%20%20%20%20-97b7de?style=flat-square) `#97b7de` | −10 | **+5** | **+5** | ±0 | Plie le cours du temps |
-
-</details>
-
-<details>
-<summary><b>🏹 Distance — 6 classes</b></summary>
-
-| Id | Classe | Couleur | PV | ATQ | DEF | SOIN | Description |
-|:---:|---|:---:|:---:|:---:|:---:|:---:|---|
-| 2 | **Archer** | ![](https://img.shields.io/badge/-%20%20%20%20-22c55e?style=flat-square) `#22c55e` | −5 | **+10** | −5 | ±0 | Tir rapide à distance |
-| 17 | **Chasseur** | ![](https://img.shields.io/badge/-%20%20%20%20-91922d?style=flat-square) `#91922d` | ±0 | **+10** | −5 | −5 | Pisteur des terres sauvages |
-| 18 | **Tireur d'élite** | ![](https://img.shields.io/badge/-%20%20%20%20-dde37c?style=flat-square) `#dde37c` | −15 | **+20** | −5 | ±0 | Un tir, une cible |
-| 19 | **Assassin** | ![](https://img.shields.io/badge/-%20%20%20%20-787279?style=flat-square) `#787279` | −20 | **+20** | **+5** | −5 | Frappe dans l'ombre |
-| 20 | **Ombrelame** | ![](https://img.shields.io/badge/-%20%20%20%20-a616fe?style=flat-square) `#a616fe` | −5 | **+5** | **+5** | −5 | Lame tissée d'ombre |
-| 21 | **Corsaire** | ![](https://img.shields.io/badge/-%20%20%20%20-07aafa?style=flat-square) `#07aafa` | **+10** | **+5** | −10 | −5 | Pirate des mers lointaines |
-
-</details>
-
-<details>
-<summary><b>🛡️ Soutien — 6 classes</b></summary>
-
-| Id | Classe | Couleur | PV | ATQ | DEF | SOIN | Description |
-|:---:|---|:---:|:---:|:---:|:---:|:---:|---|
-| 22 | **Prêtre** | ![](https://img.shields.io/badge/-%20%20%20%20-efdcae?style=flat-square) `#efdcae` | **+5** | −15 | −5 | **+15** | Foi inébranlable |
-| 23 | **Barde** | ![](https://img.shields.io/badge/-%20%20%20%20-c5529c?style=flat-square) `#c5529c` | ±0 | −5 | ±0 | **+5** | Chants qui galvanisent |
-| 24 | **Alchimiste** | ![](https://img.shields.io/badge/-%20%20%20%20-71f4d9?style=flat-square) `#71f4d9` | **+5** | −5 | −10 | **+10** | Potions et mixtures |
-| 25 | **Ingénieur** | ![](https://img.shields.io/badge/-%20%20%20%20-f4b269?style=flat-square) `#f4b269` | −5 | −5 | **+10** | ±0 | Machines et tourelles |
-| 26 | **Gardien** | ![](https://img.shields.io/badge/-%20%20%20%20-32719e?style=flat-square) `#32719e` | **+5** | −20 | **+15** | ±0 | Mur vivant, défense ultime |
-| 27 | **Moine** | ![](https://img.shields.io/badge/-%20%20%20%20-f0b11d?style=flat-square) `#f0b11d` | **+5** | **+5** | −15 | **+5** | Corps et esprit en harmonie |
-
-</details>
-
-> [!TIP]
-> **Ajouter une classe** : une valeur juste avant `NB_CLASSES` dans l'`enum` (jamais au milieu : l'identifiant est écrit dans les sauvegardes), puis une ligne dans `classes[]`. Les listes de la console, les onglets et la grille de la fenêtre, l'aperçu et les tests la prennent en compte sans autre modification.
-
-> [!IMPORTANT]
-> **Trois règles protègent le combat :** un personnage ne peut pas s'attaquer lui-même, un personnage K.O. (0 PV) ne peut ni attaquer ni être attaqué, et les PV ne descendent jamais sous 0.
-
-<img src=".github/readme/fil-rouge.svg" width="100%" alt=""/>
-
-## 💾 Sauvegarde
-
-Un personnage par ligne, au format texte (`nom pv attaque défense classe soin`, la classe étant l'identifiant de 0 à 27 du tableau ci-dessus) :
+Un personnage par ligne, au format texte : `nom pv attaque défense classe soin`, où la classe est l'identifiant de 0 à 27 des tableaux ci-dessus.
 
 ```text
 Aragorn 80 60 30 0 10
@@ -418,9 +430,9 @@ Elara 55 15 10 22 40
 ```
 
 > [!NOTE]
-> **Compatibilité.** Le soin est ajouté *en fin de ligne* pour ne pas déplacer la classe. Une ligne à 5 champs, écrite avant cette statistique, reste lisible : le personnage reçoit `SOIN_MIGRATION` (20), modifié par sa classe. Elle sera réécrite au format complet à la prochaine sauvegarde.
+> **Compatibilité.** Le soin est ajouté *en fin de ligne* pour ne pas déplacer la classe. Une ligne à 5 champs, écrite avant cette statistique, reste lisible : le personnage reçoit `SOIN_MIGRATION` (20), modifié par sa classe. Elle est réécrite au format complet à la prochaine sauvegarde.
 
-Le chargement est **transactionnel** : tout le fichier est lu dans un roster temporaire, puis il remplace l'équipe seulement s'il est entièrement valide.
+Le chargement est **transactionnel** : tout le fichier est lu dans un roster temporaire, qui remplace l'équipe seulement s'il est entièrement valide.
 
 ```mermaid
 sequenceDiagram
@@ -436,8 +448,8 @@ sequenceDiagram
         F-->>S: NULL
         S-->>M: SAUVEGARDE_ERR_OUVERTURE
     else fichier lisible
-        loop chaque ligne
-            S->>F: fscanf("%29s %d %d %d %d")
+        loop chaque ligne (fgets)
+            S->>S: sscanf : 5 champs (ancien format) ou 6
             S->>S: stats 0-99 ? classe connue ? nom unique ?
         end
         alt une ligne invalide
@@ -460,13 +472,81 @@ sequenceDiagram
 
 <img src=".github/readme/fil-rouge.svg" width="100%" alt=""/>
 
-## 🏗️ Architecture
+<a id="choix-techniques"></a>
+
+## 06 · Les choix techniques
+
+**1. Un moteur qui n'affiche rien.** [`bataille.c`](src/personnage/bataille.c) ne contient ni `printf` ni CSFML. Les interfaces lui envoient une **action** (`bataille_agir(b, ACTION_ATTAQUER, cible, ev)`) et reçoivent en retour une liste d'**événements** déjà résolus. La console les écrit, la fenêtre les anime.
+
+```mermaid
+sequenceDiagram
+    participant UI as Console / CSFML
+    participant M as bataille.c
+    UI->>M: bataille_agir(Attaquer, Varek)
+    M->>M: valide la cible, calcule, met à jour les PV
+    M->>M: tour suivant · fait expirer la garde
+    M-->>UI: événements [ATTAQUE −24] [KO Varek] [GARDE_FIN Elara]
+    UI->>UI: joue les animations, puis affiche le journal
+```
+
+> [!IMPORTANT]
+> Les animations **ne décident jamais** du résultat : le moteur renvoie des événements déjà résolus (dégâts, PV après, garde utilisée, K.O., victoire). L'arène les joue dans le temps et met à jour les PV affichés et le journal **au moment de l'impact**, sans rien recalculer.
+
+**2. Une seule source de vérité pour les classes.** La table `classes[]` donne à la fois la couleur ANSI 24 bits du terminal, la couleur CSFML, l'emblème et les modificateurs. Les illustrations de ce README la lisent aussi.
+
+**3. Des copies pour combattre.** `bataille_init` copie les personnages dans des `combattant_t` (PV actuels, PV max, effets). Un combat ne peut donc pas abîmer le roster ni la sauvegarde.
+
+**4. Des effets prêts à grandir.** La garde est un `effet_t` avec une durée, rangé dans un tableau de `MAX_EFFETS`. D'autres effets (poison, étourdissement…) pourront s'y ajouter sans toucher aux interfaces.
+
+**5. Une bibliothèque maison.** Le code n'appelle ni `strlen`, ni `strcmp`, ni `strcpy` : il passe par `my_strlen`, `my_strcmp`, `my_strcpy` de **`libmy.a`**, 40 fonctions réécrites à la main.
+
+<details>
+<summary><b>🔐 Robustesse : ce qui a été reproduit, puis corrigé</b></summary>
+
+<br/>
+
+Le projet a été audité point par point (voir [`AMELIORATIONS.md`](AMELIORATIONS.md)) :
+
+| | Avant | Après |
+|:---:|---|---|
+| 🔴 | <kbd>Ctrl</kbd>+<kbd>D</kbd> au menu → **boucle infinie** | `lire_entier` renvoie `-1` sur fin d'entrée → sortie propre |
+| 🔴 | `scanf` du nom jamais vérifié → nom **non initialisé** | retour vérifié, tampon initialisé |
+| 🟠 | `scanf("%d")` acceptait `12abc` et pouvait déborder | `fgets` + `strtol` : toute la ligne doit être un nombre, dans les bornes |
+| 🟠 | deux personnages pouvaient porter **le même nom** | `trouver_personnage` avant chaque création |
+| 🟡 | `sprintf` sans limite dans les barres de stats | `snprintf` avec la taille du tampon |
+| 🟠 | un personnage pouvait **s'attaquer lui-même** | le moteur refuse la cible |
+| 🟡 | un personnage **K.O.** pouvait encore agir | il est sauté et ne peut pas être ciblé |
+| 🔴 | modifier un `.h` ne recompilait rien | dépendances `-MMD -MP` |
+| 🟢 | 10 personnages maximum | `roster_t` + `realloc` |
+
+```diff
+- int ret = scanf("%d", &choix);          // "12abc" → 12, Ctrl+D → boucle infinie
++ if (lire_entier("Choix", 0, 5, &choix) == -1)
++     choix = 0;                           // fin d'entrée : on quitte proprement
+```
+
+> [!TIP]
+> `boite_ligne()` et `boite_champ()` sont déclarées avec `__attribute__((format(printf, …)))` : gcc vérifie leurs formats comme ceux de `printf`. Un `%d` avec une chaîne devient une **erreur de compilation**, pas un affichage faux en pleine partie.
+
+</details>
+
+<img src=".github/readme/fil-rouge.svg" width="100%" alt=""/>
+
+<a id="architecture"></a>
+
+## 07 · L'architecture
+
+<div align="center">
+<img src=".github/readme/architecture.svg" alt="Illustration de l'architecture : la console et la fenêtre CSFML envoient des actions au moteur partagé, qui renvoie des événements ; le moteur s'appuie sur libmy.a et personnages.txt" width="100%"/>
+<sub>✏️ <b>Illustration.</b> La fenêtre compile directement les fichiers du moteur (<code>MOTEUR</code> dans <code>csfml/Makefile</code>) : <code>personnage.c combat.c bataille.c roster.c sauvegarde.c</code>.</sub>
+</div>
 
 ```text
 RedStrings/
 ├── 📁 includes/              ← un header = un thème
-│   ├── personnage.h          personnage_t, classe_t, catalogue classes[], stats
+│   ├── personnage.h          personnage_t, classe_t, catalogue classes[], statistiques
 │   ├── bataille.h            combat en équipe : tours, actions, effets, événements
+│   ├── bataille_console.h    menu_bataille()
 │   ├── roster.h              tableau dynamique de personnages
 │   ├── sauvegarde.h          sauvegarder / charger + codes d'erreur
 │   ├── boite.h               boîtes Unicode, alignement des libellés
@@ -477,68 +557,56 @@ RedStrings/
 ├── 📁 src/
 │   ├── main.c                return redstrings();
 │   ├── redstrings.c          boucle du menu
-│   ├── 📁 personnage/         moteur partagé : personnage · combat · bataille · roster · sauvegarde
-│   │                          affichage console : creer · afficher
-│   └── 📁 ui/                 boite.c · saisie.c · bataille_console.c
+│   ├── 📁 personnage/        moteur : personnage · combat · bataille · roster · sauvegarde
+│   │                         console : creer_personnage · afficher_personnage
+│   └── 📁 ui/                boite.c · saisie.c · bataille_console.c
 ├── 📁 lib/                   40 fonctions maison → libmy.a
-├── 📁 csfml/                 version graphique : scene_bataille.c (arène), scene_combat.c (équipes)…
+├── 📁 csfml/                 version graphique (src/, include/gui.h, assets/fonts/, Makefile)
 ├── 📁 tests/                 tests.c (assert)
+├── 📁 .github/readme/        images de ce README et leur générateur
 └── Makefile
 ```
 
-### 🔗 Qui dépend de qui
+### Qui dépend de qui
 
 ```mermaid
 flowchart TB
     main([main.c]) --> rs[redstrings.c<br/><i>menu</i>]
-    rs --> perso[personnage/<br/>creer · afficher · attaquer]
-    rs --> roster[roster.c<br/><i>realloc</i>]
-    rs --> save[sauvegarde.c<br/><i>fopen · fscanf</i>]
-    save --> roster
-    perso --> ui[ui/boite.c · ui/saisie.c]
-    rs --> ui
-    perso & save & rs --> libmy[(libmy.a<br/>my_strcmp · my_strlen…)]
-    gui([csfml/src/*.c<br/><i>affichage seul</i>]) --> roster & save & ph
-    gui --> combat[combat.c<br/><i>subir_attaque · est_ko</i>]
-    perso --> combat
-    gui --> libmy
-    perso --> ph
+    rs --> ui[creer · afficher<br/>bataille_console.c]
+    ui --> outils[boite.c · saisie.c]
+    rs --> save[sauvegarde.c<br/><i>fgets · sscanf</i>]
+    ui --> bat[bataille.c<br/><i>tours · actions · IA</i>]
+    gui([csfml/src/*.c<br/><i>affichage seul</i>]) --> bat
+    gui --> save
+    bat --> combat[combat.c<br/><i>calculer_degats · est_ko</i>]
+    bat --> perso[personnage.c<br/><i>table des classes</i>]
+    save --> roster[roster.c<br/><i>realloc</i>]
+    rs --> roster
+    gui --> roster
+    perso & save & bat & gui --> libmy[(libmy.a<br/>my_strcmp · my_strlen…)]
 
-    classDef app fill:#0e1230,stroke:#f43f5e,color:#eceffe
+    classDef app fill:#0e1230,stroke:#38bdf8,color:#eceffe
+    classDef moteur fill:#0e1230,stroke:#f43f5e,color:#eceffe
     classDef lib fill:#0e1230,stroke:#fbbf24,color:#eceffe
     classDef gui fill:#0e1230,stroke:#34d399,color:#eceffe
-    class main,rs,perso,roster,save,ui,combat app
-    class libmy,ph lib
+    class main,rs,ui,outils app
+    class bat,combat,perso,save,roster moteur
+    class libmy lib
     class gui gui
 ```
 
-### 🧬 Les structures de données
+### Les structures de données
 
 ```mermaid
 classDiagram
     direction LR
     class personnage_t {
-        char nom[NOM_MAX]
+        char nom[30]
         int pv
         int atq
         int def
+        int soin
         classe_t classe
-    }
-    class roster_t {
-        personnage_t *data
-        int len
-        int capacite
-        +roster_init()
-        +roster_ajouter() int
-        +roster_liberer()
-    }
-    class classe_t {
-        <<enumeration>>
-        GUERRIER = 0
-        MAGE = 1
-        ARCHER = 2
-        PALADIN ... MOINE
-        NB_CLASSES = 28
     }
     class info_classe_t {
         const char *nom
@@ -548,9 +616,39 @@ classDiagram
         int mods[NB_STATS]
         embleme_t embleme
     }
+    class roster_t {
+        personnage_t *data
+        int len
+        int capacite
+    }
+    class combattant_t {
+        personnage_t perso
+        int pv
+        int pv_max
+        effet_t effets[MAX_EFFETS]
+        int nb_effets
+    }
+    class bataille_t {
+        equipe_t equipes[2]
+        ref_t ordre[8]
+        int tour
+        int manche
+        int gagnant
+        char journal[8][96]
+    }
+    class evenement_t {
+        type_evenement_t type
+        ref_t acteur
+        ref_t cible
+        int valeur
+        int pv_apres
+        int garde
+    }
     roster_t "1" o-- "0..*" personnage_t
-    personnage_t --> classe_t
-    classe_t ..> info_classe_t : table classes
+    personnage_t ..> info_classe_t : classes[classe]
+    combattant_t *-- personnage_t : copie
+    bataille_t "1" *-- "2..8" combattant_t
+    bataille_t ..> evenement_t : bataille_agir()
 ```
 
 <details>
@@ -585,18 +683,84 @@ r->data = tmp;
 ```mermaid
 pie showData
     title Lignes de C par partie
-    "Version graphique (csfml/)" : 3303
+    "Version graphique (csfml/)" : 5639
+    "Console et moteur (src/)" : 1396
     "libmy (lib/)" : 697
-    "Console (src/)" : 612
-    "Headers (includes/)" : 276
-    "Tests (tests/)" : 142
+    "Headers (includes/)" : 547
+    "Tests (tests/)" : 419
 ```
+
+<sub>Compté avec <code>wc -l</code> sur les fichiers <code>.c</code> et <code>.h</code> de chaque dossier.</sub>
+
+</details>
+
+<details>
+<summary><b>📚 Les 40 fonctions de libmy.a</b></summary>
+
+<br/>
+
+| Header | Famille | Fonctions |
+|---|---|---|
+| `my_string.h` | Longueur, comparaison | `my_strlen` · `my_strcmp` · `my_strncmp` · `my_strstr` |
+| `my_string.h` | Copie, concaténation | `my_strcpy` · `my_strncpy` · `my_strcat` · `my_strncat` · `my_strdup` |
+| `my_string.h` | Transformation | `my_revstr` · `my_strupcase` · `my_strlowcase` · `my_strcapitalize` |
+| `my_string.h` | Tests (1 = vrai) | `my_str_isalpha` · `my_str_islower` · `my_str_isupper` · `my_str_isnum` · `my_str_isprintable` |
+| `my.h` | Affichage | `my_putchar` · `my_putstr` · `my_put_nbr` · `my_showstr` · `my_showmem` |
+| `my.h` | Nombres | `isneg` · `my_getnbr` · `my_compute_power_rec` · `my_compute_square_root` · `my_is_prime` · `my_find_prime_sup` · `my_swap` · `my_sort_int_array` |
+| `my.h` | Tableaux et paramètres | `my_arraylen` · `my_arraystrlen` · `my_str_to_word_array` · `my_show_word_array` · `my_swap_params` · `my_print_params` · `my_rev_params` · `my_sort_params` · `concat_params` |
 
 </details>
 
 <img src=".github/readme/fil-rouge.svg" width="100%" alt=""/>
 
-## 🔨 Le Makefile
+<a id="installer"></a>
+
+## 08 · Installer et compiler
+
+```bash
+git clone https://github.com/Vylllixis/RedStrings.git
+cd RedStrings
+make            # compile ./redstrings (et lib/libmy.a au passage)
+./redstrings    # version terminal
+```
+
+### La version graphique
+
+Elle a besoin de **CSFML** (le binding C de SFML) :
+
+| Système | Commande |
+|---|---|
+| 🐧 Debian / Ubuntu | `sudo apt install libcsfml-dev` |
+| 🎩 Fedora | `sudo dnf install CSFML-devel` |
+| 🏔️ Arch | `sudo pacman -S csfml` |
+
+```bash
+make csfml            # compile ./redstrings_csfml
+./redstrings_csfml
+```
+
+> [!TIP]
+> Si CSFML manque, `make csfml` s'arrête tout de suite avec un message clair au lieu d'une erreur de compilation :
+> `✗ CSFML introuvable, installe-la avec : sudo apt install libcsfml-dev`
+
+> [!NOTE]
+> Les polices (Noto Sans, DejaVu Sans) sont cherchées à côté de l'exécutable, puis depuis le dossier courant : tu peux lancer le jeu depuis n'importe où dans le projet.
+
+<details>
+<summary><b>🧰 Prérequis</b></summary>
+
+<br/>
+
+| Outil | Pourquoi | Vérifier |
+|---|---|---|
+| `gcc` (C11) | compilation | `gcc --version` |
+| `make` | construction | `make --version` |
+| `ar` | archive `libmy.a` | `ar --version` |
+| CSFML *(optionnel)* | version graphique | `ls /usr/include/SFML/Graphics.h` |
+
+</details>
+
+### Le Makefile
 
 | Commande | Résultat |
 |---|---|
@@ -645,28 +809,24 @@ CFLAGS = -std=c11 -Wall -Wextra -Werror -pedantic -Wshadow -Wmissing-prototypes
 
 </details>
 
-> [!TIP]
-> `boite_ligne()` et `boite_champ()` sont déclarées avec `__attribute__((format(printf, …)))` : gcc vérifie leurs formats comme ceux de `printf`. Un `%d` avec une chaîne devient une **erreur de compilation**, au lieu d'un affichage faux en pleine partie.
+<a id="tests"></a>
 
-<img src=".github/readme/fil-rouge.svg" width="100%" alt=""/>
-
-## 🧪 Tests
+### Les tests
 
 ```bash
 make tests
 ```
 
-`tests/tests.c` est compilé avec **tout le jeu sauf `main.c`**, plus AddressSanitizer et UBSan : un débordement, un comportement indéfini **ou une fuite mémoire** fait échouer les tests.
+`tests/tests.c` est compilé avec **tout le jeu sauf `main.c`**, plus AddressSanitizer et UBSan : un débordement, un comportement indéfini **ou une fuite mémoire** fait échouer les tests. Aucune fenêtre n'est ouverte : le moteur de combat se teste seul.
 
 | Domaine | Ce qui est vérifié |
 |---|---|
 | `my_strcmp` | égalité, différence, préfixe, chaînes vides |
+| `calculer_degats` | 40 × 50 % = 20 · défense 100 → 0 dégât · K.O. à 0 PV |
 | Catalogue | ≥ 20 classes, noms uniques, descriptions courtes, catégories et emblèmes valides, modificateurs bornés de somme nulle, couleurs distinctes deux à deux |
 | Modificateurs | Berserker 50/50/50/20 → 55/65/45/5, Prêtre soin 20 → 35, bornes 0 et 99 |
 | Bataille | équipes invalides refusées, ordre alterné, dégâts et minimum de 1, K.O. jamais négatif, vaincu ni jouable ni ciblable, soin 40 → 75 et plafonné, garde −50 % puis expiration, IA, combat entier 4 contre 3, roster intact |
 | Compatibilité | une ligne sans soin se relit (migration), le soin fait l'aller-retour, champ en trop ou soin hors limites refusés, identifiant hors catalogue refusé |
-| `calculer_degats` | 40 × 50 % = 20 · défense 100 → 0 dégât |
-| `attaquer` | les PV diminuent et ne passent **jamais sous 0** |
 | `trouver_personnage` | trouvé, absent, sensible à la casse, tableau vide |
 | `roster_t` | 100 ajouts d'affilée, ordre conservé, libération complète |
 | Sauvegarde | aller-retour fichier → mémoire identique |
@@ -674,82 +834,40 @@ make tests
 
 <img src=".github/readme/fil-rouge.svg" width="100%" alt=""/>
 
-## 🔐 Robustesse & sécurité
+<a id="contribuer"></a>
 
-Le projet a été audité point par point (voir [`AMELIORATIONS.md`](AMELIORATIONS.md)). Chaque problème a été **reproduit**, puis corrigé :
+## 09 · Contribuer
 
-| | Avant | Après |
-|:---:|---|---|
-| 🔴 | <kbd>Ctrl</kbd>+<kbd>D</kbd> au menu → **boucle infinie** | `lire_entier` renvoie `-1` sur fin d'entrée → sortie propre |
-| 🔴 | `scanf` du nom jamais vérifié → nom **non initialisé** | retour vérifié, tampon initialisé |
-| 🟠 | `scanf("%d")` acceptait `12abc` et pouvait déborder | `fgets` + `strtol` : toute la ligne doit être un nombre, dans les bornes |
-| 🟠 | deux personnages pouvaient porter **le même nom** | `trouver_personnage` avant chaque création |
-| 🟡 | `sprintf` sans limite dans les barres de stats | `snprintf` avec la taille du tampon |
-| 🟠 | un personnage pouvait **s'attaquer lui-même** | combat refusé |
-| 🟡 | un personnage **mort** pouvait encore attaquer | combat refusé |
-| 🔴 | modifier un `.h` ne recompilait rien | dépendances `-MMD -MP` |
-| 🟢 | 10 personnages maximum | `roster_t` + `realloc` |
+### Le flux de travail
 
-```diff
-- int ret = scanf("%d", &choix);          // "12abc" → 12, Ctrl+D → boucle infinie
-+ if (lire_entier("Choix", 0, 5, &choix) == -1)
-+     choix = 0;                           // fin d'entrée : on quitte proprement
+Le dépôt suit **git flow** : chaque changement vit sur sa propre branche partie de `develop`, puis y est fusionné avec `--no-ff`. `main` ne reçoit que les versions publiées (`v0.1.0` → `v1.2.0`).
+
+```mermaid
+gitGraph
+    commit id: "v1.2.0" tag: "v1.2.0"
+    branch develop
+    checkout develop
+    branch refactor/csfml-moteur-commun
+    commit id: "♻️ moteur commun"
+    checkout develop
+    merge refactor/csfml-moteur-commun
+    branch feature/catalogue-classes
+    commit id: "✨ 28 classes"
+    commit id: "✅ catalogue"
+    checkout develop
+    merge feature/catalogue-classes
+    branch feature/combat-tactique
+    commit id: "✨ bataille.c"
+    commit id: "✅ bataille"
+    commit id: "✨ arène CSFML"
+    checkout develop
+    merge feature/combat-tactique
 ```
-
-<img src=".github/readme/fil-rouge.svg" width="100%" alt=""/>
-
-## 📚 libmy.a
-
-Une bibliothèque de **40 fonctions** réécrites à la main, compilée en archive statique et liée aux deux versions du jeu. Le code n'utilise pas `strlen`, `strcmp` ou `strcpy` de la libc : il passe par `my_strlen`, `my_strcmp` et `my_strcpy`.
-
-<details>
-<summary><b>🔤 Chaînes — <code>my_string.h</code> (18 fonctions)</b></summary>
-
-<br/>
-
-| Famille | Fonctions |
-|---|---|
-| Longueur, comparaison | `my_strlen` · `my_strcmp` · `my_strncmp` · `my_strstr` |
-| Copie, concaténation | `my_strcpy` · `my_strncpy` · `my_strcat` · `my_strncat` · `my_strdup` |
-| Transformation | `my_revstr` · `my_strupcase` · `my_strlowcase` · `my_strcapitalize` |
-| Tests (1 = vrai) | `my_str_isalpha` · `my_str_islower` · `my_str_isupper` · `my_str_isnum` · `my_str_isprintable` |
-
-</details>
-
-<details>
-<summary><b>🔢 Affichage, nombres, tableaux — <code>my.h</code> (22 fonctions)</b></summary>
-
-<br/>
-
-| Famille | Fonctions |
-|---|---|
-| Affichage | `my_putchar` · `my_putstr` · `my_put_nbr` · `my_showstr` · `my_showmem` |
-| Nombres | `isneg` · `my_getnbr` · `my_compute_power_rec` · `my_compute_square_root` · `my_is_prime` · `my_find_prime_sup` · `my_swap` · `my_sort_int_array` |
-| Tableaux & paramètres | `my_arraylen` · `my_arraystrlen` · `my_str_to_word_array` · `my_show_word_array` · `my_swap_params` · `my_print_params` · `my_rev_params` · `my_sort_params` · `concat_params` |
-
-</details>
-
-<img src=".github/readme/fil-rouge.svg" width="100%" alt=""/>
-
-## 📐 Conventions
 
 <table>
 <tr><td valign="top" width="50%">
 
-#### Nommage
-
-| Élément | Style | Exemple |
-|---|---|---|
-| Fonctions | `snake_case` | `creer_personnage` |
-| Variables, champs | `snake_case` | `nb_persos`, `p->atq` |
-| Types | `snake_case_t` | `roster_t` |
-| Macros, `enum` | `MAJUSCULES` | `STAT_MAX`, `MAGE` |
-| Fichiers | `snake_case.c` | `afficher_personnage.c` |
-| Langue | français | `trouver_personnage` |
-
-</td><td valign="top" width="50%">
-
-#### Commits (gitmoji)
+#### Commits (gitmoji, en français)
 
 | | Type | Usage |
 |:---:|---|---|
@@ -762,59 +880,51 @@ Une bibliothèque de **40 fonctions** réécrites à la main, compilée en archi
 | 🔀 | `merge` | fusion d'une branche |
 | 🔖 | `chore(release)` | nouvelle version |
 
+Exemple : `✨ feat(bataille): moteur de combat en équipe, au tour par tour`
+
+</td><td valign="top" width="50%">
+
+#### Nommage du code
+
+| Élément | Style | Exemple |
+|---|---|---|
+| Fonctions | `snake_case` | `creer_personnage` |
+| Variables, champs | `snake_case` | `nb_persos`, `p->atq` |
+| Types | `snake_case_t` | `roster_t` |
+| Macros, `enum` | `MAJUSCULES` | `STAT_MAX`, `MAGE` |
+| Fichiers | `snake_case.c` | `afficher_personnage.c` |
+| Langue | français | `trouver_personnage` |
+
 </td></tr>
 </table>
 
-Le dépôt suit **git flow** : chaque changement vit sur sa branche, puis est fusionné dans `develop` avec `--no-ff`. `main` ne reçoit que les versions publiées (`v0.1.0` → `v1.1.0`).
+### Avant de proposer un changement
 
-```mermaid
-gitGraph
-    commit id: "v1.1.0" tag: "v1.1.0"
-    branch develop
-    checkout develop
-    commit id: "fix Ctrl+D"
-    branch feature/nom-unique
-    commit id: "✨ nom unique"
-    commit id: "🐛 lire_entier"
-    checkout develop
-    merge feature/nom-unique
-    branch feature/split-headers
-    commit id: "♻️ découpe my.h"
-    commit id: "🚚 src/ en dossiers"
-    checkout develop
-    merge feature/split-headers
-    branch feature/roster-dynamique
-    commit id: "✨ realloc"
-    checkout develop
-    merge feature/roster-dynamique
-    branch feature/sauvegarde
-    commit id: "✨ save/load"
-    checkout develop
-    merge feature/sauvegarde
-    branch test/unitaires
-    commit id: "✅ make tests"
-    checkout develop
-    merge test/unitaires
+```bash
+make re && make tests      # aucun avertissement (-Werror), aucun test ni sanitizer en échec
+make csfml                 # si CSFML est installée
 ```
+
+> [!TIP]
+> **Ajouter une classe** : une valeur juste avant `NB_CLASSES` dans l'`enum` (jamais au milieu : l'identifiant est écrit dans les sauvegardes), puis une ligne dans `classes[]`. Les listes de la console, les onglets et la grille de la fenêtre, l'aperçu et les tests la prennent en compte sans autre modification.
+
+### Régénérer les illustrations du README
+
+Les SVG de `.github/readme/` sont produits par un script Python 3 sans dépendance, qui relit le catalogue des classes. Après une modification de `classes[]` :
+
+```bash
+python3 .github/readme/outils/generer_svg.py
+```
+
+Le résultat est déterministe : deux exécutions donnent les mêmes fichiers. Chaque animation a pour état de base son image **finale**, donc un afficheur qui ignore les animations montre quand même l'image complète. Les captures (`.github/readme/captures/*.webp`) sont des enregistrements du jeu et ne sont pas générées.
 
 <img src=".github/readme/fil-rouge.svg" width="100%" alt=""/>
 
-## 🗺️ Feuille de route
+<a id="licence"></a>
 
-- [x] Menu console, création, fiche, combat
-- [x] Version graphique CSFML
-- [x] Bibliothèque `libmy.a`
-- [x] Saisies sécurisées, nom unique, règles de combat
-- [x] Headers découpés par thème, `src/` rangé en sous-dossiers
-- [x] Personnages illimités (`realloc`)
-- [x] Sauvegarde / chargement
-- [x] Tests unitaires + sanitizers
-- [x] Combat en équipe (1 à 4), soin, garde, IA, arène animée
-- [ ] Compétences spéciales, attaques de zone, effets de statut (le moteur a déjà `effet_t`)
-- [ ] Documentation Doxygen (`Doxyfile`, `make doc`)
-- [x] Version graphique branchée sur le moteur commun (roster, combat, classes, sauvegarde)
-- [ ] Version graphique : faire défiler les cartes pour dépasser 10 personnages
-- [x] Publier la version `v1.2.0` sur `main`
+## 10 · Licence
+
+Le dépôt ne contient **pas encore de fichier `LICENSE`**. Tant qu'aucune licence n'est choisie, le code reste sous le droit d'auteur par défaut de son auteur : le lire est possible, mais aucune autorisation de réutilisation n'est accordée. Les polices de `csfml/assets/fonts/` gardent leurs propres licences.
 
 <img src=".github/readme/fil-rouge.svg" width="100%" alt=""/>
 
@@ -829,13 +939,19 @@ gitGraph
 <details>
 <summary><b>Où est mon fichier de sauvegarde ?</b></summary>
 <br/>
-Dans le dossier depuis lequel tu as lancé <code>./redstrings</code> : <code>personnages.txt</code>. Il est ignoré par git.
+Dans le dossier depuis lequel tu as lancé le jeu : <code>personnages.txt</code>. Il est ignoré par git, et les deux versions du jeu lisent le même.
 </details>
 
 <details>
 <summary><b>Le chargement dit « Fichier corrompu » : j'ai perdu mon équipe ?</b></summary>
 <br/>
 Non. Le fichier est lu dans un roster temporaire : en cas d'erreur, ton équipe actuelle n'est pas touchée.
+</details>
+
+<details>
+<summary><b>Mes personnages perdent-ils leurs PV après un combat ?</b></summary>
+<br/>
+Non. Le combat travaille sur des copies : à la fin, chacun retrouve ses statistiques d'origine.
 </details>
 
 <details>
@@ -853,7 +969,7 @@ gdb ./redstrings_debug    # ou pas à pas
 <details>
 <summary><b>Pourquoi des noms sans espace ?</b></summary>
 <br/>
-Le nom sert d'identifiant (recherche, combat, fichier de sauvegarde). Il est lu avec <code>scanf("%29s")</code>, qui s'arrête au premier espace : 29 caractères maximum, plus le <code>'\0'</code>, pour tenir dans <code>char nom[30]</code>.
+Le nom sert d'identifiant (recherche, équipes, fichier de sauvegarde). Il est lu avec <code>scanf("%29s")</code>, qui s'arrête au premier espace : 29 caractères maximum, plus le <code>'\0'</code>, pour tenir dans <code>char nom[30]</code>.
 </details>
 
 <br/>
@@ -863,6 +979,6 @@ Le nom sert d'identifiant (recherche, combat, fichier de sauvegarde). Il est lu 
 <img src=".github/readme/fil-rouge.svg" width="60%" alt=""/>
 
 <sub>Projet fil rouge · <b>Langage C avancé</b> · ESGI 2ᵉ année · 2026</sub><br/>
-<sub>Fait avec ❤️, <code>gcc -Werror</code> et beaucoup de <code>printf</code> par <a href="https://github.com/Vylllixis"><b>Vyllixis</b></a></sub>
+<sub>Fait avec <code>gcc -Werror</code> et beaucoup de <code>printf</code> par <a href="https://github.com/Vylllixis"><b>Vyllixis</b></a></sub>
 
 </div>
