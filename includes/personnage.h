@@ -6,28 +6,45 @@
 #ifndef PERSONNAGE_H
     #define PERSONNAGE_H
 
-typedef enum Classe {
+typedef enum classe {
     GUERRIER,   /**< Affiché en rouge. */
     MAGE,       /**< Affiché en magenta. */
-    ARCHER      /**< Affiché en vert. */
-} Classe_t;
+    ARCHER,      /**< Affiché en vert. */
+    NB_CLASSES
+} classe_t;
 
 typedef struct {
-    char name[30];      /**< Nom, sans espace, sert d'identifiant. */
+    const char *nom;
+    const char *couleur;
+} info_classe_t;
+
+extern const info_classe_t classes[NB_CLASSES];
+
+#define NOM_MAX   30
+#define STAT_MIN  0
+#define STAT_MAX  99
+
+typedef struct {
+    char nom[30];      /**< Nom, sans espace, sert d'identifiant. */
     int pv;             /**< Points de vie, mort à 0. */
-    int atk;            /**< Dégâts bruts infligés. */
+    int atq;            /**< Dégâts bruts infligés. */
     int def;            /**< Pourcentage de réduction des dégâts reçus. */
-    Classe_t classe;    /**< Classe du personnage. */
+    classe_t classe;    /**< Classe du personnage. */
 } personnage_t;
 
 /** Cherche un personnage par son nom, renvoie son indice ou -1. */
-int findPersonnage(const personnage_t *tab, int size, const char *name);
+int trouver_personnage(const personnage_t *tab, int size, const char *nom);
 
-/** Demande le nom, les stats et la classe au joueur (nom unique dans tab). */
-int creerPersonnage(personnage_t *p, personnage_t *tab, int len);
+#define STR_(x) #x
+#define STR(x)  STR_(x)
+#define NOM_LONGUEUR 29   /* NOM_MAX - 1 */
+
+/** Demande le nom, les stats et la classe au joueur (nom unique dans tab).
+ *  Renvoie 0 si le personnage est créé, -1 si la saisie a échoué. */
+int creer_personnage(personnage_t *p, personnage_t *tab, int len);
 
 /** Affiche la fiche du personnage avec ses barres de stats. */
-int afficherPersonnage(const personnage_t *p);
+void afficher_personnage(const personnage_t *p);
 
 /** Retire à la cible les dégâts de l'attaquant, réduits par sa défense. */
 void attaquer(personnage_t *attaquant, personnage_t *cible);
