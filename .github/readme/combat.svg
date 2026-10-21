@@ -1,0 +1,53 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="960" height="360" viewBox="0 0 960 360" role="img" aria-label="Animation : Merlin (attaque 85) frappe Aragorn (défense 30 %) : 59 dégâts, Aragorn passe de 80 à 21 PV">
+  <rect width="0" height="0"><animate id="loop" attributeName="x" from="0" to="0" dur="9s" begin="0s;loop.end"/></rect>
+  <rect width="960" height="360" rx="24" fill="#090b18"/>
+  <rect x=".5" y=".5" width="959" height="359" rx="24" fill="none" stroke="#ffffff" stroke-opacity=".08"/>
+  <rect x="40" y="58" width="250" height="236" rx="18" fill="#161a2e" stroke="#d946ef" stroke-opacity=".55"/><rect x="62" y="56" width="206" height="4" rx="2" fill="#d946ef"/><text x="64" y="106" font-family="'Inter','Segoe UI','Noto Sans','Helvetica Neue',Arial,sans-serif" font-size="28" font-weight="800" fill="#eceffe">Merlin</text><rect x="64" y="120" width="62" height="24" rx="12" fill="#d946ef" fill-opacity=".18"/><text x="75" y="137" font-family="'Inter','Segoe UI','Noto Sans','Helvetica Neue',Arial,sans-serif" font-size="12" font-weight="700" letter-spacing="2" fill="#d946ef">MAGE</text><text x="64" y="196" font-family="'Inter','Segoe UI','Noto Sans','Helvetica Neue',Arial,sans-serif" font-size="13" letter-spacing="2" fill="#5c6688">ATTAQUE</text><text x="64" y="252" font-family="'Inter','Segoe UI','Noto Sans','Helvetica Neue',Arial,sans-serif" font-size="56" font-weight="900" fill="#f43f5e">85</text>
+  <rect x="670" y="58" width="250" height="236" rx="18" fill="#161a2e" stroke="#ef4444" stroke-opacity=".55"/><rect x="692" y="56" width="206" height="4" rx="2" fill="#ef4444"/><text x="694" y="106" font-family="'Inter','Segoe UI','Noto Sans','Helvetica Neue',Arial,sans-serif" font-size="28" font-weight="800" fill="#eceffe">Aragorn</text><rect x="694" y="120" width="102" height="24" rx="12" fill="#ef4444" fill-opacity=".18"/><text x="705" y="137" font-family="'Inter','Segoe UI','Noto Sans','Helvetica Neue',Arial,sans-serif" font-size="12" font-weight="700" letter-spacing="2" fill="#ef4444">GUERRIER</text><text x="694" y="182" font-family="'Inter','Segoe UI','Noto Sans','Helvetica Neue',Arial,sans-serif" font-size="13" letter-spacing="2" fill="#5c6688">DÉFENSE</text><text x="694" y="214" font-family="'Inter','Segoe UI','Noto Sans','Helvetica Neue',Arial,sans-serif" font-size="30" font-weight="900" fill="#60a5fa">30%</text><text x="694" y="248" font-family="'Inter','Segoe UI','Noto Sans','Helvetica Neue',Arial,sans-serif" font-size="13" letter-spacing="2" fill="#5c6688">POINTS DE VIE</text><rect x="694" y="258" width="200" height="14" rx="7" fill="#ffffff" fill-opacity=".07"/><rect x="694" y="258" width="161.6" height="14" rx="7" fill="#34d399"><set attributeName="width" to="161.6" begin="loop.begin"/><animate attributeName="width" to="42.4" dur=".9s" begin="loop.begin+5.2s" fill="freeze" calcMode="spline" keySplines=".3 0 .2 1" keyTimes="0;1"/><set attributeName="fill" to="#34d399" begin="loop.begin"/><set attributeName="fill" to="#fbbf24" begin="loop.begin+5.6s"/></rect><text x="894" y="250" text-anchor="end" font-family="'Inter','Segoe UI','Noto Sans','Helvetica Neue',Arial,sans-serif" font-size="20" font-weight="900" fill="#eceffe"><tspan>80<set attributeName="opacity" to="1" begin="loop.begin"/><set attributeName="opacity" to="0" begin="loop.begin+5.4s"/></tspan></text><text x="894" y="250" text-anchor="end" font-family="'Inter','Segoe UI','Noto Sans','Helvetica Neue',Arial,sans-serif" font-size="20" font-weight="900" fill="#fbbf24" opacity="0">21<set attributeName="opacity" to="0" begin="loop.begin"/><set attributeName="opacity" to="1" begin="loop.begin+5.4s"/></text>
+  
+  <text x="480" y="120" text-anchor="middle" font-family="'Inter','Segoe UI','Noto Sans','Helvetica Neue',Arial,sans-serif" font-size="13" letter-spacing="3" fill="#5c6688">CE QUE MERLIN ENVOIE</text>
+  <rect x="330" y="168" width="300.0" height="28" rx="8" fill="#ffffff" fill-opacity=".05"/>
+  <line x1="330.0" x2="330.0" y1="202" y2="208" stroke="#5c6688"/><text x="330.0" y="224" text-anchor="middle" font-family="'JetBrains Mono','Fira Code','Cascadia Code',ui-monospace,SFMono-Regular,Menlo,Consolas,'DejaVu Sans Mono',monospace" font-size="11" fill="#5c6688">0</text><line x1="405.0" x2="405.0" y1="202" y2="208" stroke="#5c6688"/><text x="405.0" y="224" text-anchor="middle" font-family="'JetBrains Mono','Fira Code','Cascadia Code',ui-monospace,SFMono-Regular,Menlo,Consolas,'DejaVu Sans Mono',monospace" font-size="11" fill="#5c6688">25</text><line x1="480.0" x2="480.0" y1="202" y2="208" stroke="#5c6688"/><text x="480.0" y="224" text-anchor="middle" font-family="'JetBrains Mono','Fira Code','Cascadia Code',ui-monospace,SFMono-Regular,Menlo,Consolas,'DejaVu Sans Mono',monospace" font-size="11" fill="#5c6688">50</text><line x1="555.0" x2="555.0" y1="202" y2="208" stroke="#5c6688"/><text x="555.0" y="224" text-anchor="middle" font-family="'JetBrains Mono','Fira Code','Cascadia Code',ui-monospace,SFMono-Regular,Menlo,Consolas,'DejaVu Sans Mono',monospace" font-size="11" fill="#5c6688">75</text><line x1="630.0" x2="630.0" y1="202" y2="208" stroke="#5c6688"/><text x="630.0" y="224" text-anchor="middle" font-family="'JetBrains Mono','Fira Code','Cascadia Code',ui-monospace,SFMono-Regular,Menlo,Consolas,'DejaVu Sans Mono',monospace" font-size="11" fill="#5c6688">100</text>
+  <g>
+    <rect x="330" y="168" width="0" height="28" rx="8" fill="#f43f5e">
+      <set attributeName="width" to="0" begin="loop.begin"/>
+      <animate attributeName="width" from="0" to="177.0" dur="1s" begin="loop.begin+0.4s" fill="freeze" calcMode="spline" keySplines=".2 .8 .2 1" keyTimes="0;1"/>
+    </rect>
+    <rect x="507.0" y="168" width="0" height="28" rx="0" fill="#f43f5e">
+      <set attributeName="width" to="0" begin="loop.begin"/>
+      <set attributeName="fill" to="#f43f5e" begin="loop.begin"/>
+      <set attributeName="opacity" to="1" begin="loop.begin"/>
+      <animate attributeName="width" from="0" to="78.0" dur=".3s" begin="loop.begin+1.4s" fill="freeze"/>
+      <set attributeName="fill" to="#60a5fa" begin="loop.begin+2.4s"/>
+      <animate attributeName="opacity" from="1" to="0" dur=".8s" begin="loop.begin+3.2s" fill="freeze"/>
+      <animateTransform attributeName="transform" type="translate" values="0 0;0 0" dur=".01s" begin="loop.begin" fill="freeze"/>
+      <animateTransform attributeName="transform" type="translate" from="0 0" to="30 -30" dur=".8s" begin="loop.begin+3.2s" fill="freeze"/>
+    </rect>
+  </g>
+  <g opacity="0">
+    <set attributeName="opacity" to="0" begin="loop.begin"/>
+    <animate attributeName="opacity" from="0" to="1" dur=".4s" begin="loop.begin+2.4s" fill="freeze"/>
+    <animate attributeName="opacity" from="1" to="0" dur=".4s" begin="loop.begin+3.6s" fill="freeze"/>
+    <text x="546.0" y="156" text-anchor="middle" font-family="'Inter','Segoe UI','Noto Sans','Helvetica Neue',Arial,sans-serif" font-size="14" font-weight="800" fill="#60a5fa">🛡 −30 %</text>
+  </g>
+  <g opacity="0">
+    <set attributeName="opacity" to="0" begin="loop.begin"/>
+    <animate attributeName="opacity" from="0" to="1" dur=".4s" begin="loop.begin+3.6s" fill="freeze"/>
+    <text x="418.5" y="188" text-anchor="middle" font-family="'Inter','Segoe UI','Noto Sans','Helvetica Neue',Arial,sans-serif" font-size="16" font-weight="900" fill="#fff">59 dégâts</text>
+  </g>
+  <g opacity="0">
+    <set attributeName="opacity" to="0" begin="loop.begin"/>
+    <animate attributeName="opacity" values="0;1;1;0" keyTimes="0;.15;.7;1" dur="1.8s" begin="loop.begin+5.1s" fill="freeze"/>
+    <text x="850" y="214" text-anchor="middle" font-family="'Inter','Segoe UI','Noto Sans','Helvetica Neue',Arial,sans-serif" font-size="40" font-weight="900" fill="#f43f5e">−59
+      <animateTransform attributeName="transform" type="translate" from="0 10" to="0 -30" dur="1.8s" begin="loop.begin+5.1s" fill="freeze"/>
+    </text>
+  </g>
+  <circle cx="507.0" cy="182" r="0" fill="#f43f5e">
+    <set attributeName="r" to="0" begin="loop.begin"/>
+    <set attributeName="r" to="9" begin="loop.begin+4.3s"/>
+    <set attributeName="r" to="0" begin="loop.begin+5.1s"/>
+    <animate attributeName="cx" from="507.0" to="760" dur=".8s" begin="loop.begin+4.3s" fill="freeze" calcMode="spline" keySplines=".6 0 .9 .5" keyTimes="0;1"/>
+    <animate attributeName="cy" values="182;128;250" dur=".8s" begin="loop.begin+4.3s" fill="freeze"/>
+  </circle>
+  <text x="480" y="326" text-anchor="middle" font-family="'JetBrains Mono','Fira Code','Cascadia Code',ui-monospace,SFMono-Regular,Menlo,Consolas,'DejaVu Sans Mono',monospace" font-size="20"><tspan fill="#eceffe">Dégâts</tspan><tspan fill="#5c6688"> = </tspan><tspan fill="#f43f5e" font-weight="900">85<set attributeName="opacity" to=".25" begin="loop.begin"/><set attributeName="opacity" to="1" begin="loop.begin+0.4s"/></tspan><tspan fill="#5c6688"> × (100 − </tspan><tspan fill="#60a5fa" font-weight="900">30<set attributeName="opacity" to=".25" begin="loop.begin"/><set attributeName="opacity" to="1" begin="loop.begin+2.4s"/></tspan><tspan fill="#5c6688">) / 100</tspan><tspan fill="#5c6688"> = </tspan><tspan fill="#fbbf24" font-weight="900">59<set attributeName="opacity" to=".25" begin="loop.begin"/><set attributeName="opacity" to="1" begin="loop.begin+3.6s"/></tspan></text>
+</svg>
