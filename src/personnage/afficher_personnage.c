@@ -35,20 +35,15 @@ static void afficher_stat(const char *nom, int valeur, const char *couleur)
 
 void afficher_personnage(const personnage_t *p)
 {
-    const char *nom_classe = "Guerrier";
-    const char *couleur_classe = ROUGE;
+    const info_classe_t *c = &classes[p->classe];
 
-    if (p->classe == MAGE) {
-        nom_classe = "Mage";
-        couleur_classe = MAGENTA;
-    } else if (p->classe == ARCHER) {
-        nom_classe = "Archer";
-        couleur_classe = VERT;
-    }
     printf("\n");
     boite_haut(GRIS);
-    boite_ligne(GRIS, "  " GRAS "%s" RESET GRIS "  ·  " RESET "%s%s" RESET,
-        p->nom, couleur_classe, nom_classe);
+    boite_ligne(GRIS, "  " GRAS "%s" RESET, p->nom);
+    boite_separateur(GRIS);
+    boite_champ(GRIS, "Classe", GRAS "%s%s" RESET, couleur_ansi(p->classe), c->nom);
+    boite_champ(GRIS, "Catégorie", "%s", nom_categorie(c->categorie));
+    boite_ligne(GRIS, "  " GRIS "%s" RESET, c->description);
     boite_separateur(GRIS);
     afficher_stat("PV", p->pv, VERT);
     afficher_stat("ATK", p->atq, ROUGE);
