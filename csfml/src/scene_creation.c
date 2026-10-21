@@ -21,12 +21,12 @@
 #define SOCLE_Y 338.f
 #define DUREE_SORTIE_CREATION 1.f
 
-static const char *LABELS_STATS[3] = {"Points de vie", "Attaque", "Défense"};
-static const char *DESCRIPTIONS[NB_CLASSES] = {
-    [GUERRIER] = "Corps à corps",
-    [MAGE] = "Magie",
-    [ARCHER] = "Distance",
-};
+/* Grille de classes : 4 colonnes x 2 lignes, assez pour la plus grande catégorie. */
+#define GRILLE_COLONNES 4
+#define TUILE_H 40.f
+#define TUILE_ECART 6.f
+
+static const char *LABELS_STATS[NB_STATS] = {"Points de vie", "Attaque", "Défense"};
 
 void entrer_creation(app_t *app)
 {
@@ -87,6 +87,7 @@ static void creer(app_t *app, creation_t *c)
     p.atq = c->valeurs[1];
     p.def = c->valeurs[2];
     p.classe = c->classe;
+    appliquer_classe(&p);
     if (roster_ajouter(&app->equipe, &p) == -1) {
         notifier(app, "✗", "Mémoire insuffisante", C_ROUGE);
         return;
@@ -98,6 +99,35 @@ static void creer(app_t *app, creation_t *c)
     c->flash = 1.f;
     c->sortie = DUREE_SORTIE_CREATION;
     c->focus = -1;
+}
+
+/** Classe suivante (sens = 1) ou précédente dans l'ordre des catégories. */
+static classe_t classe_voisine(classe_t c, int sens)
+{
+    classe_t ordre[NB_CLASSES];
+    int i = 0;
+
+    ordre_classes(ordre);
+    while (ordre[i] != c)
+        i++;
+    return ordre[(i + sens + NB_CLASSES) % NB_CLASSES];
+}
+
+/** Première classe d'une catégorie (pour les onglets). */
+static classe_t premiere_classe(categorie_t cat)
+{
+    for (int i = 0; i < NB_CLASSES; i++) {
+        if (classes[i].categorie == cat)
+            return (classe_t)i;
+    }
+    return GUERRIER;
+}
+
+static classe_t categorie_voisine(classe_t c, int sens)
+{
+    int cat = (classes[c].categorie + sens + NB_CATEGORIES) % NB_CATEGORIES;
+
+    return premiere_classe((categorie_t)cat);
 }
 
 static void ajuster(int *v, int delta)
@@ -126,10 +156,9 @@ static void clavier(app_t *app, creation_t *c)
         c->focus--;
     if (c->focus >= 1 && c->focus <= 3 && (k[sfKeyLeft] || k[sfKeyRight]))
         ajuster(&c->valeurs[c->focus - 1], k[sfKeyLeft] ? -pas : pas);
-    if (c->focus == 4 && k[sfKeyLeft])
-        c->classe = (c->classe + NB_CLASSES - 1) % NB_CLASSES;
-    if (c->focus == 4 && k[sfKeyRight])
-        c->classe = (c->classe + 1) % NB_CLASSES;
+    if (c->focus == 4 && (k[sfKeyLeft] || k[sfKeyRight]))
+        c->classe = app->in.shift ? categorie_voisine(c->classe, k[sfKeyLeft] ? -1 : 1)
+            : classe_voisine(c->classe, k[sfKeyLeft] ? -1 : 1);
     if (k[sfKeyEnter])
         creer(app, c);
 }
@@ -138,103 +167,110 @@ static void clavier(app_t *app, creation_t *c)
 /*  Cartes de classe                                                   */
 /* ------------------------------------------------------------------ */
 
-/** Motif de fond propre à chaque classe : lames, constellation, cible. */
-static void motif_classe(app_t *app, classe_t i, sfFloatRect r, sfColor col)
+/** Onglets de catégorie : celui de la classe choisie est allumé. */
+static void onglets(app_t *app, creation_t *c, float y)
 {
-    static const float ETOILES[10] = {0.62f, 0.30f, 0.74f, 0.18f, 0.86f, 0.36f,
-        0.80f, 0.62f, 0.68f, 0.52f};
-    sfVector2f pts[5];
-    sfVector2f c = {r.left + r.width - 38.f, r.top + 42.f};
+    float w = (FW - TUILE_ECART * (NB_CATEGORIES - 1)) / NB_CATEGORIES;
+    categorie_t actuelle = classes[c->classe].categorie;
+    sfFloatRect r;
+    float h = 0.f;
+    float on = 0.f;
+    int nb = 0;
+    char buf[48];
 
-    if (i == GUERRIER) {
-        for (int k = 0; k < 5; k++) {
-            pts[0] = (sfVector2f){r.left + r.width * 0.52f + k * 16.f, r.top + 76.f};
-            pts[1] = (sfVector2f){pts[0].x + 30.f, r.top + 12.f};
-            ligne_epaisse(app, pts, 2, k == 2 ? 3.f : 1.5f, col, 0);
+    for (int k = 0; k < NB_CATEGORIES; k++) {
+        r = (sfFloatRect){FX + k * (w + TUILE_ECART), y, w, 26.f};
+        if (survole(app, r)) {
+            app->curseur_voulu = CURSEUR_MAIN;
+            if (app->in.clic && (categorie_t)k != actuelle) {
+                c->classe = premiere_classe((categorie_t)k);
+                c->focus = 4;
+            }
         }
-    } else if (i == MAGE) {
-        for (int k = 0; k < 5; k++)
-            pts[k] = (sfVector2f){r.left + r.width * ETOILES[2 * k],
-                r.top + r.height * ETOILES[2 * k + 1] * 0.8f};
-        ligne_epaisse(app, pts, 5, 1.f, col, 0);
-        for (int k = 0; k < 5; k++)
-            losange(app, pts[k], k == 1 ? 3.5f : 2.2f, col);
-    } else {
-        for (int k = 1; k <= 3; k++)
-            arc_cercle(app, c, 9.f * k, 1.2f, (sfVector2f){0.f, 2.f * PI}, col, 0);
-        pts[0] = (sfVector2f){c.x - 34.f, c.y};
-        pts[1] = (sfVector2f){c.x + 30.f, c.y};
-        ligne_epaisse(app, pts, 2, 1.f, col, 0);
-        pts[0] = (sfVector2f){c.x, c.y - 34.f};
-        pts[1] = (sfVector2f){c.x, c.y + 34.f};
-        ligne_epaisse(app, pts, 2, 1.f, col, 0);
+        c->onglets[k].survol = approcher(c->onglets[k].survol, survole(app, r) ? 1.f
+            : 0.f, 14.f, app->dt);
+        c->onglets[k].appui = approcher(c->onglets[k].appui, (categorie_t)k == actuelle
+            ? 1.f : 0.f, 14.f, app->dt);
+        h = c->onglets[k].survol;
+        on = c->onglets[k].appui;
+        nb = 0;
+        for (int i = 0; i < NB_CLASSES; i++)
+            nb += classes[i].categorie == (categorie_t)k;
+        panneau(app, r, 8.f, avec_alpha(C_CYAN, 0.04f * h + 0.16f * on),
+            avec_alpha(C_CYAN, 0.02f * h + 0.05f * on), melanger(avec_alpha(C_BLANC,
+            0.08f + 0.08f * h), avec_alpha(C_CYAN, 0.8f), on));
+        rect_arrondi(app, (sfFloatRect){r.left + 8.f, r.top + r.height - 2.f,
+            (r.width - 16.f) * on, 2.f}, 0.f, C_CYAN);
+        snprintf(buf, sizeof(buf), "%s  %d", nom_categorie((categorie_t)k), nb);
+        texte(app, POLICE_GRAS, buf, 13, (sfVector2f){r.left + r.width / 2.f,
+            r.top + 13.f}, melanger(C_TEXTE_FAIBLE, C_TEXTE, fmaxf(on, h * 0.6f)),
+            ALIGNE_CENTRE);
     }
 }
 
-static void carte_classe(app_t *app, creation_t *c, classe_t i, sfFloatRect r)
+/** Tuile compacte d'une classe : emblème coloré, nom, état de sélection. */
+static void tuile_classe(app_t *app, creation_t *c, classe_t i, sfFloatRect r)
 {
     sfColor col = couleur_classe(i);
     float h = c->tuiles[i].survol;
     float sel = c->tuiles[i].appui;
-    sfVector2f med = {r.left + 38.f, r.top + 40.f};
+    sfVector2f med = {r.left + 22.f, r.top + r.height / 2.f};
+    float place = r.width - 48.f;
+    unsigned int taille = 13;
+    char nom[48];
 
     if (sel > 0.01f)
-        lueur(app, (sfVector2f){r.left + r.width / 2.f, r.top + r.height / 2.f},
-            (sfVector2f){r.width * 0.8f, r.height * 0.9f}, avec_alpha(col, 0.22f * sel));
-    ombre_biseau(app, r, 14.f, 0.7f + 0.5f * sel);
-    panneau(app, r, 14.f, melanger(C_SURFACE_HAUTE, col, 0.05f * h + 0.16f * sel),
+        lueur(app, (sfVector2f){r.left + r.width / 2.f, med.y}, (sfVector2f){r.width
+            * 0.75f, 60.f}, avec_alpha(col, 0.22f * sel));
+    panneau(app, r, 8.f, melanger(C_SURFACE_HAUTE, col, 0.06f * h + 0.18f * sel),
         melanger(C_SURFACE, C_FOND, 0.4f), melanger(melanger(C_BORD,
-        avec_alpha(col, 0.5f), h), col, sel));
-    motif_classe(app, i, r, avec_alpha(col, 0.10f + 0.10f * h + 0.22f * sel));
-    hexagone(app, med, 25.f + 2.f * sel, 0.f, melanger((sfColor){14, 16, 32, 255}, col,
-        0.12f + 0.18f * sel), avec_alpha(col, 0.35f + 0.65f * fmaxf(sel, h)));
-    embleme(app, i, med, 14.f * (1.f + 0.1f * sel), melanger(melanger(C_TEXTE_FAIBLE,
-        col, fmaxf(h, 0.4f)), melanger(col, C_BLANC, 0.45f), sel));
-    app->espacement = 1.8f;
-    texte(app, POLICE_GRAS, nom_classe_maj(i), 15, (sfVector2f){r.left + 18.f,
-        r.top + 82.f}, melanger(C_TEXTE_DOUX, melanger(col, C_BLANC, 0.6f), fmaxf(sel, h)),
+        avec_alpha(col, 0.55f), h), col, sel));
+    rect_arrondi(app, (sfFloatRect){r.left, r.top + 8.f, 3.f, r.height - 8.f}, 0.f,
+        avec_alpha(col, 0.35f + 0.65f * fmaxf(sel, h)));
+    hexagone(app, med, 13.f + sel, 0.f, melanger((sfColor){14, 16, 32, 255}, col,
+        0.15f + 0.2f * sel), avec_alpha(col, 0.5f + 0.5f * fmaxf(sel, h)));
+    embleme(app, i, med, 8.f, melanger(col, C_BLANC, 0.2f + 0.3f * sel));
+    while (taille > 11 && largeur_texte(app, POLICE_GRAS, classes[i].nom, taille) > place)
+        taille--;
+    tronquer(app, POLICE_GRAS, taille, classes[i].nom, place, nom);
+    texte(app, POLICE_GRAS, nom, taille, (sfVector2f){r.left + 40.f, med.y},
+        melanger(C_TEXTE_DOUX, melanger(col, C_BLANC, 0.55f), fmaxf(sel, h)),
         ALIGNE_GAUCHE);
-    app->espacement = 0.f;
-    texte(app, POLICE_NORMALE, DESCRIPTIONS[i], 12, (sfVector2f){r.left + 18.f,
-        r.top + 99.f}, C_TEXTE_FAIBLE, ALIGNE_GAUCHE);
-    if (sel > 0.02f) {
-        rect_arrondi(app, (sfFloatRect){r.left, r.top + r.height - 3.f,
-            (r.width - 14.f) * sortie_cubique(sel), 3.f}, 0.f, col);
-        losange(app, (sfVector2f){r.left + r.width - 20.f, r.top + 20.f},
-            10.f * sortie_rebond(sel), col);
-        texte_echelle(app, POLICE_SYMBOLES, "✔", 10, (sfVector2f){r.left + r.width
-            - 20.f, r.top + 20.f}, C_BLANC, ALIGNE_CENTRE, sel);
-    }
     if (c->focus == 4 && c->classe == i)
-        crochets(app, (sfFloatRect){r.left - 5.f, r.top - 5.f, r.width + 10.f,
-            r.height + 10.f}, 14.f, avec_alpha(C_BLANC, 0.6f + 0.3f
+        crochets(app, (sfFloatRect){r.left - 4.f, r.top - 4.f, r.width + 8.f,
+            r.height + 8.f}, 10.f, avec_alpha(C_BLANC, 0.6f + 0.3f
             * sinf(app->temps * 5.f)));
 }
 
-static void cartes_classes(app_t *app, creation_t *c, float y)
+/** Classes de la catégorie de la classe choisie, en grille. */
+static void grille_classes(app_t *app, creation_t *c, float y)
 {
-    float w = (FW - 12.f * (NB_CLASSES - 1)) / NB_CLASSES;
+    float w = (FW - TUILE_ECART * (GRILLE_COLONNES - 1)) / GRILLE_COLONNES;
+    categorie_t cat = classes[c->classe].categorie;
     sfFloatRect r;
-    classe_t i = GUERRIER;
+    int n = 0;
     int s = 0;
 
-    for (int k = 0; k < NB_CLASSES; k++) {
-        i = (classe_t)k;
-        r = (sfFloatRect){FX + k * (w + 12.f), y, w, 112.f};
+    for (int i = 0; i < NB_CLASSES; i++) {
+        c->tuiles[i].appui = approcher(c->tuiles[i].appui, c->classe == (classe_t)i
+            ? 1.f : 0.f, 12.f, app->dt);
+        if (classes[i].categorie != cat)
+            continue;
+        r = (sfFloatRect){FX + (n % GRILLE_COLONNES) * (w + TUILE_ECART),
+            y + (n / GRILLE_COLONNES) * (TUILE_H + TUILE_ECART), w, TUILE_H};
         s = survole(app, r);
         if (s)
             app->curseur_voulu = CURSEUR_MAIN;
         if (s && app->in.clic) {
-            c->classe = i;
+            c->classe = (classe_t)i;
             c->focus = 4;
         }
-        c->tuiles[k].survol = approcher(c->tuiles[k].survol, s ? 1.f : 0.f, 14.f, app->dt);
-        c->tuiles[k].appui = approcher(c->tuiles[k].appui, c->classe == i ? 1.f : 0.f,
-            12.f, app->dt);
-        maj_ressort(&c->lift[k], c->classe == i ? -6.f : (s ? -3.f : 0.f), 300.f, 18.f,
+        c->tuiles[i].survol = approcher(c->tuiles[i].survol, s ? 1.f : 0.f, 14.f,
             app->dt);
-        r.top += c->lift[k].x;
-        carte_classe(app, c, i, r);
+        maj_ressort(&c->lift[i], s ? -2.f : 0.f, 300.f, 18.f, app->dt);
+        r.top += c->lift[i].x;
+        tuile_classe(app, c, (classe_t)i, r);
+        n++;
     }
 }
 
@@ -242,7 +278,7 @@ static void cartes_classes(app_t *app, creation_t *c, float y)
 /*  Hologramme de l'aperçu                                             */
 /* ------------------------------------------------------------------ */
 
-/** Guerrier : éclats de lame en couronne, pointés vers l'extérieur. */
+/** Corps à corps : éclats de lame en couronne, pointés vers l'extérieur. */
 static void aura_guerrier(app_t *app, sfVector2f c, sfColor col, float t)
 {
     static const float ECLAT[6] = {0.f, -1.f, 0.28f, 0.6f, -0.28f, 0.6f};
@@ -257,7 +293,7 @@ static void aura_guerrier(app_t *app, sfVector2f c, sfColor col, float t)
     }
 }
 
-/** Mage : cercle runique en pointillés et astres en orbite inclinée. */
+/** Magie : cercle runique en pointillés et astres en orbite inclinée. */
 static void aura_mage(app_t *app, sfVector2f c, sfColor col, float t)
 {
     float a = 0.f;
@@ -279,7 +315,7 @@ static void aura_mage(app_t *app, sfVector2f c, sfColor col, float t)
     }
 }
 
-/** Archer : réticule qui se resserre et graduations de visée. */
+/** Distance : réticule qui se resserre et graduations de visée. */
 static void aura_archer(app_t *app, sfVector2f c, sfColor col, float t)
 {
     float e = 78.f + 8.f * sinf(t * 2.4f);
@@ -304,6 +340,36 @@ static void aura_archer(app_t *app, sfVector2f c, sfColor col, float t)
     }
     graduations(app, c, 122.f, 72, 4.f, -t * 0.12f, avec_alpha(col, 0.35f));
 }
+
+/** Soutien : halo de croix bienveillantes et ondes douces. */
+static void aura_soutien(app_t *app, sfVector2f c, sfColor col, float t)
+{
+    static const float CROIX[] = {-0.3f, -1.f, 0.3f, -1.f, 0.3f, 1.f, -0.3f, 1.f};
+    float a = 0.f;
+    float f = 0.f;
+
+    for (int k = 0; k < 3; k++) {
+        f = fmodf(t * 0.4f + k / 3.f, 1.f);
+        arc_cercle(app, c, 80.f + 70.f * f, 1.5f, (sfVector2f){0.f, 2.f * PI},
+            avec_alpha(col, 0.5f * (1.f - f)), 1);
+    }
+    for (int k = 0; k < 6; k++) {
+        a = t * 0.25f + k * PI / 3.f;
+        polygone(app, CROIX, 4, (sfVector2f){c.x + cosf(a) * 116.f, c.y + sinf(a)
+            * 116.f}, 7.f, 0.f, avec_alpha(col, 0.75f));
+        polygone(app, CROIX, 4, (sfVector2f){c.x + cosf(a) * 116.f, c.y + sinf(a)
+            * 116.f}, 7.f, PI / 2.f, avec_alpha(col, 0.75f));
+    }
+}
+
+typedef void (*aura_t)(app_t *app, sfVector2f c, sfColor col, float t);
+
+static const aura_t AURAS[NB_CATEGORIES] = {
+    [CAT_CORPS_A_CORPS] = aura_guerrier,
+    [CAT_MAGIE] = aura_mage,
+    [CAT_DISTANCE] = aura_archer,
+    [CAT_SOUTIEN] = aura_soutien,
+};
 
 /** Socle lumineux et cône de projection de l'hologramme. */
 static void projecteur(app_t *app, sfColor col)
@@ -363,12 +429,7 @@ static void hologramme(app_t *app, creation_t *c)
     if (onde < 1.f)
         arc_cercle(app, centre, 60.f + 170.f * sortie_cubique(onde), 3.f * (1.f - onde)
             + 1.f, (sfVector2f){0.f, 2.f * PI}, avec_alpha(col, 1.f - onde), 1);
-    if (c->classe == GUERRIER)
-        aura_guerrier(app, centre, col, t);
-    else if (c->classe == MAGE)
-        aura_mage(app, centre, col, t);
-    else
-        aura_archer(app, centre, col, t);
+    AURAS[classes[c->classe].categorie](app, centre, col, t);
     for (int k = 0; k < 3; k++)
         arc_cercle(app, centre, 88.f, 2.f, (sfVector2f){t * 0.5f + k * 2.f * PI / 3.f,
             t * 0.5f + k * 2.f * PI / 3.f + 1.4f}, avec_alpha(col, 0.75f), 1);
@@ -384,33 +445,52 @@ static void hologramme(app_t *app, creation_t *c)
 /*  Panneau d'aperçu                                                   */
 /* ------------------------------------------------------------------ */
 
+/** « +10 » vert, « -5 » rouge, « ±0 » discret : l'effet de la classe. */
+static void puce_mod(app_t *app, int mod, sfVector2f pos)
+{
+    sfColor c = mod > 0 ? C_VERT : (mod < 0 ? C_ROUGE : C_TEXTE_FAIBLE);
+    char buf[8];
+    float w = 0.f;
+
+    snprintf(buf, sizeof(buf), mod == 0 ? "±0" : "%+d", mod);
+    w = largeur_texte(app, POLICE_GRAS, buf, 11) + 12.f;
+    panneau(app, (sfFloatRect){pos.x, pos.y - 9.f, w, 18.f}, 5.f, avec_alpha(c, 0.16f),
+        avec_alpha(c, 0.06f), avec_alpha(c, 0.4f));
+    texte(app, POLICE_GRAS, buf, 11, (sfVector2f){pos.x + w / 2.f, pos.y}, c,
+        ALIGNE_CENTRE);
+}
+
+/** Statistiques finales = base choisie + modificateurs de la classe. */
 static void stats_apercu(app_t *app, creation_t *c, sfColor col)
 {
-    static const char *noms[3] = {"POINTS DE VIE", "ATTAQUE", "DÉFENSE"};
-    static const char *axes[3] = {"PV", "ATQ", "DEF"};
-    const sfColor cs[3] = {C_VERT, C_ROUGE, C_BLEU};
+    static const char *noms[NB_STATS] = {"POINTS DE VIE", "ATTAQUE", "DÉFENSE"};
+    static const char *axes[NB_STATS] = {"PV", "ATQ", "DEF"};
+    const sfColor cs[NB_STATS] = {C_VERT, C_ROUGE, C_BLEU};
+    int finale = 0;
     const sfVector2f radar = {AX + 108.f, 596.f};
     const float x0 = AX + 214.f;
     const float w = AW - 214.f - 26.f;
-    float v[3];
+    float v[NB_STATS];
     float y = 0.f;
+    float lx = 0.f;
     char buf[16];
 
-    for (int i = 0; i < 3; i++) {
-        c->affiche[i] = approcher(c->affiche[i], c->valeurs[i], 10.f, app->dt);
-        c->segments[i] = approcher(c->segments[i], (c->valeurs[i] + 4) / 5, 10.f,
-            app->dt);
+    for (int i = 0; i < NB_STATS; i++) {
+        finale = stat_finale(c->classe, (stat_t)i, c->valeurs[i]);
+        c->affiche[i] = approcher(c->affiche[i], finale, 10.f, app->dt);
+        c->segments[i] = approcher(c->segments[i], (finale + 4) / 5, 10.f, app->dt);
         v[i] = c->affiche[i] / STAT_MAX;
     }
     radar_stats(app, radar, 62.f, v, col);
-    for (int i = 0; i < 3; i++) {
+    for (int i = 0; i < NB_STATS; i++) {
         y = 596.f + sinf(-PI / 2.f + i * 2.f * PI / 3.f) * 80.f;
         texte(app, POLICE_GRAS, axes[i], 11, (sfVector2f){radar.x + cosf(-PI / 2.f
             + i * 2.f * PI / 3.f) * 82.f, y}, avec_alpha(cs[i], 0.8f), ALIGNE_CENTRE);
     }
-    for (int i = 0; i < 3; i++) {
+    for (int i = 0; i < NB_STATS; i++) {
         y = 528.f + i * 54.f;
-        etiquette(app, noms[i], (sfVector2f){x0, y}, C_TEXTE_DOUX, ALIGNE_GAUCHE);
+        lx = etiquette(app, noms[i], (sfVector2f){x0, y}, C_TEXTE_DOUX, ALIGNE_GAUCHE);
+        puce_mod(app, classes[c->classe].mods[i], (sfVector2f){x0 + lx + 10.f, y});
         snprintf(buf, sizeof(buf), "%d%s", (int)roundf(c->affiche[i]), i == 2 ? " %" : "");
         texte(app, POLICE_GRAS, buf, 22, (sfVector2f){x0 + w, y - 1.f},
             melanger(cs[i], C_BLANC, 0.1f), ALIGNE_DROITE);
@@ -453,9 +533,11 @@ static void apercu(app_t *app, creation_t *c, float a)
     app->espacement = 0.f;
     pastille(app, nom_classe_maj(c->classe), (sfVector2f){cx, 432.f - 30.f * envol},
         col, 0);
-    texte(app, POLICE_NORMALE, DESCRIPTIONS[c->classe], 13, (sfVector2f){cx,
-        460.f - 30.f * envol}, C_TEXTE_FAIBLE, ALIGNE_CENTRE);
-    titre_section(app, NULL, "STATISTIQUES", (sfVector2f){r.left + 26.f,
+    snprintf(buf, sizeof(buf), "%s  ·  %s", nom_categorie(classes[c->classe].categorie),
+        classes[c->classe].description);
+    texte(app, POLICE_NORMALE, buf, 13, (sfVector2f){cx, 460.f - 30.f * envol},
+        C_TEXTE_FAIBLE, ALIGNE_CENTRE);
+    titre_section(app, NULL, "STATISTIQUES FINALES", (sfVector2f){r.left + 26.f,
         490.f - 30.f * envol}, AW - 52.f, col);
     stats_apercu(app, c, col);
     panneau(app, r, 26.f, avec_alpha(C_BLANC, 0.45f * c->flash),
@@ -491,7 +573,7 @@ static void bouton_creer(app_t *app, creation_t *c, float a, int actif)
 
 static void formulaire(app_t *app, creation_t *c, float a, int actif)
 {
-    const sfColor couleurs[3] = {C_VERT, C_ROUGE, C_BLEU};
+    const sfColor couleurs[NB_STATS] = {C_VERT, C_ROUGE, C_BLEU};
     const sfFloatRect cadre = {FX - 16.f, 194.f, FW + 32.f, 418.f};
     float dy = 0.f;
 
@@ -508,23 +590,25 @@ static void formulaire(app_t *app, creation_t *c, float a, int actif)
         "Ex : Aragorn", NOM_LONGUEUR))
         c->focus = 0;
     dy = apparaitre(app, a, 1);
-    titre_section(app, "02", "STATISTIQUES", (sfVector2f){FX, 308.f + dy}, FW, C_CYAN);
-    for (int i = 0; i < 3; i++) {
+    titre_section(app, "02", "STATISTIQUES DE BASE", (sfVector2f){FX, 304.f + dy}, FW,
+        C_CYAN);
+    for (int i = 0; i < NB_STATS; i++) {
         dy = apparaitre(app, a, 2 + i);
-        if (glissiere(app, &c->stats[i], (sfFloatRect){FX, 322.f + i * 44.f + dy, FW,
-            40.f}, LABELS_STATS[i], &c->valeurs[i], couleurs[i], c->focus == 1 + i))
+        if (glissiere(app, &c->stats[i], (sfFloatRect){FX, 316.f + i * 40.f + dy, FW,
+            38.f}, LABELS_STATS[i], &c->valeurs[i], couleurs[i], c->focus == 1 + i))
             c->focus = 1 + i;
     }
     dy = apparaitre(app, a, 5);
-    titre_section(app, "03", "CLASSE", (sfVector2f){FX, 470.f + dy}, FW, C_CYAN);
-    cartes_classes(app, c, 484.f + dy);
+    titre_section(app, "03", "CLASSE", (sfVector2f){FX, 452.f + dy}, FW, C_CYAN);
+    onglets(app, c, 464.f + dy);
+    grille_classes(app, c, 498.f + dy);
     bouton_creer(app, c, a, actif);
 }
 
 static void aide_clavier(app_t *app, float a)
 {
     static const char *touches[4] = {"Tab", "‹ ›", "Maj", "Échap"};
-    static const char *actions[4] = {"naviguer", "ajuster", "×10", "retour"};
+    static const char *actions[4] = {"naviguer", "ajuster", "×10 · catégorie", "retour"};
     float x = AX + 26.f;
     float w = 0.f;
 

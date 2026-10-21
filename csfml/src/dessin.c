@@ -279,7 +279,7 @@ static void aurores(app_t *app)
     lueur(app, (sfVector2f){340 + 180 * sinf(t * 0.13f), 220 + 90 * cosf(t * 0.17f)},
         (sfVector2f){620, 420}, avec_alpha(C_CYAN, 0.10f));
     lueur(app, (sfVector2f){980 + 160 * cosf(t * 0.11f), 520 + 80 * sinf(t * 0.19f)},
-        (sfVector2f){640, 440}, avec_alpha(C_MAGE, 0.08f));
+        (sfVector2f){640, 440}, avec_alpha(C_VIOLET, 0.08f));
     lueur(app, (sfVector2f){700 + 260 * sinf(t * 0.07f), 380 + 60 * sinf(t * 0.23f)},
         (sfVector2f){560, 300}, avec_alpha(C_ROUGE, 0.07f));
 }

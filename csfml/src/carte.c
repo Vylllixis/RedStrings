@@ -11,116 +11,46 @@
 #define CARTE_H 236.f
 #define ECART 22.f
 
-static const float LAME[] = {-0.08f, 0.3f, -0.08f, -0.72f, 0.f, -0.94f,
-    0.08f, -0.72f, 0.08f, 0.3f};
-static const float GARDE[] = {-0.34f, 0.3f, 0.34f, 0.3f, 0.34f, 0.42f,
-    -0.34f, 0.42f};
-static const float POIGNEE[] = {-0.055f, 0.42f, 0.055f, 0.42f, 0.055f, 0.74f,
-    -0.055f, 0.74f};
-static const float POINTE[] = {0.88f, -0.88f, 0.739f, -0.541f, 0.541f, -0.739f};
-static const float PLUME_A[] = {-0.378f, 0.378f, -0.236f, 0.236f, -0.215f, 0.399f,
-    -0.342f, 0.526f};
-static const float PLUME_B[] = {-0.378f, 0.378f, -0.236f, 0.236f, -0.399f, 0.215f,
-    -0.526f, 0.342f};
-
 /** Nom de la classe, pris dans la table classes[] partagée avec la console. */
 const char *nom_classe(classe_t c)
 {
     return classes[c].nom;
 }
 
-/** Nom en majuscules (« MAGE »), calculé une fois depuis classes[]. */
+/**
+ * Majuscules UTF-8 : ASCII, plus les lettres accentuées du français codées
+ * sur deux octets (à → À, é → É, ï → Ï…), pour « ÉLÉMENTALISTE » ou « PRÊTRE ».
+ */
+static void majuscules_utf8(char *s)
+{
+    unsigned char *u = (unsigned char *)s;
+
+    for (int i = 0; u[i] != '\0'; i++) {
+        if (u[i] >= 'a' && u[i] <= 'z')
+            u[i] -= 32;
+        else if (u[i] == 0xC3 && u[i + 1] >= 0xA0 && u[i + 1] <= 0xBE
+            && u[i + 1] != 0xB7)
+            u[++i] -= 0x20;
+    }
+}
+
+/** Nom en majuscules, calculé une fois par classe depuis classes[]. */
 const char *nom_classe_maj(classe_t c)
 {
     static char maj[NB_CLASSES][NOM_MAX];
 
     if (maj[c][0] == '\0') {
         my_strncpy(maj[c], classes[c].nom, NOM_MAX - 1);
-        my_strupcase(maj[c]);
+        majuscules_utf8(maj[c]);
     }
     return maj[c];
 }
 
-/** Version CSFML des couleurs ANSI de classes[] : une ligne par classe. */
+/** Même couleur que dans le terminal : le RGB central de classes[]. */
 sfColor couleur_classe(classe_t c)
 {
-    const sfColor couleurs[NB_CLASSES] = {
-        [GUERRIER] = C_GUERRIER,
-        [MAGE] = C_MAGE,
-        [ARCHER] = C_ARCHER,
-    };
-
-    return couleurs[c];
-}
-
-static void epee(app_t *app, sfVector2f c, float t, float angle, sfColor col)
-{
-    polygone(app, LAME, 5, c, t, angle, col);
-    polygone(app, GARDE, 4, c, t, angle, col);
-    polygone(app, POIGNEE, 4, c, t, angle, col);
-    cercle(app, (sfVector2f){c.x - 0.84f * sinf(angle) * t,
-        c.y + 0.84f * cosf(angle) * t}, 0.1f * t, col, C_TRANSPARENT, 0.f);
-}
-
-static void etoile(app_t *app, sfVector2f c, float t, float angle, sfColor col)
-{
-    float pts[16];
-    float a = 0.f;
-
-    for (int k = 0; k < 8; k++) {
-        a = k * PI / 4.f - PI / 2.f;
-        pts[2 * k] = cosf(a) * (k % 2 ? 0.3f : 1.f);
-        pts[2 * k + 1] = sinf(a) * (k % 2 ? 0.3f : 1.f);
-    }
-    polygone(app, pts, 8, c, t, angle, col);
-}
-
-static sfVector2f point(sfVector2f c, float t, float x, float y)
-{
-    return (sfVector2f){c.x + x * t, c.y + y * t};
-}
-
-static void arc(app_t *app, sfVector2f c, float t, sfColor col)
-{
-    sfVector2f bezier[24];
-    sfVector2f corde[3] = {point(c, t, 0.38f, 0.78f), point(c, t, -0.42f, 0.42f),
-        point(c, t, -0.78f, -0.38f)};
-    sfVector2f fleche[2] = {point(c, t, -0.42f, 0.42f), point(c, t, 0.66f, -0.66f)};
-    float u = 0.f;
-
-    for (int i = 0; i < 24; i++) {
-        u = i / 23.f;
-        bezier[i] = point(c, t,
-            (1 - u) * (1 - u) * 0.38f + 2 * (1 - u) * u * 0.507f + u * u * -0.78f,
-            (1 - u) * (1 - u) * 0.78f + 2 * (1 - u) * u * -0.507f + u * u * -0.38f);
-    }
-    ligne_epaisse(app, corde, 3, fmaxf(1.f, 0.035f * t), avec_alpha(col, 0.75f), 0);
-    ligne_epaisse(app, bezier, 24, 0.11f * t, col, 0);
-    ligne_epaisse(app, fleche, 2, 0.075f * t, col, 0);
-    polygone(app, POINTE, 3, c, t, 0.f, col);
-    polygone(app, PLUME_A, 4, c, t, 0.f, col);
-    polygone(app, PLUME_B, 4, c, t, 0.f, col);
-}
-
-/** Emblème vectoriel de la classe (épées, étoile, arc). */
-void embleme(app_t *app, classe_t c, sfVector2f centre, float taille,
-    sfColor couleur)
-{
-    float t = app->temps;
-
-    if (c == GUERRIER) {
-        epee(app, centre, taille, -0.72f, couleur);
-        epee(app, centre, taille, 0.72f, couleur);
-    } else if (c == MAGE) {
-        etoile(app, point(centre, taille, -0.08f, 0.08f), taille * 0.85f,
-            sinf(t * 0.8f) * 0.12f, couleur);
-        etoile(app, point(centre, taille, 0.62f, -0.6f), taille * 0.3f,
-            t * 0.9f, couleur);
-        cercle(app, point(centre, taille, -0.62f, -0.56f), 0.08f * taille,
-            avec_alpha(couleur, 0.5f + 0.5f * sinf(t * 3.f)), C_TRANSPARENT, 0.f);
-    } else {
-        arc(app, centre, taille, couleur);
-    }
+    return (sfColor){classes[c].couleur.r, classes[c].couleur.g,
+        classes[c].couleur.b, 255};
 }
 
 void avatar(app_t *app, const personnage_t *p, sfVector2f centre, float r,

@@ -5,6 +5,8 @@
 
 #include <assert.h>
 #include <stdio.h>
+#include <stdlib.h>
+#include "boite.h"
 #include "my_string.h"
 #include "personnage.h"
 #include "roster.h"
@@ -117,7 +119,7 @@ static void test_charger_refuse_fichier_invalide(void)
     roster_init(&r);
     assert(roster_ajouter(&r, &bob) == 0);
     assert(charger(&r, "n_existe_pas.txt") == SAUVEGARDE_ERR_OUVERTURE);
-    ecrire_fichier("Al 10 10 10 9\n");          // classe inconnue
+    ecrire_fichier("Al 10 10 10 99\n");         // classe inconnue
     assert(charger(&r, FICHIER_TEST) == SAUVEGARDE_ERR_FORMAT);
     ecrire_fichier("Al 500 10 10 1\n");         // stat hors limites
     assert(charger(&r, FICHIER_TEST) == SAUVEGARDE_ERR_FORMAT);
@@ -131,8 +133,83 @@ static void test_charger_refuse_fichier_invalide(void)
     roster_liberer(&r);
 }
 
+/** Chaque classe déclarée a des métadonnées complètes et cohérentes. */
+static void test_catalogue(void)
+{
+    classe_t ordre[NB_CLASSES];
+    int vues[NB_CLASSES] = {0};
+    int par_categorie[NB_CATEGORIES] = {0};
+    int somme = 0;
+    int ecart = 0;
+
+    assert(NB_CLASSES >= 20);
+    for (int i = 0; i < NB_CLASSES; i++) {
+        assert(classes[i].nom != NULL && classes[i].nom[0] != '\0');
+        assert(classes[i].description != NULL);
+        assert(largeur_visible(classes[i].description) <= DESCRIPTION_MAX);
+        assert(classes[i].categorie < NB_CATEGORIES);
+        assert(classes[i].embleme < NB_EMBLEMES);
+        par_categorie[classes[i].categorie]++;
+        somme = 0;
+        for (int s = 0; s < NB_STATS; s++) {
+            assert(abs(classes[i].mods[s]) <= MOD_MAX);
+            somme += classes[i].mods[s];
+        }
+        assert(somme == 0);                 // une classe n'est pas « plus forte »
+        for (int j = 0; j < i; j++) {
+            assert(my_strcmp(classes[i].nom, classes[j].nom) != 0);
+            ecart = abs(classes[i].couleur.r - classes[j].couleur.r)
+                + abs(classes[i].couleur.g - classes[j].couleur.g)
+                + abs(classes[i].couleur.b - classes[j].couleur.b);
+            assert(ecart >= 40);            // couleurs distinctes deux à deux
+        }
+    }
+    for (int c = 0; c < NB_CATEGORIES; c++)
+        assert(par_categorie[c] > 0 && nom_categorie((categorie_t)c) != NULL);
+    ordre_classes(ordre);
+    for (int i = 0; i < NB_CLASSES; i++)
+        vues[ordre[i]]++;
+    for (int i = 0; i < NB_CLASSES; i++)
+        assert(vues[i] == 1);               // ordre = permutation du catalogue
+    assert(GUERRIER == 0 && MAGE == 1 && ARCHER == 2);  // sauvegardes existantes
+    assert(classe_valide(0) && classe_valide(NB_CLASSES - 1));
+    assert(!classe_valide(-1) && !classe_valide(NB_CLASSES));
+}
+
+static void test_modificateurs(void)
+{
+    personnage_t p = perso("P", 50, 50, 50, BERSERKER);
+    personnage_t g = perso("G", 95, 5, 95, GARDIEN);
+
+    appliquer_classe(&p);
+    assert(p.pv == 55 && p.atq == 65 && p.def == 30);
+    appliquer_classe(&g);                   // bornes STAT_MIN / STAT_MAX
+    assert(g.pv == 99 && g.atq == 0 && g.def == 99);
+    assert(stat_finale(GUERRIER, STAT_ATQ, 42) == 42);
+}
+
+static void test_sauvegarde_classes(void)
+{
+    roster_t r;
+
+    roster_init(&r);
+    ecrire_fichier("Ancien 50 30 20 1\n");  // fichier écrit avec 3 classes
+    assert(charger(&r, FICHIER_TEST) == SAUVEGARDE_OK && r.data[0].classe == MAGE);
+    snprintf(r.data[0].nom, NOM_MAX, "Moine");
+    r.data[0].classe = MOINE;
+    assert(sauvegarder(&r, FICHIER_TEST) == SAUVEGARDE_OK);
+    roster_liberer(&r);
+    assert(charger(&r, FICHIER_TEST) == SAUVEGARDE_OK && r.data[0].classe == MOINE);
+    roster_liberer(&r);
+    ecrire_fichier("Futur 50 30 20 28\n");  // classe inconnue de ce catalogue
+    assert(charger(&r, FICHIER_TEST) == SAUVEGARDE_ERR_FORMAT && r.len == 0);
+}
+
 int main(void)
 {
+    test_catalogue();
+    test_modificateurs();
+    test_sauvegarde_classes();
     test_my_strcmp();
     test_degats();
     test_trouver_personnage();

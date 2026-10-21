@@ -16,7 +16,7 @@ static int personnage_valide(const personnage_t *p, int classe,
 {
     if (!stat_valide(p->pv) || !stat_valide(p->atq) || !stat_valide(p->def))
         return 0;
-    if (classe < 0 || classe >= NB_CLASSES)
+    if (!classe_valide(classe))
         return 0;
     return trouver_personnage(deja_lus->data, deja_lus->len, p->nom) == -1;
 }
