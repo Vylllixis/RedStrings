@@ -53,6 +53,9 @@ static void test_degats(void)
     assert(calculer_degats(&a, &c) == 0);
     attaquer(&a, &b);
     assert(b.pv == 30);
+    b.pv = 5;
+    attaquer(&a, &b);
+    assert(b.pv == 0);      // jamais négatif, sinon le mort n'est pas détecté
 }
 
 static void test_trouver_personnage(void)
