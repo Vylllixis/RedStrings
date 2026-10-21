@@ -154,7 +154,7 @@ static void recherche(app_t *app, liste_t *l, float a, int actif)
 
     app->alpha = a * progression(app->t_scene, 0.1f, 0.35f);
     l->recherche.focus = actif;
-    champ_texte(app, &l->recherche, r, "Rechercher un nom…", 29);
+    champ_texte(app, &l->recherche, r, "Rechercher un nom…", NOM_LONGUEUR);
     loupe(app, (sfVector2f){r.left + 26.f, r.top + 26.f}, melanger(C_TEXTE_FAIBLE,
         C_CYAN, l->recherche.focus_anim));
     app->alpha = a;

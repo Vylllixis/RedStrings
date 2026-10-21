@@ -160,8 +160,8 @@ typedef struct {
     glissiere_t stats[3];
     int valeurs[3];
     classe_t classe;
-    bouton_t tuiles[3];
-    ressort_t lift[3];
+    bouton_t tuiles[NB_CLASSES];
+    ressort_t lift[NB_CLASSES];
     bouton_t creer;
     bouton_t retour;
     float segments[3];

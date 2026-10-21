@@ -13,7 +13,11 @@
 #define DUREE_SORTIE_CREATION 1.f
 
 static const char *LABELS_STATS[3] = {"Points de vie", "Attaque", "Défense"};
-static const char *DESCRIPTIONS[3] = {"Corps à corps", "Magie", "Distance"};
+static const char *DESCRIPTIONS[NB_CLASSES] = {
+    [GUERRIER] = "Corps à corps",
+    [MAGE] = "Magie",
+    [ARCHER] = "Distance",
+};
 
 void entrer_creation(app_t *app)
 {
@@ -82,10 +86,10 @@ static void creer(app_t *app, creation_t *c)
 static void ajuster(int *v, int delta)
 {
     *v += delta;
-    if (*v < 0)
-        *v = 0;
-    if (*v > 99)
-        *v = 99;
+    if (*v < STAT_MIN)
+        *v = STAT_MIN;
+    if (*v > STAT_MAX)
+        *v = STAT_MAX;
 }
 
 static void clavier(app_t *app, creation_t *c)
@@ -106,9 +110,9 @@ static void clavier(app_t *app, creation_t *c)
     if (c->focus >= 1 && c->focus <= 3 && (k[sfKeyLeft] || k[sfKeyRight]))
         ajuster(&c->valeurs[c->focus - 1], k[sfKeyLeft] ? -pas : pas);
     if (c->focus == 4 && k[sfKeyLeft])
-        c->classe = (c->classe + 2) % 3;
+        c->classe = (c->classe + NB_CLASSES - 1) % NB_CLASSES;
     if (c->focus == 4 && k[sfKeyRight])
-        c->classe = (c->classe + 1) % 3;
+        c->classe = (c->classe + 1) % NB_CLASSES;
     if (k[sfKeyEnter])
         creer(app, c);
 }
@@ -145,12 +149,12 @@ static void dessiner_tuile(app_t *app, creation_t *c, classe_t i, sfFloatRect r)
 
 static void tuiles(app_t *app, creation_t *c, float y)
 {
-    float w = (FW - 28.f) / 3.f;
+    float w = (FW - 14.f * (NB_CLASSES - 1)) / NB_CLASSES;
     sfFloatRect r;
     classe_t i = GUERRIER;
     int s = 0;
 
-    for (int k = 0; k < 3; k++) {
+    for (int k = 0; k < NB_CLASSES; k++) {
         i = (classe_t)k;
         r = (sfFloatRect){FX + k * (w + 14.f), y, w, 80.f};
         s = survole(app, r);
@@ -208,7 +212,7 @@ static void formulaire(app_t *app, creation_t *c, float a, int actif)
     etiquette(app, "NOM", (sfVector2f){FX, 212.f + dy}, C_TEXTE_FAIBLE, ALIGNE_GAUCHE);
     c->nom.focus = c->focus == 0 && actif;
     if (champ_texte(app, &c->nom, (sfFloatRect){FX, 230.f + dy, FW, 58.f},
-        "Ex : Aragorn", 29))
+        "Ex : Aragorn", NOM_LONGUEUR))
         c->focus = 0;
     dy = apparaitre(app, a, 1);
     etiquette(app, "STATISTIQUES", (sfVector2f){FX, 322.f + dy}, C_TEXTE_FAIBLE,

@@ -23,31 +23,34 @@ static const float PLUME_A[] = {-0.378f, 0.378f, -0.236f, 0.236f, -0.215f, 0.399
 static const float PLUME_B[] = {-0.378f, 0.378f, -0.236f, 0.236f, -0.399f, 0.215f,
     -0.526f, 0.342f};
 
+/** Nom de la classe, pris dans la table classes[] partagée avec la console. */
 const char *nom_classe(classe_t c)
 {
-    if (c == MAGE)
-        return "Mage";
-    if (c == ARCHER)
-        return "Archer";
-    return "Guerrier";
+    return classes[c].nom;
 }
 
+/** Nom en majuscules (« MAGE »), calculé une fois depuis classes[]. */
 const char *nom_classe_maj(classe_t c)
 {
-    if (c == MAGE)
-        return "MAGE";
-    if (c == ARCHER)
-        return "ARCHER";
-    return "GUERRIER";
+    static char maj[NB_CLASSES][NOM_MAX];
+
+    if (maj[c][0] == '\0') {
+        my_strncpy(maj[c], classes[c].nom, NOM_MAX - 1);
+        my_strupcase(maj[c]);
+    }
+    return maj[c];
 }
 
+/** Version CSFML des couleurs ANSI de classes[] : une ligne par classe. */
 sfColor couleur_classe(classe_t c)
 {
-    if (c == MAGE)
-        return C_MAGE;
-    if (c == ARCHER)
-        return C_ARCHER;
-    return C_GUERRIER;
+    const sfColor couleurs[NB_CLASSES] = {
+        [GUERRIER] = C_GUERRIER,
+        [MAGE] = C_MAGE,
+        [ARCHER] = C_ARCHER,
+    };
+
+    return couleurs[c];
 }
 
 static void epee(app_t *app, sfVector2f c, float t, float angle, sfColor col)
@@ -215,7 +218,7 @@ static void mini_stats(app_t *app, const personnage_t *p, sfFloatRect r)
             avec_alpha(C_BLANC, 0.07f));
         if (vals[i] > 0)
             rect_arrondi(app, (sfFloatRect){r.left + 52.f, y - 2.5f,
-                fmaxf(5.f, bw * vals[i] / 99.f), 5.f}, 2.5f, cs[i]);
+                fmaxf(5.f, bw * vals[i] / (float)STAT_MAX), 5.f}, 2.5f, cs[i]);
         snprintf(buf, sizeof(buf), "%d", vals[i]);
         texte(app, POLICE_GRAS, buf, 13, (sfVector2f){r.left + r.width - 18.f, y},
             cs[i], ALIGNE_DROITE);
