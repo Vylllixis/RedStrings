@@ -42,7 +42,7 @@
 - [x] **O2** 🟠 ⭐ `my.h` inclut des bibliothèques jamais utilisées
 - [x] **O3** 🟠 ⭐⭐⭐ Découper `my.h` en plusieurs headers
 - [x] **O4** 🟡 ⭐ `findPersonage` n'a pas de prototype 🧪
-- [ ] **O5** 🟢 ⭐⭐ Ranger `src/` en sous-dossiers
+- [x] **O5** 🟢 ⭐⭐ Ranger `src/` en sous-dossiers
 
 ### 📐 Lisibilité & conception
 - [ ] **L1** 🟠 ⭐ Nombres magiques (`30`, `29`, `99`, `36`)
