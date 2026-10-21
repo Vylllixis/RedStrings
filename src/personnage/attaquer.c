@@ -18,7 +18,10 @@ int calculer_degats(const personnage_t *attaquant, const personnage_t *cible)
 void attaquer(personnage_t *attaquant, personnage_t *cible)
 {
     int degats = calculer_degats(attaquant, cible);
+
     cible->pv -= degats;
+    if (cible->pv < 0)
+        cible->pv = 0;      // 0 = mort : les vérifications « pv == 0 » en dépendent
 
     printf("\n");
     boite_haut(ROUGE);
