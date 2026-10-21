@@ -10,6 +10,10 @@
 
 #define TITRE_Y 150.f
 
+/* Pas de bouton à l'écran : seulement les touches 4 et 5, comme la console. */
+#define CHOIX_SAUVEGARDER 4
+#define CHOIX_CHARGER 5
+
 void entrer_menu(app_t *app)
 {
     memset(&app->menu, 0, sizeof(menu_t));
@@ -84,8 +88,53 @@ static void titre(app_t *app, float t)
     app->alpha = a;
 }
 
+/** Touches 4 et 5 : mêmes actions que le menu de la console, sans bouton. */
+static void sauvegarder_equipe(app_t *app)
+{
+    sauvegarde_t code = sauvegarder(&app->equipe, FICHIER_SAUVEGARDE);
+    char msg[96];
+
+    if (code != SAUVEGARDE_OK) {
+        notifier(app, "✗", sauvegarde_message(code), C_ROUGE);
+        return;
+    }
+    snprintf(msg, sizeof(msg), "%d personnage%s sauvegardé%s", app->equipe.len,
+        app->equipe.len > 1 ? "s" : "", app->equipe.len > 1 ? "s" : "");
+    notifier(app, "✔", msg, C_VERT);
+}
+
+static void charger_equipe(app_t *app)
+{
+    roster_t lus;
+    sauvegarde_t code = SAUVEGARDE_OK;
+    char msg[96];
+
+    roster_init(&lus);
+    code = charger(&lus, FICHIER_SAUVEGARDE);
+    if (code != SAUVEGARDE_OK) {
+        notifier(app, "✗", sauvegarde_message(code), C_ROUGE);
+        return;
+    }
+    if (lus.len > MAX_PERSONNAGES) {
+        snprintf(msg, sizeof(msg), "Trop de personnages pour l'écran (%d / %d)",
+            lus.len, MAX_PERSONNAGES);
+        notifier(app, "✗", msg, C_ROUGE);
+        roster_liberer(&lus);
+        return;
+    }
+    roster_liberer(&app->equipe);
+    app->equipe = lus;
+    snprintf(msg, sizeof(msg), "%d personnage%s chargé%s", lus.len,
+        lus.len > 1 ? "s" : "", lus.len > 1 ? "s" : "");
+    notifier(app, "✔", msg, C_VERT);
+}
+
 static void action(app_t *app, int choix)
 {
+    if (choix == CHOIX_SAUVEGARDER)
+        sauvegarder_equipe(app);
+    if (choix == CHOIX_CHARGER)
+        charger_equipe(app);
     if (choix == 0 && app->equipe.len >= MAX_PERSONNAGES)
         notifier(app, "✗", "Nombre maximum de personnages atteint", C_ROUGE);
     else if (choix == 0)
@@ -114,6 +163,10 @@ static int touche_menu(app_t *app)
         return 2;
     if (k[sfKeyNum0] || k[sfKeyNumpad0] || k[sfKeyEscape])
         return 3;
+    if (k[sfKeyNum4] || k[sfKeyNumpad4])
+        return CHOIX_SAUVEGARDER;
+    if (k[sfKeyNum5] || k[sfKeyNumpad5])
+        return CHOIX_CHARGER;
     return -1;
 }
 
