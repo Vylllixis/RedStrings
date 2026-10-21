@@ -56,6 +56,7 @@ typedef enum {
     STAT_PV,
     STAT_ATQ,
     STAT_DEF,
+    STAT_SOIN,
     NB_STATS
 } stat_t;
 
@@ -103,11 +104,15 @@ typedef struct {
     const char *description;    /**< Une ligne, DESCRIPTION_MAX caractères max. */
     categorie_t categorie;
     rgb_t couleur;              /**< Couleur du terminal (ANSI 24 bits) et de CSFML. */
-    int mods[NB_STATS];         /**< Bonus/malus de PV, attaque, défense ; somme nulle. */
+    int mods[NB_STATS];         /**< Bonus/malus de PV, ATQ, DEF, soin ; somme nulle. */
     embleme_t embleme;
 } info_classe_t;
 
 extern const info_classe_t classes[NB_CLASSES];
+
+/* Soin donné aux personnages d'une sauvegarde écrite avant cette statistique,
+ * avant le modificateur de leur classe. */
+#define SOIN_MIGRATION 20
 
 #define NOM_MAX   30
 #define STAT_MIN  0
@@ -118,6 +123,7 @@ typedef struct {
     int pv;             /**< Points de vie, mort à 0. */
     int atq;            /**< Dégâts bruts infligés. */
     int def;            /**< Pourcentage de réduction des dégâts reçus. */
+    int soin;           /**< PV rendus par l'action Soigner. */
     classe_t classe;    /**< Classe du personnage. */
 } personnage_t;
 
@@ -132,6 +138,9 @@ int classe_valide(int id);
 
 /** Remplit `ordre` avec toutes les classes rangées par catégorie. */
 void ordre_classes(classe_t ordre[NB_CLASSES]);
+
+/** Valeur de la statistique `s` d'un personnage (PV, ATQ, DEF ou soin). */
+int valeur_stat(const personnage_t *p, stat_t s);
 
 /** Statistique de base modifiée par la classe, bornée à STAT_MIN..STAT_MAX. */
 int stat_finale(classe_t c, stat_t s, int base);
@@ -153,17 +162,12 @@ int creer_personnage(personnage_t *p, personnage_t *tab, int len);
 /** Affiche la fiche du personnage avec ses barres de stats. */
 void afficher_personnage(const personnage_t *p);
 
-/** Dégâts que l'attaquant inflige à la cible, jamais négatifs. */
+/** Dégâts bruts : attaque réduite par le pourcentage de défense de la cible.
+ *  Base de bataille_degats(), qui ajoute la garde et le minimum de 1. */
 int calculer_degats(const personnage_t *attaquant, const personnage_t *cible);
-
-/** Applique les dégâts à la cible (PV jamais sous 0) et les renvoie.
- *  Logique pure, sans affichage : partagée par la console et la CSFML. */
-int subir_attaque(const personnage_t *attaquant, personnage_t *cible);
 
 /** 1 si le personnage est K.O. (0 PV), 0 sinon. */
 int est_ko(const personnage_t *p);
 
-/** subir_attaque() puis affiche le résultat du coup dans une boîte. */
-void attaquer(personnage_t *attaquant, personnage_t *cible);
 
 #endif /* PERSONNAGE_H */

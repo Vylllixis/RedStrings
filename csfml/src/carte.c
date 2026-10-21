@@ -7,8 +7,6 @@
 #include <stdio.h>
 #include "gui.h"
 
-#define CARTE_L 216.f
-#define CARTE_H 236.f
 #define ECART 22.f
 
 /** Nom de la classe, pris dans la table classes[] partagée avec la console. */
@@ -44,6 +42,28 @@ const char *nom_classe_maj(classe_t c)
         majuscules_utf8(maj[c]);
     }
     return maj[c];
+}
+
+/** Couleur, nom et abréviation de chaque statistique (mêmes partout). */
+sfColor couleur_stat(stat_t s)
+{
+    const sfColor couleurs[NB_STATS] = {C_VERT, C_ROUGE, C_BLEU, C_SOIN};
+
+    return couleurs[s];
+}
+
+const char *nom_stat(stat_t s)
+{
+    static const char *noms[NB_STATS] = {"POINTS DE VIE", "ATTAQUE", "DÉFENSE", "SOIN"};
+
+    return noms[s];
+}
+
+const char *abrege_stat(stat_t s)
+{
+    static const char *noms[NB_STATS] = {"PV", "ATQ", "DEF", "SOI"};
+
+    return noms[s];
 }
 
 /** Même couleur que dans le terminal : le RGB central de classes[]. */
@@ -93,11 +113,8 @@ void barre_segments(app_t *app, sfFloatRect r, float segments, sfColor c)
 
 /** Fiche détaillée d'un personnage (équivalent de afficher_personnage). */
 void fiche(app_t *app, const personnage_t *p, sfFloatRect r,
-    const float segments[3])
+    const float segments[NB_STATS])
 {
-    static const char *noms[3] = {"POINTS DE VIE", "ATTAQUE", "DÉFENSE"};
-    const sfColor cs[3] = {C_VERT, C_ROUGE, C_BLEU};
-    const int vals[3] = {p->pv, p->atq, p->def};
     sfColor c = couleur_classe(p->classe);
     float cx = r.left + r.width / 2.f;
     float y = 0.f;
@@ -121,39 +138,39 @@ void fiche(app_t *app, const personnage_t *p, sfFloatRect r,
             C_ROUGE, 1);
     rect_arrondi(app, (sfFloatRect){r.left + 32.f, r.top + 282.f, r.width - 64.f, 1.f},
         0.f, avec_alpha(C_BLANC, 0.07f));
-    for (int i = 0; i < 3; i++) {
-        y = r.top + 322.f + i * 60.f;
-        etiquette(app, noms[i], (sfVector2f){r.left + 32.f, y}, C_TEXTE_DOUX,
-            ALIGNE_GAUCHE);
-        snprintf(buf, sizeof(buf), "%d%s", vals[i], i == 2 ? " %" : "");
+    for (int i = 0; i < NB_STATS; i++) {
+        y = r.top + 312.f + i * 48.f;
+        etiquette(app, nom_stat((stat_t)i), (sfVector2f){r.left + 32.f, y},
+            C_TEXTE_DOUX, ALIGNE_GAUCHE);
+        snprintf(buf, sizeof(buf), "%d%s", valeur_stat(p, (stat_t)i),
+            i == STAT_DEF ? " %" : "");
         texte(app, POLICE_GRAS, buf, 20, (sfVector2f){r.left + r.width - 32.f, y},
-            cs[i], ALIGNE_DROITE);
-        barre_segments(app, (sfFloatRect){r.left + 32.f, y + 20.f, r.width - 64.f,
-            12.f}, segments[i], cs[i]);
+            couleur_stat((stat_t)i), ALIGNE_DROITE);
+        barre_segments(app, (sfFloatRect){r.left + 32.f, y + 18.f, r.width - 64.f,
+            10.f}, segments[i], couleur_stat((stat_t)i));
     }
 }
 
 static void mini_stats(app_t *app, const personnage_t *p, sfFloatRect r)
 {
-    static const char *noms[3] = {"PV", "ATK", "DEF"};
-    const sfColor cs[3] = {C_VERT, C_ROUGE, C_BLEU};
-    const int vals[3] = {p->pv, p->atq, p->def};
     float y = 0.f;
     float bw = r.width - 52.f - 48.f;
+    int v = 0;
     char buf[8];
 
-    for (int i = 0; i < 3; i++) {
-        y = r.top + 186.f + i * 16.f;
-        texte(app, POLICE_GRAS, noms[i], 11, (sfVector2f){r.left + 18.f, y},
-            C_TEXTE_FAIBLE, ALIGNE_GAUCHE);
-        rect_arrondi(app, (sfFloatRect){r.left + 52.f, y - 2.5f, bw, 5.f}, 2.5f,
+    for (int i = 0; i < NB_STATS; i++) {
+        y = r.top + 178.f + i * 14.f;
+        v = valeur_stat(p, (stat_t)i);
+        texte(app, POLICE_GRAS, abrege_stat((stat_t)i), 10, (sfVector2f){r.left + 18.f,
+            y}, C_TEXTE_FAIBLE, ALIGNE_GAUCHE);
+        rect_arrondi(app, (sfFloatRect){r.left + 52.f, y - 2.f, bw, 4.f}, 2.f,
             avec_alpha(C_BLANC, 0.07f));
-        if (vals[i] > 0)
-            rect_arrondi(app, (sfFloatRect){r.left + 52.f, y - 2.5f,
-                fmaxf(5.f, bw * vals[i] / (float)STAT_MAX), 5.f}, 2.5f, cs[i]);
-        snprintf(buf, sizeof(buf), "%d", vals[i]);
-        texte(app, POLICE_GRAS, buf, 13, (sfVector2f){r.left + r.width - 18.f, y},
-            cs[i], ALIGNE_DROITE);
+        if (v > 0)
+            rect_arrondi(app, (sfFloatRect){r.left + 52.f, y - 2.f,
+                fmaxf(4.f, bw * v / (float)STAT_MAX), 4.f}, 2.f, couleur_stat((stat_t)i));
+        snprintf(buf, sizeof(buf), "%d", v);
+        texte(app, POLICE_GRAS, buf, 12, (sfVector2f){r.left + r.width - 18.f, y},
+            couleur_stat((stat_t)i), ALIGNE_DROITE);
     }
 }
 

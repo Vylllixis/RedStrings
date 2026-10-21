@@ -47,6 +47,7 @@ puis on les fait s'affronter. La défense réduit les dégâts en pourcentage, e
 
 ### 🖥️ Version console &nbsp;`./redstrings`
 - Menu coloré dessiné en boîtes Unicode
+- Combats en équipe (jusqu'à 4 contre 4) contre l'ordinateur
 - Personnages **illimités** (tableau dynamique `realloc`)
 - **Sauvegarde / chargement** dans `personnages.txt`
 - Chaque saisie est **vérifiée** (Ctrl+D, `12abc`, débordement…)
@@ -59,7 +60,7 @@ puis on les fait s'affronter. La défense réduit les dégâts en pourcentage, e
 - Fenêtre 1280×720, VSync, souris + clavier
 - Aperçu **en direct** pendant la création
 - Recherche par nom, cartes, fiches en modale
-- Arène animée : tours, particules, K.O., inversion des rôles
+- Arène en profondeur : ton équipe au premier plan, l'adversaire au loin, attaques, soins, gardes et K.O. animés
 - Même formule de dégâts que la console
 
 </td>
@@ -140,7 +141,7 @@ make csfml            # compile ./redstrings_csfml
 |:---:|---|---|
 | <kbd>1</kbd> | **Ajouter** | Nom → PV → Attaque → Défense → Classe. Le nom doit être unique. |
 | <kbd>2</kbd> | **Afficher** | Fiche avec barres de stats colorées. |
-| <kbd>3</kbd> | **Combat** | Attaquant puis défenseur : les dégâts sont calculés et appliqués. |
+| <kbd>3</kbd> | **Combat** | Compose ton équipe puis celle de l'ordinateur (1 à 4 chacune), puis combat au tour par tour : Attaquer, Soigner ou Défendre. |
 | <kbd>4</kbd> | **Sauvegarder** | Écrit tous les personnages dans `personnages.txt`. |
 | <kbd>5</kbd> | **Charger** | Remplace l'équipe par le contenu de `personnages.txt`. |
 | <kbd>0</kbd> ou <kbd>Ctrl</kbd>+<kbd>D</kbd> | **Quitter** | Libère la mémoire, puis « À bientôt ! ». |
@@ -153,8 +154,8 @@ make csfml            # compile ./redstrings_csfml
 | Saisie | Règle | Si c'est faux |
 |---|---|---|
 | Nom | 1 mot, 29 caractères max, **unique** | `✗ Ce nom est déjà pris` |
-| PV / Attaque / Défense | entier de **0 à 99** | `✗ Valeur invalide`, puis la question est reposée |
-| Classe | 1, 2 ou 3 | `✗ Valeur invalide` |
+| PV / Attaque / Défense / Soin | entier de **0 à 99** (statistiques de base, avant la classe) | `✗ Valeur invalide`, puis la question est reposée |
+| Classe | de 1 à 28, listées par catégorie | `✗ Valeur invalide` |
 | `12abc`, `abc`, `99999999999` | refusés : `strtol` contrôle **toute** la ligne | `✗ Valeur invalide` |
 | <kbd>Ctrl</kbd>+<kbd>D</kbd> pendant une création | la création est annulée | `✗ Saisie interrompue` |
 
@@ -166,33 +167,37 @@ make csfml            # compile ./redstrings_csfml
 <br/>
 
 ```text
-  Choix (0-5) › 1
-  Nom › Aragorn
-  Points de vie (0-99) › 80
-  Attaque       (0-99) › 60
-  Défense       (0-99) › 30
-  Choix (1-3) › 1
-  ✔ Aragorn a été créé !
-
-  Choix (0-5) › 1
-  Nom › Merlin            … 55 / 85 / 15, classe 2 (Mage)
-  ✔ Merlin a été créé !
-
   Choix (0-5) › 3
-  Attaquant › Merlin
-  Défenseur › Aragorn
-╭────────────────────────────────────╮
-│  ⚔ Merlin attaque Aragorn          │
-├────────────────────────────────────┤
-│  Attaque      85                   │
-│  Réduction    -30%                 │
-│  Dégâts       59                   │
-│  PV restants  21                   │
-╰────────────────────────────────────╯
+  Ton équipe (1 à 4, ligne vide pour terminer)
+  1. › Kaelen
+  2. › Elara
+  3. ›
+  Équipe adverse (jouée par l'ordinateur) (1 à 4, ligne vide pour terminer)
+  1. › Varek
 
-  Choix (0-5) › 4
-  ✔ 2 personnage(s) sauvegardé(s) dans personnages.txt
+  ── Équipe adverse ──
+   1 Varek         Berserker       ■■■■■■■■■■■■  75/75
+  ── Ton équipe ──
+  ▶1 Kaelen        Guerrier        ■■■■■■■■■■■■  60/60
+   2 Elara         Prêtre          ■■■■■■■■■■■■  55/55
+  Tour de Kaelen
+    1  Attaquer
+    2  Soigner
+    3  Défendre
+  Action (1-3) › 3
+  » Kaelen adopte une posture défensive.
+  » Varek attaque Elara et inflige 52 dégâts.
+  …
+  Action (1-3) › 1
+    1  Varek          -40 PV
+    0  Retour
+  Cible (0-1) › 1
+  » Kaelen attaque Varek et inflige 40 dégâts.
+  » Varek est vaincu.
+  » L'équipe adverse a été vaincue.
+  ✔ Victoire !
 ```
+<sub>Extrait d'une vraie session (couleurs retirées). Les PV perdus pendant le combat ne sont pas reportés dans le roster.</sub>
 
 </details>
 
@@ -211,14 +216,14 @@ stateDiagram-v2
 
     Creation --> Menu: créé / nom pris / Ctrl+D
     Fiche --> Menu
-    Combat --> Menu: dégâts appliqués / combat refusé
+    Combat --> Menu: victoire / défaite / Ctrl+D
     Sauvegarde --> Menu
     Chargement --> Menu: chargé / fichier refusé
 
     note right of Combat
-        refusé si :
-        · attaquant = défenseur
-        · l'un des deux est K.O.
+        équipes de 1 à 4
+        personnages K.O. exclus
+        roster jamais modifié
     end note
 ```
 
@@ -233,7 +238,8 @@ stateDiagram-v2
     Menu --> Creation: 1 · clic
     Menu --> Liste: 2 · clic
     Menu --> Selection: 3 · clic (≥ 2 persos)
-    Selection --> Arene: attaquant + défenseur
+    Selection --> Arene: ton équipe puis l'adversaire
+    Arene --> Arene: Rejouer
     Arene --> Menu: Échap
     Creation --> Menu: créé · Échap
     Liste --> Menu: Échap
@@ -246,8 +252,8 @@ stateDiagram-v2
 | **Menu** | <kbd>↑</kbd> <kbd>↓</kbd> choisir · <kbd>Entrée</kbd> valider · <kbd>1</kbd> <kbd>2</kbd> <kbd>3</kbd> raccourcis · <kbd>4</kbd> sauvegarder · <kbd>5</kbd> charger · <kbd>0</kbd>/<kbd>Échap</kbd> quitter | survol pour choisir, clic pour valider |
 | **Création** | <kbd>Tab</kbd> / <kbd>↑</kbd> <kbd>↓</kbd> naviguer · <kbd>←</kbd> <kbd>→</kbd> ajuster, ou changer de classe · <kbd>Maj</kbd> = ×10, ou catégorie suivante · <kbd>Entrée</kbd> créer | glissières, onglets de catégorie, grille de classes, bouton |
 | **Personnages** | taper pour rechercher · <kbd>Entrée</kbd> ouvrir · <kbd>←</kbd> <kbd>→</kbd> changer de fiche | clic sur une carte |
-| **Sélection** | <kbd>Échap</kbd> annule l'attaquant, puis revient au menu | clic : attaquant, puis défenseur |
-| **Arène** | <kbd>Espace</kbd>/<kbd>Entrée</kbd> attaquer · <kbd>R</kbd> inverser les rôles · <kbd>Échap</kbd> menu | boutons *Attaquer*, *Inverser*, *Menu* |
+| **Composition** | <kbd>←</kbd> <kbd>→</kbd> <kbd>↑</kbd> <kbd>↓</kbd> choisir une carte · <kbd>Espace</kbd> ajouter / retirer · <kbd>Entrée</kbd> valider l'équipe · <kbd>Échap</kbd> étape précédente | clic sur une carte, bouton *Valider* / *Lancer le combat* |
+| **Arène** | <kbd>1</kbd> <kbd>2</kbd> <kbd>3</kbd> ou <kbd>←</kbd> <kbd>→</kbd> + <kbd>Entrée</kbd> action · <kbd>←</kbd> <kbd>→</kbd> cible · <kbd>Entrée</kbd> confirmer · <kbd>Échap</kbd> retour · fin : <kbd>Entrée</kbd>/<kbd>R</kbd> rejouer, <kbd>Échap</kbd> menu | boutons d'action, survol / clic sur une cible |
 
 > [!NOTE]
 > **Un seul moteur pour deux interfaces.** `csfml/src/` ne contient que l'affichage : la version graphique compile directement `personnage.c`, `combat.c`, `roster.c` et `sauvegarde.c` depuis `src/personnage/`. Même table de classes, mêmes bornes (`STAT_MIN`, `STAT_MAX`), même calcul de dégâts (`subir_attaque`), même `roster_t`, même fichier `personnages.txt` : une équipe sauvegardée dans la console se recharge dans la fenêtre, et inversement.
@@ -281,14 +287,23 @@ stateDiagram-v2
 
 ## ⚔️ Les règles du combat
 
+Deux équipes de **1 à 4 personnages** (`TAILLE_EQUIPE_MAX`) s'affrontent au tour par tour. Tout est décidé par le moteur [`bataille.c`](src/personnage/bataille.c), commun à la console et à la fenêtre ; le combat travaille sur des **copies** des personnages : PV perdus et gardes disparaissent à la fin, le roster n'est jamais modifié.
+
 <div align="center">
 <img src=".github/readme/combat.svg" alt="Animation du calcul : 85 d'attaque, 30 % de défense, 59 dégâts, Aragorn passe de 80 à 21 PV" width="100%"/>
 </div>
 
-La défense est un **pourcentage de réduction**. Le calcul est fait en entiers (la division tronque) :
+| Action | Cible | Effet |
+|---|---|---|
+| ⚔️ **Attaquer** | un ennemi vivant | dégâts ci-dessous ; à 0 PV, la cible est vaincue |
+| ✚ **Soigner** | un allié vivant blessé (soi compris) | rend `soin` PV, sans dépasser les PV max ; indisponible si personne n'est blessé ou si le soin vaut 0 |
+| 🛡️ **Défendre** | soi-même | garde : −50 % sur tous les dégâts reçus jusqu'au **début de son prochain tour** |
+
+La défense est un **pourcentage de réduction**. Le calcul est fait en entiers (la division tronque), la garde divise encore par deux, et une attaque inflige **au moins 1** dégât :
 
 $$
-\text{dégâts} = \max\left(0,\ \left\lfloor \frac{\text{attaque} \times (100 - \text{défense})}{100} \right\rfloor\right)
+\text{dégâts} = \max\left(1,\ \left\lfloor \frac{\text{attaque} \times (100 - \text{défense})}{100} \right\rfloor \times g\right)
+\qquad g = \begin{cases} 0{,}5 & \text{en garde} \\ 1 & \text{sinon} \end{cases}
 \qquad
 \text{PV}_{\text{cible}} = \max(0,\ \text{PV}_{\text{cible}} - \text{dégâts})
 $$
@@ -297,73 +312,91 @@ $$
 |:---:|:---:|---|:---:|
 | 85 | 30 | 85 × 70 / 100 = 59,5 → **59** | 🟥 59 |
 | 40 | 50 | 40 × 50 / 100 | 🟧 20 |
-| 99 | 0 | aucune réduction | 🟥 99 |
-| 60 | 99 | 60 × 1 / 100 = 0,6 → **0** | ⬜ 0 |
+| 40 | 0, en garde | 40 × 50 % | 🟨 20 |
+| 60 | 99 | 60 × 1 / 100 = 0,6 → 0 → **minimum 1** | ⬜ 1 |
+
+**Ordre des tours** (déterministe) : les équipes alternent rang par rang — J1, A1, J2, A2… — et un personnage vaincu est sauté. Le combat s'arrête dès qu'une équipe n'a plus personne debout.
+
+**L'adversaire** est joué par l'ordinateur ([`bataille_ia`](src/personnage/bataille.c)), avec des règles simples et prévisibles : soigner l'allié le plus blessé s'il est sous la moitié de ses PV, se mettre en garde sous le quart de ses PV, sinon attaquer l'ennemi qui a le moins de PV.
+
+```mermaid
+sequenceDiagram
+    participant UI as Console / CSFML
+    participant M as bataille.c
+    UI->>M: bataille_agir(Attaquer, Varek)
+    M->>M: valide la cible, calcule, met à jour les PV
+    M->>M: tour suivant · fait expirer la garde
+    M-->>UI: événements [ATTAQUE −24] [KO Varek] [GARDE_FIN Elara]
+    UI->>UI: joue les animations, puis affiche le journal
+```
+
+> [!IMPORTANT]
+> Les animations **ne décident jamais** du résultat : le moteur renvoie des événements déjà résolus (dégâts, PV après, garde utilisée, K.O., victoire). L'écran les joue dans le temps et met à jour les PV affichés et le journal **au moment de l'impact**, sans rien recalculer ni réappliquer.
 
 ### 🧬 Les 28 classes
 
 Chaque classe vient d'**une seule ligne** de la table `classes[]` ([`personnage.c`](src/personnage/personnage.c)) : nom, description, catégorie, couleur RGB, modificateurs et emblème. La console (couleur ANSI 24 bits), la fenêtre CSFML et la logique de jeu lisent toutes cette même table.
 
 > [!NOTE]
-> **Les modificateurs s'ajoutent aux statistiques de base choisies**, une seule fois à la création, bornés entre 0 et 99. Leur somme vaut toujours 0 : une classe gagne d'un côté ce qu'elle perd de l'autre (vérifié par `make tests`). Le combat lui-même ne change pas : il utilise les statistiques finales.
+> **Les modificateurs s'ajoutent aux quatre statistiques de base choisies** (PV, attaque, défense, soin), une seule fois à la création, bornés entre 0 et 99. Leur somme vaut toujours 0 : une classe gagne d'un côté ce qu'elle perd de l'autre (vérifié par `make tests`). Le combat lui-même ne change pas : il utilise les statistiques finales.
 
 <details open>
 <summary><b>⚔️ Corps à corps — 8 classes</b></summary>
 
-| Id | Classe | Couleur | PV | ATQ | DEF | Description |
-|:---:|---|:---:|:---:|:---:|:---:|---|
-| 0 | **Guerrier** | ![](https://img.shields.io/badge/-%20%20%20%20-ef4444?style=flat-square) `#ef4444` | ±0 | ±0 | ±0 | Combattant polyvalent |
-| 3 | **Paladin** | ![](https://img.shields.io/badge/-%20%20%20%20-eee527?style=flat-square) `#eee527` | **+10** | −15 | **+5** | Rempart sacré en armure lourde |
-| 4 | **Berserker** | ![](https://img.shields.io/badge/-%20%20%20%20-cb285b?style=flat-square) `#cb285b` | **+5** | **+15** | −20 | Rage aveugle, frappe sans garde |
-| 5 | **Chevalier noir** | ![](https://img.shields.io/badge/-%20%20%20%20-8657f1?style=flat-square) `#8657f1` | −10 | **+5** | **+5** | Lame maudite, armure d'ombre |
-| 6 | **Samouraï** | ![](https://img.shields.io/badge/-%20%20%20%20-fb6e0f?style=flat-square) `#fb6e0f` | −5 | **+10** | −5 | Maître du sabre, coup décisif |
-| 7 | **Duelliste** | ![](https://img.shields.io/badge/-%20%20%20%20-e47f85?style=flat-square) `#e47f85` | −10 | **+10** | ±0 | Escrime vive et précise |
-| 8 | **Lancier** | ![](https://img.shields.io/badge/-%20%20%20%20-edf3fc?style=flat-square) `#edf3fc` | ±0 | **+5** | −5 | Allonge et charge brutale |
-| 9 | **Gladiateur** | ![](https://img.shields.io/badge/-%20%20%20%20-a1774b?style=flat-square) `#a1774b` | **+10** | **+5** | −15 | Champion de l'arène |
+| Id | Classe | Couleur | PV | ATQ | DEF | SOIN | Description |
+|:---:|---|:---:|:---:|:---:|:---:|:---:|---|
+| 0 | **Guerrier** | ![](https://img.shields.io/badge/-%20%20%20%20-ef4444?style=flat-square) `#ef4444` | ±0 | **+5** | **+5** | −10 | Combattant polyvalent |
+| 3 | **Paladin** | ![](https://img.shields.io/badge/-%20%20%20%20-eee527?style=flat-square) `#eee527` | ±0 | −10 | **+5** | **+5** | Rempart sacré en armure lourde |
+| 4 | **Berserker** | ![](https://img.shields.io/badge/-%20%20%20%20-cb285b?style=flat-square) `#cb285b` | **+5** | **+15** | −5 | −15 | Rage aveugle, frappe sans garde |
+| 5 | **Chevalier noir** | ![](https://img.shields.io/badge/-%20%20%20%20-8657f1?style=flat-square) `#8657f1` | −5 | **+5** | **+10** | −10 | Lame maudite, armure d'ombre |
+| 6 | **Samouraï** | ![](https://img.shields.io/badge/-%20%20%20%20-fb6e0f?style=flat-square) `#fb6e0f` | −5 | **+10** | ±0 | −5 | Maître du sabre, coup décisif |
+| 7 | **Duelliste** | ![](https://img.shields.io/badge/-%20%20%20%20-e47f85?style=flat-square) `#e47f85` | −10 | **+10** | **+5** | −5 | Escrime vive et précise |
+| 8 | **Lancier** | ![](https://img.shields.io/badge/-%20%20%20%20-edf3fc?style=flat-square) `#edf3fc` | ±0 | **+10** | −5 | −5 | Allonge et charge brutale |
+| 9 | **Gladiateur** | ![](https://img.shields.io/badge/-%20%20%20%20-a1774b?style=flat-square) `#a1774b` | **+10** | **+5** | −5 | −10 | Champion de l'arène |
 
 </details>
 
 <details>
 <summary><b>✨ Magie — 8 classes</b></summary>
 
-| Id | Classe | Couleur | PV | ATQ | DEF | Description |
-|:---:|---|:---:|:---:|:---:|:---:|---|
-| 1 | **Mage** | ![](https://img.shields.io/badge/-%20%20%20%20-d946ef?style=flat-square) `#d946ef` | −10 | **+15** | −5 | Arcanes offensives |
-| 10 | **Archimage** | ![](https://img.shields.io/badge/-%20%20%20%20-2964d8?style=flat-square) `#2964d8` | −15 | **+20** | −5 | Maîtrise absolue des arcanes |
-| 11 | **Élémentaliste** | ![](https://img.shields.io/badge/-%20%20%20%20-16d8f4?style=flat-square) `#16d8f4` | −5 | **+15** | −10 | Feu, glace et foudre |
-| 12 | **Nécromancien** | ![](https://img.shields.io/badge/-%20%20%20%20-9afb5f?style=flat-square) `#9afb5f` | **+5** | **+5** | −10 | Draine la vie des vivants |
-| 13 | **Invocateur** | ![](https://img.shields.io/badge/-%20%20%20%20-9996eb?style=flat-square) `#9996eb` | **+5** | ±0 | −5 | Appelle des esprits alliés |
-| 14 | **Druide** | ![](https://img.shields.io/badge/-%20%20%20%20-44862a?style=flat-square) `#44862a` | **+5** | −5 | ±0 | Force de la nature |
-| 15 | **Illusionniste** | ![](https://img.shields.io/badge/-%20%20%20%20-fab3ec?style=flat-square) `#fab3ec` | −5 | ±0 | **+5** | Trompe l'œil et l'esprit |
-| 16 | **Chronomancien** | ![](https://img.shields.io/badge/-%20%20%20%20-97b7de?style=flat-square) `#97b7de` | −10 | **+5** | **+5** | Plie le cours du temps |
+| Id | Classe | Couleur | PV | ATQ | DEF | SOIN | Description |
+|:---:|---|:---:|:---:|:---:|:---:|:---:|---|
+| 1 | **Mage** | ![](https://img.shields.io/badge/-%20%20%20%20-d946ef?style=flat-square) `#d946ef` | −10 | **+15** | ±0 | −5 | Arcanes offensives |
+| 10 | **Archimage** | ![](https://img.shields.io/badge/-%20%20%20%20-2964d8?style=flat-square) `#2964d8` | −15 | **+20** | −5 | ±0 | Maîtrise absolue des arcanes |
+| 11 | **Élémentaliste** | ![](https://img.shields.io/badge/-%20%20%20%20-16d8f4?style=flat-square) `#16d8f4` | −5 | **+15** | −5 | −5 | Feu, glace et foudre |
+| 12 | **Nécromancien** | ![](https://img.shields.io/badge/-%20%20%20%20-9afb5f?style=flat-square) `#9afb5f` | **+5** | **+5** | −10 | ±0 | Draine la vie des vivants |
+| 13 | **Invocateur** | ![](https://img.shields.io/badge/-%20%20%20%20-9996eb?style=flat-square) `#9996eb` | **+5** | ±0 | −5 | ±0 | Appelle des esprits alliés |
+| 14 | **Druide** | ![](https://img.shields.io/badge/-%20%20%20%20-44862a?style=flat-square) `#44862a` | ±0 | −5 | −5 | **+10** | Force de la nature |
+| 15 | **Illusionniste** | ![](https://img.shields.io/badge/-%20%20%20%20-fab3ec?style=flat-square) `#fab3ec` | −5 | ±0 | **+5** | ±0 | Trompe l'œil et l'esprit |
+| 16 | **Chronomancien** | ![](https://img.shields.io/badge/-%20%20%20%20-97b7de?style=flat-square) `#97b7de` | −10 | **+5** | **+5** | ±0 | Plie le cours du temps |
 
 </details>
 
 <details>
 <summary><b>🏹 Distance — 6 classes</b></summary>
 
-| Id | Classe | Couleur | PV | ATQ | DEF | Description |
-|:---:|---|:---:|:---:|:---:|:---:|---|
-| 2 | **Archer** | ![](https://img.shields.io/badge/-%20%20%20%20-22c55e?style=flat-square) `#22c55e` | −5 | **+10** | −5 | Tir rapide à distance |
-| 17 | **Chasseur** | ![](https://img.shields.io/badge/-%20%20%20%20-91922d?style=flat-square) `#91922d` | ±0 | **+10** | −10 | Pisteur des terres sauvages |
-| 18 | **Tireur d'élite** | ![](https://img.shields.io/badge/-%20%20%20%20-dde37c?style=flat-square) `#dde37c` | −15 | **+20** | −5 | Un tir, une cible |
-| 19 | **Assassin** | ![](https://img.shields.io/badge/-%20%20%20%20-787279?style=flat-square) `#787279` | −20 | **+20** | ±0 | Frappe dans l'ombre |
-| 20 | **Ombrelame** | ![](https://img.shields.io/badge/-%20%20%20%20-a616fe?style=flat-square) `#a616fe` | −5 | **+5** | ±0 | Lame tissée d'ombre |
-| 21 | **Corsaire** | ![](https://img.shields.io/badge/-%20%20%20%20-07aafa?style=flat-square) `#07aafa` | **+10** | ±0 | −10 | Pirate des mers lointaines |
+| Id | Classe | Couleur | PV | ATQ | DEF | SOIN | Description |
+|:---:|---|:---:|:---:|:---:|:---:|:---:|---|
+| 2 | **Archer** | ![](https://img.shields.io/badge/-%20%20%20%20-22c55e?style=flat-square) `#22c55e` | −5 | **+10** | −5 | ±0 | Tir rapide à distance |
+| 17 | **Chasseur** | ![](https://img.shields.io/badge/-%20%20%20%20-91922d?style=flat-square) `#91922d` | ±0 | **+10** | −5 | −5 | Pisteur des terres sauvages |
+| 18 | **Tireur d'élite** | ![](https://img.shields.io/badge/-%20%20%20%20-dde37c?style=flat-square) `#dde37c` | −15 | **+20** | −5 | ±0 | Un tir, une cible |
+| 19 | **Assassin** | ![](https://img.shields.io/badge/-%20%20%20%20-787279?style=flat-square) `#787279` | −20 | **+20** | **+5** | −5 | Frappe dans l'ombre |
+| 20 | **Ombrelame** | ![](https://img.shields.io/badge/-%20%20%20%20-a616fe?style=flat-square) `#a616fe` | −5 | **+5** | **+5** | −5 | Lame tissée d'ombre |
+| 21 | **Corsaire** | ![](https://img.shields.io/badge/-%20%20%20%20-07aafa?style=flat-square) `#07aafa` | **+10** | **+5** | −10 | −5 | Pirate des mers lointaines |
 
 </details>
 
 <details>
 <summary><b>🛡️ Soutien — 6 classes</b></summary>
 
-| Id | Classe | Couleur | PV | ATQ | DEF | Description |
-|:---:|---|:---:|:---:|:---:|:---:|---|
-| 22 | **Prêtre** | ![](https://img.shields.io/badge/-%20%20%20%20-efdcae?style=flat-square) `#efdcae` | **+15** | −15 | ±0 | Foi inébranlable |
-| 23 | **Barde** | ![](https://img.shields.io/badge/-%20%20%20%20-c5529c?style=flat-square) `#c5529c` | ±0 | −5 | **+5** | Chants qui galvanisent |
-| 24 | **Alchimiste** | ![](https://img.shields.io/badge/-%20%20%20%20-71f4d9?style=flat-square) `#71f4d9` | **+10** | −5 | −5 | Potions et mixtures |
-| 25 | **Ingénieur** | ![](https://img.shields.io/badge/-%20%20%20%20-f4b269?style=flat-square) `#f4b269` | −5 | −5 | **+10** | Machines et tourelles |
-| 26 | **Gardien** | ![](https://img.shields.io/badge/-%20%20%20%20-32719e?style=flat-square) `#32719e` | **+5** | −20 | **+15** | Mur vivant, défense ultime |
-| 27 | **Moine** | ![](https://img.shields.io/badge/-%20%20%20%20-f0b11d?style=flat-square) `#f0b11d` | **+5** | **+10** | −15 | Corps et esprit en harmonie |
+| Id | Classe | Couleur | PV | ATQ | DEF | SOIN | Description |
+|:---:|---|:---:|:---:|:---:|:---:|:---:|---|
+| 22 | **Prêtre** | ![](https://img.shields.io/badge/-%20%20%20%20-efdcae?style=flat-square) `#efdcae` | **+5** | −15 | −5 | **+15** | Foi inébranlable |
+| 23 | **Barde** | ![](https://img.shields.io/badge/-%20%20%20%20-c5529c?style=flat-square) `#c5529c` | ±0 | −5 | ±0 | **+5** | Chants qui galvanisent |
+| 24 | **Alchimiste** | ![](https://img.shields.io/badge/-%20%20%20%20-71f4d9?style=flat-square) `#71f4d9` | **+5** | −5 | −10 | **+10** | Potions et mixtures |
+| 25 | **Ingénieur** | ![](https://img.shields.io/badge/-%20%20%20%20-f4b269?style=flat-square) `#f4b269` | −5 | −5 | **+10** | ±0 | Machines et tourelles |
+| 26 | **Gardien** | ![](https://img.shields.io/badge/-%20%20%20%20-32719e?style=flat-square) `#32719e` | **+5** | −20 | **+15** | ±0 | Mur vivant, défense ultime |
+| 27 | **Moine** | ![](https://img.shields.io/badge/-%20%20%20%20-f0b11d?style=flat-square) `#f0b11d` | **+5** | **+5** | −15 | **+5** | Corps et esprit en harmonie |
 
 </details>
 
@@ -377,12 +410,15 @@ Chaque classe vient d'**une seule ligne** de la table `classes[]` ([`personnage.
 
 ## 💾 Sauvegarde
 
-Un personnage par ligne, au format texte (`nom pv attaque défense classe`, la classe étant l'identifiant de 0 à 27 du tableau ci-dessus) :
+Un personnage par ligne, au format texte (`nom pv attaque défense classe soin`, la classe étant l'identifiant de 0 à 27 du tableau ci-dessus) :
 
 ```text
-Aragorn 80 60 30 0
-Merlin 55 85 15 1
+Aragorn 80 60 30 0 10
+Elara 55 15 10 22 40
 ```
+
+> [!NOTE]
+> **Compatibilité.** Le soin est ajouté *en fin de ligne* pour ne pas déplacer la classe. Une ligne à 5 champs, écrite avant cette statistique, reste lisible : le personnage reçoit `SOIN_MIGRATION` (20), modifié par sa classe. Elle sera réécrite au format complet à la prochaine sauvegarde.
 
 Le chargement est **transactionnel** : tout le fichier est lu dans un roster temporaire, puis il remplace l'équipe seulement s'il est entièrement valide.
 
@@ -429,7 +465,8 @@ sequenceDiagram
 ```text
 RedStrings/
 ├── 📁 includes/              ← un header = un thème
-│   ├── personnage.h          personnage_t, classe_t, NOM_MAX, STAT_MIN/MAX
+│   ├── personnage.h          personnage_t, classe_t, catalogue classes[], stats
+│   ├── bataille.h            combat en équipe : tours, actions, effets, événements
 │   ├── roster.h              tableau dynamique de personnages
 │   ├── sauvegarde.h          sauvegarder / charger + codes d'erreur
 │   ├── boite.h               boîtes Unicode, alignement des libellés
@@ -440,11 +477,11 @@ RedStrings/
 ├── 📁 src/
 │   ├── main.c                return redstrings();
 │   ├── redstrings.c          boucle du menu
-│   ├── 📁 personnage/         moteur partagé : personnage · combat · roster · sauvegarde
-│   │                          affichage console : creer · afficher · attaquer
-│   └── 📁 ui/                 boite.c · saisie.c
+│   ├── 📁 personnage/         moteur partagé : personnage · combat · bataille · roster · sauvegarde
+│   │                          affichage console : creer · afficher
+│   └── 📁 ui/                 boite.c · saisie.c · bataille_console.c
 ├── 📁 lib/                   40 fonctions maison → libmy.a
-├── 📁 csfml/                 version graphique (src/, include/gui.h, assets/fonts/)
+├── 📁 csfml/                 version graphique : scene_bataille.c (arène), scene_combat.c (équipes)…
 ├── 📁 tests/                 tests.c (assert)
 └── Makefile
 ```
@@ -625,8 +662,9 @@ make tests
 |---|---|
 | `my_strcmp` | égalité, différence, préfixe, chaînes vides |
 | Catalogue | ≥ 20 classes, noms uniques, descriptions courtes, catégories et emblèmes valides, modificateurs bornés de somme nulle, couleurs distinctes deux à deux |
-| Modificateurs | Berserker 50/50/50 → 55/65/30, bornes 0 et 99 respectées |
-| Compatibilité | une sauvegarde à 3 classes se relit, un identifiant hors catalogue est refusé |
+| Modificateurs | Berserker 50/50/50/20 → 55/65/45/5, Prêtre soin 20 → 35, bornes 0 et 99 |
+| Bataille | équipes invalides refusées, ordre alterné, dégâts et minimum de 1, K.O. jamais négatif, vaincu ni jouable ni ciblable, soin 40 → 75 et plafonné, garde −50 % puis expiration, IA, combat entier 4 contre 3, roster intact |
+| Compatibilité | une ligne sans soin se relit (migration), le soin fait l'aller-retour, champ en trop ou soin hors limites refusés, identifiant hors catalogue refusé |
 | `calculer_degats` | 40 × 50 % = 20 · défense 100 → 0 dégât |
 | `attaquer` | les PV diminuent et ne passent **jamais sous 0** |
 | `trouver_personnage` | trouvé, absent, sensible à la casse, tableau vide |
@@ -771,6 +809,8 @@ gitGraph
 - [x] Personnages illimités (`realloc`)
 - [x] Sauvegarde / chargement
 - [x] Tests unitaires + sanitizers
+- [x] Combat en équipe (1 à 4), soin, garde, IA, arène animée
+- [ ] Compétences spéciales, attaques de zone, effets de statut (le moteur a déjà `effet_t`)
 - [ ] Documentation Doxygen (`Doxyfile`, `make doc`)
 - [x] Version graphique branchée sur le moteur commun (roster, combat, classes, sauvegarde)
 - [ ] Version graphique : faire défiler les cartes pour dépasser 10 personnages

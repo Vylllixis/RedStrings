@@ -23,10 +23,18 @@
 
 /* Grille de classes : 4 colonnes x 2 lignes, assez pour la plus grande catégorie. */
 #define GRILLE_COLONNES 4
-#define TUILE_H 40.f
-#define TUILE_ECART 6.f
+#define TUILE_H 38.f
 
-static const char *LABELS_STATS[NB_STATS] = {"Points de vie", "Attaque", "Défense"};
+/* Ordre du focus clavier : nom, une glissière par statistique, classe, bouton. */
+#define FOCUS_NOM 0
+#define FOCUS_STAT 1
+#define FOCUS_CLASSE (FOCUS_STAT + NB_STATS)
+#define FOCUS_BOUTON (FOCUS_CLASSE + 1)
+#define NB_FOCUS (FOCUS_BOUTON + 1)
+#define TUILE_ECART 5.f
+
+static const char *LABELS_STATS[NB_STATS] = {"Points de vie", "Attaque", "Défense",
+    "Soin"};
 
 void entrer_creation(app_t *app)
 {
@@ -36,6 +44,7 @@ void entrer_creation(app_t *app)
     c->valeurs[0] = 50;
     c->valeurs[1] = 30;
     c->valeurs[2] = 20;
+    c->valeurs[3] = 20;
     c->classe = GUERRIER;
     c->classe_vue = GUERRIER;
     c->classe_prec = GUERRIER;
@@ -78,7 +87,7 @@ static void creer(app_t *app, creation_t *c)
         notifier(app, "✗", raison, C_ROUGE);
         if (app->equipe.len < MAX_PERSONNAGES) {
             c->nom.secousse = 1.f;
-            c->focus = 0;
+            c->focus = FOCUS_NOM;
         }
         return;
     }
@@ -86,6 +95,7 @@ static void creer(app_t *app, creation_t *c)
     p.pv = c->valeurs[0];
     p.atq = c->valeurs[1];
     p.def = c->valeurs[2];
+    p.soin = c->valeurs[3];
     p.classe = c->classe;
     appliquer_classe(&p);
     if (roster_ajouter(&app->equipe, &p) == -1) {
@@ -149,14 +159,15 @@ static void clavier(app_t *app, creation_t *c)
         return;
     }
     if (k[sfKeyTab])
-        c->focus = (c->focus + (app->in.shift ? 5 : 1)) % 6;
-    if (k[sfKeyDown] && c->focus < 5)
+        c->focus = (c->focus + (app->in.shift ? NB_FOCUS - 1 : 1)) % NB_FOCUS;
+    if (k[sfKeyDown] && c->focus < FOCUS_BOUTON)
         c->focus++;
-    if (k[sfKeyUp] && c->focus > 0)
+    if (k[sfKeyUp] && c->focus > FOCUS_NOM)
         c->focus--;
-    if (c->focus >= 1 && c->focus <= 3 && (k[sfKeyLeft] || k[sfKeyRight]))
-        ajuster(&c->valeurs[c->focus - 1], k[sfKeyLeft] ? -pas : pas);
-    if (c->focus == 4 && (k[sfKeyLeft] || k[sfKeyRight]))
+    if (c->focus >= FOCUS_STAT && c->focus < FOCUS_CLASSE
+        && (k[sfKeyLeft] || k[sfKeyRight]))
+        ajuster(&c->valeurs[c->focus - FOCUS_STAT], k[sfKeyLeft] ? -pas : pas);
+    if (c->focus == FOCUS_CLASSE && (k[sfKeyLeft] || k[sfKeyRight]))
         c->classe = app->in.shift ? categorie_voisine(c->classe, k[sfKeyLeft] ? -1 : 1)
             : classe_voisine(c->classe, k[sfKeyLeft] ? -1 : 1);
     if (k[sfKeyEnter])
@@ -184,7 +195,7 @@ static void onglets(app_t *app, creation_t *c, float y)
             app->curseur_voulu = CURSEUR_MAIN;
             if (app->in.clic && (categorie_t)k != actuelle) {
                 c->classe = premiere_classe((categorie_t)k);
-                c->focus = 4;
+                c->focus = FOCUS_CLASSE;
             }
         }
         c->onglets[k].survol = approcher(c->onglets[k].survol, survole(app, r) ? 1.f
@@ -236,7 +247,7 @@ static void tuile_classe(app_t *app, creation_t *c, classe_t i, sfFloatRect r)
     texte(app, POLICE_GRAS, nom, taille, (sfVector2f){r.left + 40.f, med.y},
         melanger(C_TEXTE_DOUX, melanger(col, C_BLANC, 0.55f), fmaxf(sel, h)),
         ALIGNE_GAUCHE);
-    if (c->focus == 4 && c->classe == i)
+    if (c->focus == FOCUS_CLASSE && c->classe == i)
         crochets(app, (sfFloatRect){r.left - 4.f, r.top - 4.f, r.width + 8.f,
             r.height + 8.f}, 10.f, avec_alpha(C_BLANC, 0.6f + 0.3f
             * sinf(app->temps * 5.f)));
@@ -263,7 +274,7 @@ static void grille_classes(app_t *app, creation_t *c, float y)
             app->curseur_voulu = CURSEUR_MAIN;
         if (s && app->in.clic) {
             c->classe = (classe_t)i;
-            c->focus = 4;
+            c->focus = FOCUS_CLASSE;
         }
         c->tuiles[i].survol = approcher(c->tuiles[i].survol, s ? 1.f : 0.f, 14.f,
             app->dt);
@@ -463,11 +474,8 @@ static void puce_mod(app_t *app, int mod, sfVector2f pos)
 /** Statistiques finales = base choisie + modificateurs de la classe. */
 static void stats_apercu(app_t *app, creation_t *c, sfColor col)
 {
-    static const char *noms[NB_STATS] = {"POINTS DE VIE", "ATTAQUE", "DÉFENSE"};
-    static const char *axes[NB_STATS] = {"PV", "ATQ", "DEF"};
-    const sfColor cs[NB_STATS] = {C_VERT, C_ROUGE, C_BLEU};
     int finale = 0;
-    const sfVector2f radar = {AX + 108.f, 596.f};
+    const sfVector2f radar = {AX + 108.f, 590.f};
     const float x0 = AX + 214.f;
     const float w = AW - 214.f - 26.f;
     float v[NB_STATS];
@@ -483,18 +491,22 @@ static void stats_apercu(app_t *app, creation_t *c, sfColor col)
     }
     radar_stats(app, radar, 62.f, v, col);
     for (int i = 0; i < NB_STATS; i++) {
-        y = 596.f + sinf(-PI / 2.f + i * 2.f * PI / 3.f) * 80.f;
-        texte(app, POLICE_GRAS, axes[i], 11, (sfVector2f){radar.x + cosf(-PI / 2.f
-            + i * 2.f * PI / 3.f) * 82.f, y}, avec_alpha(cs[i], 0.8f), ALIGNE_CENTRE);
+        y = radar.y + sinf(-PI / 2.f + i * 2.f * PI / NB_STATS) * 78.f;
+        texte(app, POLICE_GRAS, abrege_stat((stat_t)i), 11, (sfVector2f){radar.x
+            + cosf(-PI / 2.f + i * 2.f * PI / NB_STATS) * 84.f, y},
+            avec_alpha(couleur_stat((stat_t)i), 0.8f), ALIGNE_CENTRE);
     }
     for (int i = 0; i < NB_STATS; i++) {
-        y = 528.f + i * 54.f;
-        lx = etiquette(app, noms[i], (sfVector2f){x0, y}, C_TEXTE_DOUX, ALIGNE_GAUCHE);
+        y = 516.f + i * 40.f;
+        lx = etiquette(app, nom_stat((stat_t)i), (sfVector2f){x0, y}, C_TEXTE_DOUX,
+            ALIGNE_GAUCHE);
         puce_mod(app, classes[c->classe].mods[i], (sfVector2f){x0 + lx + 10.f, y});
-        snprintf(buf, sizeof(buf), "%d%s", (int)roundf(c->affiche[i]), i == 2 ? " %" : "");
-        texte(app, POLICE_GRAS, buf, 22, (sfVector2f){x0 + w, y - 1.f},
-            melanger(cs[i], C_BLANC, 0.1f), ALIGNE_DROITE);
-        barre_segments(app, (sfFloatRect){x0, y + 16.f, w, 10.f}, c->segments[i], cs[i]);
+        snprintf(buf, sizeof(buf), "%d%s", (int)roundf(c->affiche[i]),
+            i == STAT_DEF ? " %" : "");
+        texte(app, POLICE_GRAS, buf, 18, (sfVector2f){x0 + w, y - 1.f},
+            melanger(couleur_stat((stat_t)i), C_BLANC, 0.1f), ALIGNE_DROITE);
+        barre_segments(app, (sfFloatRect){x0, y + 13.f, w, 8.f}, c->segments[i],
+            couleur_stat((stat_t)i));
     }
 }
 
@@ -561,7 +573,7 @@ static void bouton_creer(app_t *app, creation_t *c, float a, int actif)
         fini ? "Personnage créé" : "Créer le personnage", fini ? NULL : "Entrée",
         fini ? C_VERT : C_CYAN, pret || fini) && actif)
         creer(app, c);
-    if (c->focus == 5)
+    if (c->focus == FOCUS_BOUTON)
         crochets(app, (sfFloatRect){FX - 8.f, 620.f + dy, FW + 16.f, 72.f}, 14.f,
             avec_alpha(C_BLANC, 0.6f + 0.3f * sinf(app->temps * 5.f)));
     if (raison && actif) {
@@ -573,7 +585,6 @@ static void bouton_creer(app_t *app, creation_t *c, float a, int actif)
 
 static void formulaire(app_t *app, creation_t *c, float a, int actif)
 {
-    const sfColor couleurs[NB_STATS] = {C_VERT, C_ROUGE, C_BLEU};
     const sfFloatRect cadre = {FX - 16.f, 194.f, FW + 32.f, 418.f};
     float dy = 0.f;
 
@@ -585,7 +596,7 @@ static void formulaire(app_t *app, creation_t *c, float a, int actif)
         cadre.height + 12.f}, 18.f, avec_alpha(C_CYAN, 0.45f));
     dy = apparaitre(app, a, 0);
     titre_section(app, "01", "NOM", (sfVector2f){FX, 218.f + dy}, FW, C_CYAN);
-    c->nom.focus = c->focus == 0 && actif;
+    c->nom.focus = c->focus == FOCUS_NOM && actif;
     if (champ_texte(app, &c->nom, (sfFloatRect){FX, 232.f + dy, FW, 50.f},
         "Ex : Aragorn", NOM_LONGUEUR))
         c->focus = 0;
@@ -594,14 +605,15 @@ static void formulaire(app_t *app, creation_t *c, float a, int actif)
         C_CYAN);
     for (int i = 0; i < NB_STATS; i++) {
         dy = apparaitre(app, a, 2 + i);
-        if (glissiere(app, &c->stats[i], (sfFloatRect){FX, 316.f + i * 40.f + dy, FW,
-            38.f}, LABELS_STATS[i], &c->valeurs[i], couleurs[i], c->focus == 1 + i))
-            c->focus = 1 + i;
+        if (glissiere(app, &c->stats[i], (sfFloatRect){FX, 314.f + i * 35.f + dy, FW,
+            33.f}, LABELS_STATS[i], &c->valeurs[i], couleur_stat((stat_t)i),
+            c->focus == FOCUS_STAT + i))
+            c->focus = FOCUS_STAT + i;
     }
     dy = apparaitre(app, a, 5);
-    titre_section(app, "03", "CLASSE", (sfVector2f){FX, 452.f + dy}, FW, C_CYAN);
-    onglets(app, c, 464.f + dy);
-    grille_classes(app, c, 498.f + dy);
+    titre_section(app, "03", "CLASSE", (sfVector2f){FX, 471.f + dy}, FW, C_CYAN);
+    onglets(app, c, 482.f + dy);
+    grille_classes(app, c, 514.f + dy);
     bouton_creer(app, c, a, actif);
 }
 

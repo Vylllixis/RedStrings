@@ -240,7 +240,7 @@ static void lire_options(app_t *app, option_t o[4])
         "Équipe complète", "", C_CYAN, n < MAX_PERSONNAGES};
     o[1] = (option_t){"2", "Afficher un personnage", "Fiches et recherche par nom",
         "Aucun personnage pour l'instant", "", C_BLEU, n > 0};
-    o[2] = (option_t){"3", "Combat", "Un attaquant, un défenseur, tour par tour",
+    o[2] = (option_t){"3", "Combat", "Équipes de 1 à 4 personnages, tour par tour",
         "Il faut au moins 2 personnages", "", C_ROUGE, n >= 2};
     o[3] = (option_t){"0", "Quitter", NULL, NULL, "", C_TEXTE_DOUX, 1};
     snprintf(o[0].info, sizeof(o[0].info), "%d / %d", n, MAX_PERSONNAGES);
