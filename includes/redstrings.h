@@ -3,11 +3,6 @@
 ** PROJET FIL ROUGE C Avancé
 */
 
-/**
- * @file redstrings.h
- * @brief Point d'entrée du jeu en terminal.
- */
-
 #ifndef REDSTRINGS_H
     #define REDSTRINGS_H
 

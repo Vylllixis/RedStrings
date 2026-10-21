@@ -6,20 +6,20 @@
 #include <ctype.h>
 #include "gui.h"
 
-/** Même recherche que findPersonage() de la version terminal. */
-int trouverPersonnage(personnage_t *tab, int nb, char *nom)
+/** Même recherche que celle de la version terminal (déclarée dans personnage.h). */
+int trouver_personnage(const personnage_t *tab, int nb, const char *nom)
 {
     for (int i = 0; i < nb; i++) {
-        if (my_strcmp(tab[i].name, nom) == 0)
+        if (my_strcmp(tab[i].nom, nom) == 0)
             return i;
     }
     return -1;
 }
 
 /** Même calcul que attaquer() de la version terminal, sans affichage. */
-int appliquerAttaque(personnage_t *attaquant, personnage_t *cible)
+int appliquer_attaque(personnage_t *attaquant, personnage_t *cible)
 {
-    int degats = attaquant->atk * (100 - cible->def) / 100;
+    int degats = attaquant->atq * (100 - cible->def) / 100;
 
     if (degats < 0)
         degats = 0;
@@ -30,7 +30,7 @@ int appliquerAttaque(personnage_t *attaquant, personnage_t *cible)
 }
 
 /** Recherche insensible à la casse de `recherche` dans `nom`. */
-int contientNom(const char *nom, const char *recherche)
+int contient_nom(const char *nom, const char *recherche)
 {
     int j = 0;
 

@@ -30,43 +30,43 @@
 > Coche les cases au fur et à mesure (`[ ]` → `[x]`). L'ordre proposé va du plus important au moins important.
 
 ### 🔐 Sécurité & robustesse
-- [ ] **S1** 🔴 ⭐⭐ Boucle infinie sur Ctrl+D (fin d'entrée) 🧪
-- [ ] **S2** 🔴 ⭐ `scanf` du nom jamais vérifié → nom non initialisé
-- [ ] **S3** 🟠 ⭐⭐ `scanf("%d")` accepte `12abc` et peut déborder 🧪
-- [ ] **S4** 🟠 ⭐ Deux personnages peuvent avoir le même nom 🧪
-- [ ] **S5** 🟡 ⭐ `sprintf` sans limite dans `repeter()`
-- [ ] **S6** 🟡 ⭐ Laisser gcc vérifier les formats de `boiteLigne()`
+- [x] **S1** 🔴 ⭐⭐ Boucle infinie sur Ctrl+D (fin d'entrée) 🧪
+- [x] **S2** 🔴 ⭐ `scanf` du nom jamais vérifié → nom non initialisé
+- [x] **S3** 🟠 ⭐⭐ `scanf("%d")` accepte `12abc` et peut déborder 🧪
+- [x] **S4** 🟠 ⭐ Deux personnages peuvent avoir le même nom 🧪
+- [x] **S5** 🟡 ⭐ `sprintf` sans limite dans `repeter()`
+- [x] **S6** 🟡 ⭐ Laisser gcc vérifier les formats de `boiteLigne()`
 
 ### 🗂️ Organisation des `.h` et rangement
 - [x] **O1** 🔴 ⭐ Les `#include` sont **avant** le garde d'inclusion dans `my.h`
 - [x] **O2** 🟠 ⭐ `my.h` inclut des bibliothèques jamais utilisées
 - [x] **O3** 🟠 ⭐⭐⭐ Découper `my.h` en plusieurs headers
 - [x] **O4** 🟡 ⭐ `findPersonage` n'a pas de prototype 🧪
-- [ ] **O5** 🟢 ⭐⭐ Ranger `src/` en sous-dossiers
+- [x] **O5** 🟢 ⭐⭐ Ranger `src/` en sous-dossiers
 
 ### 📐 Lisibilité & conception
-- [ ] **L1** 🟠 ⭐ Nombres magiques (`30`, `29`, `99`, `36`)
-- [ ] **L2** 🟠 ⭐⭐ Une table de classes au lieu des `if / else`
-- [ ] **L3** 🟡 ⭐ Code dupliqué (`lireChoix` ≈ `lireEntier`)
-- [ ] **L4** 🟡 ⭐ Valeurs de retour qui ne servent à rien
-- [ ] **L5** 🟡 ⭐ `const` manquant sur `my_strcmp` / `my_strlen`
-- [ ] **L6** 🟡 ⭐ Conventions de nommage mélangées
-- [ ] **L7** 🟡 ⭐ Alignement fait avec des espaces dans les chaînes
+- [x] **L1** 🟠 ⭐ Nombres magiques (`30`, `29`, `99`, `36`)
+- [x] **L2** 🟠 ⭐⭐ Une table de classes au lieu des `if / else`
+- [x] **L3** 🟡 ⭐ Code dupliqué (`lireChoix` ≈ `lireEntier`)
+- [x] **L4** 🟡 ⭐ Valeurs de retour qui ne servent à rien
+- [x] **L5** 🟡 ⭐ `const` manquant sur `my_strcmp` / `my_strlen`
+- [x] **L6** 🟡 ⭐ Conventions de nommage mélangées
+- [x] **L7** 🟡 ⭐ Alignement fait avec des espaces dans les chaînes
 
 ### ⚔️ Logique du jeu
-- [ ] **J1** 🟠 ⭐ Un personnage peut s'attaquer lui-même 🧪
-- [ ] **J2** 🟡 ⭐ Un personnage mort peut encore attaquer
-- [ ] **J3** 🟢 ⭐ Séparer le calcul des dégâts de l'affichage
+- [x] **J1** 🟠 ⭐ Un personnage peut s'attaquer lui-même 🧪
+- [x] **J2** 🟡 ⭐ Un personnage mort peut encore attaquer
+- [x] **J3** 🟢 ⭐ Séparer le calcul des dégâts de l'affichage
 
 ### 🧰 Makefile
 - [x] **M1** 🔴 ⭐ Modifier un `.h` ne recompile rien 🧪
-- [ ] **M2** 🟠 ⭐ `make doc` plante (pas de `Doxyfile`) 🧪
-- [ ] **M3** 🟡 ⭐ Flags de compilation plus stricts + règle `debug`
+- [x] **M2** 🟠 ⭐ `make doc` plante (pas de `Doxyfile`) 🧪 — règles `doc` retirées en attendant le Doxyfile
+- [x] **M3** 🟡 ⭐ Flags de compilation plus stricts + règle `debug`
 
 ### 🚀 Pour aller plus loin
-- [ ] **B1** 🟢 ⭐⭐⭐ Allocation dynamique (`malloc` / `realloc`)
-- [ ] **B2** 🟢 ⭐⭐ Sauvegarder / charger les personnages dans un fichier
-- [ ] **B3** 🟢 ⭐⭐ Tests unitaires avec `assert`
+- [x] **B1** 🟢 ⭐⭐⭐ Allocation dynamique (`malloc` / `realloc`)
+- [x] **B2** 🟢 ⭐⭐ Sauvegarder / charger les personnages dans un fichier
+- [x] **B3** 🟢 ⭐⭐ Tests unitaires avec `assert`
 
 ---
 

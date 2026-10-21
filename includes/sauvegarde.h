@@ -1,0 +1,32 @@
+/*
+** ESGI PROJECT, 2026
+** PROJET FIL ROUGE C Avancé
+*/
+
+#ifndef SAUVEGARDE_H
+    #define SAUVEGARDE_H
+
+    #include "roster.h"
+
+    #define FICHIER_SAUVEGARDE "personnages.txt"
+
+/** Codes de retour de sauvegarder() et charger(). */
+typedef enum {
+    SAUVEGARDE_OK = 0,
+    SAUVEGARDE_ERR_OUVERTURE,   /**< fopen a échoué. */
+    SAUVEGARDE_ERR_ECRITURE,    /**< fprintf ou fclose a échoué. */
+    SAUVEGARDE_ERR_FORMAT,      /**< fichier corrompu ou valeur invalide. */
+    SAUVEGARDE_ERR_MEMOIRE      /**< allocation impossible. */
+} sauvegarde_t;
+
+/** Écrit un personnage par ligne : « nom pv atq def classe ». */
+sauvegarde_t sauvegarder(const roster_t *r, const char *chemin);
+
+/** Remplace le contenu de r par celui du fichier. En cas d'erreur, r n'est
+ *  pas modifié. */
+sauvegarde_t charger(roster_t *r, const char *chemin);
+
+/** Message en français pour un code de retour. */
+const char *sauvegarde_message(sauvegarde_t code);
+
+#endif /* SAUVEGARDE_H */

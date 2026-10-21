@@ -3,6 +3,7 @@
 */
 
 #include "my.h"
+#include "my_string.h"
 
 char *my_strcat(char *dest, char const *src)
 {

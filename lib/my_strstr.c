@@ -4,6 +4,7 @@
 
 #include <stddef.h>
 #include "my.h"
+#include "my_string.h"
 
 char *my_strstr(char *str, char const *to_find)
 {

@@ -36,12 +36,15 @@ gmon.out
 .DS_Store
 Thumbs.db
 
-# Documentation générée par Doxygen (make doc)
-/docs/html/
-/docs/latex/
-
 # Version debug (make debug)
 /redstrings_debug
+/redstrings_tests
 
 # Objets (make)
 /obj/
+
+*.md
+!README.md
+
+# Sauvegarde du jeu (menu 4)
+/personnages.txt

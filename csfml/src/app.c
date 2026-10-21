@@ -21,7 +21,7 @@ static const char *FICHIERS_POLICES[NB_POLICES] = {
 };
 
 /** Cherche la police à côté de l'exécutable, puis depuis le dossier courant. */
-static sfFont *chargerPolice(const char *nom)
+static sfFont *charger_police(const char *nom)
 {
     const char *formats[] = {"%s/csfml/assets/fonts/%s", "%s/assets/fonts/%s",
         "%s/../csfml/assets/fonts/%s"};
@@ -31,7 +31,7 @@ static sfFont *chargerPolice(const char *nom)
     ssize_t n = readlink("/proc/self/exe", exe, sizeof(exe) - 1);
 
     if (n <= 0)
-        strcpy(exe, ".");
+        my_strcpy(exe, ".");
     slash = strrchr(exe, '/');
     if (n > 0 && slash)
         *slash = '\0';
@@ -56,7 +56,7 @@ static float lisser(float a, float b, float x)
 }
 
 /** Texture de dégradé radial blanc → transparent, base de tous les halos. */
-static sfTexture *creerTexLueur(void)
+static sfTexture *creer_tex_lueur(void)
 {
     sfImage *img = sfImage_create(TAILLE_LUEUR, TAILLE_LUEUR);
     sfTexture *tex = NULL;
@@ -79,7 +79,7 @@ static sfTexture *creerTexLueur(void)
     return tex;
 }
 
-static sfTexture *creerTexVignette(void)
+static sfTexture *creer_tex_vignette(void)
 {
     sfImage *img = sfImage_create(256, 256);
     sfTexture *tex = NULL;
@@ -100,7 +100,7 @@ static sfTexture *creerTexVignette(void)
     return tex;
 }
 
-static void initPoussieres(app_t *app)
+static void init_poussieres(app_t *app)
 {
     for (int i = 0; i < NB_POUSSIERES; i++) {
         app->poussieres[i].x = aleatoire(0.f, LARGEUR);
@@ -111,10 +111,10 @@ static void initPoussieres(app_t *app)
     }
 }
 
-static int creerRessources(app_t *app)
+static int creer_ressources(app_t *app)
 {
     for (int i = 0; i < NB_POLICES; i++) {
-        app->polices[i] = chargerPolice(FICHIERS_POLICES[i]);
+        app->polices[i] = charger_police(FICHIERS_POLICES[i]);
         if (app->polices[i] == NULL) {
             fprintf(stderr, "redstrings_csfml : police introuvable (%s)\n",
                 FICHIERS_POLICES[i]);
@@ -125,8 +125,8 @@ static int creerRessources(app_t *app)
     app->forme = sfConvexShape_create();
     app->cercle = sfCircleShape_create();
     app->sprite = sfSprite_create();
-    app->texLueur = creerTexLueur();
-    app->texVignette = creerTexVignette();
+    app->tex_lueur = creer_tex_lueur();
+    app->tex_vignette = creer_tex_vignette();
     app->horloge = sfClock_create();
     app->vue = sfView_createFromRect((sfFloatRect){0, 0, LARGEUR, HAUTEUR});
     app->curseurs[CURSEUR_FLECHE] = sfCursor_createFromSystem(sfCursorArrow);
@@ -135,7 +135,7 @@ static int creerRessources(app_t *app)
     return 0;
 }
 
-int creerApp(app_t *app)
+int creer_app(app_t *app)
 {
     sfContextSettings reglages = {0, 0, 8, 1, 1, sfContextDefault, sfFalse};
     sfVideoMode mode = {LARGEUR, HAUTEUR, 32};
@@ -147,22 +147,22 @@ int creerApp(app_t *app)
     if (app->fenetre == NULL)
         return 1;
     sfRenderWindow_setVerticalSyncEnabled(app->fenetre, sfTrue);
-    if (creerRessources(app) != 0)
+    if (creer_ressources(app) != 0)
         return 1;
     app->additif.blendMode = sfBlendAdd;
     app->additif.transform = sfTransform_Identity;
     app->additif.texture = NULL;
     app->additif.shader = NULL;
-    initPoussieres(app);
+    init_poussieres(app);
     app->alpha = 1.f;
-    app->tTransition = -1.f;
+    app->t_transition = -1.f;
     app->ouvert = 1;
     app->scene = SCENE_MENU;
-    entrerMenu(app);
+    entrer_menu(app);
     return 0;
 }
 
-void detruireApp(app_t *app)
+void detruire_app(app_t *app)
 {
     if (app->fenetre)
         sfRenderWindow_destroy(app->fenetre);
@@ -182,17 +182,17 @@ void detruireApp(app_t *app)
         sfCircleShape_destroy(app->cercle);
     if (app->sprite)
         sfSprite_destroy(app->sprite);
-    if (app->texLueur)
-        sfTexture_destroy(app->texLueur);
-    if (app->texVignette)
-        sfTexture_destroy(app->texVignette);
+    if (app->tex_lueur)
+        sfTexture_destroy(app->tex_lueur);
+    if (app->tex_vignette)
+        sfTexture_destroy(app->tex_vignette);
     if (app->horloge)
         sfClock_destroy(app->horloge);
     if (app->vue)
         sfView_destroy(app->vue);
 }
 
-static void traiterEvenement(app_t *app, sfEvent *e)
+static void traiter_evenement(app_t *app, sfEvent *e)
 {
     if (e->type == sfEvtClosed)
         app->ouvert = 0;
@@ -201,8 +201,8 @@ static void traiterEvenement(app_t *app, sfEvent *e)
         app->in.shift = e->key.shift;
     }
     if (e->type == sfEvtTextEntered && e->text.unicode >= 32
-        && e->text.unicode != 127 && app->in.nbTexte < 32)
-        app->in.texte[app->in.nbTexte++] = e->text.unicode;
+        && e->text.unicode != 127 && app->in.nb_texte < 32)
+        app->in.texte[app->in.nb_texte++] = e->text.unicode;
     if (e->type == sfEvtMouseButtonPressed && e->mouseButton.button == sfMouseLeft) {
         app->in.clic = 1;
         app->in.bas = 1;
@@ -221,10 +221,10 @@ void evenements(app_t *app)
     sfEvent e;
 
     app->in.clic = 0;
-    app->in.nbTexte = 0;
+    app->in.nb_texte = 0;
     memset(app->in.touches, 0, sizeof(app->in.touches));
     while (sfRenderWindow_pollEvent(app->fenetre, &e))
-        traiterEvenement(app, &e);
+        traiter_evenement(app, &e);
     app->in.souris = sfRenderWindow_mapPixelToCoords(app->fenetre,
         sfMouse_getPositionRenderWindow(app->fenetre),
         sfRenderWindow_getDefaultView(app->fenetre));
@@ -232,108 +232,108 @@ void evenements(app_t *app)
         app->in.souris = (sfVector2f){-9999.f, -9999.f};
 }
 
-static void entrerScene(app_t *app, scene_t s)
+static void entrer_scene(app_t *app, scene_t s)
 {
     app->scene = s;
-    app->tScene = 0.f;
+    app->t_scene = 0.f;
     if (s == SCENE_MENU)
-        entrerMenu(app);
+        entrer_menu(app);
     if (s == SCENE_CREATION)
-        entrerCreation(app);
+        entrer_creation(app);
     if (s == SCENE_LISTE)
-        entrerListe(app);
+        entrer_liste(app);
     if (s == SCENE_SELECTION)
-        entrerSelection(app);
+        entrer_selection(app);
     if (s == SCENE_ARENE)
-        entrerArene(app);
+        entrer_arene(app);
 }
 
-void changerScene(app_t *app, scene_t scene)
+void changer_scene(app_t *app, scene_t scene)
 {
-    if (app->tTransition >= 0.f)
+    if (app->t_transition >= 0.f)
         return;
-    app->sceneSuivante = scene;
-    app->tTransition = 0.f;
+    app->scene_suivante = scene;
+    app->t_transition = 0.f;
 }
 
 /** Fondu + glissement : la scène sort vers le haut, la suivante arrive du bas. */
-static void majTransition(app_t *app, float *alpha, float *decalage)
+static void maj_transition(app_t *app, float *alpha, float *decalage)
 {
     float p = 0.f;
 
-    if (app->tTransition >= 0.f) {
-        app->tTransition += app->dt;
-        p = progression(app->tTransition, 0.f, DUREE_SORTIE);
+    if (app->t_transition >= 0.f) {
+        app->t_transition += app->dt;
+        p = progression(app->t_transition, 0.f, DUREE_SORTIE);
         if (p < 1.f) {
             *alpha = 1.f - p;
-            *decalage = -16.f * entreeCubique(p);
+            *decalage = -16.f * entree_cubique(p);
             return;
         }
-        entrerScene(app, app->sceneSuivante);
-        app->tTransition = -1.f;
+        entrer_scene(app, app->scene_suivante);
+        app->t_transition = -1.f;
     }
-    *alpha = progression(app->tScene, 0.f, 0.25f);
-    *decalage = 16.f * (1.f - sortieCubique(progression(app->tScene, 0.f, 0.45f)));
+    *alpha = progression(app->t_scene, 0.f, 0.25f);
+    *decalage = 16.f * (1.f - sortie_cubique(progression(app->t_scene, 0.f, 0.45f)));
 }
 
-static void dessinerScene(app_t *app)
+static void dessiner_scene(app_t *app)
 {
     if (app->scene == SCENE_MENU)
-        sceneMenu(app);
+        scene_menu(app);
     if (app->scene == SCENE_CREATION)
-        sceneCreation(app);
+        scene_creation(app);
     if (app->scene == SCENE_LISTE)
-        sceneListe(app);
+        scene_liste(app);
     if (app->scene == SCENE_SELECTION)
-        sceneSelection(app);
+        scene_selection(app);
     if (app->scene == SCENE_ARENE)
-        sceneArene(app);
+        scene_arene(app);
     if (app->scene == SCENE_AU_REVOIR)
-        sceneAuRevoir(app);
+        scene_au_revoir(app);
 }
 
-static void majCurseur(app_t *app)
+static void maj_curseur(app_t *app)
 {
-    if (app->curseurVoulu == app->curseurActuel
-        || app->curseurs[app->curseurVoulu] == NULL)
+    if (app->curseur_voulu == app->curseur_actuel
+        || app->curseurs[app->curseur_voulu] == NULL)
         return;
-    sfRenderWindow_setMouseCursor(app->fenetre, app->curseurs[app->curseurVoulu]);
-    app->curseurActuel = app->curseurVoulu;
+    sfRenderWindow_setMouseCursor(app->fenetre, app->curseurs[app->curseur_voulu]);
+    app->curseur_actuel = app->curseur_voulu;
 }
 
-void majApp(app_t *app, float dt)
+void maj_app(app_t *app, float dt)
 {
     float alpha = 1.f;
     float decalage = 0.f;
 
     app->dt = bornerf(dt, 0.f, 1.f / 30.f);
     app->temps += app->dt;
-    app->tScene += app->dt;
-    app->dtJeu = app->hitstop > 0.f ? app->dt * 0.06f : app->dt;
+    app->t_scene += app->dt;
+    app->dt_jeu = app->hitstop > 0.f ? app->dt * 0.06f : app->dt;
     app->hitstop -= app->dt;
     app->secousse = approcher(app->secousse, 0.f, 7.f, app->dt);
-    app->curseurVoulu = CURSEUR_FLECHE;
-    majTransition(app, &alpha, &decalage);
-    app->sourisBloquee = app->tTransition >= 0.f;
-    if (app->sourisBloquee) {
+    app->curseur_voulu = CURSEUR_FLECHE;
+    maj_transition(app, &alpha, &decalage);
+    app->souris_bloquee = app->t_transition >= 0.f;
+    if (app->souris_bloquee) {
         app->in.clic = 0;
-        app->in.nbTexte = 0;
+        app->in.nb_texte = 0;
         memset(app->in.touches, 0, sizeof(app->in.touches));
     }
     sfRenderWindow_clear(app->fenetre, C_FOND);
     sfRenderWindow_setView(app->fenetre, sfRenderWindow_getDefaultView(app->fenetre));
     app->alpha = 1.f;
-    dessinerFond(app);
+    dessiner_fond(app);
     sfView_setCenter(app->vue, (sfVector2f){
         LARGEUR / 2.f + sinf(app->temps * 83.f) * 12.f * app->secousse,
         HAUTEUR / 2.f + decalage + cosf(app->temps * 97.f) * 9.f * app->secousse});
     sfRenderWindow_setView(app->fenetre, app->vue);
     app->alpha = alpha;
-    dessinerScene(app);
+    dessiner_scene(app);
     app->alpha = 1.f;
-    majParticules(app);
-    dessinerParticules(app);
+    maj_particules(app);
+    dessiner_particules(app);
     sfRenderWindow_setView(app->fenetre, sfRenderWindow_getDefaultView(app->fenetre));
-    dessinerToasts(app);
-    majCurseur(app);
+    dessiner_toasts(app);
+    maj_curseur(app);
 }

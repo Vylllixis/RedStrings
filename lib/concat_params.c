@@ -4,6 +4,7 @@
 
 #include <stdlib.h>
 #include "my.h"
+#include "my_string.h"
 
 char *concat_params(int ac, char **av)
 {

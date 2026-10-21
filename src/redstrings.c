@@ -6,118 +6,135 @@
 #include <stdio.h>
 #include "boite.h"
 #include "couleurs.h"
-#include "my.h"
 #include "personnage.h"
 #include "redstrings.h"
+#include "roster.h"
+#include "sauvegarde.h"
 #include "saisie.h"
 
-#define MAX_PERSONNAGES 10
-
-static int findPersonage(personnage_t *tab, int size, char *name)
+static void afficher_menu(void)
 {
-    for (int i = 0; i < size; i++) {
-        if (my_strcmp(tab[i].name, name) == 0)
-            return i;
-    }
-    return -1;
+    boite_haut(CYAN);
+    boite_ligne(CYAN, "  " GRAS "✦ Menu principal" RESET);
+    boite_separateur(CYAN);
+    boite_ligne(CYAN, "  " GRAS "1" RESET "  Ajouter un personnage");
+    boite_ligne(CYAN, "  " GRAS "2" RESET "  Afficher un personnage");
+    boite_ligne(CYAN, "  " GRAS "3" RESET "  Combat");
+    boite_ligne(CYAN, "  " GRAS "4" RESET "  Sauvegarder");
+    boite_ligne(CYAN, "  " GRAS "5" RESET "  Charger");
+    boite_ligne(CYAN, "  " GRAS "0" RESET "  Quitter");
+    boite_bas(CYAN);
 }
 
-static void afficherErreur(const char *message)
+static int demander_personnage(const roster_t *r, const char *question)
 {
-    printf("  " ROUGE "✗ %s" RESET "\n\n", message);
-}
-
-static void afficherMenu(void)
-{
-    boiteHaut(CYAN);
-    boiteLigne(CYAN, "  " GRAS "✦ Menu principal" RESET);
-    boiteSeparateur(CYAN);
-    boiteLigne(CYAN, "  " GRAS "1" RESET "  Ajouter un personnage");
-    boiteLigne(CYAN, "  " GRAS "2" RESET "  Afficher un personnage");
-    boiteLigne(CYAN, "  " GRAS "3" RESET "  Combat");
-    boiteLigne(CYAN, "  " GRAS "0" RESET "  Quitter");
-    boiteBas(CYAN);
-}
-
-static int lireChoix(void)
-{
-    int choix = 0;
-
-    printf("  " GRAS "Choix" RESET CYAN " › " RESET);
-    while (scanf("%d", &choix) != 1) {
-        viderBuffer();
-        afficherErreur("Tape un nombre entre 0 et 3");
-        printf("  " GRAS "Choix" RESET CYAN " › " RESET);
-    }
-    viderBuffer();
-    return choix;
-}
-
-static int demanderPersonnage(personnage_t *tab, int len, const char *question)
-{
-    char nom[30];
+    char nom[30] = "";
     int idx = 0;
 
     printf("  " GRAS "%s" RESET CYAN " › " RESET, question);
-    scanf("%29s", nom);
-    viderBuffer();
-    idx = findPersonage(tab, len, nom);
+    if (scanf("%29s", nom) != 1) {
+        afficher_erreur("Saisie interrompue");
+        return -1;
+    }
+    vider_buffer();
+    idx = trouver_personnage(r->data, r->len, nom);
     if (idx == -1)
-        afficherErreur("Personnage introuvable");
+        afficher_erreur("Personnage introuvable");
     return idx;
 }
 
-static void menuAjouter(personnage_t *tab, int *len)
+static void menu_ajouter(roster_t *r)
 {
-    if (*len >= MAX_PERSONNAGES) {
-        afficherErreur("Nombre maximum de personnages atteint");
-        return;
-    }
-    creerPersonnage(&tab[*len]);
-    (*len)++;
+    personnage_t nouveau = {0};
+
+    if (creer_personnage(&nouveau, r->data, r->len) == 0
+        && roster_ajouter(r, &nouveau) == -1)
+        afficher_erreur("Mémoire insuffisante");
     printf("\n");
 }
 
-static void menuAfficher(personnage_t *tab, int len)
+static void menu_afficher(const roster_t *r)
 {
-    int idx = demanderPersonnage(tab, len, "Nom du personnage");
+    int idx = demander_personnage(r, "Nom du personnage");
 
     if (idx != -1)
-        afficherPersonnage(&tab[idx]);
+        afficher_personnage(&r->data[idx]);
 }
 
-static void menuCombat(personnage_t *tab, int len)
+static int demander_vivant(const roster_t *r, const char *question)
 {
-    int idAtk = demanderPersonnage(tab, len, "Attaquant");
-    int idDef = 0;
+    int idx = demander_personnage(r, question);
 
-    if (idAtk == -1)
+    if (idx != -1 && r->data[idx].pv == 0) {
+        afficher_erreur("Ce personnage est mort");
+        return -1;
+    }
+    return idx;
+}
+
+static void menu_combat(roster_t *r)
+{
+    int id_atq = demander_vivant(r, "Attaquant");
+    int id_def = 0;
+
+    if (id_atq == -1)
         return;
-    idDef = demanderPersonnage(tab, len, "Défenseur");
-    if (idDef == -1)
+    id_def = demander_vivant(r, "Défenseur");
+    if (id_def == -1)
         return;
-    attaquer(&tab[idAtk], &tab[idDef]);
+    if (id_atq == id_def) {
+        afficher_erreur("Un personnage ne peut pas s'attaquer lui-même");
+        return;
+    }
+    attaquer(&r->data[id_atq], &r->data[id_def]);
+}
+
+static void menu_sauvegarder(const roster_t *r)
+{
+    sauvegarde_t code = sauvegarder(r, FICHIER_SAUVEGARDE);
+
+    if (code != SAUVEGARDE_OK)
+        afficher_erreur(sauvegarde_message(code));
+    else
+        printf("  " VERT "✔ %d personnage(s) sauvegardé(s) dans %s" RESET "\n\n",
+            r->len, FICHIER_SAUVEGARDE);
+}
+
+static void menu_charger(roster_t *r)
+{
+    sauvegarde_t code = charger(r, FICHIER_SAUVEGARDE);
+
+    if (code != SAUVEGARDE_OK)
+        afficher_erreur(sauvegarde_message(code));
+    else
+        printf("  " VERT "✔ %d personnage(s) chargé(s) depuis %s" RESET "\n\n",
+            r->len, FICHIER_SAUVEGARDE);
 }
 
 int redstrings(void)
 {
-    personnage_t tabPersonnage[MAX_PERSONNAGES];
-    int len = 0;
+    roster_t roster;
     int choix = -1;
 
+    roster_init(&roster);
+
     while (choix != 0) {
-        afficherMenu();
-        choix = lireChoix();
+        afficher_menu();
+        if (lire_entier("Choix", 0, 5, &choix) == -1)
+            choix = 0;
         printf("\n");
         if (choix == 1)
-            menuAjouter(tabPersonnage, &len);
+            menu_ajouter(&roster);
         else if (choix == 2)
-            menuAfficher(tabPersonnage, len);
+            menu_afficher(&roster);
         else if (choix == 3)
-            menuCombat(tabPersonnage, len);
-        else if (choix != 0)
-            afficherErreur("Choix inconnu");
+            menu_combat(&roster);
+        else if (choix == 4)
+            menu_sauvegarder(&roster);
+        else if (choix == 5)
+            menu_charger(&roster);
     }
+    roster_liberer(&roster);
     printf("  " GRIS "À bientôt !" RESET "\n");
     return 0;
 }
