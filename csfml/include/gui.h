@@ -8,7 +8,6 @@
 
     #include <SFML/Graphics.h>
     #include "my_string.h"
-#include "personnage.h"
     #include "personnage.h"
 
     #define LARGEUR 1280
