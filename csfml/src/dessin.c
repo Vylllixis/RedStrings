@@ -229,9 +229,9 @@ float texte(app_t *app, police_t p, const char *s, unsigned int taille,
 void tronquer(app_t *app, police_t p, unsigned int taille, const char *src,
     float max, char *dst)
 {
-    int len = strlen(src);
+    int len = my_strlen(src);
 
-    strcpy(dst, src);
+    my_strcpy(dst, src);
     if (largeurTexte(app, p, dst, taille) <= max)
         return;
     while (len > 0) {
@@ -239,7 +239,7 @@ void tronquer(app_t *app, police_t p, unsigned int taille, const char *src,
         while (len > 0 && ((unsigned char)src[len] & 0xC0) == 0x80)
             len--;
         memcpy(dst, src, len);
-        strcpy(dst + len, "…");
+        my_strcpy(dst + len, "…");
         if (largeurTexte(app, p, dst, taille) <= max)
             return;
     }

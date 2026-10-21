@@ -31,7 +31,7 @@ static sfFont *chargerPolice(const char *nom)
     ssize_t n = readlink("/proc/self/exe", exe, sizeof(exe) - 1);
 
     if (n <= 0)
-        strcpy(exe, ".");
+        my_strcpy(exe, ".");
     slash = strrchr(exe, '/');
     if (n > 0 && slash)
         *slash = '\0';

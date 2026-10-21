@@ -63,7 +63,7 @@ static void creer(app_t *app, creation_t *c)
     }
     p =&app->persos[app->nbPersos++];
     memset(p, 0, sizeof(personnage_t));
-    strcpy(p->name, c->nom.texte);
+    my_strcpy(p->name, c->nom.texte);
     p->pv = c->valeurs[0];
     p->atk = c->valeurs[1];
     p->def = c->valeurs[2];
@@ -180,7 +180,7 @@ static void apercu(app_t *app, creation_t *c, float a)
         - 30.f * envol, 472.f, 510.f};
 
     memset(&p, 0, sizeof(personnage_t));
-    strcpy(p.name, c->nom.texte);
+    my_strcpy(p.name, c->nom.texte);
     p.pv = c->valeurs[0];
     p.atk = c->valeurs[1];
     p.def = c->valeurs[2];
