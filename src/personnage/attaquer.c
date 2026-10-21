@@ -8,7 +8,7 @@
 #include "couleurs.h"
 #include "personnage.h"
 
-static int calculer_degats(const personnage_t *attaquant, const personnage_t *cible)
+int calculer_degats(const personnage_t *attaquant, const personnage_t *cible)
 {
     int degats = attaquant->atq * (100 - cible->def) / 100;
 

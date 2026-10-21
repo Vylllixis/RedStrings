@@ -7,6 +7,7 @@
 
 NAME		=	redstrings
 NAME_DEBUG	=	redstrings_debug
+NAME_TESTS	=	redstrings_tests
 
 LIB_DIR		=	lib
 LIB		=	$(LIB_DIR)/libmy.a
@@ -16,6 +17,7 @@ CSFML_DIR	=	csfml
 
 SRCS		=	$(shell find src -name '*.c')
 LIB_SRCS	=	$(wildcard $(LIB_DIR)/*.c)
+TEST_SRCS	=	$(wildcard tests/*.c)
 
 #src/main.c -> obj/src/main.o
 OBJS		=	$(SRCS:%.c=$(OBJ_DIR)/%.o)
@@ -93,6 +95,13 @@ debug:
 		-o $(NAME_DEBUG)
 	$(LOG_OK) "./$(NAME_DEBUG)  ou  gdb ./$(NAME_DEBUG)"
 
+#make tests : compile tests/*.c avec le code du jeu (sans main.c) et les lance
+tests:
+	$(LOG) "TESTS" "$(NAME_TESTS)  ($(DEBUG_FLAGS))"
+	$(Q)$(CC) $(CFLAGS) $(DEBUG_FLAGS) $(CPPFLAGS) $(TEST_SRCS) \
+		$(filter-out src/main.c,$(SRCS)) $(LIB_SRCS) -o $(NAME_TESTS)
+	$(Q)./$(NAME_TESTS)
+
 #version graphique (CSFML) -> ./redstrings_csfml
 csfml:	$(LIB)
 	$(Q)$(MAKE) -C $(CSFML_DIR)
@@ -103,8 +112,8 @@ clean:
 	$(Q)$(MAKE) -C $(CSFML_DIR) clean
 
 fclean:	clean
-	$(LOG_RM) "RM" "$(NAME) $(NAME_DEBUG) $(LIB)"
-	$(Q)$(RM) $(NAME) $(NAME_DEBUG) $(LIB)
+	$(LOG_RM) "RM" "$(NAME) $(NAME_DEBUG) $(NAME_TESTS) $(LIB)"
+	$(Q)$(RM) $(NAME) $(NAME_DEBUG) $(NAME_TESTS) $(LIB)
 	$(Q)$(MAKE) -C $(CSFML_DIR) fclean
 
 re:
@@ -120,6 +129,7 @@ help:
 	@printf "  $(C_BLEU)make$(C_RESET)            compile ./$(NAME)\n"
 	@printf "  $(C_BLEU)make lib$(C_RESET)        compile seulement $(LIB)\n"
 	@printf "  $(C_BLEU)make debug$(C_RESET)      compile ./$(NAME_DEBUG) (gdb + sanitizers)\n"
+	@printf "  $(C_BLEU)make tests$(C_RESET)      lance les tests unitaires (assert)\n"
 	@printf "  $(C_BLEU)make csfml$(C_RESET)      compile la version graphique\n"
 	@printf "  $(C_BLEU)make clean$(C_RESET)      supprime les .o\n"
 	@printf "  $(C_BLEU)make fclean$(C_RESET)     supprime aussi les exécutables et $(LIB)\n"
@@ -128,4 +138,4 @@ help:
 
 -include $(DEPS)
 
-.PHONY: all lib debug csfml clean fclean re build help
+.PHONY: all lib debug tests csfml clean fclean re build help

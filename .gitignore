@@ -38,6 +38,7 @@ Thumbs.db
 
 # Version debug (make debug)
 /redstrings_debug
+/redstrings_tests
 
 # Objets (make)
 /obj/
