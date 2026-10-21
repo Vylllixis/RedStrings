@@ -12,16 +12,6 @@ int calculer_degats(const personnage_t *attaquant, const personnage_t *cible)
     return degats < 0 ? 0 : degats;
 }
 
-int subir_attaque(const personnage_t *attaquant, personnage_t *cible)
-{
-    int degats = calculer_degats(attaquant, cible);
-
-    cible->pv -= degats;
-    if (cible->pv < 0)
-        cible->pv = 0;      // 0 = K.O. : est_ko() en dépend
-    return degats;
-}
-
 int est_ko(const personnage_t *p)
 {
     return p->pv == 0;
