@@ -692,7 +692,7 @@ gitGraph
 - [x] Tests unitaires + sanitizers
 - [ ] Documentation Doxygen (`Doxyfile`, `make doc`)
 - [ ] Version graphique : équipe illimitée et sauvegarde
-- [ ] Publier la version `v1.2.0` sur `main`
+- [x] Publier la version `v1.2.0` sur `main`
 
 <img src=".github/readme/fil-rouge.svg" width="100%" alt=""/>
 
