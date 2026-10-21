@@ -243,8 +243,8 @@ stateDiagram-v2
 
 | Écran | Clavier | Souris |
 |---|---|---|
-| **Menu** | <kbd>1</kbd> <kbd>2</kbd> <kbd>3</kbd> · <kbd>4</kbd> sauvegarder · <kbd>5</kbd> charger · <kbd>0</kbd>/<kbd>Échap</kbd> quitter | clic sur un bouton |
-| **Création** | <kbd>Tab</kbd> / <kbd>↑</kbd> <kbd>↓</kbd> naviguer · <kbd>←</kbd> <kbd>→</kbd> ajuster · <kbd>Maj</kbd> = ×10 · <kbd>Entrée</kbd> créer | glissières et boutons |
+| **Menu** | <kbd>↑</kbd> <kbd>↓</kbd> choisir · <kbd>Entrée</kbd> valider · <kbd>1</kbd> <kbd>2</kbd> <kbd>3</kbd> raccourcis · <kbd>4</kbd> sauvegarder · <kbd>5</kbd> charger · <kbd>0</kbd>/<kbd>Échap</kbd> quitter | survol pour choisir, clic pour valider |
+| **Création** | <kbd>Tab</kbd> / <kbd>↑</kbd> <kbd>↓</kbd> naviguer · <kbd>←</kbd> <kbd>→</kbd> ajuster · <kbd>Maj</kbd> = ×10 · <kbd>Entrée</kbd> créer | glissières, cartes de classe, bouton |
 | **Personnages** | taper pour rechercher · <kbd>Entrée</kbd> ouvrir · <kbd>←</kbd> <kbd>→</kbd> changer de fiche | clic sur une carte |
 | **Sélection** | <kbd>Échap</kbd> annule l'attaquant, puis revient au menu | clic : attaquant, puis défenseur |
 | **Arène** | <kbd>Espace</kbd>/<kbd>Entrée</kbd> attaquer · <kbd>R</kbd> inverser les rôles · <kbd>Échap</kbd> menu | boutons *Attaquer*, *Inverser*, *Menu* |
@@ -260,12 +260,18 @@ stateDiagram-v2
 
 <br/>
 
+**Direction artistique.** Toutes les surfaces partagent la même silhouette : deux coins coupés (haut-gauche, bas-droite) et des crochets lumineux sur les deux autres. Le rouge porte la marque et le combat, le cyan les actions, le vert les PV, le bleu la défense. Les composants communs sont dans `csfml/src/hud.c` (`panneau`, `crochets`, `titre_section`, `hexagone`, `radar_stats`, `touche_clavier`…).
+
 | Effet | Où | Comment |
 |---|---|---|
+| Profondeur du fond | tous les écrans | étoiles lointaines, halos, sol quadrillé en perspective, fils rouges parcourus d'impulsions |
+| Hologramme de classe | aperçu de la création | socle, cône de projection, anneaux, aura propre à la classe (lames, orbite d'astres, réticule) |
+| Radar des statistiques | aperçu de la création | triangle PV / attaque / défense, animé avec les vraies valeurs |
+| Cartes de classe | création | médaillon, motif propre (lames, constellation, cible), changement de classe avec onde de choc |
 | Mouvements organiques | boutons, cartes | ressorts amortis (`ressort_t`) |
 | Courbes d'animation | entrées / sorties de scène | `sortie_cubique`, `entree_cubique`, `sortie_rebond` |
 | Particules | création, impacts, K.O. | jusqu'à 900 particules avec gravité |
-| Poussière d'ambiance | fond | 70 grains qui flottent |
+| Poussière d'ambiance | fond | 70 grains qui flottent, 160 étoiles qui scintillent |
 | Notifications | coin de l'écran | toasts empilables (4 max) |
 | Halo lumineux | cartes, titres | texture de dégradé radial générée au lancement |
 

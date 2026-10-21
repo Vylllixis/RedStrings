@@ -19,6 +19,7 @@
     #define MAX_PARTICULES 900
     #define MAX_TOASTS 4
     #define NB_POUSSIERES 70
+    #define NB_ETOILES 160
     #define PI 3.14159265f
 
 /* Palette */
@@ -152,6 +153,10 @@ typedef struct {
 
 typedef struct {
     bouton_t boutons[4];
+    ressort_t decalage[4];      /**< Glissement de l'option sélectionnée. */
+    int selection;              /**< Option choisie au clavier ou à la souris. */
+    int souris_bouge;           /**< La souris a bougé depuis l'image précédente. */
+    sfVector2f souris_prec;
     float survol_equipe[MAX_PERSONNAGES];
 } menu_t;
 
@@ -165,9 +170,13 @@ typedef struct {
     bouton_t creer;
     bouton_t retour;
     float segments[3];
+    float affiche[3];   /**< Statistiques affichées dans l'aperçu (animées). */
     int focus;          /**< 0 nom, 1-3 stats, 4 classe, 5 bouton. */
     float sortie;       /**< Compte à rebours après création, -1 sinon. */
     float flash;
+    classe_t classe_vue;    /**< Classe affichée à l'image précédente. */
+    classe_t classe_prec;   /**< Classe affichée avant le dernier changement. */
+    float t_classe;         /**< Temps depuis le dernier changement de classe. */
 } creation_t;
 
 typedef struct {
@@ -255,6 +264,7 @@ typedef struct {
     float t_transition;  /**< -1 si aucune transition. */
     particule_t particules[MAX_PARTICULES];
     poussiere_t poussieres[NB_POUSSIERES];
+    poussiere_t etoiles[NB_ETOILES];   /**< Plan le plus lointain du fond. */
     toast_t toasts[MAX_TOASTS];
     menu_t menu;
     creation_t creation;
@@ -312,6 +322,28 @@ float etiquette(app_t *app, const char *s, sfVector2f pos, sfColor c,
     alignement_t a);
 void dessiner_fond(app_t *app);
 
+/* hud.c */
+void panneau(app_t *app, sfFloatRect r, float coupe, sfColor haut, sfColor bas,
+    sfColor bord);
+void ombre_biseau(app_t *app, sfFloatRect r, float coupe, float force);
+void crochets(app_t *app, sfFloatRect r, float longueur, sfColor c);
+void losange(app_t *app, sfVector2f centre, float r, sfColor c);
+void hexagone(app_t *app, sfVector2f centre, float r, float rotation,
+    sfColor fond, sfColor bord);
+void titre_section(app_t *app, const char *num, const char *label,
+    sfVector2f pos, float largeur, sfColor accent);
+void arc_cercle(app_t *app, sfVector2f centre, float rayon, float epaisseur,
+    sfVector2f angles, sfColor c, int additif);
+void graduations(app_t *app, sfVector2f centre, float rayon, int n,
+    float longueur, float rotation, sfColor c);
+void ellipse(app_t *app, sfVector2f centre, sfVector2f rayon, float epaisseur,
+    sfColor c);
+void radar_stats(app_t *app, sfVector2f centre, float rayon, const float v[3],
+    sfColor c);
+float largeur_touche(app_t *app, const char *s);
+float touche_clavier(app_t *app, const char *s, sfVector2f centre, sfColor c,
+    float allume);
+
 /* particules.c */
 void emettre(app_t *app, sfVector2f pos, int n, sfColor c, float vitesse,
     float taille);
@@ -335,6 +367,8 @@ float pastille(app_t *app, const char *s, sfVector2f pos, sfColor c,
 void notifier(app_t *app, const char *icone, const char *message,
     sfColor c);
 void dessiner_toasts(app_t *app);
+void en_tete_surtitre(app_t *app, bouton_t *retour, const char *surtitre,
+    const char *titre, const char *sous_titre);
 void en_tete(app_t *app, bouton_t *retour, const char *titre,
     const char *sous_titre);
 
