@@ -19,7 +19,7 @@ static void repeter(char *dest, size_t taille, const char *motif, int fois)
         n += (size_t)snprintf(dest + n, taille - n, "%s", motif);
 }
 
-static void afficherStat(const char *nom, int valeur, const char *couleur)
+static void afficher_stat(const char *nom, int valeur, const char *couleur)
 {
     int remplies = (valeur + 4) / 5;
     char pleine[64];
@@ -29,31 +29,30 @@ static void afficherStat(const char *nom, int valeur, const char *couleur)
         remplies = LARGEUR_BARRE;
     repeter(pleine, sizeof(pleine), "█", remplies);
     repeter(vide, sizeof(vide), "░", LARGEUR_BARRE - remplies);
-    boiteLigne(GRIS, "  %-4s %s%s" GRIS "%s" RESET "  " GRAS "%2d" RESET,
+    boite_ligne(GRIS, "  %-4s %s%s" GRIS "%s" RESET "  " GRAS "%2d" RESET,
         nom, couleur, pleine, vide, valeur);
 }
 
-int afficherPersonnage(const personnage_t *p)
+void afficher_personnage(const personnage_t *p)
 {
-    const char *nameClasse = "Guerrier";
-    const char *couleurClasse = ROUGE;
+    const char *nom_classe = "Guerrier";
+    const char *couleur_classe = ROUGE;
 
     if (p->classe == MAGE) {
-        nameClasse = "Mage";
-        couleurClasse = MAGENTA;
+        nom_classe = "Mage";
+        couleur_classe = MAGENTA;
     } else if (p->classe == ARCHER) {
-        nameClasse = "Archer";
-        couleurClasse = VERT;
+        nom_classe = "Archer";
+        couleur_classe = VERT;
     }
     printf("\n");
-    boiteHaut(GRIS);
-    boiteLigne(GRIS, "  " GRAS "%s" RESET GRIS "  ·  " RESET "%s%s" RESET,
-        p->name, couleurClasse, nameClasse);
-    boiteSeparateur(GRIS);
-    afficherStat("PV", p->pv, VERT);
-    afficherStat("ATK", p->atk, ROUGE);
-    afficherStat("DEF", p->def, BLEU);
-    boiteBas(GRIS);
+    boite_haut(GRIS);
+    boite_ligne(GRIS, "  " GRAS "%s" RESET GRIS "  ·  " RESET "%s%s" RESET,
+        p->nom, couleur_classe, nom_classe);
+    boite_separateur(GRIS);
+    afficher_stat("PV", p->pv, VERT);
+    afficher_stat("ATK", p->atq, ROUGE);
+    afficher_stat("DEF", p->def, BLEU);
+    boite_bas(GRIS);
     printf("\n");
-    return 0;
 }
