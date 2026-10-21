@@ -6,21 +6,10 @@
 #include <stdio.h>
 #include "boite.h"
 #include "couleurs.h"
-#include "my_string.h"
 #include "personnage.h"
 #include "redstrings.h"
+#include "roster.h"
 #include "saisie.h"
-
-#define MAX_PERSONNAGES 10
-
-int trouver_personnage(const personnage_t *tab, int size, const char *nom)
-{
-    for (int i = 0; i < size; i++) {
-        if (my_strcmp(tab[i].nom, nom) == 0)
-            return i;
-    }
-    return -1;
-}
 
 static void afficher_menu(void)
 {
@@ -34,7 +23,7 @@ static void afficher_menu(void)
     boite_bas(CYAN);
 }
 
-static int demander_personnage(personnage_t *tab, int len, const char *question)
+static int demander_personnage(const roster_t *r, const char *question)
 {
     char nom[30] = "";
     int idx = 0;
@@ -45,61 +34,64 @@ static int demander_personnage(personnage_t *tab, int len, const char *question)
         return -1;
     }
     vider_buffer();
-    idx = trouver_personnage(tab, len, nom);
+    idx = trouver_personnage(r->data, r->len, nom);
     if (idx == -1)
         afficher_erreur("Personnage introuvable");
     return idx;
 }
 
-static void menu_ajouter(personnage_t *tab, int *len)
+static void menu_ajouter(roster_t *r)
 {
-    if (*len >= MAX_PERSONNAGES) {
-        afficher_erreur("Nombre maximum de personnages atteint");
-        return;
-    }
-    if (creer_personnage(&tab[*len], tab, *len) == 0)
-        (*len)++;
+    personnage_t nouveau = {0};
+
+    if (creer_personnage(&nouveau, r->data, r->len) == 0
+        && roster_ajouter(r, &nouveau) == -1)
+        afficher_erreur("Mémoire insuffisante");
     printf("\n");
 }
 
-static void menu_afficher(personnage_t *tab, int len)
+static void menu_afficher(const roster_t *r)
 {
-    int idx = demander_personnage(tab, len, "Nom du personnage");
+    int idx = demander_personnage(r, "Nom du personnage");
 
     if (idx != -1)
-        afficher_personnage(&tab[idx]);
+        afficher_personnage(&r->data[idx]);
 }
 
-static void menu_combat(personnage_t *tab, int len)
+static int demander_vivant(const roster_t *r, const char *question)
 {
-    int id_atq = demander_personnage(tab, len, "Attaquant");
+    int idx = demander_personnage(r, question);
+
+    if (idx != -1 && r->data[idx].pv == 0) {
+        afficher_erreur("Ce personnage est mort");
+        return -1;
+    }
+    return idx;
+}
+
+static void menu_combat(roster_t *r)
+{
+    int id_atq = demander_vivant(r, "Attaquant");
     int id_def = 0;
 
     if (id_atq == -1)
         return;
-    if (tab[id_atq].pv == 0) {
-        afficher_erreur("Ce personnage est mort");
-        return;
-    }
-    id_def = demander_personnage(tab, len, "Défenseur");
+    id_def = demander_vivant(r, "Défenseur");
     if (id_def == -1)
         return;
-    if (tab[id_def].pv == 0) {
-        afficher_erreur("Ce personnage est mort");
-        return;
-    }
     if (id_atq == id_def) {
-    afficher_erreur("Un personnage ne peut pas s'attaquer lui-même");
+        afficher_erreur("Un personnage ne peut pas s'attaquer lui-même");
         return;
     }
-    attaquer(&tab[id_atq], &tab[id_def]);
+    attaquer(&r->data[id_atq], &r->data[id_def]);
 }
 
 int redstrings(void)
 {
-    personnage_t tab_personnage[MAX_PERSONNAGES];
-    int len = 0;
+    roster_t roster;
     int choix = -1;
+
+    roster_init(&roster);
 
     while (choix != 0) {
         afficher_menu();
@@ -107,12 +99,13 @@ int redstrings(void)
             choix = 0;
         printf("\n");
         if (choix == 1)
-            menu_ajouter(tab_personnage, &len);
+            menu_ajouter(&roster);
         else if (choix == 2)
-            menu_afficher(tab_personnage, len);
+            menu_afficher(&roster);
         else if (choix == 3)
-            menu_combat(tab_personnage, len);
+            menu_combat(&roster);
     }
+    roster_liberer(&roster);
     printf("  " GRIS "À bientôt !" RESET "\n");
     return 0;
 }
