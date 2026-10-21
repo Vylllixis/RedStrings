@@ -3,6 +3,7 @@
 */
 
 #include "my.h"
+#include "my_string.h"
 
 int my_str_isprintable(char const *str)
 {

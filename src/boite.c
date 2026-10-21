@@ -3,7 +3,10 @@
 ** PROJET FIL ROUGE C Avancé
 */
 
-#include "my.h"
+#include <stdarg.h>
+#include <stdio.h>
+#include "boite.h"
+#include "couleurs.h"
 
 static int largeurVisible(const char *texte)
 {

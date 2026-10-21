@@ -3,22 +3,23 @@
 ** PROJET FIL ROUGE C Avancé
 */
 
-#include "my.h"
+#include <stdio.h>
+#include "boite.h"
+#include "couleurs.h"
+#include "my_string.h"
+#include "personnage.h"
+#include "redstrings.h"
+#include "saisie.h"
 
 #define MAX_PERSONNAGES 10
 
-int findPersonage(personnage_t *tab, int size, char *name)
+int findPersonnage(const personnage_t *tab, int size, const char *name)
 {
     for (int i = 0; i < size; i++) {
         if (my_strcmp(tab[i].name, name) == 0)
             return i;
     }
     return -1;
-}
-
-void afficherErreur(const char *message)
-{
-    printf("  " ROUGE "✗ %s" RESET "\n\n", message);
 }
 
 static void afficherMenu(void)
@@ -59,7 +60,7 @@ static int demanderPersonnage(personnage_t *tab, int len, const char *question)
     printf("  " GRAS "%s" RESET CYAN " › " RESET, question);
     scanf("%29s", nom);
     viderBuffer();
-    idx = findPersonage(tab, len, nom);
+    idx = findPersonnage(tab, len, nom);
     if (idx == -1)
         afficherErreur("Personnage introuvable");
     return idx;

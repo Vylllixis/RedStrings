@@ -3,6 +3,7 @@
 */
 
 #include "my.h"
+#include "my_string.h"
 
 int my_arraystrlen(int ac, char **av)
 {

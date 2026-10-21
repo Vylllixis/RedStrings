@@ -3,6 +3,7 @@
 */
 
 #include "my.h"
+#include "my_string.h"
 
 int my_strcmp(char const *s1, char const *s2)
 {
