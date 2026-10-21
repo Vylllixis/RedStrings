@@ -49,7 +49,14 @@ void afficher_personnage(const personnage_t *p);
 /** Dégâts que l'attaquant inflige à la cible, jamais négatifs. */
 int calculer_degats(const personnage_t *attaquant, const personnage_t *cible);
 
-/** Retire à la cible les dégâts de l'attaquant, réduits par sa défense. */
+/** Applique les dégâts à la cible (PV jamais sous 0) et les renvoie.
+ *  Logique pure, sans affichage : partagée par la console et la CSFML. */
+int subir_attaque(const personnage_t *attaquant, personnage_t *cible);
+
+/** 1 si le personnage est K.O. (0 PV), 0 sinon. */
+int est_ko(const personnage_t *p);
+
+/** subir_attaque() puis affiche le résultat du coup dans une boîte. */
 void attaquer(personnage_t *attaquant, personnage_t *cible);
 
 #endif /* PERSONNAGE_H */

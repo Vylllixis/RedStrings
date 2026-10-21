@@ -65,7 +65,7 @@ static int demander_vivant(const roster_t *r, const char *question)
 {
     int idx = demander_personnage(r, question);
 
-    if (idx != -1 && r->data[idx].pv == 0) {
+    if (idx != -1 && est_ko(&r->data[idx])) {
         afficher_erreur("Ce personnage est mort");
         return -1;
     }
