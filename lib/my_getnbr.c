@@ -4,9 +4,9 @@
 
 /*
 ** ╭─ my_getnbr.c ────────────────────────────────────────────────────────
-** │ But         Convertir le début d'une chaîne en entier : le signe « -
-** │             » est accepté, la lecture s'arrête au premier caractère
-** │             qui n'est pas un chiffre.
+** │ But         Convertir le début d'une chaîne en entier : le signe
+** │             « - » est accepté, la lecture s'arrête au premier
+** │             caractère qui n'est pas un chiffre.
 ** ╰──────────────────────────────────────────────────────────────────────
 */
 

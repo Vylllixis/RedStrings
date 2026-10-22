@@ -5,9 +5,9 @@
 
 /*
 ** ╭─ personnage.c ───────────────────────────────────────────────────────
-** │ But         Le catalogue des classes et les règles qui s'y rattachent
-** │             : modificateurs de statistiques, couleurs, catégories,
-** │             recherche par nom.
+** │ But         Le catalogue des classes et les règles qui s'y
+** │             rattachent : modificateurs de statistiques, couleurs,
+** │             catégories, recherche par nom.
 ** │ Contenu     classes[] (la table), nom_categorie, couleur_ansi,
 ** │             classe_valide, ordre_classes, valeur_stat, stat_finale,
 ** │             appliquer_classe, trouver_personnage
