@@ -78,6 +78,7 @@ void arene_demarrer(app_t *app, arene_t *ar)
     ar->nb_file = 0;
     ar->i_file = 0;
     ar->journal_vu = b->nb_journal;
+    ar->t_cartes = 0.f;
 }
 
 void entrer_arene(app_t *app)
@@ -150,6 +151,7 @@ void scene_arene(app_t *app)
     arene_souris_cibles(app, ar);
     maj_etat(app, ar);
     arene_maj_visuels(app, ar);
+    ar->t_cartes += app->dt;
     arene_placer(app, ar);
     arene_dessiner_arene(app, ar);
     n = arene_ordre_dessin(ar, ordre);
@@ -160,6 +162,8 @@ void scene_arene(app_t *app)
         arene_plaque(app, ar, ordre[i], montre_actif && arene_meme(ordre[i], actif));
     if (ar->etat == VUE_CHOIX_CIBLE)
         arene_reticules(app, ar);
+    arene_cartes_invocation(app, ar);
+    arene_carte_action(app, ar);
     app->alpha = a * e;
     arene_ordre_tours(app, ar);
     arene_panneau_equipe(app, ar, 1, (sfFloatRect){MARGE - 40.f * (1.f - e), 24.f, 360.f,

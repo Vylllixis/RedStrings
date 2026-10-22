@@ -43,6 +43,10 @@ typedef struct {
     classe_t classe_vue;    /**< Classe affichée à l'image précédente. */
     classe_t classe_prec;   /**< Classe affichée avant le dernier changement. */
     float t_classe;         /**< Temps depuis le dernier changement de classe. */
+    float t_main;           /**< Mode Yu-Gi-Oh! : temps depuis la donne de la main. */
+    int cat_main;           /**< Catégorie de la main affichée, -1 avant la première. */
+    float incl_x;           /**< Inclinaison de la grande carte vers la souris. */
+    float incl_y;
 } creation_t;
 
 typedef struct {
@@ -136,6 +140,7 @@ typedef struct {
     popup_t popups[MAX_POPUPS];
     float t_tour;
     int journal_vu;                     /**< Lignes du journal déjà révélées. */
+    float t_cartes;                     /**< Mode Yu-Gi-Oh! : temps depuis le début du combat. */
     bouton_t boutons[NB_ACTIONS];
     bouton_t rejouer;
     bouton_t quitter;

@@ -17,9 +17,13 @@
 #include "gui_scenes.h"
 #include "gui_types.h"
 #include "gui_ui.h"
+#include "gui_yugioh.h"
 
 #define FICHE_L 520.f
 #define FICHE_H 510.f
+/* Mode Yu-Gi-Oh! : la carte du personnage, à gauche de sa fiche */
+#define CARTE_FICHE_L 290.f
+#define CARTE_FICHE_ECART 36.f
 
 void entrer_liste(app_t *app)
 {
@@ -113,12 +117,34 @@ static int boutons_modal(app_t *app, liste_t *l, sfFloatRect r)
 }
 
 /** Fiche plein écran : équivalent de afficher_personnage(). */
+/** Carte de la classe du personnage : se retourne à l'ouverture et à chaque changement. */
+static void carte_fiche(app_t *app, const liste_t *l, const personnage_t *p, sfFloatRect r)
+{
+    float e = sortie_cubique(progression(l->t_modal, 0.05f, 0.6f));
+    carte3d_t k = carte3d_pose((sfVector2f){r.left - CARTE_FICHE_ECART - CARTE_FICHE_L / 2.f
+        - 60.f * (1.f - e), r.top + r.height / 2.f}, CARTE_FICHE_L);
+
+    k.rot_y = -PI * (1.f - e);
+    if (!app->in.dehors) {
+        k.rot_y += bornerf((app->in.souris.x - k.centre.x) / 400.f, -1.f, 1.f) * 0.14f;
+        k.rot_x = -bornerf((app->in.souris.y - k.centre.y) / 400.f, -1.f, 1.f) * 0.1f;
+    }
+    k.rot_z = -0.03f * e;
+    k.reflet = 0.3f + 0.7f * (1.f - progression(l->t_modal, 0.5f, 0.7f));
+    k.bord = 0.7f;
+    k.ombre = 1.f;
+    k.gris = est_ko(p) ? 1.f : 0.f;
+    k.halo = avec_alpha(couleur_classe(p->classe), 0.4f);
+    carte3d(app, p->classe, &k);
+}
+
 static void modal(app_t *app, liste_t *l, float a)
 {
     int id = l->ouvert >= 0 ? l->ouvert : l->dernier;
     const personnage_t *p = NULL;
     float m = 0.f;
     sfFloatRect r;
+    sfFloatRect zone;
     char buf[32];
 
     l->modal = approcher(l->modal, l->ouvert >= 0 ? 1.f : 0.f, 12.f, app->dt);
@@ -132,20 +158,29 @@ static void modal(app_t *app, liste_t *l, float a)
         (sfColor){4, 5, 12, 215});
     r = (sfFloatRect){LARGEUR / 2.f - FICHE_L / 2.f, 92.f + 50.f * (1.f - m), FICHE_L,
         FICHE_H};
+    if (yugioh_actif(app))
+        r.left += (CARTE_FICHE_L + CARTE_FICHE_ECART) / 2.f;
+    zone = r;
+    if (yugioh_actif(app)) {
+        zone.left -= CARTE_FICHE_L + CARTE_FICHE_ECART;
+        zone.width += CARTE_FICHE_L + CARTE_FICHE_ECART;
+    }
     lueur(app, (sfVector2f){LARGEUR / 2.f, r.top + r.height / 2.f}, (sfVector2f){520.f,
         420.f}, avec_alpha(couleur_classe(p->classe), 0.12f));
     for (int i = 0; i < NB_STATS; i++)
         l->segments[i] = fminf((valeur_stat(p, (stat_t)i) + 4) / 5, fmaxf(0.f, (l->t_modal - 0.15f
             - i * 0.12f) * 48.f));
     fiche(app, p, r, l->segments);
+    if (yugioh_actif(app))
+        carte_fiche(app, l, p, r);
     snprintf(buf, sizeof(buf), "%d / %d", id + 1, app->equipe.len);
     texte(app, POLICE_GRAS, buf, 14, (sfVector2f){LARGEUR / 2.f, r.top + r.height + 32.f},
         C_TEXTE_DOUX, ALIGNE_CENTRE);
     texte(app, POLICE_NORMALE, "Échap pour fermer  ·  flèches pour changer de personnage",
         13, (sfVector2f){LARGEUR / 2.f, r.top + r.height + 58.f}, C_TEXTE_FAIBLE,
         ALIGNE_CENTRE);
-    if (!boutons_modal(app, l, r) && app->in.clic && !app->souris_bloquee
-        && !sfFloatRect_contains(&r, app->in.souris.x, app->in.souris.y))
+    if (!boutons_modal(app, l, zone) && app->in.clic && !app->souris_bloquee
+        && !sfFloatRect_contains(&zone, app->in.souris.x, app->in.souris.y))
         l->ouvert = -1;
     app->alpha = a;
 }

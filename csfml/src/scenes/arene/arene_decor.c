@@ -29,7 +29,7 @@ void arene_disque(app_t *app, sfVector2f c, sfVector2f r, sfColor centre,
         v[i + 1] = (sfVertex){{c.x + cosf(a) * r.x, c.y + sinf(a) * r.y},
             avec_alpha(bord, app->alpha), {0, 0}};
     }
-    sfRenderWindow_drawPrimitives(app->fenetre, v, 34, sfTriangleFan, NULL);
+    cible_primitives(app, v, 34, sfTriangleFan, NULL);
 }
 
 /** Anneau d'ellipse en tirets qui tourne (sol des plateformes). */
@@ -74,7 +74,7 @@ static void faisceau(app_t *app, sfVector2f c, float largeur, sfColor col)
         {{c.x - largeur, c.y}, avec_alpha(col, 0.09f * app->alpha), {0, 0}},
     };
 
-    sfRenderWindow_drawPrimitives(app->fenetre, v, 4, sfQuads, &app->additif);
+    cible_primitives(app, v, 4, sfQuads, &app->additif);
 }
 
 /** Le fil rouge qui relie les deux camps, parcouru d'impulsions. */
@@ -123,7 +123,7 @@ static void stade(app_t *app)
         pilier[2] = (sfVertex){{x + 6.f, y}, avec_alpha(C_CYAN, (0.05f + 0.04f
             * sinf(app->temps * 1.3f + k)) * app->alpha), {0, 0}};
         pilier[3] = (sfVertex){{x - 6.f, y}, pilier[2].color, {0, 0}};
-        sfRenderWindow_drawPrimitives(app->fenetre, pilier, 4, sfQuads, &app->additif);
+        cible_primitives(app, pilier, 4, sfQuads, &app->additif);
     }
 }
 
@@ -139,7 +139,7 @@ void arene_dessiner_arene(app_t *app, arene_t *ar)
         {{0.f, HAUTEUR}, (sfColor){4, 5, 12, 60}, {0, 0}},
     };
 
-    sfRenderWindow_drawPrimitives(app->fenetre, voile, 4, sfQuads, NULL);
+    cible_primitives(app, voile, 4, sfQuads, NULL);
     app->alpha = a * e;
     stade(app);
     faisceau(app, (sfVector2f){SOL_A_X, SOL_A_Y}, PLAT_A_RX, C_BLANC);

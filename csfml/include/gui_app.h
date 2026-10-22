@@ -10,6 +10,7 @@
 #ifndef GUI_APP_H
     #define GUI_APP_H
 
+    #include <stddef.h>
     #include <SFML/Graphics.h>
     #include "roster.h"
     #include "gui_config.h"
@@ -17,6 +18,10 @@
     #include "gui_etat.h"
 
 struct app_s {
+    mode_visuel_t mode;     /**< Fixé au lancement, jamais modifié ensuite. */
+    yugioh_t yugioh;
+    sfRenderTexture *cible; /**< Si non NULL, le dessin va dans cette texture. */
+    float desature;         /**< 0..1 : portraits grisés (personnage K.O.). */
     sfRenderWindow *fenetre;
     sfView *vue;
     sfFont *polices[NB_POLICES];
@@ -60,7 +65,8 @@ struct app_s {
 };
 
 /* app.c */
-int creer_app(app_t *app);
+int creer_app(app_t *app, mode_visuel_t mode);
+int chemin_ressource(const char *relatif, char *chemin, size_t taille);
 void detruire_app(app_t *app);
 void evenements(app_t *app);
 void maj_app(app_t *app, float dt);

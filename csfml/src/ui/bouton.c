@@ -124,7 +124,7 @@ static void reflet(app_t *app, sfFloatRect r, float rayon)
         sfConvexShape_setPoint(app->forme, i, res[i]);
     sfConvexShape_setFillColor(app->forme, avec_alpha(C_BLANC, 0.16f * app->alpha));
     sfConvexShape_setOutlineThickness(app->forme, 0.f);
-    sfRenderWindow_drawConvexShape(app->fenetre, app->forme, &app->additif);
+    cible_convexe(app, app->forme, &app->additif);
 }
 
 int bouton_plein(app_t *app, bouton_t *b, sfFloatRect r, const char *label,

@@ -54,7 +54,7 @@ void graduations(app_t *app, sfVector2f centre, float rayon, int n,
         v[2 * i + 1] = (sfVertex){{centre.x + cosf(a) * (rayon + l),
             centre.y + sinf(a) * (rayon + l)}, c, {0, 0}};
     }
-    sfRenderWindow_drawPrimitives(app->fenetre, v, 2 * n, sfLines, NULL);
+    cible_primitives(app, v, 2 * n, sfLines, NULL);
 }
 
 /** Contour d'ellipse (socle, orbites). */
@@ -108,7 +108,7 @@ void radar_stats(app_t *app, sfVector2f centre, float rayon,
             i % NB_STATS);
         fond[i + 1] = (sfVertex){pts[i], avec_alpha(c, 0.42f * app->alpha), {0, 0}};
     }
-    sfRenderWindow_drawPrimitives(app->fenetre, fond, NB_STATS + 2, sfTriangleFan,
+    cible_primitives(app, fond, NB_STATS + 2, sfTriangleFan,
         NULL);
     ligne_epaisse(app, pts, NB_STATS + 1, 2.f, melanger(c, C_BLANC, 0.25f), 0);
     for (int i = 0; i < NB_STATS; i++) {

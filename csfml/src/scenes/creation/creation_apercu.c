@@ -19,6 +19,7 @@
 #include "gui_hud.h"
 #include "gui_types.h"
 #include "gui_ui.h"
+#include "gui_yugioh.h"
 #include "creation_interne.h"
 
 #define AY 74.f
@@ -106,7 +107,10 @@ void creation_apercu(app_t *app, creation_t *c, float a)
         C_TEXTE_DOUX, ALIGNE_GAUCHE);
     etiquette(app, nom_classe_maj(c->classe), (sfVector2f){r.left + AW - 26.f,
         r.top + 30.f}, col, ALIGNE_DROITE);
-    creation_hologramme(app, c);
+    if (yugioh_actif(app))
+        creation_carte_apercu(app, c);
+    else
+        creation_hologramme(app, c);
     tronquer(app, POLICE_GRAS, 32, p.nom[0] ? p.nom : "Sans nom", AW - 80.f, buf, sizeof(buf));
     app->espacement = 0.5f;
     texte(app, POLICE_GRAS, buf, 32, (sfVector2f){cx, 394.f - 30.f * envol},

@@ -11,7 +11,11 @@
 #include "gui_carte.h"
 #include "gui_emblemes.h"
 #include "gui_types.h"
+#include "gui_yugioh.h"
 #include "emblemes_interne.h"
+
+/* Rayon du portrait du mode Yu-Gi-Oh!, rapporté à la taille de l'emblème qu'il remplace. */
+#define PORTRAIT_PAR_EMBLEME 1.75f
 
 typedef void (*dessin_embleme_t)(app_t *app, sfVector2f c, float t, sfColor col);
 
@@ -42,5 +46,7 @@ static const dessin_embleme_t DESSINS[NB_EMBLEMES] = {
 void embleme(app_t *app, classe_t c, sfVector2f centre, float taille,
     sfColor couleur)
 {
+    if (yugioh_portrait(app, c, centre, taille * PORTRAIT_PAR_EMBLEME))
+        return;
     DESSINS[classe_info(c)->embleme](app, centre, taille, couleur);
 }

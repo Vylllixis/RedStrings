@@ -26,7 +26,7 @@ static void degrade(app_t *app)
         {{LARGEUR, HAUTEUR}, melanger(bas, haut, 0.4f), {0, 0}}
     };
 
-    sfRenderWindow_drawPrimitives(app->fenetre, v, 4, sfTriangleStrip, NULL);
+    cible_primitives(app, v, 4, sfTriangleStrip, NULL);
 }
 
 static void aurores(app_t *app)
@@ -98,7 +98,7 @@ static void etoiles(app_t *app)
         v[4 * i + 2] = (sfVertex){{e->x + s, e->y + s}, c, {0, 0}};
         v[4 * i + 3] = (sfVertex){{e->x, e->y + s}, c, {0, 0}};
     }
-    sfRenderWindow_drawPrimitives(app->fenetre, v, NB_ETOILES * 4, sfQuads, NULL);
+    cible_primitives(app, v, NB_ETOILES * 4, sfQuads, NULL);
 }
 
 /**
@@ -125,7 +125,7 @@ static void sol(app_t *app)
         v[n++] = (sfVertex){{0.f, y}, avec_alpha(C_CYAN, 0.10f * z), {0, 0}};
         v[n++] = (sfVertex){{LARGEUR, y}, avec_alpha(C_CYAN, 0.10f * z), {0, 0}};
     }
-    sfRenderWindow_drawPrimitives(app->fenetre, v, n, sfLines, NULL);
+    cible_primitives(app, v, n, sfLines, NULL);
     lueur(app, (sfVector2f){LARGEUR / 2.f, HORIZON}, (sfVector2f){760.f, 46.f},
         avec_alpha(C_ROUGE, 0.10f));
     lueur(app, (sfVector2f){LARGEUR / 2.f, HORIZON}, (sfVector2f){420.f, 6.f},
@@ -165,5 +165,5 @@ void dessiner_fond(app_t *app)
     sfSprite_setPosition(app->sprite, (sfVector2f){0, 0});
     sfSprite_setScale(app->sprite, (sfVector2f){LARGEUR / 256.f, HAUTEUR / 256.f});
     sfSprite_setColor(app->sprite, C_BLANC);
-    sfRenderWindow_drawSprite(app->fenetre, app->sprite, NULL);
+    cible_sprite(app, app->sprite, NULL);
 }

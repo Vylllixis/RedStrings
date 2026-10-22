@@ -17,6 +17,20 @@
 /* app_t est défini dans gui_app.h : ici seulement son nom, pour les modules de dessin. */
 typedef struct app_s app_t;
 
+/** Apparence choisie au lancement : le mode Yu-Gi-Oh! ne change que le rendu. */
+typedef enum {
+    MODE_NORMAL,
+    MODE_YUGIOH
+} mode_visuel_t;
+
+/** Ressources du mode Yu-Gi-Oh!, chargées seulement dans ce mode. */
+typedef struct {
+    sfTexture *art[NB_CLASSES];         /**< Illustration, NULL si le fichier manque. */
+    sfRenderTexture *face[NB_CLASSES];  /**< Face de la carte, dessinée une fois. */
+    sfRenderTexture *dos;               /**< Dos commun à toutes les cartes. */
+    int nb_illustrations;               /**< Illustrations réellement chargées. */
+} yugioh_t;
+
 typedef enum {
     POLICE_GRAS,
     POLICE_NORMALE,

@@ -34,6 +34,12 @@
 /* Rythme */
 #define DUREE_INTRO 1.1f
 
+/* Entrée en formation des combattants pendant l'intro (en secondes) */
+#define ENTREE_DEBUT 0.15f
+#define ENTREE_PAS_RANG 0.08f
+#define ENTREE_PAS_EQUIPE 0.12f
+#define ENTREE_DUREE 0.55f
+
 extern const float ARENE_IMPACTS[];
 
 visuel_t *arene_vis(arene_t *ar, ref_t r);
@@ -63,5 +69,8 @@ void arene_ordre_tours(app_t *app, arene_t *ar);
 void arene_journal(app_t *app, arene_t *ar, float y);
 void arene_banniere(app_t *app, arene_t *ar);
 void arene_ecran_fin(app_t *app, arene_t *ar);
+void arene_cartes_invocation(app_t *app, arene_t *ar);
+void arene_carte_action(app_t *app, arene_t *ar);
+void arene_cartes_fin(app_t *app, arene_t *ar, float cy);
 
 #endif /* ARENE_INTERNE_H */

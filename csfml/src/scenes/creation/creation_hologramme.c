@@ -129,7 +129,7 @@ static void projecteur(app_t *app, sfColor col)
     float y = 0.f;
     float f = 0.f;
 
-    sfRenderWindow_drawPrimitives(app->fenetre, cone, 4, sfQuads, &app->additif);
+    cible_primitives(app, cone, 4, sfQuads, &app->additif);
     for (int k = 0; k < 7; k++) {
         f = fmodf(k / 7.f + app->temps * 0.25f, 1.f);
         y = lerpf(SOCLE_Y - 6.f, SCENE_Y - 110.f, f);
@@ -137,7 +137,7 @@ static void projecteur(app_t *app, sfColor col)
             avec_alpha(col, 0.22f * (1.f - f) * app->alpha), {0, 0}};
         trait[1] = (sfVertex){{lerpf(SCENE_X + 108.f, SCENE_X + 62.f, f), y},
             trait[0].color, {0, 0}};
-        sfRenderWindow_drawPrimitives(app->fenetre, trait, 2, sfLines, &app->additif);
+        cible_primitives(app, trait, 2, sfLines, &app->additif);
     }
     lueur(app, (sfVector2f){SCENE_X, SOCLE_Y}, (sfVector2f){170.f, 34.f},
         avec_alpha(col, 0.35f));

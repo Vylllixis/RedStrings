@@ -46,9 +46,9 @@ void panneau(app_t *app, sfFloatRect r, float coupe, sfColor haut, sfColor bas,
         l[i] = (sfVertex){{floorf(pts[i % 6].x) + 0.5f, floorf(pts[i % 6].y) + 0.5f},
             avec_alpha(bord, app->alpha), {0, 0}};
     }
-    sfRenderWindow_drawPrimitives(app->fenetre, v, 8, sfTriangleFan, NULL);
+    cible_primitives(app, v, 8, sfTriangleFan, NULL);
     if (bord.a > 0)
-        sfRenderWindow_drawPrimitives(app->fenetre, l, 7, sfLinesStrip, NULL);
+        cible_primitives(app, l, 7, sfLinesStrip, NULL);
 }
 
 /** Ombre portée douce sous un panneau biseauté. */
@@ -130,7 +130,7 @@ void titre_section(app_t *app, const char *num, const char *label,
         {0, 0}};
     filet[1] = (sfVertex){{pos.x + largeur - 10.f, pos.y + 0.5f},
         avec_alpha(C_BLANC, 0.03f * app->alpha), {0, 0}};
-    sfRenderWindow_drawPrimitives(app->fenetre, filet, 2, sfLines, NULL);
+    cible_primitives(app, filet, 2, sfLines, NULL);
     losange(app, (sfVector2f){pos.x + largeur - 4.f, pos.y}, 3.f,
         avec_alpha(accent, 0.7f));
 }

@@ -75,7 +75,7 @@ float texte_echelle(app_t *app, police_t p, const char *s, unsigned int taille,
     sfText_setOutlineThickness(app->texte, app->contour);
     sfText_setOutlineColor(app->texte, avec_alpha((sfColor){8, 8, 18, 220},
         app->alpha * (c.a / 255.f)));
-    sfRenderWindow_drawText(app->fenetre, app->texte, NULL);
+    cible_texte(app, app->texte, NULL);
     return b.width * echelle;
 }
 

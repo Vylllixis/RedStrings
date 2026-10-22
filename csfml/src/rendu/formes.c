@@ -49,7 +49,7 @@ void rect_arrondi_bord(app_t *app, sfFloatRect r, float rayon, sfColor fond,
     sfConvexShape_setFillColor(app->forme, avec_alpha(fond, app->alpha));
     sfConvexShape_setOutlineColor(app->forme, avec_alpha(bord, app->alpha));
     sfConvexShape_setOutlineThickness(app->forme, bord.a > 0 ? -1.5f : 0.f);
-    sfRenderWindow_drawConvexShape(app->fenetre, app->forme, NULL);
+    cible_convexe(app, app->forme, NULL);
 }
 
 /** Ombre portée douce : plusieurs couches de plus en plus larges. */
@@ -77,7 +77,7 @@ void lueur(app_t *app, sfVector2f centre, sfVector2f rayon, sfColor c)
     sfSprite_setScale(app->sprite, (sfVector2f){rayon.x / 64.f,
         rayon.y / 64.f});
     sfSprite_setColor(app->sprite, avec_alpha(c, app->alpha));
-    sfRenderWindow_drawSprite(app->fenetre, app->sprite, &app->additif);
+    cible_sprite(app, app->sprite, &app->additif);
 }
 
 void cercle(app_t *app, sfVector2f centre, float r, sfColor fond,
@@ -90,7 +90,7 @@ void cercle(app_t *app, sfVector2f centre, float r, sfColor fond,
     sfCircleShape_setFillColor(app->cercle, avec_alpha(fond, app->alpha));
     sfCircleShape_setOutlineColor(app->cercle, avec_alpha(bord, app->alpha));
     sfCircleShape_setOutlineThickness(app->cercle, -epaisseur);
-    sfRenderWindow_drawCircleShape(app->fenetre, app->cercle, NULL);
+    cible_cercle(app, app->cercle, NULL);
 }
 
 /** Polygone en coordonnées unitaires, mis à l'échelle et tourné. */
@@ -108,7 +108,7 @@ void polygone(app_t *app, const float *pts, int n, sfVector2f centre,
     }
     sfConvexShape_setFillColor(app->forme, avec_alpha(c, app->alpha));
     sfConvexShape_setOutlineThickness(app->forme, 0.f);
-    sfRenderWindow_drawConvexShape(app->fenetre, app->forme, NULL);
+    cible_convexe(app, app->forme, NULL);
 }
 
 /** Polyligne épaisse construite en bande de triangles. */
@@ -135,6 +135,6 @@ void ligne_epaisse(app_t *app, const sfVector2f *pts, int n, float epaisseur,
         v[2 * i] = (sfVertex){{pts[i].x + d.x, pts[i].y + d.y}, c, {0, 0}};
         v[2 * i + 1] = (sfVertex){{pts[i].x - d.x, pts[i].y - d.y}, c, {0, 0}};
     }
-    sfRenderWindow_drawPrimitives(app->fenetre, v, n * 2, sfTriangleStrip,
+    cible_primitives(app, v, n * 2, sfTriangleStrip,
         additif ? &app->additif : NULL);
 }
