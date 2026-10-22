@@ -4,8 +4,14 @@
 */
 
 /*
- * Menu principal : choix d'une commande, sauvegarde, chargement et écran d'au revoir.
- */
+** ╭─ scene_menu.c ───────────────────────────────────────────────────────
+** │ But         Menu principal : choix d'une commande, sauvegarde,
+** │             chargement et écran d'au revoir.
+** │ Contenu     entrer_menu, sauvegarder_equipe, charger_equipe,
+** │             menu_action, menu_touche_menu, menu_nb_ko, scene_menu,
+** │             scene_au_revoir
+** ╰──────────────────────────────────────────────────────────────────────
+*/
 
 #include <stdio.h>
 #include <string.h>
