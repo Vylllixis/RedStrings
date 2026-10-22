@@ -1,0 +1,53 @@
+name: Rapport de bug
+description: Quelque chose ne marche pas comme prévu.
+labels: ["bug"]
+body:
+  - type: dropdown
+    id: version_jeu
+    attributes:
+      label: Version concernée
+      options:
+        - Console (./redstrings)
+        - Fenêtre (./redstrings_csfml)
+        - Fenêtre, mode "Yu-Gi-Oh!"
+        - Compilation / Makefile
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: Version du jeu
+      description: Résultat de `git describe --tags`, ou hash du commit.
+    validations:
+      required: true
+  - type: input
+    id: systeme
+    attributes:
+      label: Système et version de CSFML
+      description: Par exemple « Ubuntu 24.04, libcsfml-dev 2.6.0 ». Laisse vide pour la console.
+  - type: textarea
+    id: etapes
+    attributes:
+      label: Étapes pour reproduire
+      placeholder: "1. Lancer … 2. Choisir … 3. …"
+    validations:
+      required: true
+  - type: textarea
+    id: attendu
+    attributes:
+      label: Ce que tu attendais
+    validations:
+      required: true
+  - type: textarea
+    id: observe
+    attributes:
+      label: Ce qui s'est passé
+      description: Message d'erreur, capture d'écran, sortie du terminal.
+    validations:
+      required: true
+  - type: textarea
+    id: sauvegarde
+    attributes:
+      label: Fichier personnages.txt
+      description: Seulement si le bug concerne une sauvegarde ou un chargement.
+      render: text

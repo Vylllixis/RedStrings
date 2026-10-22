@@ -909,7 +909,7 @@ make tests
 
 ### Le flux de travail
 
-Le dépôt suit **git flow** : chaque changement vit sur sa propre branche partie de `develop`, puis y est fusionné avec `--no-ff`. `main` ne reçoit que les versions publiées (`v0.1.0` → `v1.4.0`).
+Le dépôt suit **git flow** : chaque changement vit sur sa propre branche partie de `develop`, puis y est fusionné avec `--no-ff`. `main` ne reçoit que les versions publiées (`v0.1.0` → `v1.4.1`).
 
 ```mermaid
 gitGraph
@@ -989,11 +989,25 @@ Le résultat est déterministe : deux exécutions donnent les mêmes fichiers. C
 
 <img src=".github/readme/fil-rouge.svg" width="100%" alt=""/>
 
+### Signaler un bug, proposer une idée
+
+Ouvre une [issue](https://github.com/Vylllixis/RedStrings/issues/new/choose) : des modèles guident le rapport (version, système, étapes pour reproduire). Les règles de contribution, les conventions de code et le workflow sont dans [`CONTRIBUTING.md`](CONTRIBUTING.md). Une faille de sécurité se signale en privé : voir [`SECURITY.md`](SECURITY.md).
+
+### Limites connues
+
+- **10 personnages au plus dans la fenêtre** (`MAX_PERSONNAGES`) : l'écran n'a de place que pour 10 cartes. La console n'a pas cette limite.
+- **Noms sans espace**, 29 caractères au plus (le nom sert d'identifiant dans la sauvegarde).
+- **Testé sous Linux uniquement.** Rien n'a été vérifié sous Windows ni macOS. Le plein écran natif dépend du système et de la carte graphique.
+- **Plein écran : seules les fonctions de bascule ont été exercées**, par un programme de test qui les appelle directement. Les vraies touches <kbd>F11</kbd> et <kbd>Alt</kbd>+<kbd>Entrée</kbd> n'ont pas été essayées à la main.
+- **Mode `"Yu-Gi-Oh!"`** : les illustrations ne sont pas dans le dépôt (droits). Il faut lancer `sh csfml/assets/yugioh/telecharger.sh`, sinon chaque carte montre l'emblème de sa classe. Voir [`THIRD_PARTY_NOTICES.md`](THIRD_PARTY_NOTICES.md).
+- **Pas encore de compétences spéciales, d'attaques de zone ni d'effets de statut** (le moteur a déjà `effet_t` pour les accueillir).
+- **Pas de documentation Doxygen** : `make doc` n'existe pas.
+
 <a id="licence"></a>
 
 ## 10 · Licence
 
-Le dépôt ne contient **pas encore de fichier `LICENSE`**. Tant qu'aucune licence n'est choisie, le code reste sous le droit d'auteur par défaut de son auteur : le lire est possible, mais aucune autorisation de réutilisation n'est accordée. Les polices de `csfml/assets/fonts/` gardent leurs propres licences.
+Le dépôt ne contient **pas encore de fichier `LICENSE`**. Tant qu'aucune licence n'est choisie, le code reste sous le droit d'auteur par défaut de son auteur : le lire est possible, mais aucune autorisation de réutilisation n'est accordée. Les polices de `csfml/assets/fonts/` gardent leurs propres licences, et les dépendances (CSFML) les leurs : voir [`THIRD_PARTY_NOTICES.md`](THIRD_PARTY_NOTICES.md).
 
 <img src=".github/readme/fil-rouge.svg" width="100%" alt=""/>
 
