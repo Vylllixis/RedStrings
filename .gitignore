@@ -49,6 +49,7 @@ Thumbs.db
 # Notes Markdown personnelles : ignorées, sauf la documentation du dépôt
 *.md
 !README.md
+!RENDU.md
 !CONTRIBUTING.md
 !SECURITY.md
 !THIRD_PARTY_NOTICES.md
