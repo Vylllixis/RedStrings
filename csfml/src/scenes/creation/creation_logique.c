@@ -4,8 +4,15 @@
 */
 
 /*
- * Création : règles (validation, voisinage des classes, ajustement) et clavier.
- */
+** ╭─ creation_logique.c ─────────────────────────────────────────────────
+** │ But         Les règles de l'écran de création : validation du
+** │             formulaire, voisinage des classes, ajustement des
+** │             valeurs, clavier.
+** │ Contenu     creation_raison_invalide, creation_creer, classe_voisine,
+** │             creation_premiere_classe, categorie_voisine, ajuster,
+** │             creation_clavier
+** ╰──────────────────────────────────────────────────────────────────────
+*/
 
 #include <stdio.h>
 #include "personnage.h"
@@ -21,10 +28,17 @@
 
 #define NB_FOCUS (FOCUS_BOUTON + 1)
 
-/**
- * Pourquoi le personnage ne peut pas être créé, ou NULL s'il peut l'être.
- * Seule source de ces règles à l'écran : le bouton et creation_creer() l'utilisent.
- */
+/*
+** ╭─ creation_raison_invalide ───────────────────────────────────────────
+** │ Pourquoi le personnage ne peut pas être créé, ou NULL s'il peut
+** │ l'être.
+** │
+** │ Refuse : un nom vide, un nom déjà pris (trouver_personnage), une
+** │ équipe pleine (MAX_PERSONNAGES).
+** │ C'est la seule source de ces règles à l'écran : le bouton et
+** │ creation_creer() l'utilisent tous les deux.
+** ╰──────────────────────────────────────────────────────────────────────
+*/
 const char *creation_raison_invalide(app_t *app, const creation_t *c)
 {
     if (c->nom.texte[0] == '\0')
@@ -36,7 +50,18 @@ const char *creation_raison_invalide(app_t *app, const creation_t *c)
     return NULL;
 }
 
-/** Équivalent graphique de creer_personnage(). */
+/*
+** ╭─ creation_creer ─────────────────────────────────────────────────────
+** │ Équivalent graphique de creer_personnage().
+** │
+** │ 1. creation_raison_invalide() : s'il y a une raison, notification
+** │    rouge (le champ se secoue) et on s'arrête
+** │ 2. remplit le personnage depuis les curseurs (nom copié avec snprintf
+** │    borné), puis appliquer_classe()
+** │ 3. roster_ajouter() : un manque de mémoire est signalé, pas ignoré
+** │ 4. notification verte, étincelles et sortie animée de l'écran
+** ╰──────────────────────────────────────────────────────────────────────
+*/
 void creation_creer(app_t *app, creation_t *c)
 {
     const char *raison = creation_raison_invalide(app, c);
