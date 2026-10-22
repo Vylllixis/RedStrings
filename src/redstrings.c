@@ -33,7 +33,7 @@ static int demander_personnage(const roster_t *r, const char *question)
     int idx = 0;
 
     printf("  " GRAS "%s" RESET CYAN " › " RESET, question);
-    if (scanf("%29s", nom) != 1) {
+    if (scanf("%" STR(NOM_LONGUEUR) "s", nom) != 1) {
         afficher_erreur("Saisie interrompue");
         return -1;
     }
