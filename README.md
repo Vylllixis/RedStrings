@@ -91,7 +91,7 @@ Le nom **RedStrings** vient d'une image : des **fils rouges** qui relient les pe
 
 <br/>
 
-| Couleur | Rôle | Constante (`csfml/include/gui.h`) |
+| Couleur | Rôle | Constante (`csfml/include/gui_config.h`) |
 |---|---|---|
 | ![](https://img.shields.io/badge/-%20%20%20%20-f43f5e?style=flat-square) `#f43f5e` | la marque, les fils, l'adversaire, l'attaque | `C_ROUGE` |
 | ![](https://img.shields.io/badge/-%20%20%20%20-38bdf8?style=flat-square) `#38bdf8` | ton équipe, les actions, le focus | `C_CYAN` |
@@ -100,7 +100,7 @@ Le nom **RedStrings** vient d'une image : des **fils rouges** qui relient les pe
 | ![](https://img.shields.io/badge/-%20%20%20%20-67e8f9?style=flat-square) `#67e8f9` | le soin | `C_SOIN` |
 | ![](https://img.shields.io/badge/-%20%20%20%20-090b18?style=flat-square) `#090b18` | le fond, un bleu nuit presque noir | `C_FOND` |
 
-**Une seule silhouette.** Toutes les surfaces ont deux coins coupés (haut-gauche, bas-droite) et des crochets lumineux sur les deux autres. Les composants communs vivent dans `csfml/src/hud.c` : `panneau`, `crochets`, `titre_section`, `hexagone`, `radar_stats`, `touche_clavier`…
+**Une seule silhouette.** Toutes les surfaces ont deux coins coupés (haut-gauche, bas-droite) et des crochets lumineux sur les deux autres. Les composants communs vivent dans `csfml/src/rendu/hud.c` : `panneau`, `crochets`, `titre_section`, `hexagone`, `radar_stats`, `touche_clavier`…
 
 <details>
 <summary><b>✨ Ce qui rend l'interface vivante</b></summary>
@@ -561,7 +561,12 @@ RedStrings/
 │   │                         console : creer_personnage · afficher_personnage
 │   └── 📁 ui/                boite.c · saisie.c · bataille_console.c
 ├── 📁 lib/                   40 fonctions maison → libmy.a
-├── 📁 csfml/                 version graphique (src/, include/gui.h, assets/fonts/, Makefile)
+├── 📁 csfml/                 version graphique
+│   ├── include/              14 headers gui_*.h, un par thème (config, types, anim, dessin, ui…)
+│   ├── src/                  app/ · outils/ · rendu/ · ui/ · scenes/{menu,creation,liste,selection,arene}/
+│   ├── tests/                tests.c : UTF-8, animation, classes (sans fenêtre)
+│   ├── assets/fonts/         polices
+│   └── Makefile
 ├── 📁 tests/                 tests.c (assert)
 ├── 📁 .github/readme/        images de ce README et leur générateur
 └── Makefile
@@ -576,7 +581,7 @@ flowchart TB
     ui --> outils[boite.c · saisie.c]
     rs --> save[sauvegarde.c<br/><i>fgets · sscanf</i>]
     ui --> bat[bataille.c<br/><i>tours · actions · IA</i>]
-    gui([csfml/src/*.c<br/><i>affichage seul</i>]) --> bat
+    gui([csfml/src/**/*.c<br/><i>affichage seul</i>]) --> bat
     gui --> save
     bat --> combat[combat.c<br/><i>calculer_degats · est_ko</i>]
     bat --> perso[personnage.c<br/><i>table des classes</i>]
@@ -683,7 +688,7 @@ r->data = tmp;
 ```mermaid
 pie showData
     title Lignes de C par partie
-    "Version graphique (csfml/)" : 5639
+    "Version graphique (csfml/)" : 6910
     "Console et moteur (src/)" : 1396
     "libmy (lib/)" : 697
     "Headers (includes/)" : 547
@@ -769,6 +774,8 @@ make csfml            # compile ./redstrings_csfml
 | `make debug` | `./redstrings_debug` avec `-g3 -O0 -fsanitize=address,undefined` |
 | `make tests` | compile et lance les tests unitaires (avec les sanitizers) |
 | `make csfml` | compile `./redstrings_csfml` |
+| `make csfml-debug` | `./redstrings_csfml_debug` avec les sanitizers |
+| `make csfml-tests` | tests de la version graphique, sans fenêtre (UTF-8, animation, classes) |
 | `make clean` | supprime les `.o` |
 | `make fclean` | supprime aussi les exécutables et `libmy.a` |
 | `make re` | `fclean` puis `make` |
@@ -831,6 +838,7 @@ make tests
 | `roster_t` | 100 ajouts d'affilée, ordre conservé, libération complète |
 | Sauvegarde | aller-retour fichier → mémoire identique |
 | Chargement refusé | fichier absent · classe inconnue · stat > 99 · nom en double · ligne tronquée · texte au lieu d'un nombre (et l'équipe reste intacte) |
+| Version graphique (`make csfml-tests`) | UTF-8 : aller-retour, séquences tronquées / trop longues / substituts refusés, bornes du tampon · courbes d'animation · couleurs jamais hors d'un octet · recherche par nom · identifiant de classe hors table |
 
 <img src=".github/readme/fil-rouge.svg" width="100%" alt=""/>
 
