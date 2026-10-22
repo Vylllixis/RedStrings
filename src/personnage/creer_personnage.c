@@ -3,6 +3,17 @@
 ** PROJET FIL ROUGE C Avancé
 */
 
+/*
+** ╭─ creer_personnage.c ─────────────────────────────────────────────────
+** │ But         Guider le joueur pour créer un personnage : un nom, des
+** │             statistiques de base, puis une classe qui les modifie.
+** │ Contenu     lire_stat, ecrire_mod, afficher_choix_classe,
+** │             choisir_classe, creer_personnage
+** │ Utilise     saisie.c (lire_entier), la table classes[] de
+** │             personnage.c
+** ╰──────────────────────────────────────────────────────────────────────
+*/
+
 #include <stdio.h>
 #include "boite.h"
 #include "couleurs.h"
@@ -64,6 +75,18 @@ static int choisir_classe(classe_t *classe)
     return 0;
 }
 
+/*
+** ╭─ creer_personnage ───────────────────────────────────────────────────
+** │ Crée un personnage en trois temps.
+** │
+** │ 1. le nom : lu avec une taille limite, refusé s'il existe déjà dans
+** │    tab
+** │ 2. les statistiques de base (PV, attaque, défense, soin)
+** │ 3. la classe, puis appliquer_classe() ajoute ses modificateurs
+** │ Renvoie 0 si le personnage est créé, -1 s'il est annulé (nom pris,
+** │ Ctrl+D). L'ajout dans la liste est fait par l'appelant.
+** ╰──────────────────────────────────────────────────────────────────────
+*/
 int creer_personnage(personnage_t *p, personnage_t *tab, int len)
 {
     //en-tête
