@@ -470,12 +470,48 @@ static void aide_menu(app_t *app, float t)
     app->alpha = a;
 }
 
+/** Crédit animé : la direction visuelle a été réalisée avec Claude. */
+static void credit_claude(app_t *app, float t)
+{
+    static const char *phrase = "Direction visuelle et animations réalisées avec Claude";
+    float a = app->alpha;
+    float apparition = progression(t, 1.4f, 0.6f);
+    float frappe = progression(t, 1.9f, 1.6f);
+    float balayage = fmodf(t - 3.8f, 6.f) / 1.4f;
+    char buf[96];
+    int n = 0;
+    int cible = (int)(frappe * (float)my_strlen(phrase));
+    float largeur = largeur_texte(app, POLICE_NORMALE, phrase, 13);
+    float x = LARGEUR / 2.f - (largeur + 44.f) / 2.f;
+    sfVector2f c = {x + 11.f, 684.f};
+
+    while (phrase[n] != '\0' && (n < cible || ((unsigned char)phrase[n] & 0xC0) == 0x80))
+        n++;
+    for (int i = 0; i < n; i++)
+        buf[i] = phrase[i];
+    buf[n] = '\0';
+    app->alpha = a * apparition;
+    lueur(app, c, (sfVector2f){26.f, 26.f}, avec_alpha(C_ROUGE, 0.22f
+        + 0.08f * sinf(t * 2.4f)));
+    hexagone(app, c, 9.f, t * 0.8f, avec_alpha(C_FOND, 0.9f), C_ROUGE);
+    hexagone(app, c, 3.6f, -t * 0.8f, C_ROUGE, C_ROUGE);
+    arc_cercle(app, c, 14.f, 1.5f, (sfVector2f){t * 2.f, t * 2.f + 1.6f},
+        avec_alpha(C_CYAN, 0.8f), 1);
+    texte(app, POLICE_NORMALE, buf, 13, (sfVector2f){x + 28.f, 684.f},
+        C_TEXTE_DOUX, ALIGNE_GAUCHE);
+    if (balayage > 0.f && balayage < 1.f && n >= cible)
+        lueur(app, (sfVector2f){x + 28.f + largeur * balayage, 684.f},
+            (sfVector2f){34.f, 14.f}, avec_alpha(C_TEXTE, 0.16f));
+    app->alpha = a;
+}
+
 void scene_menu(app_t *app)
 {
     titre(app, app->t_scene);
     commandes(app, app->t_scene);
     panneau_equipe(app, app->t_scene);
     aide_menu(app, app->t_scene);
+    credit_claude(app, app->t_scene);
 }
 
 void scene_au_revoir(app_t *app)
