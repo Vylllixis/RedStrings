@@ -563,7 +563,7 @@ RedStrings/
 ├── 📁 lib/                   40 fonctions maison → libmy.a
 ├── 📁 csfml/                 version graphique
 │   ├── include/              14 headers gui_*.h, un par thème (config, types, anim, dessin, ui…)
-│   ├── src/                  app/ · outils/ · rendu/ · ui/ · scenes/{menu,creation,liste,selection,arene}/
+│   ├── src/                  app/ · outils/ · rendu/ · ui/ · yugioh/ · scenes/{menu,creation,liste,selection,arene}/
 │   ├── tests/                tests.c : UTF-8, animation, classes (sans fenêtre)
 │   ├── assets/fonts/         polices
 │   └── Makefile
@@ -750,6 +750,63 @@ make csfml            # compile ./redstrings_csfml
 
 > [!NOTE]
 > Les polices (Noto Sans, DejaVu Sans) sont cherchées à côté de l'exécutable, puis depuis le dossier courant : tu peux lancer le jeu depuis n'importe où dans le projet.
+
+<details>
+<summary><b>🃏 Un mode caché…</b></summary>
+
+<br/>
+
+```bash
+./redstrings_csfml "Yu-Gi-Oh!"     # les guillemets comptent : l'argument contient un point d'exclamation
+```
+
+Le même jeu, habillé en duel de cartes. **Seul le rendu change** : mêmes 28 classes, mêmes noms, mêmes statistiques, même moteur de combat, même sauvegarde. Sans argument, rien ne change ; un autre argument est refusé (`usage`, code 84).
+
+- **Création** : la grille des classes devient une main de cartes distribuée face cachée, qui se retourne, se soulève au survol et s'incline vers la souris. L'aperçu montre une grande carte qui fait un tour complet à chaque changement de classe, avec un reflet holographique.
+- **Fiche** : la carte du personnage, en perspective, à côté de ses vraies statistiques.
+- **Arène** : chaque carte s'ouvre au-dessus de son combattant puis plonge dans son jeton ; la carte de l'acteur s'active pendant une attaque, un soin ou une garde ; tes cartes brillent à la victoire et se grisent à la défaite.
+- **Partout** : l'illustration remplace l'emblème dans les hexagones (menu, cartes, jetons, ordre des tours).
+
+Le titre de chaque carte est le **nom de la classe RedStrings** : le nom officiel de la carte ne sert qu'à retrouver son illustration (`csfml/src/yugioh/cartes.c`). Les illustrations ne sont pas dans le dépôt : elles appartiennent à leurs ayants droit (Kazuki Takahashi / Konami). Le script les télécharge en local depuis la base YGOPRODeck :
+
+```bash
+sh csfml/assets/yugioh/telecharger.sh
+```
+
+Sans elles, le mode fonctionne quand même : chaque carte montre l'emblème de sa classe.
+
+| Classe | Carte | Cadre |
+|---|---|---|
+| Guerrier | Gilford the Legend | Effet |
+| Mage | Dark Magician | Normal |
+| Archer | Arcane Archer of the Forest | Effet |
+| Paladin | Paladin of White Dragon | Rituel |
+| Berserker | Beast King Barbaros | Effet |
+| Chevalier noir | Dark Blade | Normal |
+| Samouraï | Legendary Six Samurai - Shi En | Synchro |
+| Duelliste | Flame Swordsman | Fusion |
+| Lancier | Gaia The Fierce Knight | Normal |
+| Gladiateur | Gladiator Beast Laquari | Effet |
+| Archimage | Endymion, the Master Magician | Effet |
+| Élémentaliste | Elemental Mistress Doriado | Rituel |
+| Nécromancien | Zombie Master | Effet |
+| Invocateur | Aleister the Invoker | Effet |
+| Druide | Aurkus, Lightsworn Druid | Effet |
+| Illusionniste | Illusionist Faceless Mage | Normal |
+| Chronomancien | Time Wizard | Effet |
+| Chasseur | Amazoness Archer | Effet |
+| Tireur d'élite | Machina Sniper | Effet |
+| Assassin | Night Assailant | Effet |
+| Ombrelame | The Phantom Knights of Break Sword | Xyz |
+| Corsaire | Blackeyes, the Plunder Patroll Seaguide | Effet |
+| Prêtre | St. Joan | Fusion |
+| Barde | Aria the Melodious Diva | Effet |
+| Alchimiste | Alchemist of Black Spells | Effet |
+| Ingénieur | Ancient Gear Engineer | Effet |
+| Gardien | Big Shield Gardna | Effet |
+| Moine | Master Monk | Effet |
+
+</details>
 
 <details>
 <summary><b>🧰 Prérequis</b></summary>
