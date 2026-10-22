@@ -4,16 +4,21 @@
 */
 
 /*
- * L'arène : combat en équipe, mis en scène comme les combats « vus de
- * trois quarts » des anciens jeux de rôle. Ton équipe au premier plan en
- * bas à gauche, l'adversaire plus loin en haut à droite.
- *
- * Séparation stricte :
- *  - bataille.c décide (dégâts, soins, garde, tours, victoire) ;
- *  - ce fichier reçoit les événements et les JOUE dans le temps. Les PV
- *    affichés et le journal ne rattrapent l'état réel qu'au moment de
- *    l'impact ; aucune valeur n'est recalculée ni réappliquée ici.
- */
+** ╭─ scene_arene.c ──────────────────────────────────────────────────────
+** │ But         L'arène : le combat en équipe, mis en scène comme les
+** │             combats « vus de trois quarts » des anciens jeux de rôle.
+** │             Ton équipe au premier plan en bas à gauche, l'adversaire
+** │             plus loin en haut à droite.
+** │ Séparation  bataille.c DÉCIDE (dégâts, soins, garde, tours,
+** │             victoire) ; ce fichier reçoit les événements et les JOUE
+** │             dans le temps. Les PV affichés et le journal ne rattrapent
+** │             l'état réel qu'au moment de l'impact ; aucune valeur n'est
+** │             recalculée ni réappliquée ici.
+** │ Contenu     arene_vis, arene_couleur_equipe, arene_couleur_action,
+** │             arene_demarrer, entrer_arene, arene_debut_tour,
+** │             arene_lancer, maj_etat, arene_echelle_monde, scene_arene
+** ╰──────────────────────────────────────────────────────────────────────
+*/
 
 #include <math.h>
 #include <string.h>
@@ -106,6 +111,19 @@ void arene_debut_tour(arene_t *ar)
     ar->action = ACTION_ATTAQUER;
 }
 
+/*
+** ╭─ arene_lancer ───────────────────────────────────────────────────────
+** │ Demande au moteur de jouer une action, puis prépare sa mise en scène.
+** │
+** │ 1. bataille_agir() calcule TOUT tout de suite (dégâts, soins,
+** │    victoire) et renvoie la liste des événements
+** │ 2. s'il refuse (n < 0) : notification d'erreur, rien ne change
+** │ 3. sinon la liste est gardée dans ar->file et l'état passe à
+** │    VUE_ANIMATION : l'écran va REJOUER ces événements un par un
+** │ L'affichage ne recalcule jamais rien : il montre ce que le moteur a
+** │ décidé.
+** ╰──────────────────────────────────────────────────────────────────────
+*/
 void arene_lancer(app_t *app, arene_t *ar, action_t a, ref_t cible)
 {
     int n = bataille_agir(&ar->bataille, a, cible, ar->file);
@@ -121,6 +139,18 @@ void arene_lancer(app_t *app, arene_t *ar, action_t a, ref_t cible)
     ar->etat = VUE_ANIMATION;
 }
 
+/*
+** ╭─ maj_etat ───────────────────────────────────────────────────────────
+** │ Fait avancer l'arène à chaque image.
+** │
+** │ - VUE_INTRO : après DUREE_INTRO, arene_debut_tour() lance le premier
+** │   tour
+** │ - VUE_ORDINATEUR : après DELAI_ORDINATEUR, bataille_ia() choisit et
+** │   arene_lancer() joue l'action
+** │ - dans tous les cas, arene_jouer_evenements() fait avancer
+** │   l'animation en cours
+** ╰──────────────────────────────────────────────────────────────────────
+*/
 static void maj_etat(app_t *app, arene_t *ar)
 {
     action_t a = ACTION_ATTAQUER;
@@ -137,11 +167,14 @@ static void maj_etat(app_t *app, arene_t *ar)
     arene_jouer_evenements(app, ar);
 }
 
-/**
- * Échelle du « monde » (plateformes, combattants, effets) : uniforme, pour
- * que la composition garde ses proportions dans toute fenêtre. L'interface
- * (panneaux, commandes) reste à sa taille, ancrée aux bords réels.
- */
+/*
+** ╭─ arene_echelle_monde ────────────────────────────────────────────────
+** │ Échelle du « monde » de l'arène (plateformes, combattants, effets) :
+** │ uniforme, pour ne rien déformer.
+** │
+** │ min(largeur visible / 1280, hauteur visible / 720), jamais sous 0,5.
+** ╰──────────────────────────────────────────────────────────────────────
+*/
 float arene_echelle_monde(const app_t *app)
 {
     return fmaxf(0.5f, fminf(app->ecran.width / LARGEUR, app->ecran.height / HAUTEUR));
