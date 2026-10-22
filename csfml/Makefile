@@ -26,7 +26,7 @@ OBJS_MOTEUR	=	$(MOTEUR:%.c=$(OBJ_DIR)/moteur/%.o)
 
 #fonctions de la version graphique qui ne dépendent pas de SFML : testables sans fenêtre
 TEST_SRCS	=	tests/tests.c src/outils/anim.c src/outils/jeu.c src/outils/utf8.c \
-			src/ui/libelles.c $(MOTEUR_DIR)/personnage.c
+			src/ui/libelles.c src/yugioh/cartes.c $(MOTEUR_DIR)/personnage.c
 
 DEPS		=	$(OBJS:.o=.d) $(OBJS_MOTEUR:.o=.d)
 

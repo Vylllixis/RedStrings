@@ -17,6 +17,7 @@
 #include "gui_carte.h"
 #include "gui_jeu.h"
 #include "gui_utf8.h"
+#include "gui_yugioh.h"
 
 static int proche(float a, float b)
 {
@@ -148,6 +149,50 @@ static void test_classes_sures(void)
         assert(strlen(nom_classe_maj((classe_t)i)) < NOM_MAX);
 }
 
+static void test_mode_arguments(void)
+{
+    char exe[] = "redstrings_csfml";
+    char yugioh[] = "Yu-Gi-Oh!";
+    char proche[] = "yu-gi-oh!";
+    char sans_point[] = "Yu-Gi-Oh";
+    char colle[] = "Yu-Gi-Oh!x";
+    char *aucun_arg[] = {exe};
+    char *bon[] = {exe, yugioh};
+    char *casse[] = {exe, proche};
+    char *incomplet[] = {exe, sans_point};
+    char *trop_long[] = {exe, colle};
+    char *deux[] = {exe, yugioh, yugioh};
+    mode_visuel_t m = MODE_YUGIOH;
+
+    assert(mode_depuis_arguments(1, aucun_arg, &m) == 0 && m == MODE_NORMAL);
+    assert(mode_depuis_arguments(2, bon, &m) == 0 && m == MODE_YUGIOH);
+    assert(mode_depuis_arguments(2, casse, &m) == -1 && m == MODE_NORMAL);
+    assert(mode_depuis_arguments(2, incomplet, &m) == -1 && m == MODE_NORMAL);
+    assert(mode_depuis_arguments(2, trop_long, &m) == -1 && m == MODE_NORMAL);
+    assert(mode_depuis_arguments(3, deux, &m) == -1 && m == MODE_NORMAL);
+}
+
+/** Une carte par classe, chacune différente, avec des données de carte valides. */
+static void test_cartes_yugioh(void)
+{
+    const carte_classe_t *a = NULL;
+
+    for (int i = 0; i < NB_CLASSES; i++) {
+        a = carte_de_classe((classe_t)i);
+        assert(a->ressource != NULL && a->ressource[0] != '\0');
+        assert(a->code > 0);
+        assert((unsigned)a->cadre < NB_CADRES && (unsigned)a->attribut < NB_ATTRIBUTS);
+        assert(a->niveau >= 1 && a->niveau <= 12);
+        for (int j = 0; j < i; j++) {
+            assert(carte_de_classe((classe_t)j)->code != a->code);
+            assert(strcmp(carte_de_classe((classe_t)j)->ressource, a->ressource) != 0);
+        }
+    }
+    assert(carte_de_classe((classe_t)999) == carte_de_classe(GUERRIER));
+    assert(strcmp(nom_attribut((attribut_carte_t)-1), "Ténèbres") == 0);
+    assert(strcmp(nom_cadre(CADRE_XYZ), "Xyz") == 0);
+}
+
 int main(void)
 {
     test_utf8_encoder();
@@ -159,5 +204,7 @@ int main(void)
     test_couleurs();
     test_contient_nom();
     test_classes_sures();
+    test_mode_arguments();
+    test_cartes_yugioh();
     return 0;
 }
