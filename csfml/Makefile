@@ -6,19 +6,27 @@
 # ─── Fichiers ────────────────────────────────────────────────────────
 
 NAME		=	../redstrings_csfml
+NAME_DEBUG	=	../redstrings_csfml_debug
+NAME_TESTS	=	../redstrings_csfml_tests
 
 LIB_DIR		=	../lib
 LIB		=	$(LIB_DIR)/libmy.a
 
 OBJ_DIR		=	obj
+OBJ_DEBUG	=	obj_debug
 
-SRCS		=	$(wildcard src/*.c)
+#toutes les sources, quel que soit le sous-dossier de src/
+SRCS		=	$(shell find src -name '*.c')
 OBJS		=	$(SRCS:src/%.c=$(OBJ_DIR)/%.o)
 
 #moteur du jeu partagé avec la version console (aucun affichage dedans)
 MOTEUR_DIR	=	../src/personnage
 MOTEUR		=	personnage.c combat.c bataille.c roster.c sauvegarde.c
 OBJS_MOTEUR	=	$(MOTEUR:%.c=$(OBJ_DIR)/moteur/%.o)
+
+#fonctions de la version graphique qui ne dépendent pas de SFML : testables sans fenêtre
+TEST_SRCS	=	tests/tests.c src/outils/anim.c src/outils/jeu.c src/outils/utf8.c \
+			src/ui/libelles.c src/yugioh/cartes.c $(MOTEUR_DIR)/personnage.c
 
 DEPS		=	$(OBJS:.o=.d) $(OBJS_MOTEUR:.o=.d)
 
@@ -27,8 +35,15 @@ DEPS		=	$(OBJS:.o=.d) $(OBJS_MOTEUR:.o=.d)
 CC		=	gcc
 RM		=	rm -rf
 
+#avertissements en plus de ceux du projet principal : formats, const, pointeurs nuls, VLA, flottants
+WSUPP		=	-Wformat=2 -Wcast-qual -Wnull-dereference -Wwrite-strings \
+			-Wstrict-prototypes -Wvla -Wundef -Wlogical-op -Wfloat-equal
 CFLAGS		=	-std=c11 -Wall -Wextra -Werror -pedantic -Wshadow \
-			-Wmissing-prototypes -O2
+			-Wmissing-prototypes $(WSUPP) -O2
+#make debug : -O0, symboles et sanitizers (comme le Makefile principal)
+SANITIZE	=	-fsanitize=address,undefined
+CFLAGS_DEBUG	=	-std=c11 -Wall -Wextra -Werror -pedantic -Wshadow \
+			-Wmissing-prototypes $(WSUPP) -g3 -O0 $(SANITIZE)
 #readlink() est POSIX : -std=c11 seul le masque
 CPPFLAGS	=	-I./include -I../includes -D_POSIX_C_SOURCE=200809L
 DEPFLAGS	=	-MMD -MP
@@ -58,7 +73,7 @@ LOG_RM		=	@printf "  $(C_GRIS)%-6s %s$(C_RESET)\n"
 # ─── Règles ──────────────────────────────────────────────────────────
 
 all:	verifier lib $(NAME)
-	$(LOG_OK) "./redstrings_csfml est prêt"
+	$(LOG_OK) "./$(notdir $(NAME)) est prêt"
 
 #libmy.a est construite par le Makefile principal
 lib:
@@ -71,12 +86,12 @@ verifier:
 		exit 1; }
 
 $(NAME):	$(OBJS) $(OBJS_MOTEUR) $(LIB)
-	$(LOG) "LD" "redstrings_csfml"
+	$(LOG) "LD" "$(notdir $(NAME))"
 	$(Q)$(CC) -o $(NAME) $(OBJS) $(OBJS_MOTEUR) $(LDFLAGS) $(LDLIBS)
 
 $(OBJ_DIR)/%.o:	src/%.c
 	$(LOG) "CC" "csfml/$<"
-	@mkdir -p $(OBJ_DIR)
+	@mkdir -p $(dir $@)
 	$(Q)$(CC) $(CFLAGS) $(CPPFLAGS) $(DEPFLAGS) -c $< -o $@
 
 $(OBJ_DIR)/moteur/%.o:	$(MOTEUR_DIR)/%.c
@@ -84,13 +99,26 @@ $(OBJ_DIR)/moteur/%.o:	$(MOTEUR_DIR)/%.c
 	@mkdir -p $(OBJ_DIR)/moteur
 	$(Q)$(CC) $(CFLAGS) $(CPPFLAGS) $(DEPFLAGS) -c $< -o $@
 
+#version de débogage : une autre arborescence d'objets, pour ne rien mélanger
+debug:	verifier lib
+	$(Q)$(MAKE) NAME=$(NAME_DEBUG) OBJ_DIR=$(OBJ_DEBUG) CFLAGS="$(CFLAGS_DEBUG)" \
+		LDFLAGS="$(LDFLAGS) $(SANITIZE)" $(NAME_DEBUG)
+	$(LOG_OK) "./$(notdir $(NAME_DEBUG)) est prêt"
+
+#tests unitaires sans fenêtre, avec les sanitizers
+tests:	lib
+	$(LOG) "TESTS" "$(notdir $(NAME_TESTS))  ($(SANITIZE))"
+	$(Q)$(CC) $(CFLAGS_DEBUG) $(CPPFLAGS) $(TEST_SRCS) $(LDFLAGS) -lmy -lm -o $(NAME_TESTS)
+	$(Q)./$(NAME_TESTS)
+	$(LOG_OK) "Tous les tests de la version graphique passent"
+
 clean:
-	$(LOG_RM) "RM" "csfml/$(OBJ_DIR)/"
-	$(Q)$(RM) $(OBJ_DIR)
+	$(LOG_RM) "RM" "csfml/$(OBJ_DIR)/ csfml/$(OBJ_DEBUG)/"
+	$(Q)$(RM) $(OBJ_DIR) $(OBJ_DEBUG)
 
 fclean:	clean
-	$(LOG_RM) "RM" "redstrings_csfml"
-	$(Q)$(RM) $(NAME)
+	$(LOG_RM) "RM" "redstrings_csfml redstrings_csfml_debug redstrings_csfml_tests"
+	$(Q)$(RM) $(NAME) $(NAME_DEBUG) $(NAME_TESTS)
 
 re:
 	$(Q)$(MAKE) fclean
@@ -98,4 +126,4 @@ re:
 
 -include $(DEPS)
 
-.PHONY: all verifier lib clean fclean re
+.PHONY: all verifier lib debug tests clean fclean re

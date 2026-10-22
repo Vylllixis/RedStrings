@@ -3,16 +3,26 @@
 ** PROJET FIL ROUGE C Avancé
 */
 
+#include <stdio.h>
 #include <stdlib.h>
-#include "gui.h"
+#include "gui_app.h"
+#include "gui_jeu.h"
+#include "gui_types.h"
 
-int main(void)
+int main(int argc, char **argv)
 {
-    app_t *app = malloc(sizeof(app_t));
+    mode_visuel_t mode = MODE_NORMAL;
+    app_t *app = NULL;
 
+    if (mode_depuis_arguments(argc, argv, &mode) != 0) {
+        fprintf(stderr, "redstrings_csfml : argument inconnu « %s »\nusage : %s\n",
+            argv[1], argv[0]);
+        return 84;
+    }
+    app = malloc(sizeof(app_t));
     if (app == NULL)
         return 84;
-    if (creer_app(app) != 0) {
+    if (creer_app(app, mode) != 0) {
         detruire_app(app);
         free(app);
         return 84;

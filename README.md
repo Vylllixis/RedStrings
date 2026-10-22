@@ -91,7 +91,7 @@ Le nom **RedStrings** vient d'une image : des **fils rouges** qui relient les pe
 
 <br/>
 
-| Couleur | Rôle | Constante (`csfml/include/gui.h`) |
+| Couleur | Rôle | Constante (`csfml/include/gui_config.h`) |
 |---|---|---|
 | ![](https://img.shields.io/badge/-%20%20%20%20-f43f5e?style=flat-square) `#f43f5e` | la marque, les fils, l'adversaire, l'attaque | `C_ROUGE` |
 | ![](https://img.shields.io/badge/-%20%20%20%20-38bdf8?style=flat-square) `#38bdf8` | ton équipe, les actions, le focus | `C_CYAN` |
@@ -100,7 +100,7 @@ Le nom **RedStrings** vient d'une image : des **fils rouges** qui relient les pe
 | ![](https://img.shields.io/badge/-%20%20%20%20-67e8f9?style=flat-square) `#67e8f9` | le soin | `C_SOIN` |
 | ![](https://img.shields.io/badge/-%20%20%20%20-090b18?style=flat-square) `#090b18` | le fond, un bleu nuit presque noir | `C_FOND` |
 
-**Une seule silhouette.** Toutes les surfaces ont deux coins coupés (haut-gauche, bas-droite) et des crochets lumineux sur les deux autres. Les composants communs vivent dans `csfml/src/hud.c` : `panneau`, `crochets`, `titre_section`, `hexagone`, `radar_stats`, `touche_clavier`…
+**Une seule silhouette.** Toutes les surfaces ont deux coins coupés (haut-gauche, bas-droite) et des crochets lumineux sur les deux autres. Les composants communs vivent dans `csfml/src/rendu/hud.c` : `panneau`, `crochets`, `titre_section`, `hexagone`, `radar_stats`, `touche_clavier`…
 
 <details>
 <summary><b>✨ Ce qui rend l'interface vivante</b></summary>
@@ -416,6 +416,10 @@ stateDiagram-v2
 | **Personnages** | taper pour rechercher · <kbd>Entrée</kbd> ouvrir · <kbd>←</kbd> <kbd>→</kbd> changer de fiche | clic sur une carte |
 | **Composition** | <kbd>←</kbd> <kbd>→</kbd> <kbd>↑</kbd> <kbd>↓</kbd> choisir une carte · <kbd>Espace</kbd> ajouter / retirer · <kbd>Entrée</kbd> valider l'équipe · <kbd>Échap</kbd> étape précédente | clic sur une carte, bouton *Valider* / *Lancer le combat* |
 | **Arène** | <kbd>1</kbd> <kbd>2</kbd> <kbd>3</kbd> ou <kbd>←</kbd> <kbd>→</kbd> + <kbd>Entrée</kbd> action · <kbd>←</kbd> <kbd>→</kbd> cible · <kbd>Entrée</kbd> confirmer · <kbd>Échap</kbd> retour · fin : <kbd>Entrée</kbd>/<kbd>R</kbd> rejouer, <kbd>Échap</kbd> menu | boutons d'action, survol / clic sur une cible |
+| **Partout** | <kbd>F11</kbd> ou <kbd>Alt</kbd>+<kbd>Entrée</kbd> : fenêtré ↔ plein écran · <kbd>Maj</kbd>+<kbd>F11</kbd> : plein écran natif ou sans bordure | bords de la fenêtre pour la redimensionner |
+
+> [!NOTE]
+> **Fenêtre libre.** La fenêtre se redimensionne à la souris (800 × 600 au minimum), et passe en plein écran sans bordure (par défaut) ou natif sans redémarrer : la partie en cours, les animations et la saisie sont conservées. L'interface garde au moins 1024 × 720 unités visibles et grossit au plus ×2 : en dessous, la création se réorganise et les grilles de cartes choisissent leurs colonnes ; au-delà, l'espace en plus sert à respirer. Le combat garde sa composition (mise à l'échelle uniforme) et ses panneaux s'ancrent aux coins réels de la fenêtre. Le texte est tramé à sa taille réelle, donc net à toute taille.
 
 > [!WARNING]
 > L'écran n'a de place que pour **10 cartes** (`MAX_PERSONNAGES`) : la fenêtre refuse de créer un 11ᵉ personnage, et refuse de charger un fichier qui en contient plus (l'équipe actuelle n'est alors pas touchée). La console, elle, n'a pas de limite.
@@ -561,7 +565,12 @@ RedStrings/
 │   │                         console : creer_personnage · afficher_personnage
 │   └── 📁 ui/                boite.c · saisie.c · bataille_console.c
 ├── 📁 lib/                   40 fonctions maison → libmy.a
-├── 📁 csfml/                 version graphique (src/, include/gui.h, assets/fonts/, Makefile)
+├── 📁 csfml/                 version graphique
+│   ├── include/              14 headers gui_*.h, un par thème (config, types, anim, dessin, ui…)
+│   ├── src/                  app/ · outils/ · rendu/ · ui/ · yugioh/ · scenes/{menu,creation,liste,selection,arene}/
+│   ├── tests/                tests.c : UTF-8, animation, classes (sans fenêtre)
+│   ├── assets/fonts/         polices
+│   └── Makefile
 ├── 📁 tests/                 tests.c (assert)
 ├── 📁 .github/readme/        images de ce README et leur générateur
 └── Makefile
@@ -576,7 +585,7 @@ flowchart TB
     ui --> outils[boite.c · saisie.c]
     rs --> save[sauvegarde.c<br/><i>fgets · sscanf</i>]
     ui --> bat[bataille.c<br/><i>tours · actions · IA</i>]
-    gui([csfml/src/*.c<br/><i>affichage seul</i>]) --> bat
+    gui([csfml/src/**/*.c<br/><i>affichage seul</i>]) --> bat
     gui --> save
     bat --> combat[combat.c<br/><i>calculer_degats · est_ko</i>]
     bat --> perso[personnage.c<br/><i>table des classes</i>]
@@ -683,7 +692,7 @@ r->data = tmp;
 ```mermaid
 pie showData
     title Lignes de C par partie
-    "Version graphique (csfml/)" : 5639
+    "Version graphique (csfml/)" : 6910
     "Console et moteur (src/)" : 1396
     "libmy (lib/)" : 697
     "Headers (includes/)" : 547
@@ -747,6 +756,63 @@ make csfml            # compile ./redstrings_csfml
 > Les polices (Noto Sans, DejaVu Sans) sont cherchées à côté de l'exécutable, puis depuis le dossier courant : tu peux lancer le jeu depuis n'importe où dans le projet.
 
 <details>
+<summary><b>🃏 Un mode caché…</b></summary>
+
+<br/>
+
+```bash
+./redstrings_csfml "Yu-Gi-Oh!"     # les guillemets comptent : l'argument contient un point d'exclamation
+```
+
+Le même jeu, habillé en duel de cartes. **Seul le rendu change** : mêmes 28 classes, mêmes noms, mêmes statistiques, même moteur de combat, même sauvegarde. Sans argument, rien ne change ; un autre argument est refusé (`usage`, code 84).
+
+- **Création** : la grille des classes devient une main de cartes distribuée face cachée, qui se retourne, se soulève au survol et s'incline vers la souris. L'aperçu montre une grande carte qui fait un tour complet à chaque changement de classe, avec un reflet holographique.
+- **Fiche** : la carte du personnage, en perspective, à côté de ses vraies statistiques.
+- **Arène** : chaque carte s'ouvre au-dessus de son combattant puis plonge dans son jeton ; la carte de l'acteur s'active pendant une attaque, un soin ou une garde ; tes cartes brillent à la victoire et se grisent à la défaite.
+- **Partout** : l'illustration remplace l'emblème dans les hexagones (menu, cartes, jetons, ordre des tours).
+
+Le titre de chaque carte est le **nom de la classe RedStrings** : le nom officiel de la carte ne sert qu'à retrouver son illustration (`csfml/src/yugioh/cartes.c`). Les illustrations ne sont pas dans le dépôt : elles appartiennent à leurs ayants droit (Kazuki Takahashi / Konami). Le script les télécharge en local depuis la base YGOPRODeck :
+
+```bash
+sh csfml/assets/yugioh/telecharger.sh
+```
+
+Sans elles, le mode fonctionne quand même : chaque carte montre l'emblème de sa classe.
+
+| Classe | Carte | Cadre |
+|---|---|---|
+| Guerrier | Gilford the Legend | Effet |
+| Mage | Dark Magician | Normal |
+| Archer | Arcane Archer of the Forest | Effet |
+| Paladin | Paladin of White Dragon | Rituel |
+| Berserker | Beast King Barbaros | Effet |
+| Chevalier noir | Dark Blade | Normal |
+| Samouraï | Legendary Six Samurai - Shi En | Synchro |
+| Duelliste | Flame Swordsman | Fusion |
+| Lancier | Gaia The Fierce Knight | Normal |
+| Gladiateur | Gladiator Beast Laquari | Effet |
+| Archimage | Endymion, the Master Magician | Effet |
+| Élémentaliste | Elemental Mistress Doriado | Rituel |
+| Nécromancien | Zombie Master | Effet |
+| Invocateur | Aleister the Invoker | Effet |
+| Druide | Aurkus, Lightsworn Druid | Effet |
+| Illusionniste | Illusionist Faceless Mage | Normal |
+| Chronomancien | Time Wizard | Effet |
+| Chasseur | Amazoness Archer | Effet |
+| Tireur d'élite | Machina Sniper | Effet |
+| Assassin | Night Assailant | Effet |
+| Ombrelame | The Phantom Knights of Break Sword | Xyz |
+| Corsaire | Blackeyes, the Plunder Patroll Seaguide | Effet |
+| Prêtre | St. Joan | Fusion |
+| Barde | Aria the Melodious Diva | Effet |
+| Alchimiste | Alchemist of Black Spells | Effet |
+| Ingénieur | Ancient Gear Engineer | Effet |
+| Gardien | Big Shield Gardna | Effet |
+| Moine | Master Monk | Effet |
+
+</details>
+
+<details>
 <summary><b>🧰 Prérequis</b></summary>
 
 <br/>
@@ -769,6 +835,8 @@ make csfml            # compile ./redstrings_csfml
 | `make debug` | `./redstrings_debug` avec `-g3 -O0 -fsanitize=address,undefined` |
 | `make tests` | compile et lance les tests unitaires (avec les sanitizers) |
 | `make csfml` | compile `./redstrings_csfml` |
+| `make csfml-debug` | `./redstrings_csfml_debug` avec les sanitizers |
+| `make csfml-tests` | tests de la version graphique, sans fenêtre (UTF-8, animation, classes) |
 | `make clean` | supprime les `.o` |
 | `make fclean` | supprime aussi les exécutables et `libmy.a` |
 | `make re` | `fclean` puis `make` |
@@ -831,6 +899,7 @@ make tests
 | `roster_t` | 100 ajouts d'affilée, ordre conservé, libération complète |
 | Sauvegarde | aller-retour fichier → mémoire identique |
 | Chargement refusé | fichier absent · classe inconnue · stat > 99 · nom en double · ligne tronquée · texte au lieu d'un nombre (et l'équipe reste intacte) |
+| Version graphique (`make csfml-tests`) | UTF-8 : aller-retour, séquences tronquées / trop longues / substituts refusés, bornes du tampon · courbes d'animation · couleurs jamais hors d'un octet · recherche par nom · identifiant de classe hors table |
 
 <img src=".github/readme/fil-rouge.svg" width="100%" alt=""/>
 
@@ -840,7 +909,7 @@ make tests
 
 ### Le flux de travail
 
-Le dépôt suit **git flow** : chaque changement vit sur sa propre branche partie de `develop`, puis y est fusionné avec `--no-ff`. `main` ne reçoit que les versions publiées (`v0.1.0` → `v1.3.0`).
+Le dépôt suit **git flow** : chaque changement vit sur sa propre branche partie de `develop`, puis y est fusionné avec `--no-ff`. `main` ne reçoit que les versions publiées (`v0.1.0` → `v1.4.0`).
 
 ```mermaid
 gitGraph
