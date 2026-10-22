@@ -110,6 +110,8 @@ static void clavier(app_t *app, selection_t *s)
     } else if (k[sfKeyEscape]) {
         changer_scene(app, SCENE_MENU);
     }
+    if (n <= 0)
+        return;
     if (k[sfKeyRight])
         s->curseur = (s->curseur + 1) % n;
     if (k[sfKeyLeft])

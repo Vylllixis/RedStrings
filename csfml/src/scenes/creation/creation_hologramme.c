@@ -174,7 +174,7 @@ void creation_hologramme(app_t *app, creation_t *c)
     if (onde < 1.f)
         arc_cercle(app, centre, 60.f + 170.f * sortie_cubique(onde), 3.f * (1.f - onde)
             + 1.f, (sfVector2f){0.f, 2.f * PI}, avec_alpha(col, 1.f - onde), 1);
-    AURAS[classes[c->classe].categorie](app, centre, col, t);
+    AURAS[classe_info(c->classe)->categorie](app, centre, col, t);
     for (int k = 0; k < 3; k++)
         arc_cercle(app, centre, 88.f, 2.f, (sfVector2f){t * 0.5f + k * 2.f * PI / 3.f,
             t * 0.5f + k * 2.f * PI / 3.f + 1.4f}, avec_alpha(col, 0.75f), 1);

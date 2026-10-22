@@ -7,6 +7,7 @@
 
 NAME		=	../redstrings_csfml
 NAME_DEBUG	=	../redstrings_csfml_debug
+NAME_TESTS	=	../redstrings_csfml_tests
 
 LIB_DIR		=	../lib
 LIB		=	$(LIB_DIR)/libmy.a
@@ -23,6 +24,10 @@ MOTEUR_DIR	=	../src/personnage
 MOTEUR		=	personnage.c combat.c bataille.c roster.c sauvegarde.c
 OBJS_MOTEUR	=	$(MOTEUR:%.c=$(OBJ_DIR)/moteur/%.o)
 
+#fonctions de la version graphique qui ne dépendent pas de SFML : testables sans fenêtre
+TEST_SRCS	=	tests/tests.c src/outils/anim.c src/outils/jeu.c src/outils/utf8.c \
+			src/ui/libelles.c $(MOTEUR_DIR)/personnage.c
+
 DEPS		=	$(OBJS:.o=.d) $(OBJS_MOTEUR:.o=.d)
 
 # ─── Compilation ─────────────────────────────────────────────────────
@@ -30,12 +35,15 @@ DEPS		=	$(OBJS:.o=.d) $(OBJS_MOTEUR:.o=.d)
 CC		=	gcc
 RM		=	rm -rf
 
+#avertissements en plus de ceux du projet principal : formats, const, pointeurs nuls, VLA, flottants
+WSUPP		=	-Wformat=2 -Wcast-qual -Wnull-dereference -Wwrite-strings \
+			-Wstrict-prototypes -Wvla -Wundef -Wlogical-op -Wfloat-equal
 CFLAGS		=	-std=c11 -Wall -Wextra -Werror -pedantic -Wshadow \
-			-Wmissing-prototypes -O2
+			-Wmissing-prototypes $(WSUPP) -O2
 #make debug : -O0, symboles et sanitizers (comme le Makefile principal)
 SANITIZE	=	-fsanitize=address,undefined
 CFLAGS_DEBUG	=	-std=c11 -Wall -Wextra -Werror -pedantic -Wshadow \
-			-Wmissing-prototypes -g3 -O0 $(SANITIZE)
+			-Wmissing-prototypes $(WSUPP) -g3 -O0 $(SANITIZE)
 #readlink() est POSIX : -std=c11 seul le masque
 CPPFLAGS	=	-I./include -I../includes -D_POSIX_C_SOURCE=200809L
 DEPFLAGS	=	-MMD -MP
@@ -97,13 +105,20 @@ debug:	verifier lib
 		LDFLAGS="$(LDFLAGS) $(SANITIZE)" $(NAME_DEBUG)
 	$(LOG_OK) "./$(notdir $(NAME_DEBUG)) est prêt"
 
+#tests unitaires sans fenêtre, avec les sanitizers
+tests:	lib
+	$(LOG) "TESTS" "$(notdir $(NAME_TESTS))  ($(SANITIZE))"
+	$(Q)$(CC) $(CFLAGS_DEBUG) $(CPPFLAGS) $(TEST_SRCS) $(LDFLAGS) -lmy -lm -o $(NAME_TESTS)
+	$(Q)./$(NAME_TESTS)
+	$(LOG_OK) "Tous les tests de la version graphique passent"
+
 clean:
 	$(LOG_RM) "RM" "csfml/$(OBJ_DIR)/ csfml/$(OBJ_DEBUG)/"
 	$(Q)$(RM) $(OBJ_DIR) $(OBJ_DEBUG)
 
 fclean:	clean
-	$(LOG_RM) "RM" "redstrings_csfml redstrings_csfml_debug"
-	$(Q)$(RM) $(NAME) $(NAME_DEBUG)
+	$(LOG_RM) "RM" "redstrings_csfml redstrings_csfml_debug redstrings_csfml_tests"
+	$(Q)$(RM) $(NAME) $(NAME_DEBUG) $(NAME_TESTS)
 
 re:
 	$(Q)$(MAKE) fclean
@@ -111,4 +126,4 @@ re:
 
 -include $(DEPS)
 
-.PHONY: all verifier lib debug clean fclean re
+.PHONY: all verifier lib debug tests clean fclean re

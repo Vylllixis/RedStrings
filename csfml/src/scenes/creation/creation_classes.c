@@ -33,7 +33,7 @@
 void creation_onglets(app_t *app, creation_t *c, float y)
 {
     float w = (FW - TUILE_ECART * (NB_CATEGORIES - 1)) / NB_CATEGORIES;
-    categorie_t actuelle = classes[c->classe].categorie;
+    categorie_t actuelle = classe_info(c->classe)->categorie;
     sfFloatRect r;
     float h = 0.f;
     float on = 0.f;
@@ -57,7 +57,7 @@ void creation_onglets(app_t *app, creation_t *c, float y)
         on = c->onglets[k].appui;
         nb = 0;
         for (int i = 0; i < NB_CLASSES; i++)
-            nb += classes[i].categorie == (categorie_t)k;
+            nb += classe_info(i)->categorie == (categorie_t)k;
         panneau(app, r, 8.f, avec_alpha(C_CYAN, 0.04f * h + 0.16f * on),
             avec_alpha(C_CYAN, 0.02f * h + 0.05f * on), melanger(avec_alpha(C_BLANC,
             0.08f + 0.08f * h), avec_alpha(C_CYAN, 0.8f), on));
@@ -92,9 +92,9 @@ static void tuile_classe(app_t *app, creation_t *c, classe_t i, sfFloatRect r)
     hexagone(app, med, 13.f + sel, 0.f, melanger((sfColor){14, 16, 32, 255}, col,
         0.15f + 0.2f * sel), avec_alpha(col, 0.5f + 0.5f * fmaxf(sel, h)));
     embleme(app, i, med, 8.f, melanger(col, C_BLANC, 0.2f + 0.3f * sel));
-    while (taille > 11 && largeur_texte(app, POLICE_GRAS, classes[i].nom, taille) > place)
+    while (taille > 11 && largeur_texte(app, POLICE_GRAS, classe_info(i)->nom, taille) > place)
         taille--;
-    tronquer(app, POLICE_GRAS, taille, classes[i].nom, place, nom);
+    tronquer(app, POLICE_GRAS, taille, classe_info(i)->nom, place, nom, sizeof(nom));
     texte(app, POLICE_GRAS, nom, taille, (sfVector2f){r.left + 40.f, med.y},
         melanger(C_TEXTE_DOUX, melanger(col, C_BLANC, 0.55f), fmaxf(sel, h)),
         ALIGNE_GAUCHE);
@@ -108,7 +108,7 @@ static void tuile_classe(app_t *app, creation_t *c, classe_t i, sfFloatRect r)
 void creation_grille_classes(app_t *app, creation_t *c, float y)
 {
     float w = (FW - TUILE_ECART * (GRILLE_COLONNES - 1)) / GRILLE_COLONNES;
-    categorie_t cat = classes[c->classe].categorie;
+    categorie_t cat = classe_info(c->classe)->categorie;
     sfFloatRect r;
     int n = 0;
     int s = 0;
@@ -116,7 +116,7 @@ void creation_grille_classes(app_t *app, creation_t *c, float y)
     for (int i = 0; i < NB_CLASSES; i++) {
         c->tuiles[i].appui = approcher(c->tuiles[i].appui, c->classe == (classe_t)i
             ? 1.f : 0.f, 12.f, app->dt);
-        if (classes[i].categorie != cat)
+        if (classe_info(i)->categorie != cat)
             continue;
         r = (sfFloatRect){FX + (n % GRILLE_COLONNES) * (w + TUILE_ECART),
             y + (n / GRILLE_COLONNES) * (TUILE_H + TUILE_ECART), w, TUILE_H};

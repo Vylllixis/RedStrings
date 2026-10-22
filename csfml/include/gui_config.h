@@ -24,6 +24,11 @@
     #define NB_POUSSIERES 70
     #define NB_ETOILES 160
     #define PI 3.14159265f
+    /* Tailles des tampons de texte de l'interface. */
+    #define MAX_SAISIE 32        /* caractères tapés pendant une image */
+    #define TAILLE_TOAST 96
+    #define TAILLE_ICONE 8
+    #define TAILLE_POPUP 24
 
 /* Palette */
     #define C_FOND          ((sfColor){9, 11, 24, 255})

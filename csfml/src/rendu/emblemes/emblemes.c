@@ -8,6 +8,7 @@
  */
 
 #include "personnage.h"
+#include "gui_carte.h"
 #include "gui_emblemes.h"
 #include "gui_types.h"
 #include "emblemes_interne.h"
@@ -37,9 +38,9 @@ static const dessin_embleme_t DESSINS[NB_EMBLEMES] = {
     [EMB_ORBE] = emb_d_orbe,
 };
 
-/** Emblème vectoriel de la classe, choisi par classes[c].embleme. */
+/** Emblème vectoriel de la classe, choisi par classe_info(c)->embleme. */
 void embleme(app_t *app, classe_t c, sfVector2f centre, float taille,
     sfColor couleur)
 {
-    DESSINS[classes[c].embleme](app, centre, taille, couleur);
+    DESSINS[classe_info(c)->embleme](app, centre, taille, couleur);
 }

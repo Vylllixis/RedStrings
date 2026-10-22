@@ -78,7 +78,7 @@ void fiche(app_t *app, const personnage_t *p, sfFloatRect r,
     rect_arrondi(app, (sfFloatRect){cx - 44.f, r.top, 88.f, 3.f}, 1.5f, c);
     avatar(app, p, (sfVector2f){cx, r.top + 104.f}, 60.f, est_ko(p) ? 1.f : 0.f);
     tronquer(app, POLICE_GRAS, 32, p->nom[0] ? p->nom : "Sans nom",
-        r.width - 60.f, buf);
+        r.width - 60.f, buf, sizeof(buf));
     texte(app, POLICE_GRAS, buf, 32, (sfVector2f){cx, r.top + 200.f},
         p->nom[0] ? C_TEXTE : C_TEXTE_FAIBLE, ALIGNE_CENTRE);
     pastille(app, nom_classe_maj(p->classe), (sfVector2f){cx, r.top + 244.f}, c, 0);
@@ -150,7 +150,7 @@ void mini_carte(app_t *app, const personnage_t *p, sfFloatRect r,
         crochets(app, (sfFloatRect){r.left - 5.f, r.top - 5.f, r.width + 10.f,
             r.height + 10.f}, 14.f * survol, avec_alpha(c, survol));
     avatar(app, p, (sfVector2f){cx, r.top + 64.f}, 36.f, mort);
-    tronquer(app, POLICE_GRAS, 19, p->nom, r.width - 28.f, buf);
+    tronquer(app, POLICE_GRAS, 19, p->nom, r.width - 28.f, buf, sizeof(buf));
     texte(app, POLICE_GRAS, buf, 19, (sfVector2f){cx, r.top + 122.f}, C_TEXTE,
         ALIGNE_CENTRE);
     pastille(app, nom_classe_maj(p->classe), (sfVector2f){cx, r.top + 152.f}, c, 0);
