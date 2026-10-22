@@ -2,6 +2,14 @@
 **
 */
 
+/*
+** ╭─ my_strcapitalize.c ─────────────────────────────────────────────────
+** │ But         Mettre une majuscule à la première lettre de chaque mot,
+** │             et des minuscules ailleurs. Un mot commence après tout
+** │             caractère qui n'est ni une lettre ni un chiffre.
+** ╰──────────────────────────────────────────────────────────────────────
+*/
+
 #include <stdbool.h>
 #include "my.h"
 #include "my_string.h"
