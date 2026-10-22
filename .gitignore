@@ -2,6 +2,7 @@
 /redstrings
 /redstrings_csfml
 /redstrings_csfml_debug
+/redstrings_csfml_tests
 
 # Objets de la version CSFML
 /csfml/obj/
