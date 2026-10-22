@@ -4,7 +4,7 @@
 */
 
 #include <ctype.h>
-#include "gui.h"
+#include "gui_jeu.h"
 
 /** Recherche insensible à la casse de `recherche` dans `nom`. */
 int contient_nom(const char *nom, const char *recherche)

@@ -11,7 +11,14 @@
  */
 
 #include <math.h>
-#include "gui.h"
+#include "personnage.h"
+#include "gui_anim.h"
+#include "gui_app.h"
+#include "gui_config.h"
+#include "gui_dessin.h"
+#include "gui_emblemes.h"
+#include "gui_hud.h"
+#include "gui_types.h"
 
 typedef void (*dessin_embleme_t)(app_t *app, sfVector2f c, float t, sfColor col);
 

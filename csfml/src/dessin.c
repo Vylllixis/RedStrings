@@ -5,7 +5,12 @@
 
 #include <math.h>
 #include <string.h>
-#include "gui.h"
+#include "my_string.h"
+#include "gui_anim.h"
+#include "gui_app.h"
+#include "gui_config.h"
+#include "gui_dessin.h"
+#include "gui_types.h"
 
 #define POINTS_COIN 8
 #define MAX_POINTS_LIGNE 160

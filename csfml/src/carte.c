@@ -5,7 +5,17 @@
 
 #include <math.h>
 #include <stdio.h>
-#include "gui.h"
+#include "personnage.h"
+#include "my_string.h"
+#include "gui_anim.h"
+#include "gui_app.h"
+#include "gui_carte.h"
+#include "gui_config.h"
+#include "gui_dessin.h"
+#include "gui_emblemes.h"
+#include "gui_hud.h"
+#include "gui_types.h"
+#include "gui_ui.h"
 
 #define ECART 22.f
 

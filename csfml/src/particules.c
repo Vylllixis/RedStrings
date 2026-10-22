@@ -4,7 +4,12 @@
 */
 
 #include <math.h>
-#include "gui.h"
+#include "gui_anim.h"
+#include "gui_app.h"
+#include "gui_config.h"
+#include "gui_dessin.h"
+#include "gui_particules.h"
+#include "gui_types.h"
 
 /** Projette `n` étincelles depuis `pos` dans toutes les directions. */
 void emettre(app_t *app, sfVector2f pos, int n, sfColor c, float vitesse,
