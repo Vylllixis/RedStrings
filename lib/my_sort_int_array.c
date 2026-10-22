@@ -2,6 +2,14 @@
 **
 */
 
+/*
+** ╭─ my_sort_int_array.c ────────────────────────────────────────────────
+** │ But         Trier un tableau d'entiers par ordre croissant (tri à
+** │             bulles).
+** │ Utilise     my_swap
+** ╰──────────────────────────────────────────────────────────────────────
+*/
+
 #include "my.h"
 
 void my_sort_int_array(int *tab, int size)

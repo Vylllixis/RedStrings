@@ -4,8 +4,14 @@
 */
 
 /*
- * Fond animé commun à tous les écrans : dégradé, aurores, fils rouges, étoiles, sol, poussière.
- */
+** ╭─ fond.c ─────────────────────────────────────────────────────────────
+** │ But         Le fond animé commun à tous les écrans : dégradé,
+** │             aurores, fils rouges, étoiles, sol, poussière.
+** │ Contenu     degrade, aurores, y_fil, fils_rouges, etoiles, sol,
+** │             poussieres, dessiner_fond (appelée à chaque image par
+** │             maj_app)
+** ╰──────────────────────────────────────────────────────────────────────
+*/
 
 #include <math.h>
 #include "gui_anim.h"

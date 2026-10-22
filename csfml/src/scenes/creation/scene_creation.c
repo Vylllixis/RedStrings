@@ -4,8 +4,14 @@
 */
 
 /*
- * Écran de création d'un personnage : formulaire, classes et aperçu en direct.
- */
+** ╭─ scene_creation.c ───────────────────────────────────────────────────
+** │ But         Écran de création d'un personnage : formulaire, classes
+** │             et aperçu en direct.
+** │ Équivaut à  creer_personnage() de la console
+** │ Contenu     entrer_creation, apparaitre, bouton_creer, formulaire,
+** │             aide_clavier, creation_geometrie, scene_creation
+** ╰──────────────────────────────────────────────────────────────────────
+*/
 
 #include <math.h>
 #include <stdio.h>
@@ -142,11 +148,15 @@ static void aide_clavier(app_t *app, float a)
 #define COMPO_D 1232.f
 #define MARGE_ECRAN 24.f
 
-/**
- * Formulaire et aperçu se partagent la largeur visible : à 1280 et au-delà,
- * la composition d'origine ; plus étroit, les deux panneaux rétrécissent
- * dans les mêmes proportions (les textes gardent leur taille).
- */
+/*
+** ╭─ creation_geometrie ─────────────────────────────────────────────────
+** │ Formulaire et aperçu se partagent la largeur visible.
+** │
+** │ - à 1280 et au-delà : la composition d'origine
+** │ - plus étroit : les deux panneaux rétrécissent dans les mêmes
+** │   proportions (les textes gardent leur taille)
+** ╰──────────────────────────────────────────────────────────────────────
+*/
 void creation_geometrie(app_t *app, creation_t *c)
 {
     float g = fmaxf(COMPO_G, app->ecran.left + MARGE_ECRAN);

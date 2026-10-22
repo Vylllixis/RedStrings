@@ -4,8 +4,14 @@
 */
 
 /*
- * Emblème de chaque classe : choix du dessin selon la classe.
- */
+** ╭─ emblemes.c ─────────────────────────────────────────────────────────
+** │ But         Dessiner l'emblème d'une classe : un motif vectoriel
+** │             choisi par classe_info(c)->embleme dans la table
+** │             DESSINS ; en mode Yu-Gi-Oh!, l'illustration de la carte
+** │             le remplace quand elle est chargée.
+** │ Contenu     DESSINS (un emb_d_* par motif), embleme
+** ╰──────────────────────────────────────────────────────────────────────
+*/
 
 #include "personnage.h"
 #include "gui_carte.h"

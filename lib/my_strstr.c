@@ -2,6 +2,14 @@
 **
 */
 
+/*
+** ╭─ my_strstr.c ────────────────────────────────────────────────────────
+** │ But         Chercher la première occurrence d'une sous-chaîne.
+** │             Renvoie un pointeur à cet endroit, ou NULL si elle n'est
+** │             pas trouvée (une sous-chaîne vide est trouvée au début).
+** ╰──────────────────────────────────────────────────────────────────────
+*/
+
 #include <stddef.h>
 #include "my.h"
 #include "my_string.h"

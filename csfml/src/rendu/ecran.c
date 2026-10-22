@@ -4,10 +4,15 @@
 */
 
 /*
- * Géométrie de l'écran : les scènes sont conçues dans un repère 1280 × 720
- * centré dans la fenêtre ; ces fonctions disent ce qui en est visible et
- * permettent d'ancrer un élément au bord ou d'en réduire une zone.
- */
+** ╭─ ecran.c ────────────────────────────────────────────────────────────
+** │ But         Géométrie de l'écran : les scènes sont conçues dans un
+** │             repère 1280 x 720 centré dans la fenêtre ; ces fonctions
+** │             disent ce qui en est visible et permettent d'ancrer un
+** │             élément au bord ou d'en réduire une zone.
+** │ Contenu     ecran_visible, ecran_couvrant, decal_gauche,
+** │             decal_droite, vers_ecran, zoom_debut, zoom_fin
+** ╰──────────────────────────────────────────────────────────────────────
+*/
 
 #include "gui_app.h"
 #include "gui_config.h"

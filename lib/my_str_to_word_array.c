@@ -2,6 +2,15 @@
 **
 */
 
+/*
+** ╭─ my_str_to_word_array.c ─────────────────────────────────────────────
+** │ But         Découper une chaîne en mots (suites de lettres et de
+** │             chiffres). Le tableau renvoyé est terminé par NULL.
+** │ Utilise     my_strlen, my_strncpy
+** │ Attention   le tableau et chaque mot sont alloués : à libérer
+** ╰──────────────────────────────────────────────────────────────────────
+*/
+
 #include <stdlib.h>
 #include "my.h"
 #include "my_string.h"

@@ -4,8 +4,14 @@
 */
 
 /*
- * Arène : panneaux d'équipe, ordre des tours, journal, bandeau, nombres flottants, fin.
- */
+** ╭─ arene_infos.c ──────────────────────────────────────────────────────
+** │ But         Arène : panneaux d'équipe, ordre des tours, journal,
+** │             bandeau, nombres flottants, écran de fin.
+** │ Contenu     arene_dessiner_popups, ligne_equipe, nb_vivants_vus,
+** │             arene_panneau_equipe, arene_ordre_tours, arene_journal,
+** │             arene_banniere, arene_ecran_fin
+** ╰──────────────────────────────────────────────────────────────────────
+*/
 
 #include <math.h>
 #include <stdio.h>

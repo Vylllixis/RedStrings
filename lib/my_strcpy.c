@@ -2,6 +2,13 @@
 **
 */
 
+/*
+** ╭─ my_strcpy.c ────────────────────────────────────────────────────────
+** │ But         Copier une chaîne, '\0' compris, dans dest.
+** │ Attention   dest doit être assez grand
+** ╰──────────────────────────────────────────────────────────────────────
+*/
+
 #include "my.h"
 #include "my_string.h"
 

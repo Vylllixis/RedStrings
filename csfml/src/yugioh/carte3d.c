@@ -4,11 +4,17 @@
 */
 
 /*
- * Une carte dans l'espace : la face (ou le dos) est plaquée sur une grille
- * projetée en perspective, ce qui permet de la retourner, de l'incliner vers
- * la souris et de la faire basculer. Par-dessus : ombre, halo, reflet
- * holographique qui la traverse, lumière qui court le long du cadre.
- */
+** ╭─ carte3d.c ──────────────────────────────────────────────────────────
+** │ But         Une carte dans l'espace : la face (ou le dos) est plaquée
+** │             sur une grille projetée en perspective, ce qui permet de
+** │             la retourner, de l'incliner vers la souris et de la faire
+** │             basculer. Par-dessus : ombre, halo, reflet holographique,
+** │             lumière qui court le long du cadre.
+** │ Contenu     carte3d_pose, tourner, carte3d_point,
+** │             carte3d_face_visible, grille, carreau, ombre_portee,
+** │             face_texturee, irise, reflet, carte3d
+** ╰──────────────────────────────────────────────────────────────────────
+*/
 
 #include <math.h>
 #include "personnage.h"
@@ -36,7 +42,14 @@ carte3d_t carte3d_pose(sfVector2f centre, float largeur)
     return k;
 }
 
-/** Rotation autour de Y (retournement), puis X (bascule), puis Z (inclinaison). */
+/*
+** ╭─ tourner ────────────────────────────────────────────────────────────
+** │ Fait tourner un point de la carte dans l'espace : d'abord autour de Y
+** │ (retournement), puis de X (bascule), puis de Z (inclinaison).
+** │
+** │ Renvoie (x, y, z) : le z sert ensuite à la perspective.
+** ╰──────────────────────────────────────────────────────────────────────
+*/
 static sfVector3f tourner(const carte3d_t *k, float x, float y)
 {
     float x1 = x * cosf(k->rot_y);
@@ -48,7 +61,19 @@ static sfVector3f tourner(const carte3d_t *k, float x, float y)
         x1 * sinf(k->rot_z) + y2 * cosf(k->rot_z), z2};
 }
 
-/** Point (u, v) de la carte (0..1, origine en haut à gauche) projeté à l'écran. */
+/*
+** ╭─ carte3d_point ──────────────────────────────────────────────────────
+** │ Projette à l'écran le point (u, v) de la carte (de 0 à 1, origine en
+** │ haut à gauche).
+** │
+** │ 1. place le point par rapport au centre de la carte, à sa taille
+** │    réelle
+** │ 2. tourner() applique les rotations
+** │ 3. perspective : f = PERSPECTIVE / (PERSPECTIVE + z) ; plus un point
+** │    est loin, plus il est petit
+** │ 4. ajoute le centre de la carte à l'écran
+** ╰──────────────────────────────────────────────────────────────────────
+*/
 sfVector2f carte3d_point(const carte3d_t *k, float u, float v)
 {
     float l = k->largeur;
@@ -100,6 +125,19 @@ static void ombre_portee(app_t *app, const carte3d_t *k, float a)
     }
 }
 
+/*
+** ╭─ face_texturee ──────────────────────────────────────────────────────
+** │ Plaque la face (ou le dos) sur la carte.
+** │
+** │ La carte est une grille de GRILLE_X x GRILLE_Y carreaux dont les
+** │ sommets sont projetés par carte3d_point().
+** │ 1. choisit la texture : la face si carte3d_face_visible(), sinon le
+** │    dos
+** │ 2. règle la luminosité selon l'angle de la carte, et le gris
+** │ 3. chaque sommet reçoit sa coordonnée de texture (miroir pour le dos)
+** │ 4. cible_primitives() dessine le tout d'un coup (sfQuads)
+** ╰──────────────────────────────────────────────────────────────────────
+*/
 static void face_texturee(app_t *app, classe_t c, const carte3d_t *k,
     const sfVector2f p[NB_POINTS], float a)
 {

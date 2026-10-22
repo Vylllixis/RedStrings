@@ -4,10 +4,14 @@
 */
 
 /*
- * Tests des fonctions de la version graphique qui ne touchent pas à SFML :
- * UTF-8, courbes d'animation, couleurs, recherche par nom et accès sûrs à la
- * table des classes. Aucune fenêtre n'est ouverte.
- */
+** ╭─ tests.c (graphique) ────────────────────────────────────────────────
+** │ But         Tests des fonctions de la version graphique qui ne
+** │             touchent pas à SFML : UTF-8, courbes d'animation,
+** │             couleurs, recherche par nom et accès sûrs à la table des
+** │             classes. Aucune fenêtre n'est ouverte.
+** │ Lancer      make csfml-tests
+** ╰──────────────────────────────────────────────────────────────────────
+*/
 
 #include <assert.h>
 #include <math.h>

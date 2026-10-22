@@ -2,6 +2,13 @@
 **
 */
 
+/*
+** ╭─ my_arraystrlen.c ───────────────────────────────────────────────────
+** │ But         Additionner les longueurs des ac chaînes de av.
+** │ Utilise     my_strlen
+** ╰──────────────────────────────────────────────────────────────────────
+*/
+
 #include "my.h"
 #include "my_string.h"
 

@@ -4,8 +4,11 @@
 */
 
 /*
- * Création : onglets de catégorie et grille des classes.
- */
+** ╭─ creation_classes.c ─────────────────────────────────────────────────
+** │ But         Création : onglets de catégorie et grille des classes.
+** │ Contenu     creation_onglets, tuile_classe, creation_grille_classes
+** ╰──────────────────────────────────────────────────────────────────────
+*/
 
 #include <math.h>
 #include <stdio.h>

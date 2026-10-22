@@ -3,6 +3,17 @@
 ** PROJET FIL ROUGE C Avancé
 */
 
+/*
+** ╭─ afficher_personnage.c ──────────────────────────────────────────────
+** │ But         Afficher la fiche d'un personnage : nom, classe,
+** │             catégorie, description, puis une barre pour chaque
+** │             statistique.
+** │ Contenu     repeter, afficher_stat, afficher_personnage
+** │ Utilise     boite.c pour les cadres, la table classes[] de
+** │             personnage.c
+** ╰──────────────────────────────────────────────────────────────────────
+*/
+
 #include <stdio.h>
 #include "boite.h"
 #include "couleurs.h"
@@ -19,6 +30,16 @@ static void repeter(char *dest, size_t taille, const char *motif, int fois)
         n += (size_t)snprintf(dest + n, taille - n, "%s", motif);
 }
 
+/*
+** ╭─ afficher_stat ──────────────────────────────────────────────────────
+** │ Dessine une barre de 20 cases pour une statistique.
+** │
+** │ - cases pleines = valeur / 5, arrondi au-dessus, bornées à
+** │   LARGEUR_BARRE
+** │ - pleines en couleur (█), vides en gris (░), puis la valeur en gras
+** │ - les barres sont construites dans des tampons bornés (snprintf)
+** ╰──────────────────────────────────────────────────────────────────────
+*/
 static void afficher_stat(const char *nom, int valeur, const char *couleur)
 {
     int remplies = (valeur + 4) / 5;

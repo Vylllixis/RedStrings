@@ -3,6 +3,18 @@
 ** PROJET FIL ROUGE C Avancé
 */
 
+/*
+** ╭─ sauvegarde.c ───────────────────────────────────────────────────────
+** │ But         Écrire et relire la liste des personnages dans un fichier
+** │             texte, une ligne par personnage : « nom pv atq def classe
+** │             soin ».
+** │ Contenu     sauvegarder, charger, lire_fichier, lire_ligne_perso,
+** │             personnage_valide, sauvegarde_message
+** │ Utilise     roster.c ; le fichier est lu avec fgets, jamais avec un
+** │             tampon sans limite
+** ╰──────────────────────────────────────────────────────────────────────
+*/
+
 #include <stdio.h>
 #include "my_string.h"
 #include "sauvegarde.h"
@@ -51,11 +63,17 @@ static int ligne_vide(const char *s)
     return 1;
 }
 
-/**
- * Une ligne : « nom pv atq def classe soin ». Une ligne sans le soin vient
- * d'une sauvegarde plus ancienne : le soin vaut alors SOIN_MIGRATION, modifié
- * par la classe. Renvoie 0 si la ligne est valide, -1 sinon.
- */
+/*
+** ╭─ lire_ligne_perso ───────────────────────────────────────────────────
+** │ Lit une ligne « nom pv atq def classe soin ».
+** │
+** │ - une ligne sans le soin vient d'une ancienne sauvegarde : le soin
+** │   vaut alors SOIN_MIGRATION, modifié par la classe
+** │ - refusée si le nombre de champs est faux, si la classe n'existe pas,
+** │   ou s'il reste du texte à la fin
+** │ Renvoie 0 si la ligne est valide, -1 sinon.
+** ╰──────────────────────────────────────────────────────────────────────
+*/
 static int lire_ligne_perso(const char *ligne, personnage_t *p)
 {
     int classe = 0;
@@ -101,6 +119,19 @@ static sauvegarde_t lire_fichier(FILE *f, roster_t *lus)
     return ferror(f) ? SAUVEGARDE_ERR_FORMAT : SAUVEGARDE_OK;
 }
 
+/*
+** ╭─ charger ────────────────────────────────────────────────────────────
+** │ Charge un fichier en « tout ou rien ».
+** │
+** │ 1. ouvre le fichier
+** │ 2. lit tout dans une liste temporaire (lus)
+** │ 3. si une ligne est invalide : libère lus et ne touche PAS à la liste
+** │    du joueur
+** │ 4. sinon remplace la liste du joueur par lus
+** │ Un fichier corrompu ne peut donc jamais abîmer les personnages en
+** │ cours.
+** ╰──────────────────────────────────────────────────────────────────────
+*/
 sauvegarde_t charger(roster_t *r, const char *chemin)
 {
     FILE *f = fopen(chemin, "r");

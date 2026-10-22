@@ -4,8 +4,12 @@
 */
 
 /*
- * Création : aperçu en direct des statistiques finales.
- */
+** ╭─ creation_apercu.c ──────────────────────────────────────────────────
+** │ But         Création : aperçu en direct des statistiques finales
+** │             (base choisie + modificateurs de la classe).
+** │ Contenu     puce_mod, stats_apercu, creation_apercu
+** ╰──────────────────────────────────────────────────────────────────────
+*/
 
 #include <math.h>
 #include <stdio.h>

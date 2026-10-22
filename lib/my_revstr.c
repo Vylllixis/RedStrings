@@ -2,6 +2,15 @@
 **
 */
 
+/*
+** ╭─ my_revstr.c ────────────────────────────────────────────────────────
+** │ But         Inverser une chaîne sur place : le premier caractère est
+** │             échangé avec le dernier, le deuxième avec
+** │             l'avant-dernier, etc.
+** │ Utilise     my_strlen
+** ╰──────────────────────────────────────────────────────────────────────
+*/
+
 #include "my.h"
 #include "my_string.h"
 

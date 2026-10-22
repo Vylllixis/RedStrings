@@ -2,6 +2,13 @@
 **
 */
 
+/*
+** ╭─ my_putstr.c ────────────────────────────────────────────────────────
+** │ But         Écrire une chaîne, caractère par caractère.
+** │ Utilise     my_putchar
+** ╰──────────────────────────────────────────────────────────────────────
+*/
+
 #include "my.h"
 
 int my_putstr(char const *str)

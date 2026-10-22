@@ -4,8 +4,13 @@
 */
 
 /*
- * Cartes de personnage : avatar, fiche et mini-carte.
- */
+** ╭─ carte.c ────────────────────────────────────────────────────────────
+** │ But         Cartes de personnage : avatar, fiche détaillée
+** │             (équivalent graphique de afficher_personnage) et
+** │             mini-carte.
+** │ Contenu     avatar, barre_segments, fiche, mini_stats, mini_carte
+** ╰──────────────────────────────────────────────────────────────────────
+*/
 
 #include <math.h>
 #include <stdio.h>

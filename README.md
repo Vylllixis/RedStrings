@@ -1005,7 +1005,7 @@ Ouvre une [issue](https://github.com/Vylllixis/RedStrings/issues/new/choose) : d
 - **Plein écran : seules les fonctions de bascule ont été exercées**, par un programme de test qui les appelle directement. Les vraies touches <kbd>F11</kbd> et <kbd>Alt</kbd>+<kbd>Entrée</kbd> n'ont pas été essayées à la main.
 - **Mode `"Yu-Gi-Oh!"`** : les illustrations ne sont pas dans le dépôt (droits). Il faut lancer `sh csfml/assets/yugioh/telecharger.sh`, sinon chaque carte montre l'emblème de sa classe. Voir [`THIRD_PARTY_NOTICES.md`](THIRD_PARTY_NOTICES.md).
 - **Pas encore de compétences spéciales, d'attaques de zone ni d'effets de statut** (le moteur a déjà `effet_t` pour les accueillir).
-- **Documentation de l'API** : `make doc` génère un HTML sobre des interfaces publiques (`.h`) dans `docs/` ; les fichiers `.c` ne sont pas documentés au format Doxygen.
+- **Documentation de l'API** : `make doc` génère un HTML sobre des interfaces publiques (`.h`) dans `docs/` . Les fichiers `.c` ne passent pas par Doxygen : chacun commence par une boîte qui dit son but et son contenu, et les fonctions importantes ont leur boîte qui explique leur fonctionnement étape par étape (voir [`CONTRIBUTING.md`](CONTRIBUTING.md#conventions-du-code)).
 
 <a id="licence"></a>
 

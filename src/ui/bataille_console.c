@@ -4,10 +4,16 @@
 */
 
 /*
- * Combat en équipe dans le terminal. Toutes les règles viennent du moteur
- * (bataille.c) : ce fichier ne fait que demander les choix du joueur et
- * afficher l'état et le journal.
- */
+** ╭─ bataille_console.c ─────────────────────────────────────────────────
+** │ But         Le combat en équipe dans le terminal : composer les
+** │             équipes, demander les actions du joueur, afficher l'état
+** │             et le journal.
+** │ Règle       toutes les règles viennent du moteur (bataille.c) ; ce
+** │             fichier ne fait que demander et afficher
+** │ Sections    Constitution des équipes · Affichage · Tour du joueur ·
+** │             Boucle de combat
+** ╰──────────────────────────────────────────────────────────────────────
+*/
 
 #include <stdio.h>
 #include "bataille.h"
@@ -50,10 +56,15 @@ static int nb_disponibles(const roster_t *r, const personnage_t *equipe, int n,
     return dispo;
 }
 
-/**
- * Demande jusqu'à TAILLE_EQUIPE_MAX noms (ligne vide pour finir).
- * Renvoie la taille de l'équipe, ou -1 sur Ctrl+D.
- */
+/*
+** ╭─ choisir_equipe ─────────────────────────────────────────────────────
+** │ Demande jusqu'à TAILLE_EQUIPE_MAX noms (une ligne vide termine).
+** │
+** │ Refuse un nom introuvable, un personnage K.O., ou un personnage déjà
+** │ engagé dans l'une des deux équipes.
+** │ Renvoie la taille de l'équipe, ou -1 sur Ctrl+D.
+** ╰──────────────────────────────────────────────────────────────────────
+*/
 static int choisir_equipe(const roster_t *r, const char *titre,
     personnage_t equipe[TAILLE_EQUIPE_MAX], const personnage_t *autre, int nb_autre)
 {
@@ -211,6 +222,19 @@ static int tour_joueur(const bataille_t *b, action_t *a, ref_t *cible)
 /*  Boucle de combat                                                   */
 /* ------------------------------------------------------------------ */
 
+/*
+** ╭─ jouer ──────────────────────────────────────────────────────────────
+** │ La boucle du combat, tant qu'il n'y a pas de gagnant.
+** │
+** │ 1. affiche l'état des deux équipes
+** │ 2. équipe 0 : le joueur choisit (tour_joueur) ; équipe 1 :
+** │    bataille_ia()
+** │ 3. bataille_agir() applique l'action
+** │ 4. afficher_nouveautes() montre les lignes de journal écrites depuis
+** │    `avant`
+** │ À la fin : Victoire ou Défaite.
+** ╰──────────────────────────────────────────────────────────────────────
+*/
 static void jouer(bataille_t *b)
 {
     evenement_t ev[MAX_EVENEMENTS];
@@ -245,6 +269,18 @@ static int nb_vivants(const roster_t *r)
     return n;
 }
 
+/*
+** ╭─ menu_bataille ──────────────────────────────────────────────────────
+** │ Prépare puis lance un combat.
+** │
+** │ 1. il faut au moins 2 personnages en forme
+** │ 2. le joueur compose son équipe, en laissant au moins 1 personnage à
+** │    l'adversaire
+** │ 3. l'adversaire (l'ordinateur) est composé parmi les personnages
+** │    restants
+** │ 4. bataille_init() puis jouer()
+** ╰──────────────────────────────────────────────────────────────────────
+*/
 void menu_bataille(const roster_t *r)
 {
     personnage_t joueurs[TAILLE_EQUIPE_MAX];

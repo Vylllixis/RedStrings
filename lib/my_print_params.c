@@ -2,6 +2,13 @@
 **
 */
 
+/*
+** ╭─ my_print_params.c ──────────────────────────────────────────────────
+** │ But         Écrire chaque argument du programme sur sa ligne.
+** │ Utilise     my_putstr, my_putchar
+** ╰──────────────────────────────────────────────────────────────────────
+*/
+
 #include "my.h"
 
 int my_print_params(int ac, char **av)

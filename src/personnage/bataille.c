@@ -3,6 +3,18 @@
 ** PROJET FIL ROUGE C Avancé
 */
 
+/*
+** ╭─ bataille.c ─────────────────────────────────────────────────────────
+** │ But         Le moteur du combat en équipe, au tour par tour. Il ne
+** │             contient AUCUN affichage : il décide, les interfaces
+** │             montrent.
+** │ Sections    Journal · Combattants et effets · Initialisation et tours
+** │             · Règles des actions · Résolution · Ordinateur
+** │ Utilisé par bataille_console.c (terminal) et l'arène de la version
+** │             graphique
+** ╰──────────────────────────────────────────────────────────────────────
+*/
+
 #include <stdarg.h>
 #include <stdio.h>
 #include "bataille.h"
@@ -11,6 +23,15 @@
 /*  Journal                                                            */
 /* ------------------------------------------------------------------ */
 
+/*
+** ╭─ noter ──────────────────────────────────────────────────────────────
+** │ Écrit une ligne dans le journal du combat.
+** │
+** │ Le journal est un tampon circulaire de JOURNAL_MAX lignes : la case
+** │ est nb_journal % JOURNAL_MAX, donc les lignes les plus anciennes sont
+** │ écrasées. vsnprintf() borne chaque ligne.
+** ╰──────────────────────────────────────────────────────────────────────
+*/
 static void noter(bataille_t *b, const char *format, ...)
     __attribute__((format(printf, 2, 3)));
 
@@ -76,7 +97,16 @@ static void poser_effet(combattant_t *c, type_effet_t type, int tours)
     c->effets[i] = (effet_t){type, tours};
 }
 
-/** Début du tour du porteur : chaque effet perd un tour, ceux à 0 expirent. */
+/*
+** ╭─ vieillir_effets ────────────────────────────────────────────────────
+** │ Au début du tour du porteur, chaque effet perd 1 tour ; à 0 il
+** │ expire.
+** │
+** │ Un effet expiré est retiré en recopiant le dernier à sa place
+** │ (l'ordre n'a pas d'importance). Quand c'est la garde, on produit un
+** │ événement EV_GARDE_FIN et une ligne de journal.
+** ╰──────────────────────────────────────────────────────────────────────
+*/
 static int vieillir_effets(bataille_t *b, ref_t r, evenement_t *ev, int n)
 {
     combattant_t *c = bataille_combattant(b, r);
@@ -122,7 +152,14 @@ static int equipe_valide(const personnage_t *persos, int n)
     return 1;
 }
 
-/** Ordre déterministe : les équipes alternent, rang par rang (J1, A1, J2, A2…). */
+/*
+** ╭─ calculer_ordre ─────────────────────────────────────────────────────
+** │ Fixe l'ordre des tours, une seule fois au début du combat.
+** │
+** │ Les équipes alternent, rang par rang : J1, A1, J2, A2... Cet ordre ne
+** │ dépend d'aucune statistique, donc le combat est prévisible.
+** ╰──────────────────────────────────────────────────────────────────────
+*/
 static void calculer_ordre(bataille_t *b)
 {
     b->nb_ordre = 0;
@@ -163,7 +200,16 @@ static int equipe_vivante(const equipe_t *e)
     return 0;
 }
 
-/** Passe au prochain combattant vivant et fait vieillir ses effets. */
+/*
+** ╭─ tour_suivant ───────────────────────────────────────────────────────
+** │ Passe au prochain combattant VIVANT.
+** │
+** │ 1. avance dans l'ordre ; en fin de liste on revient à 0 et manche++
+** │ 2. saute les K.O. (au plus nb_ordre essais, donc jamais de boucle
+** │    infinie)
+** │ 3. fait vieillir les effets du nouvel actif
+** ╰──────────────────────────────────────────────────────────────────────
+*/
 static int tour_suivant(bataille_t *b, evenement_t *ev, int n)
 {
     for (int k = 0; k < b->nb_ordre; k++) {
@@ -182,6 +228,15 @@ static int tour_suivant(bataille_t *b, evenement_t *ev, int n)
 /*  Règles des actions                                                 */
 /* ------------------------------------------------------------------ */
 
+/*
+** ╭─ bataille_degats ────────────────────────────────────────────────────
+** │ Dégâts réels d'une attaque.
+** │
+** │ 1. calculer_degats() : ATQ x (100 - DEF) / 100
+** │ 2. si la cible est en garde : encore -GARDE_REDUCTION %
+** │ 3. au minimum 1 : un coup fait toujours au moins 1 dégât
+** ╰──────────────────────────────────────────────────────────────────────
+*/
 int bataille_degats(const combattant_t *attaquant, const combattant_t *cible)
 {
     int degats = calculer_degats(&attaquant->perso, &cible->perso);
@@ -198,6 +253,18 @@ int bataille_soin(const combattant_t *soigneur, const combattant_t *cible)
     return soigneur->perso.soin < manque ? soigneur->perso.soin : manque;
 }
 
+/*
+** ╭─ bataille_cible_valide ──────────────────────────────────────────────
+** │ Dit si `cible` est permise pour l'action `a`. C'est LE point de
+** │ contrôle des règles.
+** │
+** │ - toujours refusé : combat fini, indice hors équipe, cible K.O.
+** │ - ATTAQUER : une cible de l'équipe adverse
+** │ - SOIGNER : un allié (soi-même compris) qui a des PV à regagner
+** │ - DEFENDRE : uniquement soi-même
+** │ bataille_agir() refuse tout ce que cette fonction n'accepte pas.
+** ╰──────────────────────────────────────────────────────────────────────
+*/
 int bataille_cible_valide(const bataille_t *b, action_t a, ref_t cible)
 {
     ref_t r = bataille_actif(b);
@@ -287,6 +354,18 @@ static int se_defendre(bataille_t *b, ref_t r, evenement_t *ev, int n)
     return n;
 }
 
+/*
+** ╭─ bataille_agir ──────────────────────────────────────────────────────
+** │ Joue l'action du combattant actif.
+** │
+** │ 1. bataille_cible_valide() : sinon renvoie -1, rien n'a changé
+** │ 2. applique l'action (attaquer_cible, soigner_cible ou se_defendre)
+** │ 3. si une équipe n'a plus de vivant : gagnant + événement EV_VICTOIRE
+** │ 4. sinon tour_suivant() passe la main
+** │ ev[] reçoit les événements produits (de quoi animer l'interface).
+** │ Renvoie leur nombre, ou -1 si l'action est refusée.
+** ╰──────────────────────────────────────────────────────────────────────
+*/
 int bataille_agir(bataille_t *b, action_t a, ref_t cible,
     evenement_t ev[MAX_EVENEMENTS])
 {
@@ -317,12 +396,17 @@ int bataille_agir(bataille_t *b, action_t a, ref_t cible,
 /*  Ordinateur                                                         */
 /* ------------------------------------------------------------------ */
 
-/**
- * Règles simples et prévisibles, dans l'ordre :
- *  1. soigner l'allié vivant le plus blessé s'il est sous la moitié de ses PV ;
- *  2. se mettre en garde sous le quart de ses PV (si pas déjà en garde) ;
- *  3. sinon attaquer l'ennemi vivant qui a le moins de PV.
- */
+/*
+** ╭─ bataille_ia ────────────────────────────────────────────────────────
+** │ L'ordinateur joue avec des règles simples et prévisibles, dans
+** │ l'ordre :
+** │
+** │ 1. soigner l'allié vivant le plus blessé, s'il est sous la moitié de
+** │    ses PV
+** │ 2. se mettre en garde sous le quart de ses PV (si pas déjà en garde)
+** │ 3. sinon attaquer l'ennemi vivant qui a le moins de PV
+** ╰──────────────────────────────────────────────────────────────────────
+*/
 void bataille_ia(const bataille_t *b, action_t *a, ref_t *cible)
 {
     ref_t r = bataille_actif(b);

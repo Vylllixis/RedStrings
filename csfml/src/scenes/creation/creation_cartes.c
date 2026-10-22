@@ -4,11 +4,18 @@
 */
 
 /*
- * Création, mode Yu-Gi-Oh! : la grille des classes devient une main de
- * cartes, et l'hologramme de l'aperçu une grande carte qui se retourne à
- * chaque changement de classe. Mêmes classes, même ordre, mêmes règles de
- * sélection que la grille normale : seul le dessin change.
- */
+** ╭─ creation_cartes.c ──────────────────────────────────────────────────
+** │ But         Création, mode Yu-Gi-Oh! : la grille des classes devient
+** │             une main de cartes, et l'hologramme de l'aperçu une
+** │             grande carte qui se retourne à chaque changement de
+** │             classe.
+** │ Règle       mêmes classes, même ordre, mêmes règles de sélection que
+** │             la grille normale : seul le dessin change
+** │ Contenu     cartes_de_categorie, pose_main, carte_survolee,
+** │             dessiner_main, creation_main_cartes, cercle_invocation,
+** │             creation_carte_apercu
+** ╰──────────────────────────────────────────────────────────────────────
+*/
 
 #include <math.h>
 #include "personnage.h"
@@ -177,11 +184,17 @@ static void cercle_invocation(app_t *app, sfColor col)
     graduations(app, c, 162.f, 72, 4.f, -t * 0.06f, avec_alpha(C_BLANC, 0.16f));
 }
 
-/**
- * La grande carte : entre en scène en se redressant, se retourne d'un tour
- * complet à chaque changement de classe (ancienne face, dos, nouvelle face),
- * s'incline vers la souris et s'envole quand le personnage est créé.
- */
+/*
+** ╭─ creation_carte_apercu ──────────────────────────────────────────────
+** │ La grande carte de l'aperçu.
+** │
+** │ - entre en scène en se redressant
+** │ - se retourne d'un tour complet à chaque changement de classe
+** │   (ancienne face, dos, nouvelle face)
+** │ - s'incline vers la souris
+** │ - s'envole quand le personnage est créé
+** ╰──────────────────────────────────────────────────────────────────────
+*/
 void creation_carte_apercu(app_t *app, creation_t *c)
 {
     float f = progression(c->t_classe, 0.f, DUREE_RETOURNEMENT);

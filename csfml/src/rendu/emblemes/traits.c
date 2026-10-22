@@ -4,8 +4,13 @@
 */
 
 /*
- * Primitives des emblèmes : points, épaisseurs, traits, épée, étoile, flamme.
- */
+** ╭─ traits.c ───────────────────────────────────────────────────────────
+** │ But         Primitives communes des emblèmes : points, épaisseurs,
+** │             traits, épée, étoile, flamme.
+** │ Contenu     emb_pt, emb_ep, emb_trait, emb_epee, emb_etoile,
+** │             emb_flamme
+** ╰──────────────────────────────────────────────────────────────────────
+*/
 
 #include <math.h>
 #include "gui_config.h"

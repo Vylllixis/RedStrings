@@ -4,8 +4,11 @@
 */
 
 /*
- * Pastilles et notifications empilables (toasts).
- */
+** ╭─ notification.c ─────────────────────────────────────────────────────
+** │ But         Pastilles et notifications empilables (toasts).
+** │ Contenu     pastille, notifier, dessiner_toast, dessiner_toasts
+** ╰──────────────────────────────────────────────────────────────────────
+*/
 
 #include <math.h>
 #include <stdio.h>

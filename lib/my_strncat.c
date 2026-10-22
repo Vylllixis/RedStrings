@@ -2,6 +2,15 @@
 **
 */
 
+/*
+** ╭─ my_strncat.c ───────────────────────────────────────────────────────
+** │ But         Comme my_strcat, mais en collant au plus n caractères de
+** │             src. Le '\0' final est toujours ajouté.
+** │ Utilise     my_strlen
+** │ Attention   dest doit avoir la place pour les caractères ajoutés
+** ╰──────────────────────────────────────────────────────────────────────
+*/
+
 #include "my.h"
 #include "my_string.h"
 

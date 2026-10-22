@@ -4,8 +4,14 @@
 */
 
 /*
- * Arène : choix de l'action et de la cible, au clavier et à la souris.
- */
+** ╭─ arene_commandes.c ──────────────────────────────────────────────────
+** │ But         Arène : choix de l'action et de la cible, au clavier et à
+** │             la souris.
+** │ Contenu     choisir_cibles, valider_action, arene_clavier,
+** │             arene_souris_cibles, acteur_affiche, bouton_action,
+** │             arene_panneau_commandes
+** ╰──────────────────────────────────────────────────────────────────────
+*/
 
 #include <math.h>
 #include <stdio.h>

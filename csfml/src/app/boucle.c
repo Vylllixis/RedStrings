@@ -4,8 +4,13 @@
 */
 
 /*
- * Une image : transition entre scènes, dessin de la scène courante, curseur.
- */
+** ╭─ boucle.c ───────────────────────────────────────────────────────────
+** │ But         Ce qui se passe à chaque image : transition entre scènes,
+** │             dessin de la scène courante, curseur de la souris.
+** │ Contenu     changer_scene, maj_app (appelée par main), entrer_scene,
+** │             maj_transition, dessiner_scene, maj_curseur
+** ╰──────────────────────────────────────────────────────────────────────
+*/
 
 #include <math.h>
 #include <string.h>
@@ -44,7 +49,17 @@ void changer_scene(app_t *app, scene_t scene)
     app->t_transition = 0.f;
 }
 
-/** Fondu + glissement : la scène sort vers le haut, la suivante arrive du bas. */
+/*
+** ╭─ maj_transition ─────────────────────────────────────────────────────
+** │ Calcule le fondu et le glissement entre deux scènes (alpha et
+** │ decalage sont les résultats).
+** │
+** │ - sortie : la scène disparaît (alpha 1 → 0) en glissant vers le haut,
+** │   pendant DUREE_SORTIE ; puis entrer_scene() prépare la suivante
+** │ - entrée : la nouvelle scène apparaît (alpha 0 → 1) en glissant
+** │   depuis le bas
+** ╰──────────────────────────────────────────────────────────────────────
+*/
 static void maj_transition(app_t *app, float *alpha, float *decalage)
 {
     float p = 0.f;
@@ -89,6 +104,21 @@ static void maj_curseur(app_t *app)
     app->curseur_actuel = app->curseur_voulu;
 }
 
+/*
+** ╭─ maj_app ────────────────────────────────────────────────────────────
+** │ Une image complète, appelée à chaque tour de la boucle de main().
+** │
+** │ 1. met à jour les temps : dt est borné à 1/30 s (pas de saut après un
+** │    blocage) ; à chaque K.O., le « hitstop » ralentit le jeu un court
+** │    instant
+** │ 2. maj_transition() calcule le fondu entre deux scènes ; pendant ce
+** │    temps, la souris et le clavier sont ignorés
+** │ 3. dessine le fond (vue fixe), puis la scène (vue qui tremble quand
+** │    app->secousse > 0)
+** │ 4. particules, puis notifications par-dessus, en vue fixe
+** │ 5. règle le curseur de la souris (flèche, main, texte)
+** ╰──────────────────────────────────────────────────────────────────────
+*/
 void maj_app(app_t *app, float dt)
 {
     float alpha = 1.f;

@@ -2,6 +2,14 @@
 **
 */
 
+/*
+** ╭─ my_show_word_array.c ───────────────────────────────────────────────
+** │ But         Écrire les mots d'un tableau terminé par NULL, séparés
+** │             par un espace, avec un point à la fin.
+** │ Utilise     my_putstr, my_putchar
+** ╰──────────────────────────────────────────────────────────────────────
+*/
+
 #include <stddef.h>
 #include "my.h"
 

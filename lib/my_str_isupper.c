@@ -2,6 +2,13 @@
 **
 */
 
+/*
+** ╭─ my_str_isupper.c ───────────────────────────────────────────────────
+** │ But         Vérifier que la chaîne ne contient que des majuscules.
+** │             Renvoie 1 si c'est vrai, 0 sinon.
+** ╰──────────────────────────────────────────────────────────────────────
+*/
+
 #include "my.h"
 #include "my_string.h"
 

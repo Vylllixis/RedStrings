@@ -2,6 +2,15 @@
 **
 */
 
+/*
+** ╭─ concat_params.c ────────────────────────────────────────────────────
+** │ But         Coller tous les arguments du programme dans une seule
+** │             chaîne allouée, un argument par ligne.
+** │ Utilise     my_arraystrlen, my_strlen
+** │ Attention   le résultat est à libérer avec free()
+** ╰──────────────────────────────────────────────────────────────────────
+*/
+
 #include <stdlib.h>
 #include "my.h"
 #include "my_string.h"

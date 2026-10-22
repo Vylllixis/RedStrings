@@ -4,10 +4,15 @@
 */
 
 /*
- * Face et dos des cartes, dessinés une seule fois dans une texture au
- * lancement (voir ressources.c). Le titre est le nom de la classe RedStrings :
- * le nom officiel de la carte n'apparaît jamais.
- */
+** ╭─ face.c ─────────────────────────────────────────────────────────────
+** │ But         Face des cartes, dessinée une seule fois dans une texture
+** │             au lancement (voir ressources.c). Le titre est le nom de
+** │             la classe RedStrings : le nom officiel de la carte
+** │             n'apparaît jamais.
+** │ Contenu     yugioh_degrade, grain, etoile_niveau, titre, niveau,
+** │             illustration, mod_texte, encart, dessiner_face
+** ╰──────────────────────────────────────────────────────────────────────
+*/
 
 #include <math.h>
 #include <stdio.h>

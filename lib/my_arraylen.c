@@ -2,6 +2,13 @@
 **
 */
 
+/*
+** ╭─ my_arraylen.c ──────────────────────────────────────────────────────
+** │ But         Compter les éléments d'un tableau de chaînes terminé par
+** │             NULL.
+** ╰──────────────────────────────────────────────────────────────────────
+*/
+
 #include <stddef.h>
 #include "my.h"
 

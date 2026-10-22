@@ -4,8 +4,11 @@
 */
 
 /*
- * Menu : aperçu de l'équipe, une case par personnage.
- */
+** ╭─ menu_equipe.c ──────────────────────────────────────────────────────
+** │ But         Menu : aperçu de l'équipe, une case par personnage.
+** │ Contenu     emplacement, menu_panneau_equipe
+** ╰──────────────────────────────────────────────────────────────────────
+*/
 
 #include <math.h>
 #include <stdio.h>

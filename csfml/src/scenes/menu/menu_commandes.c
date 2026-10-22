@@ -4,8 +4,13 @@
 */
 
 /*
- * Menu : les quatre commandes (ajouter, afficher, combat, quitter).
- */
+** ╭─ menu_commandes.c ───────────────────────────────────────────────────
+** │ But         Menu : les quatre commandes (ajouter, afficher, combat,
+** │             quitter).
+** │ Contenu     menu_option_principale, lire_options, dessiner_option,
+** │             menu_commandes
+** ╰──────────────────────────────────────────────────────────────────────
+*/
 
 #include <math.h>
 #include <stdio.h>

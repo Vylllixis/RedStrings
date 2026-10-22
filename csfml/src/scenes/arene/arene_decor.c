@@ -4,8 +4,13 @@
 */
 
 /*
- * Arène : décor (stade, plateformes, faisceaux, fil rouge entre les camps).
- */
+** ╭─ arene_decor.c ──────────────────────────────────────────────────────
+** │ But         Arène : le décor (stade, plateformes, faisceaux, fil
+** │             rouge entre les camps).
+** │ Contenu     arene_disque, anneau_tirets, plateforme, faisceau,
+** │             fil_des_camps, stade, arene_voile, arene_dessiner_arene
+** ╰──────────────────────────────────────────────────────────────────────
+*/
 
 #include <math.h>
 #include "gui_anim.h"

@@ -3,6 +3,18 @@
 ** PROJET FIL ROUGE C Avancé
 */
 
+/*
+** ╭─ tests.c ────────────────────────────────────────────────────────────
+** │ But         Tests automatiques des règles du jeu, avec assert() : si
+** │             une règle casse, le programme s'arrête en indiquant la
+** │             ligne.
+** │ Contenu     combat en équipe (init, attaque, soin, garde, IA, partie
+** │             complète), catalogue de classes, sauvegarde, liste de
+** │             personnages, my_strcmp
+** │ Lancer      make tests
+** ╰──────────────────────────────────────────────────────────────────────
+*/
+
 #include <assert.h>
 #include <stdio.h>
 #include <stdlib.h>

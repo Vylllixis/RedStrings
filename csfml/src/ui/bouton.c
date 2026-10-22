@@ -4,8 +4,13 @@
 */
 
 /*
- * Boutons : survol, appui, reflet, variantes pleine, de retour et ronde.
- */
+** ╭─ bouton.c ───────────────────────────────────────────────────────────
+** │ But         Boutons : survol, appui, reflet, et leurs variantes
+** │             (pleine, de retour, ronde).
+** │ Contenu     survole, interaction, bouton, couper_x, reflet,
+** │             bouton_plein, bouton_retour, bouton_rond
+** ╰──────────────────────────────────────────────────────────────────────
+*/
 
 #include <math.h>
 #include "gui_anim.h"

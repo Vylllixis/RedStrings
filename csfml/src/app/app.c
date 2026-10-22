@@ -4,8 +4,13 @@
 */
 
 /*
- * Création et destruction de l'application.
- */
+** ╭─ app.c ──────────────────────────────────────────────────────────────
+** │ But         Création et destruction de l'application (la structure
+** │             app_t qui contient tout : fenêtre, ressources, état du
+** │             jeu).
+** │ Contenu     creer_app, detruire_app
+** ╰──────────────────────────────────────────────────────────────────────
+*/
 
 #include <stdio.h>
 #include <stdlib.h>

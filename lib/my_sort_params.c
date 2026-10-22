@@ -2,6 +2,14 @@
 **
 */
 
+/*
+** ╭─ my_sort_params.c ───────────────────────────────────────────────────
+** │ But         Trier les arguments par ordre alphabétique (tri à bulles,
+** │             sur place) puis les écrire.
+** │ Utilise     my_strcmp, my_swap_params, my_print_params
+** ╰──────────────────────────────────────────────────────────────────────
+*/
+
 #include "my.h"
 #include "my_string.h"
 

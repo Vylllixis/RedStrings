@@ -2,6 +2,13 @@
 **
 */
 
+/*
+** ╭─ my_str_isalpha.c ───────────────────────────────────────────────────
+** │ But         Vérifier que la chaîne ne contient que des lettres.
+** │             Renvoie 1 si c'est vrai (une chaîne vide aussi), 0 sinon.
+** ╰──────────────────────────────────────────────────────────────────────
+*/
+
 #include "my.h"
 #include "my_string.h"
 

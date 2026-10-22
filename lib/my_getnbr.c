@@ -2,6 +2,14 @@
 **
 */
 
+/*
+** ╭─ my_getnbr.c ────────────────────────────────────────────────────────
+** │ But         Convertir le début d'une chaîne en entier : le signe
+** │             « - » est accepté, la lecture s'arrête au premier
+** │             caractère qui n'est pas un chiffre.
+** ╰──────────────────────────────────────────────────────────────────────
+*/
+
 #include "my.h"
 
 int my_getnbr(char const *str)

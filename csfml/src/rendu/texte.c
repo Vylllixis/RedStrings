@@ -4,8 +4,14 @@
 */
 
 /*
- * Texte : conversion UTF-8, mesure, dessin avec contour et espacement, troncature.
- */
+** ╭─ texte.c ────────────────────────────────────────────────────────────
+** │ But         Le texte : conversion UTF-8, mesure, dessin avec contour
+** │             et espacement, troncature.
+** │ Contenu     facteur_texte, preparer_texte, largeur_texte,
+** │             position_caractere, texte_echelle, texte, tronquer,
+** │             etiquette
+** ╰──────────────────────────────────────────────────────────────────────
+*/
 
 #include <math.h>
 #include <stdio.h>
@@ -19,11 +25,16 @@
 /* Un texte plus long que cela est coupé : les libellés de l'interface sont courts. */
 #define TAILLE_TEXTE_MAX 256
 
-/**
- * Le texte est tramé à sa taille réelle à l'écran (échelle de l'interface et
- * zoom de la zone compris), puis réduit d'autant : il reste net à toute taille
- * de fenêtre. Dans une texture (faces des cartes), il est tramé tel quel.
- */
+/*
+** ╭─ facteur_texte ──────────────────────────────────────────────────────
+** │ Le texte est tramé à sa taille réelle à l'écran (échelle de
+** │ l'interface x zoom de la zone), puis réduit d'autant : il reste net à
+** │ toute taille de fenêtre.
+** │
+** │ Dans une texture (faces des cartes), le facteur vaut 1 : le texte est
+** │ tramé tel quel.
+** ╰──────────────────────────────────────────────────────────────────────
+*/
 static float facteur_texte(const app_t *app)
 {
     return app->cible != NULL ? 1.f : app->echelle * app->zoom;
@@ -103,11 +114,20 @@ float texte(app_t *app, police_t p, const char *s, unsigned int taille,
     return texte_echelle(app, p, s, taille, pos, c, a, 1.f);
 }
 
-/**
- * Copie `src` dans `dst` (`taille_dst` octets, terminateur compris) en
- * l'abrégeant avec « … » si le texte est trop large. Jamais d'écriture
- * au-delà de `taille_dst`.
- */
+/*
+** ╭─ tronquer ───────────────────────────────────────────────────────────
+** │ Copie `src` dans `dst` (`taille_dst` octets, terminateur compris),
+** │ abrégée avec « … » si le texte est trop large.
+** │
+** │ 1. copie complète ; si elle tient dans `max`, c'est fini
+** │ 2. sinon retire un caractère à la fois par la fin (en reculant sur
+** │    les octets de suite UTF-8 : jamais de caractère coupé en deux) et
+** │    ajoute « … »
+** │ 3. s'arrête dès que le texte tient
+** │ snprintf() borne toutes les écritures : jamais au-delà de
+** │ `taille_dst`.
+** ╰──────────────────────────────────────────────────────────────────────
+*/
 void tronquer(app_t *app, police_t p, unsigned int taille, const char *src,
     float max, char *dst, size_t taille_dst)
 {

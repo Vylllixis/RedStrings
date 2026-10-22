@@ -4,8 +4,13 @@
 */
 
 /*
- * Arène : lecture des événements du moteur, impacts, élan des attaques, animations.
- */
+** ╭─ arene_evenements.c ─────────────────────────────────────────────────
+** │ But         Arène : lecture des événements du moteur, impacts, élan
+** │             des attaques, animations.
+** │ Contenu     popup, impact, elan_attaque, arene_jouer_evenements,
+** │             arene_maj_visuels
+** ╰──────────────────────────────────────────────────────────────────────
+*/
 
 #include <math.h>
 #include <stdio.h>
@@ -45,7 +50,19 @@ static void popup(arene_t *ar, sfVector2f pos, const char *texte_popup,
     snprintf(p->texte, sizeof(p->texte), "%s", texte_popup);
 }
 
-/** Moment de l'impact : l'écran rattrape le résultat déjà calculé par le moteur. */
+/*
+** ╭─ impact ─────────────────────────────────────────────────────────────
+** │ Le moment de l'impact : l'écran rattrape le résultat déjà calculé par
+** │ le moteur.
+** │
+** │ - ATTAQUE : PV affichés = pv_apres, flash, secousse, nombre rouge
+** │   (bleu si garde), étincelles
+** │ - SOIN : PV affichés, lueur verte, nombre vert
+** │ - GARDE / GARDE_FIN : bouclier affiché ou retiré
+** │ - K.O. : le combattant passe en K.O., étincelles grises, et un court
+** │   « hitstop » (0,08 s) souligne le coup
+** ╰──────────────────────────────────────────────────────────────────────
+*/
 static void impact(app_t *app, arene_t *ar, const evenement_t *ev)
 {
     visuel_t *c = arene_vis(ar, ev->cible);
@@ -104,6 +121,20 @@ static void elan_attaque(arene_t *ar, const evenement_t *ev, float t)
     a->elan = (sfVector2f){d.x * k, d.y * k};
 }
 
+/*
+** ╭─ arene_jouer_evenements ─────────────────────────────────────────────
+** │ Rejoue, un par un, les événements déjà calculés par le moteur
+** │ (ar->file).
+** │
+** │ 1. t_evt compte le temps de l'événement courant (dt_jeu : ralenti
+** │    pendant le hitstop)
+** │ 2. à l'instant ARENE_IMPACTS[type], impact() met à jour ce que l'on
+** │    voit ; une seule fois par événement (impact_fait)
+** │ 3. quand DUREES[type] est écoulé, on passe à l'événement suivant
+** │ 4. file épuisée : VUE_FIN s'il y a un gagnant, sinon
+** │    arene_debut_tour()
+** ╰──────────────────────────────────────────────────────────────────────
+*/
 void arene_jouer_evenements(app_t *app, arene_t *ar)
 {
     const evenement_t *ev = NULL;
