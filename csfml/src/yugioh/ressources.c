@@ -4,11 +4,17 @@
 */
 
 /*
- * Ressources du mode Yu-Gi-Oh! : illustrations (csfml/assets/yugioh/<code>.jpg)
- * et faces imprimées une fois pour toutes dans des textures. Rien n'est
- * chargé en mode normal. Une illustration absente n'empêche pas de jouer :
- * la face montre alors l'emblème de la classe.
- */
+** ╭─ ressources.c ───────────────────────────────────────────────────────
+** │ But         Ressources du mode Yu-Gi-Oh! : illustrations
+** │             (csfml/assets/yugioh/<code>.jpg) et faces imprimées une
+** │             fois pour toutes dans des textures. Rien n'est chargé en
+** │             mode normal.
+** │ Tolérance   une illustration absente n'empêche pas de jouer : la face
+** │             montre alors l'emblème de la classe
+** │ Contenu     yugioh_actif, charger_illustration, imprimer,
+** │             yugioh_charger, yugioh_liberer
+** ╰──────────────────────────────────────────────────────────────────────
+*/
 
 #include <stdio.h>
 #include "personnage.h"
@@ -39,7 +45,18 @@ static sfTexture *charger_illustration(classe_t c)
     return t;
 }
 
-/** Dessine une face (ou le dos si `c` vaut -1) dans une nouvelle texture. */
+/*
+** ╭─ imprimer ───────────────────────────────────────────────────────────
+** │ Dessine une face (ou le dos si `c` vaut -1) dans une nouvelle
+** │ texture.
+** │
+** │ 1. app->cible = la texture : toutes les primitives (cible.c)
+** │    dessinent alors dedans au lieu de la fenêtre
+** │ 2. dessiner_dos() ou dessiner_face(), puis app->cible = NULL
+** │ 3. display, lissage et mipmaps pour un rendu net à toute taille
+** │ Renvoie NULL si la texture ne peut pas être créée.
+** ╰──────────────────────────────────────────────────────────────────────
+*/
 static sfRenderTexture *imprimer(app_t *app, int c)
 {
     sfContextSettings reglages = {0, 0, 4, 1, 1, sfContextDefault, sfFalse};
@@ -60,6 +77,17 @@ static sfRenderTexture *imprimer(app_t *app, int c)
     return rt;
 }
 
+/*
+** ╭─ yugioh_charger ─────────────────────────────────────────────────────
+** │ Prépare le mode Yu-Gi-Oh! au lancement.
+** │
+** │ 1. charge l'illustration de chaque classe ; une manquante n'est pas
+** │    grave (message sur stderr, la face montrera l'emblème)
+** │ 2. imprime le dos commun, puis la face de chaque classe, dans des
+** │    textures : le dessin se fait une seule fois
+** │ 3. renvoie -1 si une texture ne peut pas être créée
+** ╰──────────────────────────────────────────────────────────────────────
+*/
 int yugioh_charger(app_t *app)
 {
     yugioh_t *y = &app->yugioh;
