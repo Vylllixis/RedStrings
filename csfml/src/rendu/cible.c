@@ -4,10 +4,16 @@
 */
 
 /*
- * Cible du dessin : la fenêtre, ou une texture quand app->cible est posée.
- * Toutes les primitives passent par ici, ce qui permet d'« imprimer » une
- * image une seule fois dans une texture (les faces des cartes, par exemple).
- */
+** ╭─ cible.c ────────────────────────────────────────────────────────────
+** │ But         Choisir où l'on dessine : la fenêtre, ou une texture
+** │             quand app->cible est posée. Toutes les primitives passent
+** │             par ici, ce qui permet d'« imprimer » une image une seule
+** │             fois dans une texture (les faces des cartes, par
+** │             exemple).
+** │ Contenu     cible_primitives, cible_convexe, cible_cercle,
+** │             cible_sprite, cible_texte
+** ╰──────────────────────────────────────────────────────────────────────
+*/
 
 #include "gui_app.h"
 #include "gui_dessin.h"
