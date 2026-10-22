@@ -4,8 +4,12 @@
 */
 
 /*
- * Lecture des événements clavier et souris de la fenêtre.
- */
+** ╭─ evenements.c ───────────────────────────────────────────────────────
+** │ But         Lecture des événements clavier et souris de la fenêtre.
+** │ Contenu     redimensionner, touche_affichage (F11, Alt+Entrée,
+** │             Maj+F11), traiter_evenement, evenements
+** ╰──────────────────────────────────────────────────────────────────────
+*/
 
 #include <string.h>
 #include "gui_app.h"
