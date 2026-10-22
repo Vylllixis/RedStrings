@@ -3,6 +3,15 @@
 ** PROJET FIL ROUGE C Avancé
 */
 
+/*
+** ╭─ jeu.c ──────────────────────────────────────────────────────────────
+** │ But         Deux petits outils de jeu : la recherche de personnage
+** │             par nom (sans tenir compte de la casse) et la lecture de
+** │             l'argument de lancement.
+** │ Contenu     contient_nom, mode_depuis_arguments
+** ╰──────────────────────────────────────────────────────────────────────
+*/
+
 #include <ctype.h>
 #include "my_string.h"
 #include "gui_jeu.h"

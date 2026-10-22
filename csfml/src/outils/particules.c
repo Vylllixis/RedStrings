@@ -3,6 +3,17 @@
 ** PROJET FIL ROUGE C Avancé
 */
 
+/*
+** ╭─ particules.c ───────────────────────────────────────────────────────
+** │ But         Les étincelles : émission, mise à jour (gravité, durée de
+** │             vie) et dessin.
+** │ Mémoire     un tableau de taille fixe (MAX_PARTICULES) dont les cases
+** │             mortes sont réutilisées : jamais d'allocation pendant le
+** │             jeu
+** │ Contenu     emettre, maj_particules, dessiner_particules
+** ╰──────────────────────────────────────────────────────────────────────
+*/
+
 #include <math.h>
 #include "gui_anim.h"
 #include "gui_app.h"
