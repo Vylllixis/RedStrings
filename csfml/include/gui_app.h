@@ -23,7 +23,17 @@ struct app_s {
     sfRenderTexture *cible; /**< Si non NULL, le dessin va dans cette texture. */
     float desature;         /**< 0..1 : portraits grisés (personnage K.O.). */
     sfRenderWindow *fenetre;
-    sfView *vue;
+    affichage_t affichage;      /**< Mode de fenêtre courant. */
+    affichage_t plein_ecran;    /**< Plein écran retrouvé par F11 (sans bordure au départ). */
+    int affichage_demande;      /**< Changement à appliquer après les événements, -1 sinon. */
+    sfVector2u taille_fenetre;  /**< Taille du mode fenêtré, retrouvée en sortant du plein écran. */
+    float echelle;              /**< Pixels de l'écran par unité de l'interface. */
+    sfFloatRect ecran;          /**< Zone visible, dans le repère des scènes (1280 × 720 centré). */
+    sfView *vue;                /**< Vue des scènes, avec la secousse de l'écran. */
+    sfView *vue_fixe;           /**< Même cadrage, sans secousse : fond, notifications, souris. */
+    sfView *vue_zoom;           /**< Vue d'une zone mise à l'échelle (zoom_debut / zoom_fin). */
+    sfVector2f souris_hors_zoom;
+    float zoom;                 /**< Échelle de la zone en cours, 1 hors zoom. */
     sfFont *polices[NB_POLICES];
     sfText *texte;
     sfConvexShape *forme;
@@ -67,6 +77,14 @@ struct app_s {
 /* app.c */
 int creer_app(app_t *app, mode_visuel_t mode);
 int chemin_ressource(const char *relatif, char *chemin, size_t taille);
+
+/* affichage.c : fenêtre, modes d'affichage, échelle et vues */
+int ouvrir_fenetre(app_t *app, affichage_t mode);
+void appliquer_taille(app_t *app, unsigned int largeur, unsigned int hauteur);
+void demander_affichage(app_t *app, affichage_t mode);
+void appliquer_demande_affichage(app_t *app);
+void basculer_plein_ecran(app_t *app);
+void changer_type_plein_ecran(app_t *app);
 void detruire_app(app_t *app);
 void evenements(app_t *app);
 void maj_app(app_t *app, float dt);

@@ -23,6 +23,14 @@ typedef enum {
     MODE_YUGIOH
 } mode_visuel_t;
 
+/** Mode de la fenêtre ; F11 ou Alt+Entrée basculent entre fenêtré et plein écran. */
+typedef enum {
+    AFFICHAGE_FENETRE,
+    AFFICHAGE_PLEIN_ECRAN,      /**< Plein écran natif (mode vidéo exclusif). */
+    AFFICHAGE_SANS_BORDURE,     /**< Fenêtre sans décoration à la taille du bureau. */
+    NB_AFFICHAGES
+} affichage_t;
+
 /** Ressources du mode Yu-Gi-Oh!, chargées seulement dans ce mode. */
 typedef struct {
     sfTexture *art[NB_CLASSES];         /**< Illustration, NULL si le fichier manque. */
@@ -137,6 +145,9 @@ typedef struct {
     float survol[MAX_PERSONNAGES];
     sfVector2f pos[MAX_PERSONNAGES];    /**< Position animée de chaque carte. */
     int place[MAX_PERSONNAGES];
+    int colonnes;           /**< Colonnes choisies selon la place disponible. */
+    float zoom;             /**< Échelle uniforme de la grille (au plus 1). */
+    sfVector2f pivot;       /**< Point fixe de la mise à l'échelle (haut de la grille). */
 } grille_t;
 
 #endif /* GUI_TYPES_H */

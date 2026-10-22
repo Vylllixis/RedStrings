@@ -168,11 +168,13 @@ int app_creer_ressources(app_t *app)
     app->tex_vignette = creer_tex_vignette();
     app->horloge = sfClock_create();
     app->vue = sfView_createFromRect((sfFloatRect){0, 0, LARGEUR, HAUTEUR});
+    app->vue_fixe = sfView_createFromRect((sfFloatRect){0, 0, LARGEUR, HAUTEUR});
+    app->vue_zoom = sfView_createFromRect((sfFloatRect){0, 0, LARGEUR, HAUTEUR});
     app->curseurs[CURSEUR_FLECHE] = sfCursor_createFromSystem(sfCursorArrow);
     app->curseurs[CURSEUR_MAIN] = sfCursor_createFromSystem(sfCursorHand);
     app->curseurs[CURSEUR_TEXTE] = sfCursor_createFromSystem(sfCursorText);
     if (!app->texte || !app->forme || !app->cercle || !app->sprite || !app->tex_lueur
-        || !app->tex_vignette || !app->horloge || !app->vue) {
+        || !app->tex_vignette || !app->horloge || !app->vue || !app->vue_fixe || !app->vue_zoom) {
         fprintf(stderr, "redstrings_csfml : ressource graphique impossible à créer\n");
         return 1;
     }

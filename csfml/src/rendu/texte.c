@@ -7,6 +7,7 @@
  * Texte : conversion UTF-8, mesure, dessin avec contour et espacement, troncature.
  */
 
+#include <math.h>
 #include <stdio.h>
 #include <string.h>
 #include "gui_anim.h"
@@ -18,35 +19,50 @@
 /* Un texte plus long que cela est coupé : les libellés de l'interface sont courts. */
 #define TAILLE_TEXTE_MAX 256
 
-static void preparer_texte(app_t *app, police_t p, const char *s,
+/**
+ * Le texte est tramé à sa taille réelle à l'écran (échelle de l'interface et
+ * zoom de la zone compris), puis réduit d'autant : il reste net à toute taille
+ * de fenêtre. Dans une texture (faces des cartes), il est tramé tel quel.
+ */
+static float facteur_texte(const app_t *app)
+{
+    return app->cible != NULL ? 1.f : app->echelle * app->zoom;
+}
+
+/** Prépare le texte et renvoie le rapport entre sa taille tramée et `taille`. */
+static float preparer_texte(app_t *app, police_t p, const char *s,
     unsigned int taille)
 {
     uint32_t buf[TAILLE_TEXTE_MAX];
+    unsigned int trame = (unsigned int)fmaxf(1.f, roundf(taille * facteur_texte(app)));
 
     utf8_decoder(s, buf, TAILLE_TEXTE_MAX);
     sfText_setFont(app->texte, app->polices[p]);
-    sfText_setCharacterSize(app->texte, taille);
+    sfText_setCharacterSize(app->texte, trame);
     sfText_setLetterSpacing(app->texte, app->espacement > 0.f
         ? app->espacement : 1.f);
     sfText_setUnicodeString(app->texte, buf);
+    return taille > 0 ? (float)trame / taille : 1.f;
 }
 
 float largeur_texte(app_t *app, police_t p, const char *s, unsigned int taille)
 {
-    preparer_texte(app, p, s, taille);
-    return sfText_getLocalBounds(app->texte).width;
+    float r = preparer_texte(app, p, s, taille);
+
+    return sfText_getLocalBounds(app->texte).width / r;
 }
 
 /** Abscisse du caractère numéro `index` (en points de code). */
 float position_caractere(app_t *app, police_t p, const char *s,
     unsigned int taille, int index)
 {
-    preparer_texte(app, p, s, taille);
+    float r = preparer_texte(app, p, s, taille);
+
     sfText_setPosition(app->texte, (sfVector2f){0.f, 0.f});
     sfText_setOrigin(app->texte, (sfVector2f){0.f, 0.f});
     sfText_setScale(app->texte, (sfVector2f){1.f, 1.f});
     sfText_setRotation(app->texte, 0.f);
-    return sfText_findCharacterPos(app->texte, index).x;
+    return sfText_findCharacterPos(app->texte, index).x / r;
 }
 
 /**
@@ -57,26 +73,28 @@ float texte_echelle(app_t *app, police_t p, const char *s, unsigned int taille,
     sfVector2f pos, sfColor c, alignement_t a, float echelle)
 {
     sfFloatRect b;
-    sfGlyph h = sfFont_getGlyph(app->polices[p], 'H', taille, sfFalse, 0.f);
+    sfGlyph h;
     float ox = 0.f;
+    float r = preparer_texte(app, p, s, taille);
+    unsigned int trame = sfText_getCharacterSize(app->texte);
 
-    preparer_texte(app, p, s, taille);
+    h = sfFont_getGlyph(app->polices[p], 'H', trame, sfFalse, 0.f);
     b = sfText_getLocalBounds(app->texte);
     if (a == ALIGNE_CENTRE)
         ox = b.left + b.width / 2.f;
     else if (a == ALIGNE_DROITE)
         ox = b.left + b.width;
     sfText_setOrigin(app->texte, (sfVector2f){ox,
-        taille + h.bounds.top + h.bounds.height / 2.f});
+        trame + h.bounds.top + h.bounds.height / 2.f});
     sfText_setPosition(app->texte, pos);
-    sfText_setScale(app->texte, (sfVector2f){echelle, echelle});
+    sfText_setScale(app->texte, (sfVector2f){echelle / r, echelle / r});
     sfText_setRotation(app->texte, app->rotation);
     sfText_setFillColor(app->texte, avec_alpha(c, app->alpha));
-    sfText_setOutlineThickness(app->texte, app->contour);
+    sfText_setOutlineThickness(app->texte, app->contour * r);
     sfText_setOutlineColor(app->texte, avec_alpha((sfColor){8, 8, 18, 220},
         app->alpha * (c.a / 255.f)));
     cible_texte(app, app->texte, NULL);
-    return b.width * echelle;
+    return b.width / r * echelle;
 }
 
 float texte(app_t *app, police_t p, const char *s, unsigned int taille,

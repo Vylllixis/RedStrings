@@ -12,8 +12,20 @@
 
     #include <SFML/Graphics.h>
 
+    /* Repère de conception des scènes : il est centré dans la fenêtre, quelle que soit sa taille. */
     #define LARGEUR 1280
     #define HAUTEUR 720
+    /* Espace logique minimal garanti à l'interface : en dessous, elle se réduit. */
+    #define ECRAN_L_MIN 1024.f
+    #define ECRAN_H_MIN 720.f
+    /* Au-delà de ce grossissement, l'espace en plus sert à respirer, pas à agrandir. */
+    #define ECHELLE_MAX 2.f
+    #define ECHELLE_MIN 0.5f
+    /* Taille de fenêtre minimale et taille au lancement */
+    #define FENETRE_L_MIN 800
+    #define FENETRE_H_MIN 600
+    #define FENETRE_L_DEPART 1280
+    #define FENETRE_H_DEPART 720
     /* Le roster est illimité, mais l'écran n'a de place que pour 10 cartes. */
     #define MAX_PERSONNAGES 10
     /* Cartes de personnage des grilles (liste, composition des équipes). */
