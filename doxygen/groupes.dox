@@ -1,0 +1,44 @@
+/**
+@defgroup moteur Moteur de jeu
+@brief Règles du jeu : classes, personnages, combat en équipe et sauvegarde, sans aucun affichage.
+
+@defgroup console Version terminal
+@brief Menu, saisies, boîtes Unicode et couleurs ANSI.
+
+@defgroup libmy Bibliothèque libmy
+@brief Fonctions de chaînes, de nombres et d'affichage réécrites à la main.
+
+@defgroup fenetre Version graphique
+@brief Interface CSFML : application, dessin, composants, scènes.
+*/
+
+/** @file personnage.h @ingroup moteur */
+/** @file bataille.h @ingroup moteur */
+/** @file roster.h @ingroup moteur */
+/** @file sauvegarde.h @ingroup moteur */
+
+/** @file bataille_console.h @ingroup console */
+/** @file saisie.h @ingroup console */
+/** @file boite.h @ingroup console */
+/** @file couleurs.h @ingroup console */
+/** @file redstrings.h @ingroup console */
+
+/** @file my.h @ingroup libmy */
+/** @file my_string.h @ingroup libmy */
+
+/** @file gui_config.h @ingroup fenetre */
+/** @file gui_types.h @ingroup fenetre */
+/** @file gui_etat.h @ingroup fenetre */
+/** @file gui_app.h @ingroup fenetre */
+/** @file gui_anim.h @ingroup fenetre */
+/** @file gui_dessin.h @ingroup fenetre */
+/** @file gui_hud.h @ingroup fenetre */
+/** @file gui_ui.h @ingroup fenetre */
+/** @file gui_carte.h @ingroup fenetre */
+/** @file gui_ecran.h @ingroup fenetre */
+/** @file gui_emblemes.h @ingroup fenetre */
+/** @file gui_particules.h @ingroup fenetre */
+/** @file gui_jeu.h @ingroup fenetre */
+/** @file gui_scenes.h @ingroup fenetre */
+/** @file gui_utf8.h @ingroup fenetre */
+/** @file gui_yugioh.h @ingroup fenetre */

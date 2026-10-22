@@ -27,6 +27,14 @@ make csfml-tests    # fonctions de la version graphique, sans fenêtre
 
 Les deux commandes affichent un message de réussite et s'arrêtent sur la première vérification qui échoue.
 
+## Documentation de l'API
+
+```bash
+make doc            # demande Doxygen : sudo apt install doxygen
+```
+
+Ouvrir ensuite `docs/index.html` dans un navigateur : la page d'accueil présente les quatre ensembles (moteur, terminal, `libmy`, fenêtre) et l'ordre de lecture conseillé. Le dossier `docs/` n'est pas versionné : il se régénère à la demande.
+
 ## Ce qu'il y a à voir
 
 | Où | Quoi |

@@ -64,6 +64,9 @@ personnages.txt
 /csfml/assets/yugioh/*.jpg
 /csfml/assets/yugioh/*.tmp
 
+# Documentation générée (make doc)
+/docs/
+
 # Python (générateur d'illustrations du README)
 __pycache__/
 *.pyc
