@@ -43,6 +43,10 @@ typedef struct {
     classe_t classe_vue;    /**< Classe affichée à l'image précédente. */
     classe_t classe_prec;   /**< Classe affichée avant le dernier changement. */
     float t_classe;         /**< Temps depuis le dernier changement de classe. */
+    float fx;               /**< Formulaire : bord gauche et largeur (selon la fenêtre). */
+    float fw;
+    float ax;               /**< Aperçu : bord gauche et largeur. */
+    float aw;
     float t_main;           /**< Mode Yu-Gi-Oh! : temps depuis la donne de la main. */
     int cat_main;           /**< Catégorie de la main affichée, -1 avant la première. */
     float incl_x;           /**< Inclinaison de la grande carte vers la souris. */

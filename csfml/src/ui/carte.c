@@ -4,7 +4,7 @@
 */
 
 /*
- * Cartes de personnage : avatar, fiche, mini-carte et grille animée.
+ * Cartes de personnage : avatar, fiche et mini-carte.
  */
 
 #include <math.h>
@@ -19,8 +19,6 @@
 #include "gui_hud.h"
 #include "gui_types.h"
 #include "gui_ui.h"
-
-#define ECART 22.f
 
 void avatar(app_t *app, const personnage_t *p, sfVector2f centre, float r,
     float mort)
@@ -162,56 +160,4 @@ void mini_carte(app_t *app, const personnage_t *p, sfFloatRect r,
             C_ROUGE, 1);
     if (marque && marque->badge)
         pastille(app, marque->badge, (sfVector2f){cx, r.top}, marque->couleur, 1);
-}
-
-static const marque_t *chercher_marque(const marque_t *marques, int nb, int id)
-{
-    for (int k = 0; k < nb; k++) {
-        if (marques[k].id == id)
-            return &marques[k];
-    }
-    return NULL;
-}
-
-/** Grille de cartes centrée (5 par ligne). Renvoie l'id cliqué ou -1. */
-int grille_cartes(app_t *app, grille_t *g, const int *ids, int n, float y0,
-    const marque_t *marques, int nb_marques)
-{
-    int clique = -1;
-    float a = app->alpha;
-    int id = 0;
-    int nb_ligne = 0;
-    float x = 0.f;
-    float y = 0.f;
-    float e = 0.f;
-    int s = 0;
-
-    for (int i = 0; i < n; i++) {
-        id = ids[i];
-        nb_ligne = n - (i / 5) * 5 < 5 ? n - (i / 5) * 5 : 5;
-        x = LARGEUR / 2.f - (nb_ligne * CARTE_L + (nb_ligne - 1) * ECART) / 2.f
-            + (i % 5) * (CARTE_L + ECART);
-        y = y0 + (i / 5) * (CARTE_H + ECART);
-        if (!g->place[id])
-            g->pos[id] = (sfVector2f){x, y};
-        g->place[id] = 1;
-        g->pos[id].x = approcher(g->pos[id].x, x, 12.f, app->dt);
-        g->pos[id].y = approcher(g->pos[id].y, y, 12.f, app->dt);
-        x = g->pos[id].x;
-        y = g->pos[id].y;
-        e = sortie_rebond(progression(app->t_scene, 0.15f + i * 0.05f, 0.55f));
-        s = survole(app, (sfFloatRect){x, y, CARTE_L, CARTE_H});
-        if (s)
-            app->curseur_voulu = CURSEUR_MAIN;
-        if (s && app->in.clic)
-            clique = id;
-        g->survol[id] = approcher(g->survol[id], s ? 1.f : 0.f, 14.f, app->dt);
-        maj_ressort(&g->lift[id], s ? -10.f : 0.f, 280.f, 18.f, app->dt);
-        app->alpha = a * progression(app->t_scene, 0.15f + i * 0.05f, 0.3f);
-        mini_carte(app, &app->equipe.data[id], (sfFloatRect){x, y + g->lift[id].x
-            + 40.f * (1.f - e), CARTE_L, CARTE_H}, g->survol[id],
-            chercher_marque(marques, nb_marques, id));
-    }
-    app->alpha = a;
-    return clique;
 }

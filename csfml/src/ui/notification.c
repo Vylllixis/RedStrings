@@ -44,7 +44,7 @@ void notifier(app_t *app, const char *icone, const char *message, sfColor c)
     snprintf(t->icone, sizeof(t->icone), "%s", icone);
     t->couleur = c;
     t->t = 0.f;
-    t->y = -50.f;
+    t->y = app->ecran.top - 50.f;
     t->actif = 1;
 }
 
@@ -86,7 +86,7 @@ void dessiner_toasts(app_t *app)
             t->actif = 0;
             continue;
         }
-        t->y = approcher(t->y, 24.f + i * 56.f, 13.f, app->dt);
+        t->y = approcher(t->y, app->ecran.top + 24.f + i * 56.f, 13.f, app->dt);
         dessiner_toast(app, t);
     }
 }

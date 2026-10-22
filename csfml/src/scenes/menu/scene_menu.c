@@ -16,6 +16,7 @@
 #include "gui_app.h"
 #include "gui_config.h"
 #include "gui_dessin.h"
+#include "gui_ecran.h"
 #include "gui_etat.h"
 #include "gui_scenes.h"
 #include "gui_types.h"
@@ -150,7 +151,7 @@ void scene_au_revoir(app_t *app)
     texte(app, POLICE_NORMALE, "Merci d'avoir joué à Redstrings", 18,
         (sfVector2f){LARGEUR / 2.f, 432.f}, C_TEXTE_DOUX, ALIGNE_CENTRE);
     app->alpha = 1.f;
-    rect_arrondi(app, (sfFloatRect){-60.f, -60.f, LARGEUR + 120.f, HAUTEUR + 120.f}, 0.f,
+    rect_arrondi(app, ecran_couvrant(app), 0.f,
         avec_alpha(C_NOIR, progression(t, 1.1f, 0.5f)));
     app->alpha = a;
     if (t > 1.65f)

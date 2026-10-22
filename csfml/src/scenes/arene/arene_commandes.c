@@ -15,6 +15,7 @@
 #include "gui_carte.h"
 #include "gui_config.h"
 #include "gui_dessin.h"
+#include "gui_ecran.h"
 #include "gui_etat.h"
 #include "gui_hud.h"
 #include "gui_types.h"
@@ -160,8 +161,9 @@ static int bouton_action(app_t *app, arene_t *ar, int a, sfFloatRect r, int disp
 
 void arene_panneau_commandes(app_t *app, arene_t *ar, float e)
 {
-    sfFloatRect r = {LARGEUR - MARGE - CMD_L + 60.f * (1.f - e), HAUTEUR - MARGE
-        - CMD_H + 12.f, CMD_L, CMD_H};
+    sfFloatRect v = ecran_visible(app);
+    sfFloatRect r = {v.left + v.width - MARGE - CMD_L + 60.f * (1.f - e), v.top + v.height
+        - MARGE - CMD_H + 12.f, CMD_L, CMD_H};
     const combattant_t *c = bataille_lire(&ar->bataille, acteur_affiche(ar));
     float bw = (CMD_L - 40.f - 2 * 10.f) / NB_ACTIONS;
     float x = 0.f;

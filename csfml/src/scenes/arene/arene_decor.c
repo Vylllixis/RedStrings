@@ -12,6 +12,7 @@
 #include "gui_app.h"
 #include "gui_config.h"
 #include "gui_dessin.h"
+#include "gui_ecran.h"
 #include "gui_etat.h"
 #include "gui_hud.h"
 #include "gui_types.h"
@@ -127,19 +128,26 @@ static void stade(app_t *app)
     }
 }
 
+/** Voile qui assombrit le fond : il couvre toute la fenêtre, quelle que soit sa forme. */
+void arene_voile(app_t *app)
+{
+    sfFloatRect r = ecran_visible(app);
+    sfVertex voile[4] = {
+        {{r.left, r.top}, (sfColor){4, 5, 12, 170}, {0, 0}},
+        {{r.left + r.width, r.top}, (sfColor){4, 5, 12, 170}, {0, 0}},
+        {{r.left + r.width, r.top + r.height}, (sfColor){4, 5, 12, 60}, {0, 0}},
+        {{r.left, r.top + r.height}, (sfColor){4, 5, 12, 60}, {0, 0}},
+    };
+
+    cible_primitives(app, voile, 4, sfQuads, NULL);
+}
+
 void arene_dessiner_arene(app_t *app, arene_t *ar)
 {
     float intro = ar->etat == VUE_INTRO ? ar->t_etat : DUREE_INTRO;
     float e = sortie_cubique(progression(intro, 0.f, 0.7f));
     float a = app->alpha;
-    sfVertex voile[4] = {
-        {{0.f, 0.f}, (sfColor){4, 5, 12, 170}, {0, 0}},
-        {{LARGEUR, 0.f}, (sfColor){4, 5, 12, 170}, {0, 0}},
-        {{LARGEUR, HAUTEUR}, (sfColor){4, 5, 12, 60}, {0, 0}},
-        {{0.f, HAUTEUR}, (sfColor){4, 5, 12, 60}, {0, 0}},
-    };
 
-    cible_primitives(app, voile, 4, sfQuads, NULL);
     app->alpha = a * e;
     stade(app);
     faisceau(app, (sfVector2f){SOL_A_X, SOL_A_Y}, PLAT_A_RX, C_BLANC);

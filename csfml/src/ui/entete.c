@@ -11,6 +11,7 @@
 #include "gui_app.h"
 #include "gui_config.h"
 #include "gui_dessin.h"
+#include "gui_ecran.h"
 #include "gui_hud.h"
 #include "gui_types.h"
 #include "gui_ui.h"
@@ -29,23 +30,24 @@ void en_tete_surtitre(app_t *app, bouton_t *retour, const char *surtitre,
     float e3 = sortie_cubique(progression(t, 0.16f, 0.5f));
     float a = app->alpha;
     float lt = 0.f;
+    float x = 64.f + decal_gauche(app);
 
     app->alpha = a * e1;
-    if (bouton_retour(app, retour, (sfVector2f){64.f - 20.f * (1.f - e1), 30.f}))
+    if (bouton_retour(app, retour, (sfVector2f){x - 20.f * (1.f - e1), 30.f}))
         changer_scene(app, SCENE_MENU);
     app->alpha = a * e2;
     if (surtitre) {
-        losange(app, (sfVector2f){68.f, 98.f}, 4.f, C_ROUGE);
-        etiquette(app, surtitre, (sfVector2f){82.f, 98.f}, C_ROUGE, ALIGNE_GAUCHE);
+        losange(app, (sfVector2f){x + 4.f, 98.f}, 4.f, C_ROUGE);
+        etiquette(app, surtitre, (sfVector2f){x + 18.f, 98.f}, C_ROUGE, ALIGNE_GAUCHE);
     }
     app->espacement = 0.6f;
-    lt = texte(app, POLICE_GRAS, titre, 36, (sfVector2f){64.f, 130.f + 16.f * (1.f - e2)},
+    lt = texte(app, POLICE_GRAS, titre, 36, (sfVector2f){x, 130.f + 16.f * (1.f - e2)},
         C_TEXTE, ALIGNE_GAUCHE);
     app->espacement = 0.f;
-    rect_arrondi(app, (sfFloatRect){64.f + lt + 16.f, 128.f + 16.f * (1.f - e2),
+    rect_arrondi(app, (sfFloatRect){x + lt + 16.f, 128.f + 16.f * (1.f - e2),
         120.f * e2, 2.f}, 0.f, avec_alpha(C_ROUGE, 0.6f));
     app->alpha = a * e3;
-    texte(app, POLICE_NORMALE, sous_titre, 15, (sfVector2f){64.f,
+    texte(app, POLICE_NORMALE, sous_titre, 15, (sfVector2f){x,
         164.f + 16.f * (1.f - e3)}, C_TEXTE_DOUX, ALIGNE_GAUCHE);
     app->alpha = a;
 }

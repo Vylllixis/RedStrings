@@ -12,6 +12,7 @@
 #include "gui_carte.h"
 #include "gui_config.h"
 #include "gui_dessin.h"
+#include "gui_ecran.h"
 #include "gui_etat.h"
 #include "gui_jeu.h"
 #include "gui_scenes.h"
@@ -154,7 +155,7 @@ static void modal(app_t *app, liste_t *l, float a)
     l->t_modal += app->dt;
     m = l->modal;
     app->alpha = a * m;
-    rect_arrondi(app, (sfFloatRect){-60.f, -60.f, LARGEUR + 120.f, HAUTEUR + 120.f}, 0.f,
+    rect_arrondi(app, ecran_couvrant(app), 0.f,
         (sfColor){4, 5, 12, 215});
     r = (sfFloatRect){LARGEUR / 2.f - FICHE_L / 2.f, 92.f + 50.f * (1.f - m), FICHE_L,
         FICHE_H};
@@ -188,7 +189,7 @@ static void modal(app_t *app, liste_t *l, float a)
 static void recherche(app_t *app, liste_t *l, float a, int actif)
 {
     float dy = 16.f * (1.f - sortie_cubique(progression(app->t_scene, 0.1f, 0.5f)));
-    sfFloatRect r = {856.f, 96.f + dy, 360.f, 52.f};
+    sfFloatRect r = {856.f + decal_droite(app), 96.f + dy, 360.f, 52.f};
 
     app->alpha = a * progression(app->t_scene, 0.1f, 0.35f);
     l->recherche.focus = actif;
