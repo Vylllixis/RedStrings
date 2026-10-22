@@ -14,6 +14,8 @@ Ouvre une [issue](../../issues/new/choose) avec le modèle qui convient. Pour un
 
 Une faille de sécurité ne se signale pas dans une issue publique : voir [SECURITY.md](SECURITY.md).
 
+En participant au projet (issues, pull requests), tu acceptes de respecter le [code de conduite](CODE_OF_CONDUCT.md).
+
 ## Mettre en place l'environnement
 
 Prérequis : `gcc` (C11), `make`, `ar`, et pour la version graphique la bibliothèque CSFML 2.6 (`sudo apt install libcsfml-dev` sous Debian/Ubuntu).
