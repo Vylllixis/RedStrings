@@ -1,0 +1,31 @@
+name: Idée de fonctionnalité
+description: Proposer une amélioration ou une nouvelle fonctionnalité.
+labels: ["enhancement"]
+body:
+  - type: textarea
+    id: besoin
+    attributes:
+      label: Le besoin
+      description: Quel problème ou quelle envie cherches-tu à résoudre ?
+    validations:
+      required: true
+  - type: textarea
+    id: proposition
+    attributes:
+      label: Ta proposition
+      description: Comment ça pourrait marcher, côté joueur. Une règle de jeu change-t-elle ?
+    validations:
+      required: true
+  - type: dropdown
+    id: ou
+    attributes:
+      label: Où ?
+      options:
+        - Moteur de combat (commun aux deux versions)
+        - Version console
+        - Version fenêtre (CSFML)
+        - Documentation / outils
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives envisagées
