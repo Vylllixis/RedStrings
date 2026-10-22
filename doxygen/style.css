@@ -1,0 +1,13 @@
+/* Retouches légères : lisibilité avant tout */
+body, table, div, p, dl, .title, .memtitle, #projectname {
+  font-family: -apple-system, "Segoe UI", "Noto Sans", "Helvetica Neue", Arial, sans-serif;
+}
+div.contents { max-width: 980px; line-height: 1.55; }
+div.contents p, div.contents li { font-size: 15px; }
+#projectname { font-weight: 700; letter-spacing: .02em; }
+#projectbrief { opacity: .8; }
+.memtitle { border-radius: 4px 4px 0 0; }
+.memitem { border-radius: 4px; }
+table.doxtable th { background: #f3e7ea; }
+table.doxtable td, table.doxtable th { padding: 6px 10px; }
+code, .fragment, .memname { font-family: "DejaVu Sans Mono", Menlo, Consolas, monospace; }

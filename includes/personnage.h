@@ -153,7 +153,7 @@ int trouver_personnage(const personnage_t *tab, int size, const char *nom);
 
 #define STR_(x) #x
 #define STR(x)  STR_(x)
-#define NOM_LONGUEUR 29   /* NOM_MAX - 1 */
+#define NOM_LONGUEUR 29   /**< NOM_MAX - 1 */
 
 /** Demande le nom, les stats et la classe au joueur (nom unique dans tab).
  *  Renvoie 0 si le personnage est créé, -1 si la saisie a échoué. */

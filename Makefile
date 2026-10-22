@@ -102,6 +102,15 @@ tests:
 		$(filter-out src/main.c,$(SRCS)) $(LIB_SRCS) -o $(NAME_TESTS)
 	$(Q)./$(NAME_TESTS)
 
+#documentation HTML (Doxygen) -> docs/index.html
+doc:
+	@command -v doxygen >/dev/null 2>&1 || { printf "  $(C_ROUGE)✗$(C_RESET)      %s\n" \
+		"Doxygen introuvable, installe-le avec : sudo apt install doxygen"; exit 1; }
+	$(LOG) "DOXYGEN" "docs/index.html"
+	$(Q)rm -rf docs
+	$(Q)doxygen Doxyfile 2>&1 | grep -vE 'has not been updated|since release|sentences may appear|^$$' || true
+	$(LOG_OK) "documentation générée : docs/index.html"
+
 #version graphique (CSFML) -> ./redstrings_csfml
 csfml:	$(LIB)
 	$(Q)$(MAKE) -C $(CSFML_DIR)
@@ -138,6 +147,7 @@ help:
 	@printf "  $(C_BLEU)make lib$(C_RESET)        compile seulement $(LIB)\n"
 	@printf "  $(C_BLEU)make debug$(C_RESET)      compile ./$(NAME_DEBUG) (gdb + sanitizers)\n"
 	@printf "  $(C_BLEU)make tests$(C_RESET)      lance les tests unitaires (assert)\n"
+	@printf "  $(C_BLEU)make doc$(C_RESET)         génère la documentation HTML (docs/index.html)\n"
 	@printf "  $(C_BLEU)make csfml$(C_RESET)      compile la version graphique\n"
 	@printf "  $(C_BLEU)make csfml-debug$(C_RESET) compile la version graphique avec les sanitizers\n"
 	@printf "  $(C_BLEU)make csfml-tests$(C_RESET) lance les tests de la version graphique\n"
@@ -148,4 +158,4 @@ help:
 
 -include $(DEPS)
 
-.PHONY: all lib debug tests csfml csfml-debug csfml-tests clean fclean re build help
+.PHONY: all lib debug tests doc csfml csfml-debug csfml-tests clean fclean re build help

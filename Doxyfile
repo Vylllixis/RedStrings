@@ -1,0 +1,61 @@
+# Doxyfile de RedStrings : volontairement sobre.
+# Génère docs/index.html à partir des en-têtes publics (make doc).
+
+PROJECT_NAME           = "RedStrings"
+PROJECT_NUMBER         = 1.5.0
+PROJECT_BRIEF          = "Jeu de combat tactique en équipe, au tour par tour, en C11"
+OUTPUT_LANGUAGE        = French
+OUTPUT_DIRECTORY       = docs
+HTML_OUTPUT            = .
+CREATE_SUBDIRS         = NO
+
+# Ce qui est lu : les API publiques, pas le détail des .c
+INPUT                  = includes csfml/include doxygen
+FILE_PATTERNS          = *.h *.dox
+RECURSIVE              = NO
+EXCLUDE_SYMBOLS        = *_H
+STRIP_FROM_PATH        = includes csfml/include
+STRIP_FROM_INC_PATH    = includes csfml/include
+
+# Ce qui est montré : uniquement ce qui est documenté
+EXTRACT_ALL            = NO
+EXTRACT_STATIC         = NO
+JAVADOC_AUTOBRIEF      = YES
+OPTIMIZE_OUTPUT_FOR_C  = YES
+MARKDOWN_SUPPORT       = YES
+SORT_MEMBER_DOCS       = NO
+SORT_BRIEF_DOCS        = NO
+SHOW_INCLUDE_FILES     = NO
+SHOW_USED_FILES        = NO
+INLINE_SIMPLE_STRUCTS  = YES
+GENERATE_TODOLIST      = NO
+GENERATE_TESTLIST      = NO
+GENERATE_BUGLIST       = NO
+GENERATE_DEPRECATEDLIST= NO
+ALPHABETICAL_INDEX     = NO
+SOURCE_BROWSER         = NO
+VERBATIM_HEADERS       = NO
+
+# Pas de graphes ni de LaTeX : une page lisible, rien de plus
+HAVE_DOT               = NO
+GENERATE_LATEX         = NO
+GENERATE_HTML          = YES
+
+# Présentation
+GENERATE_TREEVIEW      = YES
+DISABLE_INDEX          = YES
+FULL_SIDEBAR           = NO
+SEARCHENGINE           = YES
+SERVER_BASED_SEARCH    = NO
+HTML_COLORSTYLE        = LIGHT
+HTML_COLORSTYLE_HUE    = 350
+HTML_COLORSTYLE_SAT    = 55
+HTML_COLORSTYLE_GAMMA  = 90
+HTML_EXTRA_STYLESHEET  = doxygen/style.css
+
+# Messages : seulement ce qui est faux dans les commentaires
+QUIET                  = YES
+WARNINGS               = YES
+WARN_IF_UNDOCUMENTED   = NO
+WARN_IF_DOC_ERROR      = YES
+WARN_NO_PARAMDOC       = NO

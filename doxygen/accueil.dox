@@ -1,0 +1,31 @@
+/**
+@mainpage RedStrings
+
+Jeu de combat tactique en équipe, au tour par tour, écrit en C11. Un moteur de jeu unique, sans aucun affichage, est partagé par deux interfaces : un **terminal** et une **fenêtre graphique** (CSFML).
+
+Cette documentation décrit les **interfaces publiques** (les fichiers `.h`).
+La présentation du projet, les règles du jeu et les instructions de
+compilation sont dans le `README.md` et le `RENDU.md` du dépôt.
+
+@section accueil_modules Les quatre ensembles
+
+| Ensemble | Rôle | Où commencer |
+|---|---|---|
+| @ref moteur | Règles du jeu : classes, personnages, combat en équipe, sauvegarde. Ne dépend d'aucune interface. | `bataille.h` |
+| @ref console | Version terminal : menu, saisies sécurisées, boîtes Unicode, couleurs. | `bataille_console.h` |
+| @ref libmy | Bibliothèque maison `libmy.a` : 40 fonctions de chaînes, nombres et affichage. | `my_string.h` |
+| @ref fenetre | Version graphique : application, dessin, interface, scènes. | `gui_app.h` |
+
+@section accueil_principe Le principe d'architecture
+
+Le moteur (@ref moteur) reçoit une **action** (attaquer, soigner, se défendre)
+et renvoie la liste des **événements** déjà résolus : dégâts, soin, garde,
+K.O., victoire. Les deux interfaces se contentent de les représenter. Une
+animation ne décide donc jamais d'un résultat.
+
+@section accueil_demarrer Pour lire l'API dans l'ordre
+
+1. `personnage.h` : les 28 classes, leurs statistiques et le personnage.
+2. `bataille.h` : le déroulement d'un combat (actions, événements, tours).
+3. `roster.h` et `sauvegarde.h` : la liste des personnages et son fichier.
+*/
