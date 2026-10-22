@@ -2,6 +2,13 @@
 **
 */
 
+/*
+** ╭─ my_showmem.c ───────────────────────────────────────────────────────
+** │ But         Écrire une zone mémoire de size caractères, 16 par ligne.
+** │ Utilise     my_putchar
+** ╰──────────────────────────────────────────────────────────────────────
+*/
+
 #include "my.h"
 
 int my_showmem(char const *str, int size)
