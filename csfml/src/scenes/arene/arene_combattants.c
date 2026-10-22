@@ -4,8 +4,14 @@
 */
 
 /*
- * Arène : placement, dessin et plaque de chaque combattant, réticules de ciblage.
- */
+** ╭─ arene_combattants.c ────────────────────────────────────────────────
+** │ But         Arène : placement, dessin et plaque de chaque combattant,
+** │             réticules de ciblage.
+** │ Contenu     rayon_base, arene_placer, arene_ordre_dessin, couleur_pv,
+** │             arene_barre_pv, socle, bouclier,
+** │             arene_dessiner_combattant, arene_plaque, arene_reticules
+** ╰──────────────────────────────────────────────────────────────────────
+*/
 
 #include <math.h>
 #include <stdio.h>
