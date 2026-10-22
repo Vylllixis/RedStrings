@@ -4,8 +4,15 @@
 */
 
 /*
- * Texte UTF-8 : décodage et encodage stricts, sans dépendre de SFML.
- */
+** ╭─ utf8.c ─────────────────────────────────────────────────────────────
+** │ But         Texte UTF-8 : décodage et encodage stricts, sans dépendre
+** │             de SFML.
+** │ Contenu     point_valide, longueur_sequence, decoder_un,
+** │             utf8_encoder, utf8_decoder, utf8_nb_caracteres,
+** │             utf8_supprimer_dernier, utf8_majuscules
+** │ Testé par   csfml/tests/tests.c
+** ╰──────────────────────────────────────────────────────────────────────
+*/
 
 #include "gui_utf8.h"
 
@@ -35,7 +42,19 @@ static int longueur_sequence(unsigned char c)
     return 0;
 }
 
-/** Décode une séquence ; renvoie sa longueur, ou 0 si elle est invalide. */
+/*
+** ╭─ decoder_un ─────────────────────────────────────────────────────────
+** │ Décode UN caractère UTF-8 au début de `u`.
+** │
+** │ 1. longueur_sequence() lit l'octet de tête : le caractère fait 1 à 4
+** │    octets
+** │ 2. chaque octet de suite doit être de la forme 10xxxxxx (6 bits
+** │    utiles chacun)
+** │ 3. refuse les encodages trop longs (MIN_PAR_LONGUEUR) et les points
+** │    de code invalides
+** │ Renvoie la longueur lue, ou 0 si la séquence est invalide.
+** ╰──────────────────────────────────────────────────────────────────────
+*/
 static int decoder_un(const unsigned char *u, uint32_t *point)
 {
     int len = longueur_sequence(u[0]);
@@ -81,6 +100,15 @@ int utf8_encoder(uint32_t point, char sortie[4])
     return 4;
 }
 
+/*
+** ╭─ utf8_decoder ───────────────────────────────────────────────────────
+** │ Décode toute la chaîne en points de code.
+** │
+** │ Un octet invalide est sauté au lieu d'arrêter le décodage. Il n'écrit
+** │ jamais plus de max - 1 points de code, plus le 0 final : pas de
+** │ débordement. Renvoie le nombre de points de code écrits.
+** ╰──────────────────────────────────────────────────────────────────────
+*/
 int utf8_decoder(const char *s, uint32_t *dst, int max)
 {
     const unsigned char *u = (const unsigned char *)s;
