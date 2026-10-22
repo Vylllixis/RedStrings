@@ -3,6 +3,18 @@
 ** PROJET FIL ROUGE C Avancé
 */
 
+/*
+** ╭─ redstrings.c ───────────────────────────────────────────────────────
+** │ But         Menu principal du jeu en terminal : affiche les choix,
+** │             lit le choix du joueur, puis appelle l'action demandée.
+** │ Contenu     afficher_menu, demander_personnage, menu_ajouter /
+** │             afficher / sauvegarder / charger, et redstrings() qui
+** │             boucle sur le menu.
+** │ Utilise     roster.c (la liste des personnages), creer_personnage.c,
+** │             bataille_console.c, sauvegarde.c, saisie.c
+** ╰──────────────────────────────────────────────────────────────────────
+*/
+
 #include <stdio.h>
 #include "bataille_console.h"
 #include "boite.h"
@@ -84,6 +96,17 @@ static void menu_charger(roster_t *r)
             r->len, FICHIER_SAUVEGARDE);
 }
 
+/*
+** ╭─ redstrings ─────────────────────────────────────────────────────────
+** │ Boucle du menu principal, jusqu'à ce que le joueur choisisse 0.
+** │
+** │ 1. roster_init() prépare la liste des personnages (vide)
+** │ 2. affiche le menu et lit un choix entre 0 et 5 (Ctrl+D = quitter)
+** │ 3. appelle la fonction menu_* qui correspond au choix
+** │ 4. en sortant, roster_liberer() rend la mémoire : aucune fuite
+** │ Renvoie 0, le code de sortie du programme.
+** ╰──────────────────────────────────────────────────────────────────────
+*/
 int redstrings(void)
 {
     roster_t roster;
