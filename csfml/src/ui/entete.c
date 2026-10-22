@@ -4,8 +4,12 @@
 */
 
 /*
- * En-tête d'écran : bouton de retour, surtitre, titre et sous-titre.
- */
+** ╭─ entete.c ───────────────────────────────────────────────────────────
+** │ But         En-tête commun des écrans secondaires : bouton de retour,
+** │             surtitre, titre et sous-titre.
+** │ Contenu     en_tete_surtitre, en_tete
+** ╰──────────────────────────────────────────────────────────────────────
+*/
 
 #include "gui_anim.h"
 #include "gui_app.h"
