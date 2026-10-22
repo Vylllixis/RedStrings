@@ -106,6 +106,10 @@ tests:
 csfml:	$(LIB)
 	$(Q)$(MAKE) -C $(CSFML_DIR)
 
+#version graphique avec sanitizers -> ./redstrings_csfml_debug
+csfml-debug:	$(LIB)
+	$(Q)$(MAKE) -C $(CSFML_DIR) debug
+
 clean:
 	$(LOG_RM) "RM" "$(OBJ_DIR)/"
 	$(Q)$(RM) $(OBJ_DIR)
@@ -131,6 +135,7 @@ help:
 	@printf "  $(C_BLEU)make debug$(C_RESET)      compile ./$(NAME_DEBUG) (gdb + sanitizers)\n"
 	@printf "  $(C_BLEU)make tests$(C_RESET)      lance les tests unitaires (assert)\n"
 	@printf "  $(C_BLEU)make csfml$(C_RESET)      compile la version graphique\n"
+	@printf "  $(C_BLEU)make csfml-debug$(C_RESET) compile la version graphique avec les sanitizers\n"
 	@printf "  $(C_BLEU)make clean$(C_RESET)      supprime les .o\n"
 	@printf "  $(C_BLEU)make fclean$(C_RESET)     supprime aussi les exécutables et $(LIB)\n"
 	@printf "  $(C_BLEU)make re$(C_RESET)         fclean puis make\n"
@@ -138,4 +143,4 @@ help:
 
 -include $(DEPS)
 
-.PHONY: all lib debug tests csfml clean fclean re build help
+.PHONY: all lib debug tests csfml csfml-debug clean fclean re build help

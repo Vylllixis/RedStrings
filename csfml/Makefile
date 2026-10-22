@@ -6,13 +6,16 @@
 # ─── Fichiers ────────────────────────────────────────────────────────
 
 NAME		=	../redstrings_csfml
+NAME_DEBUG	=	../redstrings_csfml_debug
 
 LIB_DIR		=	../lib
 LIB		=	$(LIB_DIR)/libmy.a
 
 OBJ_DIR		=	obj
+OBJ_DEBUG	=	obj_debug
 
-SRCS		=	$(wildcard src/*.c)
+#toutes les sources, quel que soit le sous-dossier de src/
+SRCS		=	$(shell find src -name '*.c')
 OBJS		=	$(SRCS:src/%.c=$(OBJ_DIR)/%.o)
 
 #moteur du jeu partagé avec la version console (aucun affichage dedans)
@@ -29,6 +32,10 @@ RM		=	rm -rf
 
 CFLAGS		=	-std=c11 -Wall -Wextra -Werror -pedantic -Wshadow \
 			-Wmissing-prototypes -O2
+#make debug : -O0, symboles et sanitizers (comme le Makefile principal)
+SANITIZE	=	-fsanitize=address,undefined
+CFLAGS_DEBUG	=	-std=c11 -Wall -Wextra -Werror -pedantic -Wshadow \
+			-Wmissing-prototypes -g3 -O0 $(SANITIZE)
 #readlink() est POSIX : -std=c11 seul le masque
 CPPFLAGS	=	-I./include -I../includes -D_POSIX_C_SOURCE=200809L
 DEPFLAGS	=	-MMD -MP
@@ -58,7 +65,7 @@ LOG_RM		=	@printf "  $(C_GRIS)%-6s %s$(C_RESET)\n"
 # ─── Règles ──────────────────────────────────────────────────────────
 
 all:	verifier lib $(NAME)
-	$(LOG_OK) "./redstrings_csfml est prêt"
+	$(LOG_OK) "./$(notdir $(NAME)) est prêt"
 
 #libmy.a est construite par le Makefile principal
 lib:
@@ -71,12 +78,12 @@ verifier:
 		exit 1; }
 
 $(NAME):	$(OBJS) $(OBJS_MOTEUR) $(LIB)
-	$(LOG) "LD" "redstrings_csfml"
+	$(LOG) "LD" "$(notdir $(NAME))"
 	$(Q)$(CC) -o $(NAME) $(OBJS) $(OBJS_MOTEUR) $(LDFLAGS) $(LDLIBS)
 
 $(OBJ_DIR)/%.o:	src/%.c
 	$(LOG) "CC" "csfml/$<"
-	@mkdir -p $(OBJ_DIR)
+	@mkdir -p $(dir $@)
 	$(Q)$(CC) $(CFLAGS) $(CPPFLAGS) $(DEPFLAGS) -c $< -o $@
 
 $(OBJ_DIR)/moteur/%.o:	$(MOTEUR_DIR)/%.c
@@ -84,13 +91,19 @@ $(OBJ_DIR)/moteur/%.o:	$(MOTEUR_DIR)/%.c
 	@mkdir -p $(OBJ_DIR)/moteur
 	$(Q)$(CC) $(CFLAGS) $(CPPFLAGS) $(DEPFLAGS) -c $< -o $@
 
+#version de débogage : une autre arborescence d'objets, pour ne rien mélanger
+debug:	verifier lib
+	$(Q)$(MAKE) NAME=$(NAME_DEBUG) OBJ_DIR=$(OBJ_DEBUG) CFLAGS="$(CFLAGS_DEBUG)" \
+		LDFLAGS="$(LDFLAGS) $(SANITIZE)" $(NAME_DEBUG)
+	$(LOG_OK) "./$(notdir $(NAME_DEBUG)) est prêt"
+
 clean:
-	$(LOG_RM) "RM" "csfml/$(OBJ_DIR)/"
-	$(Q)$(RM) $(OBJ_DIR)
+	$(LOG_RM) "RM" "csfml/$(OBJ_DIR)/ csfml/$(OBJ_DEBUG)/"
+	$(Q)$(RM) $(OBJ_DIR) $(OBJ_DEBUG)
 
 fclean:	clean
-	$(LOG_RM) "RM" "redstrings_csfml"
-	$(Q)$(RM) $(NAME)
+	$(LOG_RM) "RM" "redstrings_csfml redstrings_csfml_debug"
+	$(Q)$(RM) $(NAME) $(NAME_DEBUG)
 
 re:
 	$(Q)$(MAKE) fclean
@@ -98,4 +111,4 @@ re:
 
 -include $(DEPS)
 
-.PHONY: all verifier lib clean fclean re
+.PHONY: all verifier lib debug clean fclean re
