@@ -46,12 +46,24 @@ Thumbs.db
 # Objets (make)
 /obj/
 
+# Notes Markdown personnelles : ignorées, sauf la documentation du dépôt
 *.md
 !README.md
+!AMELIORATIONS.md
+!CONTRIBUTING.md
+!SECURITY.md
+!THIRD_PARTY_NOTICES.md
+!CODE_OF_CONDUCT.md
+!.github/*.md
+!.github/**/*.md
 
-# Sauvegarde du jeu (menu 4)
-/personnages.txt
+# Sauvegarde du jeu (menu 4) : créée dans le dossier où le jeu est lancé
+personnages.txt
 
 # Illustrations du mode Yu-Gi-Oh! (droits de leurs ayants droit, téléchargées en local)
 /csfml/assets/yugioh/*.jpg
 /csfml/assets/yugioh/*.tmp
+
+# Python (générateur d'illustrations du README)
+__pycache__/
+*.pyc
