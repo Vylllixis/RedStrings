@@ -4,11 +4,19 @@
 */
 
 /*
- * Fenêtre et affichage : trois modes (fenêtré redimensionnable, plein écran
- * natif, plein écran sans bordure), changement à chaud, et calcul de
- * l'échelle de l'interface. Les scènes dessinent dans un repère 1280 × 720
- * centré dans la fenêtre ; `app->ecran` donne la partie réellement visible.
- */
+** ╭─ affichage.c ────────────────────────────────────────────────────────
+** │ But         Fenêtre et affichage : trois modes (fenêtré
+** │             redimensionnable, plein écran natif, plein écran sans
+** │             bordure), changement à chaud, et calcul de l'échelle de
+** │             l'interface.
+** │ Repère      les scènes dessinent dans un repère 1280 x 720 centré
+** │             dans la fenêtre ; app->ecran donne la partie réellement
+** │             visible
+** │ Contenu     ouvrir_fenetre, appliquer_taille, demander_affichage,
+** │             appliquer_demande_affichage, basculer_plein_ecran,
+** │             changer_type_plein_ecran
+** ╰──────────────────────────────────────────────────────────────────────
+*/
 
 #include <math.h>
 #include <stdio.h>
@@ -54,11 +62,19 @@ static sfRenderWindow *creer_fenetre(app_t *app, affichage_t mode)
     return sfRenderWindow_create(taille, "Redstrings", sfDefaultStyle, &reglages);
 }
 
-/**
- * Crée la fenêtre dans le mode demandé, en remplaçant l'ancienne. Polices,
- * textures et état du jeu ne dépendent pas de la fenêtre : rien n'est perdu.
- * Si un plein écran échoue, on revient au mode fenêtré.
- */
+/*
+** ╭─ ouvrir_fenetre ─────────────────────────────────────────────────────
+** │ Crée la fenêtre dans le mode demandé, en remplaçant l'ancienne.
+** │
+** │ 1. creer_fenetre() essaie le mode demandé
+** │ 2. si un plein écran échoue, on retente en mode fenêtré ; si tout
+** │    échoue, renvoie -1 et l'ancienne fenêtre reste en place
+** │ 3. sinon l'ancienne est détruite, la synchronisation verticale
+** │    activée, et appliquer_taille() recalcule l'échelle
+** │ Polices, textures et état du jeu ne dépendent pas de la fenêtre :
+** │ rien n'est perdu.
+** ╰──────────────────────────────────────────────────────────────────────
+*/
 int ouvrir_fenetre(app_t *app, affichage_t mode)
 {
     sfRenderWindow *f = creer_fenetre(app, mode);
@@ -83,11 +99,20 @@ int ouvrir_fenetre(app_t *app, affichage_t mode)
     return 0;
 }
 
-/**
- * Nouvelle taille de fenêtre : l'échelle garantit au moins
- * ECRAN_L_MIN × ECRAN_H_MIN unités visibles, sans dépasser ECHELLE_MAX ;
- * la zone visible garde les proportions de la fenêtre (rien n'est étiré).
- */
+/*
+** ╭─ appliquer_taille ───────────────────────────────────────────────────
+** │ Nouvelle taille de fenêtre : calcule l'échelle de l'interface.
+** │
+** │ 1. échelle = min(largeur / ECRAN_L_MIN, hauteur / ECRAN_H_MIN),
+** │    bornée entre ECHELLE_MIN et ECHELLE_MAX : au moins ECRAN_L_MIN x
+** │    ECRAN_H_MIN unités restent visibles
+** │ 2. app->ecran = la zone visible, en unités du repère 1280 x 720,
+** │    centrée
+** │ 3. les deux vues reçoivent cette taille
+** │ La zone visible garde les proportions de la fenêtre : rien n'est
+** │ étiré.
+** ╰──────────────────────────────────────────────────────────────────────
+*/
 void appliquer_taille(app_t *app, unsigned int largeur, unsigned int hauteur)
 {
     float l = 0.f;
