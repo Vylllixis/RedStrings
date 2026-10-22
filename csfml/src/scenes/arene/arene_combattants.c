@@ -56,7 +56,8 @@ void arene_placer(app_t *app, arene_t *ar)
             v = &ar->vis[eq][i];
             fx = FORMATIONS[n - 1][i][0];
             fy = FORMATIONS[n - 1][i][1];
-            e = sortie_cubique(progression(intro, 0.15f + i * 0.08f + eq * 0.12f, 0.55f));
+            e = sortie_cubique(progression(intro, ENTREE_DEBUT + i * ENTREE_PAS_RANG
+                + eq * ENTREE_PAS_EQUIPE, ENTREE_DUREE));
             v->sol = eq == 0
                 ? (sfVector2f){SOL_J_X + fx * PLAT_J_RX * 0.8f - 320.f * (1.f - e),
                     SOL_J_Y + fy * PLAT_J_RY * 0.75f}
@@ -126,7 +127,7 @@ static void socle(app_t *app, const visuel_t *v, sfVector2f sol, sfColor col,
 
     arene_disque(app, sol, (sfVector2f){v->rayon * 1.05f, v->rayon * 0.3f},
         (sfColor){2, 3, 8, 170}, (sfColor){2, 3, 8, 0});
-    sfRenderWindow_drawPrimitives(app->fenetre, colonne, 4, sfQuads, &app->additif);
+    cible_primitives(app, colonne, 4, sfQuads, &app->additif);
     ellipse(app, sol, (sfVector2f){v->rayon * (1.f + 0.15f * actif), v->rayon * 0.28f
         * (1.f + 0.15f * actif)}, 1.5f + actif, avec_alpha(col, 0.4f + 0.5f * actif));
 }
@@ -170,7 +171,9 @@ void arene_dessiner_combattant(app_t *app, arene_t *ar, ref_t r, int actif)
     hexagone(app, p, rr, 0.f, melanger((sfColor){14, 16, 32, 245}, col, 0.2f), col);
     hexagone(app, p, rr * 0.8f, PI / 6.f + app->temps * 0.2f * (1.f - mort),
         C_TRANSPARENT, avec_alpha(col, 0.35f));
+    app->desature = mort;
     embleme(app, c->perso.classe, p, rr * 0.52f, melanger(col, C_BLANC, 0.5f));
+    app->desature = 0.f;
     if (v->flash > 0.01f)
         hexagone(app, p, rr, 0.f, avec_alpha(C_BLANC, 0.75f * v->flash), C_TRANSPARENT);
     bouclier(app, p, rr, v);

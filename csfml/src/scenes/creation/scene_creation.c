@@ -21,6 +21,7 @@
 #include "gui_scenes.h"
 #include "gui_types.h"
 #include "gui_ui.h"
+#include "gui_yugioh.h"
 #include "creation_interne.h"
 
 static const char *LABELS_STATS[NB_STATS] = {"Points de vie", "Attaque", "Défense",
@@ -39,6 +40,7 @@ void entrer_creation(app_t *app)
     c->classe_vue = GUERRIER;
     c->classe_prec = GUERRIER;
     c->t_classe = 10.f;
+    c->cat_main = -1;
     c->sortie = -1.f;
 }
 
@@ -102,7 +104,10 @@ static void formulaire(app_t *app, creation_t *c, float a, int actif)
     dy = apparaitre(app, a, 5);
     titre_section(app, "03", "CLASSE", (sfVector2f){FX, 471.f + dy}, FW, C_CYAN);
     creation_onglets(app, c, 482.f + dy);
-    creation_grille_classes(app, c, 514.f + dy);
+    if (yugioh_actif(app))
+        creation_main_cartes(app, c, 514.f + dy);
+    else
+        creation_grille_classes(app, c, 514.f + dy);
     bouton_creer(app, c, a, actif);
 }
 

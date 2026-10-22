@@ -39,5 +39,7 @@ void creation_grille_classes(app_t *app, creation_t *c, float y);
 void creation_suivre_classe(app_t *app, creation_t *c);
 void creation_hologramme(app_t *app, creation_t *c);
 void creation_apercu(app_t *app, creation_t *c, float a);
+void creation_main_cartes(app_t *app, creation_t *c, float y);
+void creation_carte_apercu(app_t *app, creation_t *c);
 
 #endif /* CREATION_INTERNE_H */

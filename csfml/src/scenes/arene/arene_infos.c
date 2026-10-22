@@ -215,6 +215,7 @@ void arene_ecran_fin(app_t *app, arene_t *ar)
         (sfColor){4, 5, 12, 150}, (sfColor){4, 5, 12, 190}, C_TRANSPARENT);
     lueur(app, (sfVector2f){LARGEUR / 2.f, cy}, (sfVector2f){560.f, 180.f},
         avec_alpha(col, 0.3f));
+    arene_cartes_fin(app, ar, cy);
     app->espacement = 2.4f;
     app->contour = 3.f;
     texte_echelle(app, POLICE_GRAS, gagne ? "VICTOIRE" : "DÉFAITE", 76,
