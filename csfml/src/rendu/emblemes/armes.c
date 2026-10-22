@@ -4,8 +4,13 @@
 */
 
 /*
- * Emblèmes des classes de combat : épées, lame, bouclier, hache, lance, arc, cible.
- */
+** ╭─ armes.c ────────────────────────────────────────────────────────────
+** │ But         Emblèmes des classes de combat : épées, lame, bouclier,
+** │             hache, lance, arc, cible.
+** │ Contenu     emb_d_epees, emb_d_lame, emb_d_bouclier, emb_d_hache,
+** │             emb_d_lance, emb_d_arc, emb_d_cible
+** ╰──────────────────────────────────────────────────────────────────────
+*/
 
 #include <math.h>
 #include "gui_anim.h"

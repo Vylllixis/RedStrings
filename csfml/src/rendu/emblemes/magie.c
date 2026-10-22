@@ -4,8 +4,13 @@
 */
 
 /*
- * Emblèmes des classes magiques : étoile, flamme, crâne, portail, feuille, lune, sablier, orbe.
- */
+** ╭─ magie.c ────────────────────────────────────────────────────────────
+** │ But         Emblèmes des classes magiques : étoile, flamme, crâne,
+** │             portail, feuille, lune, sablier, orbe.
+** │ Contenu     emb_d_etoile, emb_d_flamme, emb_d_crane, emb_d_portail,
+** │             emb_d_feuille, emb_d_lune, emb_d_sablier, emb_d_orbe
+** ╰──────────────────────────────────────────────────────────────────────
+*/
 
 #include <math.h>
 #include "gui_anim.h"
