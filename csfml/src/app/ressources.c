@@ -4,8 +4,14 @@
 */
 
 /*
- * Ressources : polices, textures de halo et de vignette, poussières d'ambiance.
- */
+** ╭─ ressources.c ───────────────────────────────────────────────────────
+** │ But         Ressources de l'application : polices, textures de halo
+** │             et de vignette, poussières d'ambiance.
+** │ Contenu     chemin_ressource, charger_police, creer_tex_lueur,
+** │             creer_tex_vignette, app_init_poussieres,
+** │             app_creer_ressources
+** ╰──────────────────────────────────────────────────────────────────────
+*/
 
 #include <math.h>
 #include <stdio.h>
@@ -43,10 +49,18 @@ static int chercher_depuis(const char *base, const char *relatif, char *chemin,
     return -1;
 }
 
-/**
- * Chemin d'une ressource (« fonts/X.ttf », « yugioh/X.jpg ») : à côté de
- * l'exécutable, puis depuis le dossier courant. Renvoie -1 si elle manque.
- */
+/*
+** ╭─ chemin_ressource ───────────────────────────────────────────────────
+** │ Trouve le chemin d'un fichier de ressource (« fonts/X.ttf », «
+** │ yugioh/X.jpg »).
+** │
+** │ 1. cherche à côté de l'exécutable (son dossier est lu dans
+** │    /proc/self/exe)
+** │ 2. sinon cherche depuis le dossier courant
+** │ Le programme marche donc quel que soit l'endroit d'où on le lance.
+** │ Renvoie 0 si le fichier est trouvé.
+** ╰──────────────────────────────────────────────────────────────────────
+*/
 int chemin_ressource(const char *relatif, char *chemin, size_t taille)
 {
     char exe[1024] = {0};
@@ -150,6 +164,17 @@ void app_init_poussieres(app_t *app)
     }
 }
 
+/*
+** ╭─ app_creer_ressources ───────────────────────────────────────────────
+** │ Crée d'un coup les ressources SFML réutilisées à chaque image :
+** │ polices, objets de dessin (texte, forme, cercle, sprite), textures de
+** │ halo et de vignette, horloge, vues, curseurs.
+** │
+** │ Chaque création est vérifiée : à la moindre erreur, un message sur
+** │ stderr et la fonction renvoie 1 (le programme s'arrête proprement).
+** │ Renvoie 0 si tout est prêt.
+** ╰──────────────────────────────────────────────────────────────────────
+*/
 int app_creer_ressources(app_t *app)
 {
     for (int i = 0; i < NB_POLICES; i++) {
