@@ -3,6 +3,15 @@
 ** PROJET FIL ROUGE C Avancé
 */
 
+/*
+** ╭─ saisie.c ───────────────────────────────────────────────────────────
+** │ But         Lire le clavier sans risque : lignes de taille bornée,
+** │             entiers vérifiés, message d'erreur uniforme.
+** │ Contenu     vider_buffer, afficher_erreur, lire_ligne, lire_entier
+** │ Utilisé par tous les menus, creer_personnage.c et bataille_console.c
+** ╰──────────────────────────────────────────────────────────────────────
+*/
+
 #include <errno.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -29,6 +38,17 @@ static void afficher_question(const char *question, int min, int max)
         question, min, max);
 }
 
+/*
+** ╭─ lire_ligne ─────────────────────────────────────────────────────────
+** │ Lit une ligne dans buf, sans jamais dépasser sa taille.
+** │
+** │ 1. fgets() lit au plus taille - 1 caractères
+** │ 2. si la ligne finit par '\n', on le retire
+** │ 3. sinon la ligne était trop longue : vider_buffer() jette la fin,
+** │    pour qu'elle ne pollue pas la question suivante
+** │ Renvoie 0 si OK, -1 si l'entrée est fermée (Ctrl+D).
+** ╰──────────────────────────────────────────────────────────────────────
+*/
 int lire_ligne(char *buf, size_t taille)
 {
     size_t len = 0;
@@ -43,6 +63,18 @@ int lire_ligne(char *buf, size_t taille)
     return 0;
 }
 
+/*
+** ╭─ lire_entier ────────────────────────────────────────────────────────
+** │ Lit un entier compris entre min et max ; redemande tant que la saisie
+** │ est mauvaise.
+** │
+** │ 1. lire_ligne() lit toute la ligne
+** │ 2. strtol() convertit et dit où la conversion s'est arrêtée
+** │ 3. accepté seulement si tout le texte est un nombre (pas de "12abc"),
+** │    sans dépassement, et si min <= valeur <= max
+** │ Renvoie 0 si OK, -1 si l'entrée est fermée (Ctrl+D).
+** ╰──────────────────────────────────────────────────────────────────────
+*/
 int lire_entier(const char *question, int min, int max, int *resultat)
 {
     char buf[32];
