@@ -4,8 +4,12 @@
 */
 
 /*
- * Champ de saisie de texte : caractères UTF-8, curseur, secousse en cas d'erreur.
- */
+** ╭─ champ.c ────────────────────────────────────────────────────────────
+** │ But         Champ de saisie de texte : caractères UTF-8, curseur,
+** │             secousse en cas d'erreur.
+** │ Contenu     saisir, dessiner_saisie, champ_texte
+** ╰──────────────────────────────────────────────────────────────────────
+*/
 
 #include <math.h>
 #include <stdio.h>
@@ -19,7 +23,20 @@
 #include "gui_ui.h"
 #include "gui_utf8.h"
 
-/** Ajoute les caractères tapés. L'espace est refusé (le nom sert d'identifiant). */
+/*
+** ╭─ saisir ─────────────────────────────────────────────────────────────
+** │ Ajoute au champ les caractères tapés pendant cette image. L'espace
+** │ est refusé : le nom sert d'identifiant.
+** │
+** │ 1. refuse l'espace et les caractères de contrôle ; encode le reste en
+** │    UTF-8 (1 à 4 octets)
+** │ 2. refuse si le texte dépasserait `max` (lui-même borné par la taille
+** │    du tampon) : le champ se secoue
+** │ 3. copie avec memcpy() et remet le '\0' final
+** │ 4. Retour arrière : utf8_supprimer_dernier() retire un caractère
+** │    entier, pas un octet.
+** ╰──────────────────────────────────────────────────────────────────────
+*/
 static void saisir(app_t *app, champ_t *c, int max)
 {
     char u[4];
