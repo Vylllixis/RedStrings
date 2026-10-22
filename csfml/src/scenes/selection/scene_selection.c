@@ -4,9 +4,15 @@
 */
 
 /*
- * Composition des deux équipes avant un combat : d'abord la tienne, puis
- * celle de l'adversaire (jouée par l'ordinateur). Souris ou clavier.
- */
+** ╭─ scene_selection.c ──────────────────────────────────────────────────
+** │ But         Composition des deux équipes avant un combat : d'abord la
+** │             tienne, puis celle de l'adversaire (jouée par
+** │             l'ordinateur). Souris ou clavier.
+** │ Équivaut à  choisir_equipe() de la console
+** │ Contenu     entrer_selection, rang, nb_libres, basculer, valider,
+** │             clavier, etape, etapes, curseur, scene_selection
+** ╰──────────────────────────────────────────────────────────────────────
+*/
 
 #include <math.h>
 #include <stdio.h>
