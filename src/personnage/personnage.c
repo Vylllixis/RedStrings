@@ -3,17 +3,37 @@
 ** PROJET FIL ROUGE C Avancé
 */
 
+/*
+** ╭─ personnage.c ───────────────────────────────────────────────────────
+** │ But         Le catalogue des classes et les règles qui s'y rattachent
+** │             : modificateurs de statistiques, couleurs, catégories,
+** │             recherche par nom.
+** │ Contenu     classes[] (la table), nom_categorie, couleur_ansi,
+** │             classe_valide, ordre_classes, valeur_stat, stat_finale,
+** │             appliquer_classe, trouver_personnage
+** │ Utilisé par creer_personnage.c, afficher_personnage.c, sauvegarde.c,
+** │             bataille.c et la version graphique
+** ╰──────────────────────────────────────────────────────────────────────
+*/
+
 #include <stdio.h>
 #include "my_string.h"
 #include "personnage.h"
 
 /*
- * Le catalogue complet. Une ligne par classe :
- *   nom, description, catégorie, couleur {r, g, b}, {PV, ATQ, DEF, SOIN}, emblème.
- * Les modificateurs ont une somme nulle : une classe gagne d'un côté ce
- * qu'elle perd de l'autre. Les couleurs sont choisies pour rester
- * distinctes deux à deux et lisibles sur le fond sombre de l'interface.
- */
+** ╭─ classes[] ──────────────────────────────────────────────────────────
+** │ Le catalogue complet. Une ligne par classe : nom, description,
+** │ catégorie, couleur {r, g, b}, modificateurs {PV, ATQ, DEF, SOIN},
+** │ emblème.
+** │
+** │ - ajouter une classe : une valeur dans l'enum de personnage.h, puis
+** │   une ligne ici
+** │ - les modificateurs ont une somme nulle : une classe gagne d'un côté
+** │   ce qu'elle perd de l'autre
+** │ - les couleurs sont distinctes deux à deux et lisibles sur fond
+** │   sombre
+** ╰──────────────────────────────────────────────────────────────────────
+*/
 const info_classe_t classes[NB_CLASSES] = {
     [GUERRIER] = {"Guerrier", "Combattant polyvalent",
         CAT_CORPS_A_CORPS, {239, 68, 68}, {0, 5, 5, -10}, EMB_EPEES},
@@ -85,7 +105,16 @@ const char *nom_categorie(categorie_t c)
     return NOMS_CATEGORIES[c];
 }
 
-/** Séquence construite une fois à partir de la couleur RGB de la table. */
+/*
+** ╭─ couleur_ansi ───────────────────────────────────────────────────────
+** │ Renvoie le code couleur ANSI de la classe, construit à partir de son
+** │ RGB.
+** │
+** │ Construit une seule fois par classe, puis gardé dans un tableau
+** │ static : les appels suivants renvoient directement le texte déjà
+** │ prêt.
+** ╰──────────────────────────────────────────────────────────────────────
+*/
 const char *couleur_ansi(classe_t c)
 {
     static char sequences[NB_CLASSES][24];
@@ -120,6 +149,13 @@ int valeur_stat(const personnage_t *p, stat_t s)
     return valeurs[s];
 }
 
+/*
+** ╭─ stat_finale ────────────────────────────────────────────────────────
+** │ Statistique de base + modificateur de la classe, ramenée entre
+** │ STAT_MIN et STAT_MAX : une stat ne sort jamais de l'intervalle
+** │ autorisé.
+** ╰──────────────────────────────────────────────────────────────────────
+*/
 int stat_finale(classe_t c, stat_t s, int base)
 {
     int v = base + classes[c].mods[s];
