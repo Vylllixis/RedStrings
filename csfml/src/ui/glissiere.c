@@ -4,8 +4,11 @@
 */
 
 /*
- * Glissière de valeur avec piste graduée et poignée animée.
- */
+** ╭─ glissiere.c ────────────────────────────────────────────────────────
+** │ But         Glissière de valeur avec piste graduée et poignée animée.
+** │ Contenu     piste, glissiere
+** ╰──────────────────────────────────────────────────────────────────────
+*/
 
 #include <math.h>
 #include <stdio.h>
@@ -44,11 +47,14 @@ static void piste(app_t *app, float tx, float tw, float cy, float f, sfColor col
         18.f}, avec_alpha(col, 0.16f));
 }
 
-/**
- * Glissière d'une statistique : libellé, piste en cases avec un curseur en
- * losange, puis valeur dans un cadran. Se manipule à la souris ou au
- * clavier (géré par l'écran appelant).
- */
+/*
+** ╭─ glissiere ──────────────────────────────────────────────────────────
+** │ Glissière d'une statistique : libellé, piste en cases avec un curseur
+** │ en losange, puis valeur dans un cadran.
+** │
+** │ Se manipule à la souris ; le clavier est géré par l'écran appelant.
+** ╰──────────────────────────────────────────────────────────────────────
+*/
 int glissiere(app_t *app, glissiere_t *g, sfFloatRect r, const char *label,
     int *valeur, sfColor col, int focus)
 {
