@@ -15,11 +15,13 @@
  *    l'impact ; aucune valeur n'est recalculée ni réappliquée ici.
  */
 
+#include <math.h>
 #include <string.h>
 #include "bataille.h"
 #include "gui_anim.h"
 #include "gui_app.h"
 #include "gui_config.h"
+#include "gui_ecran.h"
 #include "gui_etat.h"
 #include "gui_scenes.h"
 #include "gui_types.h"
@@ -135,6 +137,16 @@ static void maj_etat(app_t *app, arene_t *ar)
     arene_jouer_evenements(app, ar);
 }
 
+/**
+ * Échelle du « monde » (plateformes, combattants, effets) : uniforme, pour
+ * que la composition garde ses proportions dans toute fenêtre. L'interface
+ * (panneaux, commandes) reste à sa taille, ancrée aux bords réels.
+ */
+float arene_echelle_monde(const app_t *app)
+{
+    return fmaxf(0.5f, fminf(app->ecran.width / LARGEUR, app->ecran.height / HAUTEUR));
+}
+
 void scene_arene(app_t *app)
 {
     arene_t *ar = &app->arene;
@@ -146,13 +158,20 @@ void scene_arene(app_t *app)
     float e = sortie_cubique(progression(intro, 0.5f, 0.5f));
     float a = app->alpha;
     int n = 0;
+    sfFloatRect v = ecran_visible(app);
+    sfVector2f centre = {LARGEUR / 2.f, HAUTEUR / 2.f};
+    float monde = arene_echelle_monde(app);
 
     arene_clavier(app, ar);
+    zoom_debut(app, centre, monde);
     arene_souris_cibles(app, ar);
+    zoom_fin(app);
     maj_etat(app, ar);
     arene_maj_visuels(app, ar);
     ar->t_cartes += app->dt;
     arene_placer(app, ar);
+    arene_voile(app);
+    zoom_debut(app, centre, monde);
     arene_dessiner_arene(app, ar);
     n = arene_ordre_dessin(ar, ordre);
     for (int i = 0; i < n; i++)
@@ -164,19 +183,24 @@ void scene_arene(app_t *app)
         arene_reticules(app, ar);
     arene_cartes_invocation(app, ar);
     arene_carte_action(app, ar);
+    zoom_fin(app);
     app->alpha = a * e;
     arene_ordre_tours(app, ar);
-    arene_panneau_equipe(app, ar, 1, (sfFloatRect){MARGE - 40.f * (1.f - e), 24.f, 360.f,
-        44.f + ar->bataille.equipes[1].taille * LIGNE_A});
-    arene_journal(app, ar, 90.f + ar->bataille.equipes[1].taille * LIGNE_A);
-    arene_panneau_equipe(app, ar, 0, (sfFloatRect){LARGEUR - MARGE - CMD_L + 40.f * (1.f - e),
-        HAUTEUR - MARGE - CMD_H - 14.f - (44.f + ar->bataille.equipes[0].taille * LIGNE_J),
-        CMD_L, 44.f + ar->bataille.equipes[0].taille * LIGNE_J});
+    arene_panneau_equipe(app, ar, 1, (sfFloatRect){v.left + MARGE - 40.f * (1.f - e),
+        v.top + 24.f, PANNEAU_ADVERSE_L, 44.f + ar->bataille.equipes[1].taille * LIGNE_A});
+    arene_journal(app, ar, (sfVector2f){v.left + MARGE, v.top + 90.f
+        + ar->bataille.equipes[1].taille * LIGNE_A});
+    arene_panneau_equipe(app, ar, 0, (sfFloatRect){v.left + v.width - MARGE - CMD_L + 40.f
+        * (1.f - e), v.top + v.height - MARGE - CMD_H - 14.f - (44.f
+        + ar->bataille.equipes[0].taille * LIGNE_J), CMD_L, 44.f
+        + ar->bataille.equipes[0].taille * LIGNE_J});
     if (ar->etat != VUE_FIN)
         arene_panneau_commandes(app, ar, e);
     app->alpha = a;
     arene_banniere(app, ar);
+    zoom_debut(app, centre, monde);
     arene_dessiner_popups(app, ar);
+    zoom_fin(app);
     if (ar->etat == VUE_FIN)
         arene_ecran_fin(app, ar);
 }

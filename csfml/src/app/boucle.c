@@ -109,7 +109,7 @@ void maj_app(app_t *app, float dt)
         memset(app->in.touches, 0, sizeof(app->in.touches));
     }
     sfRenderWindow_clear(app->fenetre, C_FOND);
-    sfRenderWindow_setView(app->fenetre, sfRenderWindow_getDefaultView(app->fenetre));
+    sfRenderWindow_setView(app->fenetre, app->vue_fixe);
     app->alpha = 1.f;
     dessiner_fond(app);
     sfView_setCenter(app->vue, (sfVector2f){
@@ -121,7 +121,7 @@ void maj_app(app_t *app, float dt)
     app->alpha = 1.f;
     maj_particules(app);
     dessiner_particules(app);
-    sfRenderWindow_setView(app->fenetre, sfRenderWindow_getDefaultView(app->fenetre));
+    sfRenderWindow_setView(app->fenetre, app->vue_fixe);
     dessiner_toasts(app);
     maj_curseur(app);
 }

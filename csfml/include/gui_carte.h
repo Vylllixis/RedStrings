@@ -28,6 +28,7 @@ void fiche(app_t *app, const personnage_t *p, sfFloatRect r,
     const float segments[NB_STATS]);
 void mini_carte(app_t *app, const personnage_t *p, sfFloatRect r,
     float survol, const marque_t *marque);
+sfVector2f grille_vers_ecran(const grille_t *g, sfVector2f p);
 int grille_cartes(app_t *app, grille_t *g, const int *ids, int n, float y0,
     const marque_t *marques, int nb_marques);
 

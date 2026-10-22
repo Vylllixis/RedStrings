@@ -21,20 +21,22 @@
 
 int creer_app(app_t *app, mode_visuel_t mode_visuel)
 {
-    sfContextSettings reglages = {0, 0, 8, 1, 1, sfContextDefault, sfFalse};
-    sfVideoMode mode = {LARGEUR, HAUTEUR, 32};
+    sfVector2u taille;
 
     memset(app, 0, sizeof(app_t));
     app->mode = mode_visuel;
+    app->taille_fenetre = (sfVector2u){FENETRE_L_DEPART, FENETRE_H_DEPART};
+    app->plein_ecran = AFFICHAGE_SANS_BORDURE;
+    app->affichage_demande = -1;
+    app->zoom = 1.f;
     roster_init(&app->equipe);
     srand(time(NULL));
-    app->fenetre = sfRenderWindow_create(mode, "Redstrings",
-        sfTitlebar | sfClose, &reglages);
-    if (app->fenetre == NULL)
+    if (ouvrir_fenetre(app, AFFICHAGE_FENETRE) != 0)
         return 1;
-    sfRenderWindow_setVerticalSyncEnabled(app->fenetre, sfTrue);
     if (app_creer_ressources(app) != 0)
         return 1;
+    taille = sfRenderWindow_getSize(app->fenetre);
+    appliquer_taille(app, taille.x, taille.y);
     app->additif.blendMode = sfBlendAdd;
     app->additif.transform = sfTransform_Identity;
     app->additif.texture = NULL;
@@ -83,5 +85,9 @@ void detruire_app(app_t *app)
         sfClock_destroy(app->horloge);
     if (app->vue)
         sfView_destroy(app->vue);
+    if (app->vue_fixe)
+        sfView_destroy(app->vue_fixe);
+    if (app->vue_zoom)
+        sfView_destroy(app->vue_zoom);
     roster_liberer(&app->equipe);
 }

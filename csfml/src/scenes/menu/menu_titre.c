@@ -52,6 +52,7 @@ static void cadre_logo(app_t *app, float t)
     float e = sortie_cubique(progression(t, 0.f, 1.2f));
     float a = app->alpha;
     sfVector2f aile[2];
+    float place_aile = app->ecran.width / 2.f - 330.f - 60.f;
 
     app->alpha = a * e;
     losange(app, (sfVector2f){LARGEUR / 2.f - 138.f, 44.f}, 3.f, C_ROUGE);
@@ -61,7 +62,8 @@ static void cadre_logo(app_t *app, float t)
     for (int k = 0; k < 2; k++) {
         aile[0] = (sfVector2f){LARGEUR / 2.f + (k ? 1.f : -1.f) * (330.f + 40.f * (1.f - e)),
             TITRE_Y + 4.f};
-        aile[1] = (sfVector2f){aile[0].x + (k ? 1.f : -1.f) * 220.f * e, TITRE_Y + 4.f};
+        aile[1] = (sfVector2f){aile[0].x + (k ? 1.f : -1.f) * fminf(220.f, place_aile) * e,
+            TITRE_Y + 4.f};
         ligne_epaisse(app, aile, 2, 1.f, avec_alpha(C_ROUGE, 0.45f), 0);
         losange(app, aile[0], 4.f, C_ROUGE);
         losange(app, aile[1], 2.5f, avec_alpha(C_ROUGE, 0.6f));

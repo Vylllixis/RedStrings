@@ -15,6 +15,7 @@
 #include "gui_carte.h"
 #include "gui_config.h"
 #include "gui_dessin.h"
+#include "gui_ecran.h"
 #include "gui_emblemes.h"
 #include "gui_etat.h"
 #include "gui_hud.h"
@@ -126,13 +127,15 @@ void arene_ordre_tours(app_t *app, arene_t *ar)
     const bataille_t *b = &ar->bataille;
     ref_t r;
     const combattant_t *c = NULL;
-    float x = LARGEUR / 2.f - 3 * 40.f;
+    /* À droite du panneau des adversaires si la fenêtre est étroite (centré sinon). */
+    float x = fmaxf(LARGEUR / 2.f - 3 * 40.f, app->ecran.left + MARGE + PANNEAU_ADVERSE_L + 54.f);
+    float haut = app->ecran.top;
     float a = app->alpha;
     float t = 0.f;
     int vus = 0;
 
     app->alpha = a * (ar->etat == VUE_ANIMATION ? 0.45f : 1.f);
-    etiquette(app, "ORDRE DES TOURS", (sfVector2f){LARGEUR / 2.f, 22.f},
+    etiquette(app, "ORDRE DES TOURS", (sfVector2f){x + 3 * 40.f, haut + 22.f},
         C_TEXTE_FAIBLE, ALIGNE_CENTRE);
     for (int k = 0; k < b->nb_ordre * 2 && vus < 7; k++) {
         r = b->ordre[(b->tour + k) % b->nb_ordre];
@@ -140,12 +143,12 @@ void arene_ordre_tours(app_t *app, arene_t *ar)
         if (!combattant_vivant(c))
             continue;
         t = vus == 0 ? 1.f : 0.f;
-        hexagone(app, (sfVector2f){x, 52.f}, 13.f + 5.f * t, 0.f, melanger(
+        hexagone(app, (sfVector2f){x, haut + 52.f}, 13.f + 5.f * t, 0.f, melanger(
             (sfColor){14, 16, 32, 240}, couleur_classe(c->perso.classe), 0.25f),
             couleur_classe(c->perso.classe));
-        embleme(app, c->perso.classe, (sfVector2f){x, 52.f}, 7.f + 3.f * t,
+        embleme(app, c->perso.classe, (sfVector2f){x, haut + 52.f}, 7.f + 3.f * t,
             melanger(couleur_classe(c->perso.classe), C_BLANC, 0.4f));
-        rect_arrondi(app, (sfFloatRect){x - 9.f, 76.f + 2.f * t, 18.f, 2.f}, 0.f,
+        rect_arrondi(app, (sfFloatRect){x - 9.f, haut + 76.f + 2.f * t, 18.f, 2.f}, 0.f,
             arene_couleur_equipe(r.equipe));
         x += 40.f + 8.f * t;
         vus++;
@@ -154,7 +157,7 @@ void arene_ordre_tours(app_t *app, arene_t *ar)
 }
 
 /** Journal : seulement les lignes déjà jouées à l'écran, les plus récentes en clair. */
-void arene_journal(app_t *app, arene_t *ar, float y)
+void arene_journal(app_t *app, arene_t *ar, sfVector2f pos)
 {
     const bataille_t *b = &ar->bataille;
     int cache = b->nb_journal - ar->journal_vu;
@@ -166,9 +169,9 @@ void arene_journal(app_t *app, arene_t *ar, float y)
         if (ligne == NULL)
             break;
         app->alpha = a * (1.f - 0.22f * k);
-        losange(app, (sfVector2f){MARGE + 4.f, y + k * 20.f}, 2.5f, k == 0 ? C_ROUGE
+        losange(app, (sfVector2f){pos.x + 4.f, pos.y + k * 20.f}, 2.5f, k == 0 ? C_ROUGE
             : C_TEXTE_FAIBLE);
-        texte(app, POLICE_NORMALE, ligne, 13, (sfVector2f){MARGE + 14.f, y + k * 20.f},
+        texte(app, POLICE_NORMALE, ligne, 13, (sfVector2f){pos.x + 14.f, pos.y + k * 20.f},
             k == 0 ? C_TEXTE : C_TEXTE_FAIBLE, ALIGNE_GAUCHE);
     }
     app->alpha = a;
@@ -211,7 +214,7 @@ void arene_ecran_fin(app_t *app, arene_t *ar)
     float cy = HAUTEUR * 0.42f;
 
     app->alpha = a * progression(ar->t_etat, 0.f, 0.4f);
-    panneau(app, (sfFloatRect){-40.f, -40.f, LARGEUR + 80.f, HAUTEUR + 80.f}, 0.f,
+    panneau(app, ecran_couvrant(app), 0.f,
         (sfColor){4, 5, 12, 150}, (sfColor){4, 5, 12, 190}, C_TRANSPARENT);
     lueur(app, (sfVector2f){LARGEUR / 2.f, cy}, (sfVector2f){560.f, 180.f},
         avec_alpha(col, 0.3f));

@@ -14,12 +14,15 @@
     #include "gui_etat.h"
     #include "gui_types.h"
 
-#define FX 64.f
-#define FW 600.f
-
-/* Panneau d'aperçu */
-#define AX 716.f
-#define AW 516.f
+/*
+ * Formulaire à gauche, aperçu à droite. Leurs bords sont recalculés à
+ * chaque image selon la largeur visible (creation_geometrie) ; à 1280 de
+ * large : formulaire 64 + 600, aperçu 716 + 516.
+ */
+#define FX (app->creation.fx)
+#define FW (app->creation.fw)
+#define AX (app->creation.ax)
+#define AW (app->creation.aw)
 #define SCENE_X (AX + AW / 2.f)
 #define SCENE_Y 250.f
 #define DUREE_SORTIE_CREATION 1.f
@@ -30,6 +33,7 @@
 #define FOCUS_CLASSE (FOCUS_STAT + NB_STATS)
 #define FOCUS_BOUTON (FOCUS_CLASSE + 1)
 
+void creation_geometrie(app_t *app, creation_t *c);
 const char *creation_raison_invalide(app_t *app, const creation_t *c);
 void creation_creer(app_t *app, creation_t *c);
 classe_t creation_premiere_classe(categorie_t cat);

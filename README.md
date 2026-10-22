@@ -416,6 +416,10 @@ stateDiagram-v2
 | **Personnages** | taper pour rechercher · <kbd>Entrée</kbd> ouvrir · <kbd>←</kbd> <kbd>→</kbd> changer de fiche | clic sur une carte |
 | **Composition** | <kbd>←</kbd> <kbd>→</kbd> <kbd>↑</kbd> <kbd>↓</kbd> choisir une carte · <kbd>Espace</kbd> ajouter / retirer · <kbd>Entrée</kbd> valider l'équipe · <kbd>Échap</kbd> étape précédente | clic sur une carte, bouton *Valider* / *Lancer le combat* |
 | **Arène** | <kbd>1</kbd> <kbd>2</kbd> <kbd>3</kbd> ou <kbd>←</kbd> <kbd>→</kbd> + <kbd>Entrée</kbd> action · <kbd>←</kbd> <kbd>→</kbd> cible · <kbd>Entrée</kbd> confirmer · <kbd>Échap</kbd> retour · fin : <kbd>Entrée</kbd>/<kbd>R</kbd> rejouer, <kbd>Échap</kbd> menu | boutons d'action, survol / clic sur une cible |
+| **Partout** | <kbd>F11</kbd> ou <kbd>Alt</kbd>+<kbd>Entrée</kbd> : fenêtré ↔ plein écran · <kbd>Maj</kbd>+<kbd>F11</kbd> : plein écran natif ou sans bordure | bords de la fenêtre pour la redimensionner |
+
+> [!NOTE]
+> **Fenêtre libre.** La fenêtre se redimensionne à la souris (800 × 600 au minimum), et passe en plein écran sans bordure (par défaut) ou natif sans redémarrer : la partie en cours, les animations et la saisie sont conservées. L'interface garde au moins 1024 × 720 unités visibles et grossit au plus ×2 : en dessous, la création se réorganise et les grilles de cartes choisissent leurs colonnes ; au-delà, l'espace en plus sert à respirer. Le combat garde sa composition (mise à l'échelle uniforme) et ses panneaux s'ancrent aux coins réels de la fenêtre. Le texte est tramé à sa taille réelle, donc net à toute taille.
 
 > [!WARNING]
 > L'écran n'a de place que pour **10 cartes** (`MAX_PERSONNAGES`) : la fenêtre refuse de créer un 11ᵉ personnage, et refuse de charger un fichier qui en contient plus (l'équipe actuelle n'est alors pas touchée). La console, elle, n'a pas de limite.

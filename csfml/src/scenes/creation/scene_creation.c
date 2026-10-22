@@ -115,9 +115,15 @@ static void aide_clavier(app_t *app, float a)
 {
     static const char *touches[4] = {"Tab", "‹ ›", "Maj", "Échap"};
     static const char *actions[4] = {"naviguer", "ajuster", "×10 · catégorie", "retour"};
-    float x = AX + 26.f;
+    float total = 0.f;
+    float x = 0.f;
     float w = 0.f;
 
+    for (int i = 0; i < 4; i++)
+        total += largeur_touche(app, touches[i]) + 8.f + largeur_texte(app, POLICE_NORMALE,
+            actions[i], 13) + 22.f;
+    /* Dans un aperçu étroit, la ligne est poussée vers la gauche pour ne pas déborder. */
+    x = fminf(AX + 26.f, AX + AW - 10.f - (total - 22.f));
     app->alpha = a * progression(app->t_scene, 0.6f, 0.4f);
     for (int i = 0; i < 4; i++) {
         w = largeur_touche(app, touches[i]);
@@ -129,6 +135,31 @@ static void aide_clavier(app_t *app, float a)
     app->alpha = a;
 }
 
+/* Composition de référence (1280 de large) : cadre du formulaire, écart, aperçu */
+#define CADRE_FORM_L 632.f
+#define ECART_PANNEAUX 36.f
+#define COMPO_G 48.f
+#define COMPO_D 1232.f
+#define MARGE_ECRAN 24.f
+
+/**
+ * Formulaire et aperçu se partagent la largeur visible : à 1280 et au-delà,
+ * la composition d'origine ; plus étroit, les deux panneaux rétrécissent
+ * dans les mêmes proportions (les textes gardent leur taille).
+ */
+void creation_geometrie(app_t *app, creation_t *c)
+{
+    float g = fmaxf(COMPO_G, app->ecran.left + MARGE_ECRAN);
+    float d = fminf(COMPO_D, app->ecran.left + app->ecran.width - MARGE_ECRAN);
+    float k = (d - g) / (COMPO_D - COMPO_G);
+    float cadre = CADRE_FORM_L * k;
+
+    c->fx = g + 16.f;
+    c->fw = cadre - 32.f;
+    c->aw = d - (g + cadre + ECART_PANNEAUX * k);
+    c->ax = d - c->aw;
+}
+
 void scene_creation(app_t *app)
 {
     creation_t *c = &app->creation;
@@ -137,6 +168,7 @@ void scene_creation(app_t *app)
     int bloque = app->souris_bloquee;
     char surtitre[32];
 
+    creation_geometrie(app, c);
     if (!actif) {
         c->sortie -= app->dt;
         if (c->sortie <= 0.f)
