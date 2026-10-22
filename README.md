@@ -8,6 +8,7 @@
 [![CSFML](https://img.shields.io/badge/GUI-CSFML%202.6-34d399?style=for-the-badge&logo=sfml&logoColor=white&labelColor=0e1230)](#csfml)
 [![Classes](https://img.shields.io/badge/classes-28-f43f5e?style=for-the-badge&labelColor=0e1230)](#personnages)
 [![Tests](https://img.shields.io/badge/tests-assert%20%2B%20ASan-fbbf24?style=for-the-badge&labelColor=0e1230)](#tests)
+[![Licence MIT](https://img.shields.io/badge/licence-MIT-34d399?style=for-the-badge&labelColor=0e1230)](#licence)
 [![ESGI](https://img.shields.io/badge/ESGI-C%20avanc%C3%A9-d946ef?style=for-the-badge&labelColor=0e1230)](#concept)
 
 **Un jeu de combat tactique en équipe, au tour par tour, écrit en C pur.**<br/>
@@ -1007,7 +1008,17 @@ Ouvre une [issue](https://github.com/Vylllixis/RedStrings/issues/new/choose) : d
 
 ## 10 · Licence
 
-Le dépôt ne contient **pas encore de fichier `LICENSE`**. Tant qu'aucune licence n'est choisie, le code reste sous le droit d'auteur par défaut de son auteur : le lire est possible, mais aucune autorisation de réutilisation n'est accordée. Les polices de `csfml/assets/fonts/` gardent leurs propres licences, et les dépendances (CSFML) les leurs : voir [`THIRD_PARTY_NOTICES.md`](THIRD_PARTY_NOTICES.md).
+Le **code source de RedStrings** (tout ce qui est dans `src/`, `lib/`, `includes/`, `csfml/src/`, `csfml/include/`, `tests/`, les `Makefile` et le générateur d'illustrations du README) est distribué sous **licence MIT**, © 2026 Vyllixis : voir [`LICENSE`](LICENSE). Tu peux l'utiliser, le modifier et le redistribuer, y compris dans un projet fermé, à condition de conserver la mention de copyright et le texte de la licence.
+
+**La licence MIT ne couvre que ce code.** Elle ne s'applique pas à ce qui appartient à d'autres :
+
+| Ressource | Licence |
+|---|---|
+| Polices `csfml/assets/fonts/` (Noto Sans, DejaVu Sans) | leurs propres licences |
+| CSFML / SFML (installées, non incluses) | zlib/libpng |
+| Illustrations du mode `"Yu-Gi-Oh!"` (non incluses, téléchargées en local) | propriété de leurs ayants droit, **aucun droit n'est accordé** par la licence MIT |
+
+Le détail est dans [`THIRD_PARTY_NOTICES.md`](THIRD_PARTY_NOTICES.md).
 
 <img src=".github/readme/fil-rouge.svg" width="100%" alt=""/>
 

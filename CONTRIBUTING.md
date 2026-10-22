@@ -61,6 +61,10 @@ Le dépôt suit **git flow** :
 
 Les pull requests se font **vers `develop`**, pas vers `main`.
 
+## Licence des contributions
+
+Le code de RedStrings est sous [licence MIT](LICENSE). En proposant une pull request, tu acceptes qu'elle soit distribuée sous cette même licence. N'envoie que du code que tu as écrit ou dont la licence est compatible avec la licence MIT.
+
 ## Ressources tierces
 
 - N'ajoute pas d'images, de sons ou de polices dont tu ne peux pas justifier la licence.
