@@ -509,7 +509,7 @@ sequenceDiagram
 
 <br/>
 
-Le projet a été audité point par point (voir [`AMELIORATIONS.md`](AMELIORATIONS.md)) :
+Le projet a été audité point par point, et chaque problème a été **reproduit**, puis corrigé :
 
 | | Avant | Après |
 |:---:|---|---|
