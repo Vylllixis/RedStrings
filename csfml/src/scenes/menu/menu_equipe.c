@@ -54,7 +54,7 @@ static void emplacement(app_t *app, int i, sfVector2f c, float e)
     hexagone(app, c, (28.f + 2.f * h[i]) * e, 0.f, melanger((sfColor){14, 16, 32, 255},
         col, 0.2f), avec_alpha(col, 0.6f + 0.4f * h[i]));
     embleme(app, p->classe, c, 13.f * e, melanger(col, C_BLANC, 0.5f));
-    tronquer(app, POLICE_GRAS, 12, p->nom, 72.f, nom);
+    tronquer(app, POLICE_GRAS, 12, p->nom, 72.f, nom, sizeof(nom));
     texte(app, POLICE_GRAS, nom, 12, (sfVector2f){c.x, c.y + 44.f},
         melanger(C_TEXTE_DOUX, C_TEXTE, h[i]), ALIGNE_CENTRE);
     if (mort > 0.f)

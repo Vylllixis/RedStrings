@@ -10,6 +10,7 @@
 #ifndef GUI_DESSIN_H
     #define GUI_DESSIN_H
 
+    #include <stddef.h>
     #include <SFML/Graphics.h>
     #include "gui_types.h"
 
@@ -32,7 +33,7 @@ float largeur_texte(app_t *app, police_t p, const char *s, unsigned int taille);
 float position_caractere(app_t *app, police_t p, const char *s,
     unsigned int taille, int index);
 void tronquer(app_t *app, police_t p, unsigned int taille, const char *src,
-    float max, char *dst);
+    float max, char *dst, size_t taille_dst);
 float etiquette(app_t *app, const char *s, sfVector2f pos, sfColor c,
     alignement_t a);
 void dessiner_fond(app_t *app);

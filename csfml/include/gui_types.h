@@ -11,6 +11,7 @@
     #define GUI_TYPES_H
 
     #include <SFML/Graphics.h>
+    #include "personnage.h"
     #include "gui_config.h"
 
 /* app_t est défini dans gui_app.h : ici seulement son nom, pour les modules de dessin. */
@@ -53,7 +54,7 @@ typedef struct {
     int dehors;                 /**< Souris hors de la fenêtre. */
     int touches[sfKeyCount];    /**< Touches pressées cette frame. */
     int shift;
-    sfUint32 texte[32];         /**< Caractères tapés cette frame. */
+    sfUint32 texte[MAX_SAISIE]; /**< Caractères tapés cette frame. */
     int nb_texte;
 } entree_t;
 
@@ -76,8 +77,8 @@ typedef struct {
 } poussiere_t;
 
 typedef struct {
-    char message[96];
-    char icone[8];
+    char message[TAILLE_TOAST];
+    char icone[TAILLE_ICONE];
     sfColor couleur;
     float t;
     float y;
@@ -96,7 +97,7 @@ typedef struct {
 } bouton_t;
 
 typedef struct {
-    char texte[30];
+    char texte[NOM_MAX];    /**< Même taille qu'un nom de personnage. */
     int focus;
     float focus_anim;
     float caret_x;

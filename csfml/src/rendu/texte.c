@@ -7,46 +7,23 @@
  * Texte : conversion UTF-8, mesure, dessin avec contour et espacement, troncature.
  */
 
+#include <stdio.h>
 #include <string.h>
-#include "my_string.h"
 #include "gui_anim.h"
 #include "gui_app.h"
 #include "gui_dessin.h"
 #include "gui_types.h"
+#include "gui_utf8.h"
 
-static int utf8_vers_utf32(const char *s, sfUint32 *dst, int max)
-{
-    const unsigned char *u = (const unsigned char *)s;
-    int n = 0;
-
-    while (*u && n < max - 1) {
-        if (*u < 0x80) {
-            dst[n++] = *u++;
-        } else if ((*u & 0xE0) == 0xC0 && u[1]) {
-            dst[n++] = ((u[0] & 0x1F) << 6) | (u[1] & 0x3F);
-            u += 2;
-        } else if ((*u & 0xF0) == 0xE0 && u[1] && u[2]) {
-            dst[n++] = ((u[0] & 0x0F) << 12) | ((u[1] & 0x3F) << 6)
-                | (u[2] & 0x3F);
-            u += 3;
-        } else if ((*u & 0xF8) == 0xF0 && u[1] && u[2] && u[3]) {
-            dst[n++] = ((u[0] & 0x07) << 18) | ((u[1] & 0x3F) << 12)
-                | ((u[2] & 0x3F) << 6) | (u[3] & 0x3F);
-            u += 4;
-        } else {
-            u++;
-        }
-    }
-    dst[n] = 0;
-    return n;
-}
+/* Un texte plus long que cela est coupé : les libellés de l'interface sont courts. */
+#define TAILLE_TEXTE_MAX 256
 
 static void preparer_texte(app_t *app, police_t p, const char *s,
     unsigned int taille)
 {
-    sfUint32 buf[256];
+    uint32_t buf[TAILLE_TEXTE_MAX];
 
-    utf8_vers_utf32(s, buf, 256);
+    utf8_decoder(s, buf, TAILLE_TEXTE_MAX);
     sfText_setFont(app->texte, app->polices[p]);
     sfText_setCharacterSize(app->texte, taille);
     sfText_setLetterSpacing(app->texte, app->espacement > 0.f
@@ -108,21 +85,26 @@ float texte(app_t *app, police_t p, const char *s, unsigned int taille,
     return texte_echelle(app, p, s, taille, pos, c, a, 1.f);
 }
 
-/** Copie `src` dans `dst` en l'abrégeant avec « … » s'il est trop large. */
+/**
+ * Copie `src` dans `dst` (`taille_dst` octets, terminateur compris) en
+ * l'abrégeant avec « … » si le texte est trop large. Jamais d'écriture
+ * au-delà de `taille_dst`.
+ */
 void tronquer(app_t *app, police_t p, unsigned int taille, const char *src,
-    float max, char *dst)
+    float max, char *dst, size_t taille_dst)
 {
-    int len = my_strlen(src);
+    size_t len = strlen(src);
 
-    my_strcpy(dst, src);
+    if (taille_dst == 0)
+        return;
+    snprintf(dst, taille_dst, "%s", src);
     if (largeur_texte(app, p, dst, taille) <= max)
         return;
     while (len > 0) {
         len--;
         while (len > 0 && ((unsigned char)src[len] & 0xC0) == 0x80)
             len--;
-        memcpy(dst, src, len);
-        my_strcpy(dst + len, "…");
+        snprintf(dst, taille_dst, "%.*s…", (int)len, src);
         if (largeur_texte(app, p, dst, taille) <= max)
             return;
     }

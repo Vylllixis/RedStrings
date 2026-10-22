@@ -127,7 +127,7 @@ void arene_dessiner_effet(app_t *app, arene_t *ar)
         ligne_epaisse(app, trainee, 2, 3.f, avec_alpha(C_BLANC, 0.35f), 1);
     }
     if (ev->type == EV_ATTAQUE && ar->t_evt >= ARENE_IMPACTS[EV_ATTAQUE])
-        EFFETS_IMPACT[classes[cl].categorie](app, c->pos, couleur_classe(cl),
+        EFFETS_IMPACT[classe_info(cl)->categorie](app, c->pos, couleur_classe(cl),
             ar->t_evt - ARENE_IMPACTS[EV_ATTAQUE], c->rayon / 56.f);
     if (ev->type == EV_SOIN)
         rayon_soin(app, a->pos, c->pos, ar->t_evt);

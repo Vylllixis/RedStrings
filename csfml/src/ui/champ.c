@@ -10,7 +10,6 @@
 #include <math.h>
 #include <stdio.h>
 #include <string.h>
-#include "my_string.h"
 #include "gui_anim.h"
 #include "gui_app.h"
 #include "gui_config.h"
@@ -18,42 +17,7 @@
 #include "gui_hud.h"
 #include "gui_types.h"
 #include "gui_ui.h"
-
-static void supprimer_dernier(char *s)
-{
-    int len = my_strlen(s);
-
-    if (len == 0)
-        return;
-    len--;
-    while (len > 0 && ((unsigned char)s[len] & 0xC0) == 0x80)
-        len--;
-    s[len] = '\0';
-}
-
-static int encoder_utf8(sfUint32 cp, char *out)
-{
-    if (cp < 0x80) {
-        out[0] = (char)cp;
-        return 1;
-    }
-    if (cp < 0x800) {
-        out[0] = (char)(0xC0 | (cp >> 6));
-        out[1] = (char)(0x80 | (cp & 0x3F));
-        return 2;
-    }
-    if (cp < 0x10000) {
-        out[0] = (char)(0xE0 | (cp >> 12));
-        out[1] = (char)(0x80 | ((cp >> 6) & 0x3F));
-        out[2] = (char)(0x80 | (cp & 0x3F));
-        return 3;
-    }
-    out[0] = (char)(0xF0 | (cp >> 18));
-    out[1] = (char)(0x80 | ((cp >> 12) & 0x3F));
-    out[2] = (char)(0x80 | ((cp >> 6) & 0x3F));
-    out[3] = (char)(0x80 | (cp & 0x3F));
-    return 4;
-}
+#include "gui_utf8.h"
 
 /** Ajoute les caractères tapés. L'espace est refusé (le nom sert d'identifiant). */
 static void saisir(app_t *app, champ_t *c, int max)
@@ -61,49 +25,39 @@ static void saisir(app_t *app, champ_t *c, int max)
     char u[4];
     int n = 0;
     int len = 0;
+    int place = (int)sizeof(c->texte) - 1;
 
-    for (int i = 0; i < app->in.nb_texte; i++) {
-        if (app->in.texte[i] <= 32) {
+    if (max > place)
+        max = place;
+    for (int i = 0; i < app->in.nb_texte && i < MAX_SAISIE; i++) {
+        n = app->in.texte[i] <= 32 ? 0 : utf8_encoder(app->in.texte[i], u);
+        len = (int)strlen(c->texte);
+        if (n == 0 || len + n > max) {
             c->secousse = 1.f;
             continue;
         }
-        n = encoder_utf8(app->in.texte[i], u);
-        len = my_strlen(c->texte);
-        if (len + n > max) {
-            c->secousse = 1.f;
-            continue;
-        }
-        memcpy(c->texte + len, u, n);
+        memcpy(c->texte + len, u, (size_t)n);
         c->texte[len + n] = '\0';
         c->tape = 0.f;
     }
     if (app->in.touches[sfKeyBackspace] && c->texte[0] != '\0') {
-        supprimer_dernier(c->texte);
+        utf8_supprimer_dernier(c->texte);
         c->tape = 1.f;
     }
 }
 
-static int nb_caracteres(const char *s)
-{
-    int n = 0;
-
-    for (int i = 0; s[i] != '\0'; i++)
-        n += ((unsigned char)s[i] & 0xC0) != 0x80;
-    return n;
-}
-
 static void dessiner_saisie(app_t *app, champ_t *c, float x0, float cy)
 {
-    char prefixe[32];
-    char dernier[8];
-    int nb = nb_caracteres(c->texte);
+    char prefixe[sizeof(c->texte)];
+    char dernier[sizeof(c->texte)];
+    int nb = utf8_nb_caracteres(c->texte);
     float xd = x0 + position_caractere(app, POLICE_NORMALE, c->texte, 21, nb - 1);
     float xf = x0 + position_caractere(app, POLICE_NORMALE, c->texte, 21, nb);
     float e = sortie_rebond(progression(c->tape, 0.f, 0.24f));
 
-    my_strcpy(prefixe, c->texte);
-    supprimer_dernier(prefixe);
-    my_strcpy(dernier, c->texte + my_strlen(prefixe));
+    snprintf(prefixe, sizeof(prefixe), "%s", c->texte);
+    utf8_supprimer_dernier(prefixe);
+    snprintf(dernier, sizeof(dernier), "%s", c->texte + strlen(prefixe));
     texte(app, POLICE_NORMALE, prefixe, 21, (sfVector2f){x0, cy}, C_TEXTE,
         ALIGNE_GAUCHE);
     texte_echelle(app, POLICE_NORMALE, dernier, 21, (sfVector2f){(xd + xf) / 2.f,
@@ -150,7 +104,7 @@ int champ_texte(app_t *app, champ_t *c, sfFloatRect r, const char *aide,
     clignote = c->tape < 0.5f ? 1.f : 0.55f + 0.45f * cosf((c->tape - 0.5f) * 5.f);
     rect_arrondi(app, (sfFloatRect){c->caret_x + dx, cy - 13.f, 2.f, 26.f}, 1.f,
         avec_alpha(C_CYAN, c->focus_anim * clignote));
-    snprintf(compteur, sizeof(compteur), "%d/%d", my_strlen(c->texte), max);
+    snprintf(compteur, sizeof(compteur), "%d/%d", utf8_nb_caracteres(c->texte), max);
     texte(app, POLICE_NORMALE, compteur, 13, (sfVector2f){r.left + dx + r.width - 18.f,
         cy}, avec_alpha(C_TEXTE_FAIBLE, 0.4f + 0.6f * c->focus_anim), ALIGNE_DROITE);
     return s && app->in.clic;

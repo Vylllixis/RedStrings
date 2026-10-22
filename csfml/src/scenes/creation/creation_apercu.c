@@ -10,7 +10,6 @@
 #include <math.h>
 #include <stdio.h>
 #include "personnage.h"
-#include "my_string.h"
 #include "gui_anim.h"
 #include "gui_app.h"
 #include "gui_carte.h"
@@ -70,7 +69,7 @@ static void stats_apercu(app_t *app, creation_t *c, sfColor col)
         y = 516.f + i * 40.f;
         lx = etiquette(app, nom_stat((stat_t)i), (sfVector2f){x0, y}, C_TEXTE_DOUX,
             ALIGNE_GAUCHE);
-        puce_mod(app, classes[c->classe].mods[i], (sfVector2f){x0 + lx + 10.f, y});
+        puce_mod(app, classe_info(c->classe)->mods[i], (sfVector2f){x0 + lx + 10.f, y});
         snprintf(buf, sizeof(buf), "%d%s", (int)roundf(c->affiche[i]),
             i == STAT_DEF ? " %" : "");
         texte(app, POLICE_GRAS, buf, 18, (sfVector2f){x0 + w, y - 1.f},
@@ -92,7 +91,7 @@ void creation_apercu(app_t *app, creation_t *c, float a)
     float cx = r.left + AW / 2.f;
     char buf[64];
 
-    my_strcpy(p.nom, c->nom.texte);
+    snprintf(p.nom, sizeof(p.nom), "%s", c->nom.texte);
     p.classe = c->classe;
     app->alpha = a * progression(app->t_scene, 0.2f, 0.35f);
     ombre_biseau(app, r, 26.f, 1.4f);
@@ -108,15 +107,15 @@ void creation_apercu(app_t *app, creation_t *c, float a)
     etiquette(app, nom_classe_maj(c->classe), (sfVector2f){r.left + AW - 26.f,
         r.top + 30.f}, col, ALIGNE_DROITE);
     creation_hologramme(app, c);
-    tronquer(app, POLICE_GRAS, 32, p.nom[0] ? p.nom : "Sans nom", AW - 80.f, buf);
+    tronquer(app, POLICE_GRAS, 32, p.nom[0] ? p.nom : "Sans nom", AW - 80.f, buf, sizeof(buf));
     app->espacement = 0.5f;
     texte(app, POLICE_GRAS, buf, 32, (sfVector2f){cx, 394.f - 30.f * envol},
         p.nom[0] ? C_TEXTE : C_TEXTE_FAIBLE, ALIGNE_CENTRE);
     app->espacement = 0.f;
     pastille(app, nom_classe_maj(c->classe), (sfVector2f){cx, 432.f - 30.f * envol},
         col, 0);
-    snprintf(buf, sizeof(buf), "%s  ·  %s", nom_categorie(classes[c->classe].categorie),
-        classes[c->classe].description);
+    snprintf(buf, sizeof(buf), "%s  ·  %s", nom_categorie(classe_info(c->classe)->categorie),
+        classe_info(c->classe)->description);
     texte(app, POLICE_NORMALE, buf, 13, (sfVector2f){cx, 460.f - 30.f * envol},
         C_TEXTE_FAIBLE, ALIGNE_CENTRE);
     titre_section(app, NULL, "STATISTIQUES FINALES", (sfVector2f){r.left + 26.f,

@@ -10,7 +10,6 @@
 #include <stdio.h>
 #include "personnage.h"
 #include "roster.h"
-#include "my_string.h"
 #include "gui_app.h"
 #include "gui_carte.h"
 #include "gui_config.h"
@@ -52,7 +51,7 @@ void creation_creer(app_t *app, creation_t *c)
         }
         return;
     }
-    my_strcpy(p.nom, c->nom.texte);
+    snprintf(p.nom, sizeof(p.nom), "%s", c->nom.texte);
     p.pv = c->valeurs[0];
     p.atq = c->valeurs[1];
     p.def = c->valeurs[2];
@@ -88,7 +87,7 @@ static classe_t classe_voisine(classe_t c, int sens)
 classe_t creation_premiere_classe(categorie_t cat)
 {
     for (int i = 0; i < NB_CLASSES; i++) {
-        if (classes[i].categorie == cat)
+        if (classe_info(i)->categorie == cat)
             return (classe_t)i;
     }
     return GUERRIER;
@@ -96,7 +95,7 @@ classe_t creation_premiere_classe(categorie_t cat)
 
 static classe_t categorie_voisine(classe_t c, int sens)
 {
-    int cat = (classes[c].categorie + sens + NB_CATEGORIES) % NB_CATEGORIES;
+    int cat = (classe_info(c)->categorie + sens + NB_CATEGORIES) % NB_CATEGORIES;
 
     return creation_premiere_classe((categorie_t)cat);
 }

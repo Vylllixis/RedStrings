@@ -14,6 +14,7 @@
     #include "personnage.h"
     #include "gui_types.h"
 
+const info_classe_t *classe_info(classe_t c);
 const char *nom_classe(classe_t c);
 const char *nom_classe_maj(classe_t c);
 sfColor couleur_classe(classe_t c);

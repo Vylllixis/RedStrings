@@ -110,7 +110,7 @@ typedef struct {
 
 /** Nombre qui s'envole au-dessus d'un combattant (« -24 », « +30 »). */
 typedef struct {
-    char texte[24];
+    char texte[TAILLE_POPUP];
     sfColor couleur;
     sfVector2f pos;
     float t;

@@ -9,6 +9,7 @@
 
 #include <string.h>
 #include "gui_app.h"
+#include "gui_config.h"
 #include "gui_types.h"
 
 static void traiter_evenement(app_t *app, sfEvent *e)
@@ -20,7 +21,7 @@ static void traiter_evenement(app_t *app, sfEvent *e)
         app->in.shift = e->key.shift;
     }
     if (e->type == sfEvtTextEntered && e->text.unicode >= 32
-        && e->text.unicode != 127 && app->in.nb_texte < 32)
+        && e->text.unicode != 127 && app->in.nb_texte < MAX_SAISIE)
         app->in.texte[app->in.nb_texte++] = e->text.unicode;
     if (e->type == sfEvtMouseButtonPressed && e->mouseButton.button == sfMouseLeft) {
         app->in.clic = 1;

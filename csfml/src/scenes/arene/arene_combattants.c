@@ -189,7 +189,7 @@ void arene_plaque(app_t *app, arene_t *ar, ref_t r, int actif)
     char nom[48];
 
     app->alpha = a * (v->ko_vis ? 0.6f : 1.f);
-    tronquer(app, POLICE_GRAS, taille, c->perso.nom, w + 30.f, nom);
+    tronquer(app, POLICE_GRAS, taille, c->perso.nom, w + 30.f, nom, sizeof(nom));
     app->contour = 2.f;
     texte(app, POLICE_GRAS, nom, taille, (sfVector2f){v->pos.x, y - (r.equipe == 0
         ? 14.f : 11.f)}, v->ko_vis ? C_TEXTE_FAIBLE : C_TEXTE, ALIGNE_CENTRE);

@@ -7,44 +7,38 @@
  * Noms, abréviations et couleurs des classes et des statistiques.
  */
 
+#include <stdio.h>
 #include "personnage.h"
-#include "my_string.h"
 #include "gui_carte.h"
 #include "gui_config.h"
-
-/** Nom de la classe, pris dans la table classes[] partagée avec la console. */
-const char *nom_classe(classe_t c)
-{
-    return classes[c].nom;
-}
+#include "gui_utf8.h"
 
 /**
- * Majuscules UTF-8 : ASCII, plus les lettres accentuées du français codées
- * sur deux octets (à → À, é → É, ï → Ï…), pour « ÉLÉMENTALISTE » ou « PRÊTRE ».
+ * Entrée de la table classes[] (partagée avec la console). Un identifiant hors
+ * table, venu d'un état corrompu, retombe sur la première classe au lieu de
+ * lire hors du tableau.
  */
-static void majuscules_utf8(char *s)
+const info_classe_t *classe_info(classe_t c)
 {
-    unsigned char *u = (unsigned char *)s;
+    return &classes[(unsigned)c < NB_CLASSES ? c : 0];
+}
 
-    for (int i = 0; u[i] != '\0'; i++) {
-        if (u[i] >= 'a' && u[i] <= 'z')
-            u[i] -= 32;
-        else if (u[i] == 0xC3 && u[i + 1] >= 0xA0 && u[i + 1] <= 0xBE
-            && u[i + 1] != 0xB7)
-            u[++i] -= 0x20;
-    }
+const char *nom_classe(classe_t c)
+{
+    return classe_info(c)->nom;
 }
 
 /** Nom en majuscules, calculé une fois par classe depuis classes[]. */
 const char *nom_classe_maj(classe_t c)
 {
     static char maj[NB_CLASSES][NOM_MAX];
+    int i = (unsigned)c < NB_CLASSES ? (int)c : 0;
 
-    if (maj[c][0] == '\0') {
-        my_strncpy(maj[c], classes[c].nom, NOM_MAX - 1);
-        majuscules_utf8(maj[c]);
+    if (maj[i][0] == '\0') {
+        snprintf(maj[i], sizeof(maj[i]), "%s", classes[i].nom);
+        utf8_majuscules(maj[i]);
     }
-    return maj[c];
+    return maj[i];
 }
 
 /** Couleur, nom et abréviation de chaque statistique (mêmes partout). */
@@ -52,26 +46,27 @@ sfColor couleur_stat(stat_t s)
 {
     const sfColor couleurs[NB_STATS] = {C_VERT, C_ROUGE, C_BLEU, C_SOIN};
 
-    return couleurs[s];
+    return couleurs[(unsigned)s < NB_STATS ? s : 0];
 }
 
 const char *nom_stat(stat_t s)
 {
     static const char *noms[NB_STATS] = {"POINTS DE VIE", "ATTAQUE", "DÉFENSE", "SOIN"};
 
-    return noms[s];
+    return noms[(unsigned)s < NB_STATS ? s : 0];
 }
 
 const char *abrege_stat(stat_t s)
 {
     static const char *noms[NB_STATS] = {"PV", "ATQ", "DEF", "SOI"};
 
-    return noms[s];
+    return noms[(unsigned)s < NB_STATS ? s : 0];
 }
 
 /** Même couleur que dans le terminal : le RGB central de classes[]. */
 sfColor couleur_classe(classe_t c)
 {
-    return (sfColor){classes[c].couleur.r, classes[c].couleur.g,
-        classes[c].couleur.b, 255};
+    const info_classe_t *info = classe_info(c);
+
+    return (sfColor){info->couleur.r, info->couleur.g, info->couleur.b, 255};
 }
