@@ -4,10 +4,14 @@
 */
 
 /*
- * Illustration de la carte découpée en hexagone : remplace l'emblème de la
- * classe partout où il apparaît (jetons de l'arène, fiches, menu, ordre des
- * tours) quand le mode Yu-Gi-Oh! est actif et que l'image a été chargée.
- */
+** ╭─ portrait.c ─────────────────────────────────────────────────────────
+** │ But         Illustration de la carte découpée en hexagone : elle
+** │             remplace l'emblème de la classe partout où il apparaît
+** │             (jetons de l'arène, fiches, menu, ordre des tours) quand
+** │             le mode Yu-Gi-Oh! est actif et que l'image est chargée.
+** │ Contenu     yugioh_portrait
+** ╰──────────────────────────────────────────────────────────────────────
+*/
 
 #include <math.h>
 #include "personnage.h"

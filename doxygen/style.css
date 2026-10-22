@@ -1,13 +1,506 @@
-/* Retouches légères : lisibilité avant tout */
-body, table, div, p, dl, .title, .memtitle, #projectname {
-  font-family: -apple-system, "Segoe UI", "Noto Sans", "Helvetica Neue", Arial, sans-serif;
+/*
+ * Habillage de la documentation RedStrings (par-dessus doxygen.css).
+ *
+ * Deux thèmes qui suivent le réglage du système : clair par défaut, sombre
+ * si le système le demande. Tout passe par les variables de :root ; pour
+ * changer une couleur, il suffit de la modifier là.
+ *
+ * Accent : le « fil rouge », sur un bleu nuit comme l'interface graphique.
+ */
+
+:root {
+  --fond: #ffffff;
+  --surface: #f6f7fb;
+  --surface-2: #eceff8;
+  --bord: #e2e6f1;
+  --texte: #1b2033;
+  --doux: #5a6482;
+  --accent: #e11d48;
+  --accent-doux: #ffe3ea;
+  --lien: #be123c;
+  --code-fond: #f1f3fa;
+  --ombre: 0 1px 2px rgba(20, 28, 60, .06), 0 4px 14px rgba(20, 28, 60, .05);
+  --c-mot: #8a3ffc;
+  --c-type: #0a7ea4;
+  --c-com: #6b7794;
+  --c-prepro: #b45309;
+  --c-chaine: #15803d;
+  --rayon: 10px;
+  --sans: system-ui, -apple-system, "Segoe UI", "Noto Sans", "Helvetica Neue", Arial, sans-serif;
+  --mono: "JetBrains Mono", "DejaVu Sans Mono", Menlo, Consolas, monospace;
 }
-div.contents { max-width: 980px; line-height: 1.55; }
-div.contents p, div.contents li { font-size: 15px; }
-#projectname { font-weight: 700; letter-spacing: .02em; }
-#projectbrief { opacity: .8; }
-.memtitle { border-radius: 4px 4px 0 0; }
-.memitem { border-radius: 4px; }
-table.doxtable th { background: #f3e7ea; }
-table.doxtable td, table.doxtable th { padding: 6px 10px; }
-code, .fragment, .memname { font-family: "DejaVu Sans Mono", Menlo, Consolas, monospace; }
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --fond: #0b0e1a;
+    --surface: #121629;
+    --surface-2: #1a2038;
+    --bord: #272e4d;
+    --texte: #e6eaff;
+    --doux: #9aa4c8;
+    --accent: #fb7185;
+    --accent-doux: #3a1522;
+    --lien: #7dd3fc;
+    --code-fond: #0f1324;
+    --ombre: 0 1px 2px rgba(0, 0, 0, .4), 0 6px 18px rgba(0, 0, 0, .3);
+    --c-mot: #c4a1ff;
+    --c-type: #67e8f9;
+    --c-com: #7c88ad;
+    --c-prepro: #fbbf6a;
+    --c-chaine: #86efac;
+  }
+  /* les petites icônes de l'arbre sont dessinées pour un fond clair */
+  #nav-tree img, #nav-tree .icon, .folder img, .icona img, #MSearchSelect img {
+    filter: invert(.85) hue-rotate(180deg);
+  }
+}
+
+/* ── Base ─────────────────────────────────────────────────────────── */
+
+html { color-scheme: light dark; }
+
+body, table, div, p, dl, #nav-tree, .title, .memtitle, #projectname {
+  font-family: var(--sans);
+}
+
+body {
+  background: var(--fond);
+  color: var(--texte);
+  font-size: 15px;
+  line-height: 1.6;
+}
+
+a, a:visited { color: var(--lien); text-decoration: none; }
+a:hover { text-decoration: underline; text-underline-offset: 3px; }
+a.el, a.elRef { font-weight: 600; }
+a.code, a.code:visited, a.line, a.line:visited { color: var(--lien); }
+
+code, tt, .memname, .fragment, div.line, pre.fragment, .memitem .memproto {
+  font-family: var(--mono);
+}
+code {
+  background: var(--code-fond);
+  border-radius: 5px;
+  padding: .08em .35em;
+  font-size: .9em;
+}
+
+hr { border: 0; border-top: 1px solid var(--bord); }
+
+/* ── Bandeau du haut ──────────────────────────────────────────────── */
+
+#top {
+  background: var(--surface);
+  border-top: 3px solid var(--accent);
+  border-bottom: 1px solid var(--bord);
+}
+#titlearea {
+  background: transparent;
+  border: 0;
+  padding: 10px 18px 8px;
+}
+#titlearea table { width: 100%; }
+#projectalign { padding-left: 0 !important; }
+#projectname {
+  font-size: 24px;
+  font-weight: 800;
+  letter-spacing: .01em;
+  color: var(--texte);
+}
+#projectnumber {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--accent);
+  background: var(--accent-doux);
+  border-radius: 999px;
+  padding: 2px 9px;
+  margin-left: 8px;
+  vertical-align: middle;
+}
+#projectbrief { color: var(--doux); font-size: 13px; padding-top: 2px; }
+
+/* ── Recherche ────────────────────────────────────────────────────── */
+
+#MSearchBox {
+  background: var(--fond);
+  border: 1px solid var(--bord);
+  border-radius: 999px;
+  box-shadow: none;
+  height: 32px;
+}
+#MSearchBox .left, #MSearchBox .right { background: none; }
+#MSearchField {
+  background: transparent;
+  color: var(--texte);
+  font-family: var(--sans);
+  font-size: 13px;
+}
+#MSearchField::placeholder { color: var(--doux); }
+#MSearchBox:focus-within { border-color: var(--accent); }
+#MSearchResultsWindow, #MSearchSelectWindow {
+  background: var(--surface);
+  border: 1px solid var(--bord);
+  border-radius: var(--rayon);
+  box-shadow: var(--ombre);
+}
+.SRResult .SREntry, .SRPage .SREntry { font-size: 13px; }
+a.SRSymbol, a.SRScope { color: var(--lien); }
+.SRStatus { color: var(--doux); }
+
+/* ── Panneau de navigation ────────────────────────────────────────── */
+
+#side-nav { background: var(--surface); border-right: 1px solid var(--bord); }
+#nav-tree {
+  background: var(--surface);
+  background-image: none;
+  padding-top: 8px;
+}
+#nav-tree .label { font-size: 13px; }
+#nav-tree a, #nav-tree .label a { color: var(--texte); font-weight: 500; }
+#nav-tree .item { border-radius: 6px; margin: 1px 6px; }
+#nav-tree .item:hover { background: var(--surface-2); }
+#nav-tree .selected {
+  background: var(--accent-doux);
+  background-image: none;
+  color: var(--texte);
+  text-shadow: none;
+  border-radius: 6px;
+}
+#nav-tree .selected a { color: var(--accent); font-weight: 700; }
+#nav-tree .arrow { color: var(--doux); }
+#splitbar, .ui-resizable-handle, .ui-resizable-e {
+  background: var(--bord) !important;
+  background-image: none !important;
+  width: 3px;
+  border: 0;
+}
+#splitbar:hover, .ui-resizable-e:hover { background: var(--accent) !important; }
+#nav-sync { opacity: .35; }
+#nav-sync:hover { opacity: 1; }
+
+/* ── Page ─────────────────────────────────────────────────────────── */
+
+#doc-content { background: var(--fond); }
+
+div.header {
+  background: var(--fond);
+  background-image: none;
+  border-bottom: 1px solid var(--bord);
+  padding: 14px 8px 4px;
+}
+div.headertitle { padding: 6px 22px 8px; }
+div.title {
+  font-size: 28px;
+  font-weight: 800;
+  line-height: 1.25;
+  color: var(--texte);
+  margin: 0;
+}
+div.summary { color: var(--doux); font-size: 12px; }
+div.summary a { color: var(--doux); }
+div.summary a:hover { color: var(--accent); }
+div.ingroups { padding-top: 4px; font-size: 12px; color: var(--doux); }
+div.ingroups a { color: var(--accent); font-weight: 600; }
+
+div.contents {
+  max-width: 1040px;
+  margin: 0;
+  padding: 18px 22px 40px;
+}
+div.contents p, div.contents li, div.textblock { font-size: 15px; }
+
+div.contents h1, div.contents h2, div.contents h3, div.contents h4 {
+  color: var(--texte);
+  font-weight: 750;
+  line-height: 1.3;
+  margin-top: 1.6em;
+}
+div.contents h1 { font-size: 24px; }
+div.contents h1:first-child { margin-top: 0; }
+div.contents h2 { font-size: 20px; }
+div.contents h3 { font-size: 17px; }
+
+/* ── Tableaux des déclarations (macros, structures, fonctions…) ───── */
+
+table.memberdecls {
+  width: 100%;
+  border-collapse: separate;
+  border-spacing: 0;
+  margin: 6px 0 4px;
+}
+tr.heading td { padding: 0; }
+h2.groupheader {
+  font-size: 15px;
+  font-weight: 800;
+  letter-spacing: .06em;
+  text-transform: uppercase;
+  color: var(--doux);
+  border: 0;
+  border-bottom: 2px solid var(--bord);
+  margin: 30px 0 8px;
+  padding: 0 0 6px;
+  position: relative;
+}
+h2.groupheader::after {
+  content: "";
+  position: absolute;
+  left: 0; bottom: -2px;
+  width: 44px; height: 2px;
+  background: var(--accent);
+}
+
+.memItemLeft, .memItemRight, .memTemplItemLeft, .memTemplItemRight,
+.mdescLeft, .mdescRight, .memTemplParams {
+  background: transparent;
+  border: 0;
+  padding: 6px 10px;
+}
+tr[class^="memitem"] > td { border-top: 1px solid var(--bord); }
+tr[class^="memitem"]:first-of-type > td, tr.heading + tr > td { border-top: 0; }
+.memItemLeft, .memTemplItemLeft {
+  color: var(--c-type);
+  font-family: var(--mono);
+  font-size: 13px;
+  white-space: nowrap;
+  text-align: right;
+}
+.memItemRight, .memTemplItemRight { font-family: var(--mono); font-size: 13px; }
+.memItemRight a.el, .memItemLeft a.el { font-weight: 700; }
+.mdescLeft, .mdescRight {
+  color: var(--doux);
+  font-family: var(--sans);
+  font-size: 14px;
+  padding-top: 0;
+  padding-bottom: 10px;
+}
+.memSeparator { border: 0 !important; line-height: 2px; font-size: 2px; }
+tr[class^="memitem"]:hover > td, tr[class^="memdesc"]:hover > td { background: var(--surface); }
+
+/* ── Documentation détaillée d'un membre ──────────────────────────── */
+
+h2.memtitle {
+  font-size: 17px;
+  font-weight: 750;
+  background: transparent;
+  background-image: none;
+  border: 0;
+  padding: 0;
+  margin: 28px 0 8px;
+  color: var(--texte);
+  text-shadow: none;
+  box-shadow: none;
+  border-radius: 0;
+}
+h2.memtitle .permalink { color: var(--accent); font-weight: 400; }
+
+.memitem {
+  background: var(--surface);
+  border: 1px solid var(--bord);
+  border-radius: var(--rayon);
+  box-shadow: var(--ombre);
+  margin: 0 0 8px;
+  overflow: hidden;
+}
+.memproto, .memproto table.memname {
+  background: var(--surface-2);
+  background-image: none;
+  border: 0;
+  text-shadow: none;
+  box-shadow: none;
+  border-radius: 0;
+}
+.memproto { padding: 10px 14px; border-bottom: 1px solid var(--bord); }
+.memname { font-size: 14px; font-weight: 600; color: var(--texte); }
+.memname td { padding: 1px 3px; }
+.memname a.el { color: var(--lien); }
+.paramtype { color: var(--c-type); white-space: nowrap; }
+.paramname { color: var(--texte); font-style: normal; }
+.paramname em { font-style: normal; font-weight: 700; }
+.memdoc {
+  background: var(--surface);
+  border: 0;
+  padding: 12px 16px 14px;
+  box-shadow: none;
+  border-radius: 0;
+}
+.memdoc p { margin: .5em 0; }
+
+/* « Paramètres », « Renvoie », « Voir aussi »… */
+dl.section { margin: 12px 0 0; }
+dl.section dt {
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+  color: var(--accent);
+  margin-bottom: 2px;
+}
+dl.section dd { margin-left: 0; padding-left: 0; }
+dl.section.note, dl.section.warning, dl.section.attention, dl.section.remark {
+  border-left: 4px solid var(--accent);
+  background: var(--accent-doux);
+  border-radius: 0 8px 8px 0;
+  padding: 8px 12px;
+}
+dl.section.note dd, dl.section.warning dd { margin: 0; }
+dl.params dt, dl.retval dt, dl.exception dt { color: var(--accent); }
+
+table.params { width: 100%; border-collapse: collapse; margin-top: 4px; }
+table.params td { padding: 3px 8px 3px 0; vertical-align: top; }
+table.params td.paramname {
+  font-family: var(--mono);
+  font-size: 13px;
+  font-weight: 700;
+  white-space: nowrap;
+  color: var(--texte);
+  width: 1%;
+}
+table.params td.paramdir { color: var(--doux); font-family: var(--mono); font-size: 12px; }
+table.params tr + tr td { border-top: 1px dashed var(--bord); }
+
+/* Champs d'une structure, valeurs d'une énumération */
+table.fieldtable {
+  width: 100%;
+  border: 1px solid var(--bord);
+  border-radius: 8px;
+  border-collapse: separate;
+  border-spacing: 0;
+  overflow: hidden;
+  box-shadow: none;
+  margin: 8px 0;
+}
+table.fieldtable th {
+  background: var(--surface-2);
+  background-image: none;
+  color: var(--doux);
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+  text-align: left;
+  border: 0;
+  border-bottom: 1px solid var(--bord);
+  padding: 7px 12px;
+}
+table.fieldtable td {
+  background: transparent;
+  border: 0;
+  border-top: 1px solid var(--bord);
+  padding: 6px 12px;
+  vertical-align: top;
+}
+table.fieldtable tr:first-child td { border-top: 0; }
+table.fieldtable tr, table.fieldtable td, table.fieldtable th { border-color: var(--bord) !important; }
+table.fieldtable td.fieldtype { color: var(--c-type); font-family: var(--mono); font-size: 13px; white-space: nowrap; }
+table.fieldtable td.fieldname { font-family: var(--mono); font-size: 13px; font-weight: 700; white-space: nowrap; }
+table.fieldtable td.fielddoc { color: var(--doux); }
+table.fieldtable td.fielddoc p { margin: 0; }
+
+/* ── Tableaux Markdown, listes, citations ─────────────────────────── */
+
+table.doxtable, table.markdownTable {
+  border-collapse: separate;
+  border-spacing: 0;
+  width: 100%;
+  margin: 12px 0;
+  border: 1px solid var(--bord);
+  border-radius: var(--rayon);
+  overflow: hidden;
+  box-shadow: var(--ombre);
+}
+table.doxtable th, table.markdownTable th {
+  background: var(--surface-2);
+  color: var(--texte);
+  text-align: left;
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: .06em;
+  text-transform: uppercase;
+  padding: 9px 12px;
+  border: 0;
+  border-bottom: 1px solid var(--bord);
+}
+table.doxtable td, table.markdownTable td {
+  padding: 9px 12px;
+  border: 0;
+  border-top: 1px solid var(--bord);
+  vertical-align: top;
+}
+table.doxtable tr:first-child td, table.markdownTable tr:first-child td { border-top: 0; }
+table.doxtable tbody tr:hover td { background: var(--surface); }
+
+div.contents ul, div.contents ol { padding-left: 1.4em; }
+div.contents li::marker { color: var(--accent); }
+blockquote {
+  border-left: 4px solid var(--accent);
+  background: var(--surface);
+  margin: 12px 0;
+  padding: 8px 14px;
+  border-radius: 0 8px 8px 0;
+  color: var(--doux);
+}
+
+/* ── Code ─────────────────────────────────────────────────────────── */
+
+div.fragment, pre.fragment {
+  background: var(--code-fond);
+  border: 1px solid var(--bord);
+  border-radius: var(--rayon);
+  padding: 10px 14px;
+  margin: 10px 0;
+  font-size: 13px;
+  line-height: 1.5;
+  overflow-x: auto;
+}
+div.line { font-size: 13px; line-height: 1.5; color: var(--texte); }
+div.line.glow { background: var(--accent-doux); box-shadow: none; }
+span.keyword, span.keywordflow { color: var(--c-mot); font-weight: 600; }
+span.keywordtype { color: var(--c-type); }
+span.comment { color: var(--c-com); font-style: italic; }
+span.preprocessor { color: var(--c-prepro); }
+span.stringliteral, span.charliteral { color: var(--c-chaine); }
+span.lineno { color: var(--doux); background: transparent; border-right: 1px solid var(--bord); }
+
+/* ── Index, fichiers, hiérarchie ──────────────────────────────────── */
+
+table.directory { border: 1px solid var(--bord); border-radius: var(--rayon); border-collapse: separate; border-spacing: 0; overflow: hidden; width: 100%; }
+table.directory tr { background: transparent; }
+table.directory td { border: 0; padding: 6px 10px; }
+table.directory tr + tr td { border-top: 1px solid var(--bord); }
+table.directory tr:hover td { background: var(--surface); }
+table.directory td.desc { color: var(--doux); }
+.directory .levels, .directory .levels span { color: var(--doux); }
+table.classindex td, .classindex a { font-size: 14px; }
+
+/* ── Pied de page ─────────────────────────────────────────────────── */
+
+#nav-path, .navpath { background: var(--surface); border-top: 1px solid var(--bord); }
+.navpath ul {
+  background: var(--surface);
+  background-image: none;
+  border: 0;
+  height: 28px;
+  line-height: 28px;
+  color: var(--doux);
+}
+.navpath li { color: var(--doux); font-size: 12px; background: none; }
+.navpath li.navelem a { color: var(--doux); height: auto; }
+.navpath li.navelem a:hover { color: var(--accent); }
+.navpath li.footer { color: var(--doux); }
+.navpath li.footer a { color: var(--doux); }
+li.navelem::before, .navpath li.navelem {
+  background-image: none;
+}
+/* logo Doxygen : petit, discret, sans la teinte rosée */
+img.footer { height: 16px; width: auto; vertical-align: middle; filter: grayscale(1); opacity: .55; }
+
+/* ── Détails ──────────────────────────────────────────────────────── */
+
+::selection { background: var(--accent); color: #fff; }
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+@media (max-width: 800px) {
+  div.contents { padding: 14px 14px 32px; }
+  div.title { font-size: 23px; }
+  .memItemLeft { white-space: normal; }
+}

@@ -4,9 +4,13 @@
 */
 
 /*
- * Finitions des cartes en perspective : lumière qui court sur le cadre, et
- * nom de la classe écrit en clair sur les petites cartes.
- */
+** ╭─ carte3d_finitions.c ────────────────────────────────────────────────
+** │ But         Finitions des cartes en perspective : lumière qui court
+** │             sur le cadre, et nom de la classe écrit en clair sur les
+** │             petites cartes.
+** │ Contenu     tour, carte3d_bord_lumineux, carte3d_titre
+** ╰──────────────────────────────────────────────────────────────────────
+*/
 
 #include <math.h>
 #include "personnage.h"

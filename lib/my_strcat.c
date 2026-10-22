@@ -2,6 +2,14 @@
 **
 */
 
+/*
+** ╭─ my_strcat.c ────────────────────────────────────────────────────────
+** │ But         Coller src à la fin de dest.
+** │ Utilise     my_strlen
+** │ Attention   dest doit avoir la place pour les deux chaînes
+** ╰──────────────────────────────────────────────────────────────────────
+*/
+
 #include "my.h"
 #include "my_string.h"
 

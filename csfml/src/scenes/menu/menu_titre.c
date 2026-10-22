@@ -4,8 +4,13 @@
 */
 
 /*
- * Menu : logo animé, fil rouge, rappel des touches et crédit de la direction visuelle.
- */
+** ╭─ menu_titre.c ───────────────────────────────────────────────────────
+** │ But         Menu : logo animé, fil rouge, rappel des touches et
+** │             crédit de la direction visuelle.
+** │ Contenu     menu_fil_rouge, cadre_logo, menu_titre, menu_aide_menu,
+** │             menu_credit_claude
+** ╰──────────────────────────────────────────────────────────────────────
+*/
 
 #include <math.h>
 #include "my_string.h"

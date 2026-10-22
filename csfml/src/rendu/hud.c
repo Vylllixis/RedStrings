@@ -4,8 +4,14 @@
 */
 
 /*
- * Panneaux biseautés, crochets, losanges, hexagones, titres de section et touches de clavier.
- */
+** ╭─ hud.c ──────────────────────────────────────────────────────────────
+** │ But         Éléments d'interface « tableau de bord » : panneaux
+** │             biseautés, crochets, losanges, hexagones, titres de
+** │             section et touches de clavier.
+** │ Contenu     contour_biseau, panneau, ombre_biseau, crochets, losange,
+** │             hexagone, titre_section, largeur_touche, touche_clavier
+** ╰──────────────────────────────────────────────────────────────────────
+*/
 
 #include <math.h>
 #include "gui_anim.h"

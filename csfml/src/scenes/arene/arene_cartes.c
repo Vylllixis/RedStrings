@@ -4,12 +4,16 @@
 */
 
 /*
- * Arène, mode Yu-Gi-Oh! : les cartes accompagnent le combat sans jamais le
- * piloter. Invocation à l'entrée (la carte se retourne puis se fond dans le
- * jeton), carte activée quand le moteur joue une attaque, un soin ou une
- * garde, cartes de ton équipe à la fin. Tout suit les événements déjà
- * résolus par bataille.c.
- */
+** ╭─ arene_cartes.c ─────────────────────────────────────────────────────
+** │ But         Arène, mode Yu-Gi-Oh! : les cartes accompagnent le combat
+** │             sans jamais le piloter. Invocation à l'entrée, carte
+** │             activée quand le moteur joue une attaque, un soin ou une
+** │             garde, cartes de ton équipe à la fin.
+** │ Règle       tout suit les événements déjà résolus par bataille.c
+** │ Contenu     invoquer, arene_cartes_invocation, action_de,
+** │             arene_carte_action, arene_cartes_fin
+** ╰──────────────────────────────────────────────────────────────────────
+*/
 
 #include <math.h>
 #include "personnage.h"

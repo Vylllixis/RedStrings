@@ -4,10 +4,15 @@
 */
 
 /*
- * Grille de cartes de personnage (liste, composition des équipes) : choisit
- * son nombre de colonnes et son échelle selon la place visible, sans jamais
- * déformer les cartes ; la souris suit la même mise à l'échelle.
- */
+** ╭─ grille.c ───────────────────────────────────────────────────────────
+** │ But         Grille de cartes de personnage (liste, composition des
+** │             équipes) : choisit son nombre de colonnes et son échelle
+** │             selon la place visible, sans jamais déformer les cartes ;
+** │             la souris suit la même mise à l'échelle.
+** │ Contenu     chercher_marque, disposer_grille, grille_vers_ecran,
+** │             grille_cartes
+** ╰──────────────────────────────────────────────────────────────────────
+*/
 
 #include <math.h>
 #include "gui_anim.h"
@@ -33,11 +38,16 @@ static const marque_t *chercher_marque(const marque_t *marques, int nb, int id)
     return NULL;
 }
 
-/**
- * Nombre de colonnes et échelle de la grille : la plus grande échelle (au
- * plus 1, à égalité le plus de colonnes) qui fait tenir les `n` cartes dans
- * la zone visible. Les cartes gardent leurs proportions.
- */
+/*
+** ╭─ disposer_grille ────────────────────────────────────────────────────
+** │ Choisit le nombre de colonnes et l'échelle de la grille.
+** │
+** │ 1. essaie de GRILLE_COLONNES_MAX colonnes jusqu'à 1
+** │ 2. pour chacune, calcule l'échelle qui fait tenir les `n` cartes dans
+** │    la zone visible (au plus 1, proportions gardées)
+** │ 3. garde la plus grande échelle ; à égalité, le plus de colonnes
+** ╰──────────────────────────────────────────────────────────────────────
+*/
 static void disposer_grille(const app_t *app, grille_t *g, int n, float y0)
 {
     sfFloatRect e = ecran_visible(app);
@@ -69,7 +79,22 @@ sfVector2f grille_vers_ecran(const grille_t *g, sfVector2f p)
         g->pivot.y + (p.y - g->pivot.y) * k};
 }
 
-/** Grille de cartes animée et centrée, adaptée à la place visible. Renvoie l'id cliqué ou -1. */
+/*
+** ╭─ grille_cartes ──────────────────────────────────────────────────────
+** │ Dessine la grille animée de cartes. Renvoie l'id de la carte cliquée,
+** │ ou -1.
+** │
+** │ 1. disposer_grille() choisit colonnes et zoom ; zoom_debut() /
+** │    zoom_fin() encadrent le dessin, et la souris suit le même zoom
+** │ 2. pour chaque carte : position cible (centrée ligne par ligne) ; la
+** │    position réelle s'en approche avec approcher(), donc les cartes
+** │    glissent quand la grille change
+** │ 3. survol : curseur main, ressort de soulèvement ; clic : l'id est
+** │    mémorisé
+** │ 4. entrée en cascade : chaque carte arrive avec un rebond, un peu
+** │    après la précédente
+** ╰──────────────────────────────────────────────────────────────────────
+*/
 int grille_cartes(app_t *app, grille_t *g, const int *ids, int n, float y0,
     const marque_t *marques, int nb_marques)
 {

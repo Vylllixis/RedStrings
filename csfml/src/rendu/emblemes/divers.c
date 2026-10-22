@@ -4,8 +4,13 @@
 */
 
 /*
- * Emblèmes des classes de soutien et d'ingénierie : ancre, croix, note, fiole, engrenage.
- */
+** ╭─ divers.c ───────────────────────────────────────────────────────────
+** │ But         Emblèmes des classes de soutien et d'ingénierie : ancre,
+** │             croix, note, fiole, engrenage.
+** │ Contenu     emb_d_ancre, emb_d_croix, emb_d_note, emb_d_fiole,
+** │             emb_d_engrenage
+** ╰──────────────────────────────────────────────────────────────────────
+*/
 
 #include <math.h>
 #include "gui_anim.h"

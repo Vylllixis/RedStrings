@@ -2,6 +2,14 @@
 **
 */
 
+/*
+** ╭─ my_rev_params.c ────────────────────────────────────────────────────
+** │ But         Comme my_print_params, mais du dernier argument au
+** │             premier.
+** │ Utilise     my_putstr, my_putchar
+** ╰──────────────────────────────────────────────────────────────────────
+*/
+
 #include "my.h"
 
 int my_rev_params(int ac, char **av)

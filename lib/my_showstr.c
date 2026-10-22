@@ -2,6 +2,14 @@
 **
 */
 
+/*
+** ╭─ my_showstr.c ───────────────────────────────────────────────────────
+** │ But         Écrire une chaîne ; un caractère non imprimable (hors
+** │             ASCII 32 à 126) est écrit « \ » suivi de son code.
+** │ Utilise     my_putchar, my_put_nbr
+** ╰──────────────────────────────────────────────────────────────────────
+*/
+
 #include "my.h"
 
 int my_showstr(char const *str)

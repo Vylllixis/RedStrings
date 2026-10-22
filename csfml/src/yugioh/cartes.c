@@ -4,11 +4,17 @@
 */
 
 /*
- * Correspondance entre chaque classe et une carte de monstre Yu-Gi-Oh!.
- * Le choix suit le rôle de la classe (description, catégorie, statistiques),
- * jamais seulement l'illustration ; chaque carte n'est utilisée qu'une fois.
- * Données des cartes (cadre, attribut, niveau) relevées sur db.ygoprodeck.com.
- */
+** ╭─ cartes.c ───────────────────────────────────────────────────────────
+** │ But         Correspondance entre chaque classe et une carte de
+** │             monstre Yu-Gi-Oh! : le choix suit le rôle de la classe
+** │             (description, catégorie, statistiques), jamais seulement
+** │             l'illustration ; chaque carte n'est utilisée qu'une fois.
+** │ Données     cadre, attribut et niveau relevés sur db.ygoprodeck.com
+** │ Contenu     carte_de_classe, couleur_cadre, encre_cadre, fond_titre,
+** │             nom_cadre, couleur_attribut, nom_attribut,
+** │             symbole_attribut
+** ╰──────────────────────────────────────────────────────────────────────
+*/
 
 #include "personnage.h"
 #include "gui_anim.h"

@@ -4,8 +4,14 @@
 */
 
 /*
- * Noms, abréviations et couleurs des classes et des statistiques.
- */
+** ╭─ libelles.c ─────────────────────────────────────────────────────────
+** │ But         Noms, abréviations et couleurs des classes et des
+** │             statistiques. Tout vient de la table classes[] partagée
+** │             avec la console.
+** │ Contenu     classe_info, nom_classe, nom_classe_maj, couleur_stat,
+** │             nom_stat, abrege_stat, couleur_classe
+** ╰──────────────────────────────────────────────────────────────────────
+*/
 
 #include <stdio.h>
 #include "personnage.h"

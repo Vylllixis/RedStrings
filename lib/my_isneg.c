@@ -2,6 +2,13 @@
 **
 */
 
+/*
+** ╭─ my_isneg.c ─────────────────────────────────────────────────────────
+** │ But         Dire si un nombre est négatif : 1 si oui, 0 sinon.
+** │ Attention   la fonction s'appelle isneg
+** ╰──────────────────────────────────────────────────────────────────────
+*/
+
 #include "my.h"
 
 int isneg(int n)

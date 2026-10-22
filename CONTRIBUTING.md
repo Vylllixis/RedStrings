@@ -49,6 +49,20 @@ Si tu modifies une règle du jeu, ajoute ou adapte un test dans `tests/tests.c`.
 | Headers | un header par thème, chacun doit compiler seul ; chaque `.c` n'inclut que ce qu'il utilise |
 | Copies de chaînes | toujours bornées (`snprintf`, taille passée avec le pointeur), jamais `strcpy` |
 | Retours à vérifier | `malloc`, `realloc`, `fopen`, créations SFML : un échec ne doit jamais faire planter |
+| Commentaires d'un `.c` | une boîte en tête du fichier (but, contenu), et une boîte seulement devant les fonctions importantes (leur fonctionnement en étapes) ; pas de commentaire Doxygen dans les `.c` |
+
+**Format des boîtes de commentaire** (sans bordure droite, pour rester faciles à modifier à la main) :
+
+```c
+/*
+** ╭─ roster.c ────────────────────────────────────────────────
+** │ But         La liste des personnages : un tableau qui grandit seul.
+** │ Contenu     roster_init, roster_ajouter, roster_liberer
+** ╰───────────────────────────────────────────────────────────
+*/
+```
+
+Devant une fonction importante, la même boîte porte son nom en titre : une phrase qui dit ce qu'elle fait, puis les étapes numérotées. Les prototypes publics, eux, restent documentés dans les `.h`.
 
 **Le moteur ne dépend d'aucune interface.** `src/personnage/` (classes, combat, `bataille.c`, sauvegarde) ne contient ni `printf` ni appel SFML : la console et la fenêtre le partagent. Les animations ne décident jamais d'un résultat ; elles jouent des événements déjà résolus par le moteur.
 

@@ -3,6 +3,17 @@
 ** PROJET FIL ROUGE C Avancé
 */
 
+/*
+** ╭─ scene_liste.c ──────────────────────────────────────────────────────
+** │ But         Écran « Afficher un personnage » : recherche par nom,
+** │             grille des personnages et fiche plein écran.
+** │ Équivaut à  demander_personnage() et afficher_personnage() de la
+** │             console
+** │ Contenu     entrer_liste, filtrer, valider, naviguer, clavier_modal,
+** │             boutons_modal, carte_fiche, modal, recherche, scene_liste
+** ╰──────────────────────────────────────────────────────────────────────
+*/
+
 #include <math.h>
 #include <stdio.h>
 #include <string.h>

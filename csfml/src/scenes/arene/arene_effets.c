@@ -4,8 +4,13 @@
 */
 
 /*
- * Arène : effets visuels des actions (impacts par catégorie, rayon de soin).
- */
+** ╭─ arene_effets.c ─────────────────────────────────────────────────────
+** │ But         Arène : effets visuels des actions (un impact différent
+** │             par catégorie, rayon de soin).
+** │ Contenu     impact_corps_a_corps, impact_magie, impact_distance,
+** │             impact_soutien, bezier, rayon_soin, arene_dessiner_effet
+** ╰──────────────────────────────────────────────────────────────────────
+*/
 
 #include <math.h>
 #include "personnage.h"

@@ -4,8 +4,13 @@
 */
 
 /*
- * Création : hologramme de la classe, avec une aura propre à chaque catégorie.
- */
+** ╭─ creation_hologramme.c ──────────────────────────────────────────────
+** │ But         Création : hologramme de la classe, avec une aura propre
+** │             à chaque catégorie.
+** │ Contenu     aura_guerrier, aura_mage, aura_archer, aura_soutien,
+** │             projecteur, creation_suivre_classe, creation_hologramme
+** ╰──────────────────────────────────────────────────────────────────────
+*/
 
 #include <math.h>
 #include "personnage.h"

@@ -2,6 +2,13 @@
 **
 */
 
+/*
+** ╭─ my_strlowcase.c ────────────────────────────────────────────────────
+** │ But         Passer une chaîne en minuscules ; les autres caractères
+** │             ne changent pas.
+** ╰──────────────────────────────────────────────────────────────────────
+*/
+
 #include "my.h"
 #include "my_string.h"
 

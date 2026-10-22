@@ -4,8 +4,13 @@
 */
 
 /*
- * Formes de base : rectangles arrondis, ombres, halos, cercles, polygones, lignes épaisses.
- */
+** ╭─ formes.c ───────────────────────────────────────────────────────────
+** │ But         Formes de base : rectangles arrondis, ombres, halos,
+** │             cercles, polygones, lignes épaisses.
+** │ Contenu     rect_arrondi, rect_arrondi_bord, ombre, lueur, cercle,
+** │             polygone, ligne_epaisse
+** ╰──────────────────────────────────────────────────────────────────────
+*/
 
 #include <math.h>
 #include "gui_anim.h"

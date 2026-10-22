@@ -2,6 +2,14 @@
 **
 */
 
+/*
+** ╭─ my_is_prime.c ──────────────────────────────────────────────────────
+** │ But         Dire si nb est premier (1) ou non (0) : on teste les
+** │             diviseurs seulement jusqu'à la racine carrée (i x i <=
+** │             nb).
+** ╰──────────────────────────────────────────────────────────────────────
+*/
+
 #include "my.h"
 
 int my_is_prime(int nb)

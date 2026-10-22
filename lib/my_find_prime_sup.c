@@ -2,6 +2,14 @@
 **
 */
 
+/*
+** ╭─ my_find_prime_sup.c ────────────────────────────────────────────────
+** │ But         Trouver le plus petit nombre premier supérieur ou égal à
+** │             nb.
+** │ Utilise     my_is_prime
+** ╰──────────────────────────────────────────────────────────────────────
+*/
+
 #include "my.h"
 
 int my_find_prime_sup(int nb)

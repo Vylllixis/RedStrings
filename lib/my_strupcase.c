@@ -2,6 +2,14 @@
 **
 */
 
+/*
+** ╭─ my_strupcase.c ─────────────────────────────────────────────────────
+** │ But         Passer une chaîne en majuscules ; les autres caractères
+** │             ne changent pas (en ASCII, une minuscule vaut sa
+** │             majuscule + 32).
+** ╰──────────────────────────────────────────────────────────────────────
+*/
+
 #include "my.h"
 #include "my_string.h"
 
