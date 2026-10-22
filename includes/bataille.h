@@ -19,13 +19,13 @@
     #include "personnage.h"
 
     #define NB_EQUIPES 2
-    #define TAILLE_EQUIPE_MAX 4         /* combattants par équipe */
-    #define MAX_EFFETS 4                /* effets temporaires par combattant */
-    #define MAX_EVENEMENTS 16           /* événements produits par une action */
-    #define JOURNAL_MAX 8               /* lignes de journal conservées */
+    #define TAILLE_EQUIPE_MAX 4         /**< combattants par équipe */
+    #define MAX_EFFETS 4                /**< effets temporaires par combattant */
+    #define MAX_EVENEMENTS 16           /**< événements produits par une action */
+    #define JOURNAL_MAX 8               /**< lignes de journal conservées */
     #define JOURNAL_LIGNE 96
-    #define GARDE_REDUCTION 50          /* % de dégâts absorbés en garde */
-    #define GARDE_DUREE 1               /* expire au début du tour suivant */
+    #define GARDE_REDUCTION 50          /**< % de dégâts absorbés en garde */
+    #define GARDE_DUREE 1               /**< expire au début du tour suivant */
 
 typedef enum {
     ACTION_ATTAQUER,
