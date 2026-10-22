@@ -3,6 +3,19 @@
 ** PROJET FIL ROUGE C Avancé
 */
 
+/*
+** ╭─ anim.c ─────────────────────────────────────────────────────────────
+** │ But         Petits calculs d'animation et de couleur : bornes,
+** │             interpolation, courbes d'accélération, ressort, mélange
+** │             de couleurs.
+** │ Contenu     bornerf, lerpf, progression, sortie_cubique,
+** │             entree_cubique, entree_sortie_cubique, sortie_rebond,
+** │             approcher, maj_ressort, aleatoire, avec_alpha, melanger,
+** │             griser
+** │ Testé par   csfml/tests/tests.c
+** ╰──────────────────────────────────────────────────────────────────────
+*/
+
 #include <math.h>
 #include <stdlib.h>
 #include "gui_anim.h"
@@ -57,12 +70,33 @@ float sortie_rebond(float t)
     return 1.f + c3 * t * t * t + c1 * t * t;
 }
 
-/** Lissage exponentiel indépendant du framerate. */
+/*
+** ╭─ approcher ──────────────────────────────────────────────────────────
+** │ Lissage exponentiel : `actuel` se rapproche de `cible`, de plus en
+** │ plus lentement.
+** │
+** │ valeur = cible + (actuel - cible) x e^(-vitesse x dt)
+** │ Le résultat ne dépend pas du nombre d'images par seconde : à 30 ou à
+** │ 144 images/s, le mouvement dure pareil. Sert aux survols et aux
+** │ positions animées.
+** ╰──────────────────────────────────────────────────────────────────────
+*/
 float approcher(float actuel, float cible, float vitesse, float dt)
 {
     return cible + (actuel - cible) * expf(-vitesse * dt);
 }
 
+/*
+** ╭─ maj_ressort ────────────────────────────────────────────────────────
+** │ Ressort amorti : un mouvement organique (léger dépassement, puis
+** │ stabilisation).
+** │
+** │ acc = (cible - x) x raideur - v x amorti ; puis v += acc x dt ; x +=
+** │ v x dt
+** │ Plus la raideur est grande, plus il rattrape vite ; plus l'amorti est
+** │ grand, moins il oscille.
+** ╰──────────────────────────────────────────────────────────────────────
+*/
 void maj_ressort(ressort_t *r, float cible, float raideur, float amorti,
     float dt)
 {
