@@ -2,13 +2,19 @@
 
 Ce fichier recense ce que RedStrings utilise sans l'avoir écrit. Il décrit l'état du dépôt ; il ne remplace pas les licences d'origine.
 
+## Périmètre de la licence MIT
+
+Le fichier [`LICENSE`](LICENSE) (MIT, © 2026 Vyllixis) couvre **le code source écrit pour RedStrings** et la documentation du dépôt. Il ne couvre **aucune** des ressources listées ci-dessous, qui restent soumises à leurs propres conditions.
+
+**Compatibilité.** CSFML et SFML sont sous licence zlib/libpng : permissive, compatible avec la licence MIT. Elles sont liées dynamiquement et ne sont pas copiées dans le dépôt, donc leur licence n'impose rien de plus au code de RedStrings. Les polices sont des fichiers de données séparés, chargés à l'exécution : elles ne sont pas relicenciées et gardent leurs conditions.
+
 ## Embarqué dans le dépôt
 
 ### Polices (`csfml/assets/fonts/`)
 
 | Fichier | Police | Auteurs et licence |
 |---|---|---|
-| `NotoSans-Regular.ttf`, `NotoSans-Bold.ttf` | Noto Sans, version 2.004 | « Copyright 2015 Google LLC » (mention lue dans le fichier de police). Les polices Noto sont diffusées par leurs auteurs sous **SIL Open Font License 1.1** ; cette licence n'est pas écrite dans les fichiers : **à confirmer sur le dépôt officiel de Noto** avant toute redistribution séparée. |
+| `NotoSans-Regular.ttf`, `NotoSans-Bold.ttf` | Noto Sans, version 2.004 | « Copyright 2015 Google LLC » (mention lue dans le fichier de police). Licence : **SIL Open Font License 1.1**, selon le dépôt officiel du projet Noto ([notofonts/latin-greek-cyrillic, `OFL.txt`](https://github.com/notofonts/latin-greek-cyrillic/blob/main/OFL.txt)). Le fichier de police ne contient pas le texte de la licence : une copie de ce texte officiel est fournie dans [`csfml/assets/fonts/OFL.txt`](csfml/assets/fonts/OFL.txt) (son en-tête porte le copyright du dépôt actuel, « 2022 The Noto Project Authors »). La licence autorise l'usage et la redistribution avec un programme, sans modification du nom ni vente de la police seule. |
 | `DejaVuSans-Bold.ttf` | DejaVu Sans Bold | « Copyright (c) 2003 by Bitstream, Inc. », « Copyright (c) 2006 by Tavmjong Bah » ; les modifications DejaVu sont dans le domaine public. Licence des polices **Bitstream Vera** (texte complet intégré au fichier de police et à <https://dejavu-fonts.github.io/License.html>) : redistribution libre, y compris avec un programme, à condition de conserver les mentions de copyright ; interdiction de vendre les polices seules ; une version modifiée doit changer de nom. |
 
 Ces polices sont utilisées telles quelles, non modifiées.
@@ -31,7 +37,7 @@ CSFML et SFML sont installées par le gestionnaire de paquets (`libcsfml-dev`) e
 
 Le mode caché de la version graphique affiche, pour chaque classe, l'illustration d'une carte de *Yu-Gi-Oh! Trading Card Game*.
 
-- **Les images ne sont pas dans ce dépôt** (ignorées par `.gitignore`). Elles appartiennent à leurs ayants droit (Kazuki Takahashi, Konami). Le script `csfml/assets/yugioh/telecharger.sh` les télécharge **en local** depuis la base YGOPRODeck pour un usage personnel ; ce dépôt n'accorde aucun droit sur elles.
+- **Les images ne sont pas dans ce dépôt** (ignorées par `.gitignore`) **et ne sont pas couvertes par la licence MIT.** Elles appartiennent à leurs ayants droit (Kazuki Takahashi, Konami). Le script `csfml/assets/yugioh/telecharger.sh` les télécharge **en local** depuis la base YGOPRODeck pour un usage personnel ; ce dépôt n'accorde aucun droit sur elles.
 - Le code ne contient que des références factuelles (nom et numéro de chaque carte, cadre, attribut, niveau) dans `csfml/src/yugioh/cartes.c`.
 - *Yu-Gi-Oh!* est une marque de ses propriétaires. RedStrings est un projet étudiant sans lien avec Konami ni avec les auteurs de la série, et ne prétend pas à leur approbation.
 - Le nom officiel d'une carte ne remplace jamais celui d'une classe à l'écran.
