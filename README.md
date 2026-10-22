@@ -838,6 +838,7 @@ Sans elles, le mode fonctionne quand même : chaque carte montre l'emblème de s
 | `make debug` | `./redstrings_debug` avec `-g3 -O0 -fsanitize=address,undefined` |
 | `make tests` | compile et lance les tests unitaires (avec les sanitizers) |
 | `make csfml` | compile `./redstrings_csfml` |
+| `make doc` | génère la documentation de l'API en HTML dans `docs/` (demande Doxygen : `sudo apt install doxygen`) |
 | `make csfml-debug` | `./redstrings_csfml_debug` avec les sanitizers |
 | `make csfml-tests` | tests de la version graphique, sans fenêtre (UTF-8, animation, classes) |
 | `make clean` | supprime les `.o` |
@@ -1004,7 +1005,7 @@ Ouvre une [issue](https://github.com/Vylllixis/RedStrings/issues/new/choose) : d
 - **Plein écran : seules les fonctions de bascule ont été exercées**, par un programme de test qui les appelle directement. Les vraies touches <kbd>F11</kbd> et <kbd>Alt</kbd>+<kbd>Entrée</kbd> n'ont pas été essayées à la main.
 - **Mode `"Yu-Gi-Oh!"`** : les illustrations ne sont pas dans le dépôt (droits). Il faut lancer `sh csfml/assets/yugioh/telecharger.sh`, sinon chaque carte montre l'emblème de sa classe. Voir [`THIRD_PARTY_NOTICES.md`](THIRD_PARTY_NOTICES.md).
 - **Pas encore de compétences spéciales, d'attaques de zone ni d'effets de statut** (le moteur a déjà `effet_t` pour les accueillir).
-- **Pas de documentation Doxygen** : `make doc` n'existe pas.
+- **Documentation de l'API** : `make doc` génère un HTML sobre des interfaces publiques (`.h`) dans `docs/` ; les fichiers `.c` ne sont pas documentés au format Doxygen.
 
 <a id="licence"></a>
 
