@@ -727,6 +727,8 @@ pie showData
 
 ## 08 · Installer et compiler
 
+> Pour une prise en main rapide (compiler, lancer, vérifier), voir [`RENDU.md`](RENDU.md).
+
 ```bash
 git clone https://github.com/Vylllixis/RedStrings.git
 cd RedStrings
@@ -910,7 +912,7 @@ make tests
 
 ### Le flux de travail
 
-Le dépôt suit **git flow** : chaque changement vit sur sa propre branche partie de `develop`, puis y est fusionné avec `--no-ff`. `main` ne reçoit que les versions publiées (`v0.1.0` → `v1.4.2`).
+Le dépôt suit **git flow** : chaque changement vit sur sa propre branche partie de `develop`, puis y est fusionné avec `--no-ff`. `main` ne reçoit que les versions publiées (`v0.1.0` → `v1.5.0`).
 
 ```mermaid
 gitGraph
