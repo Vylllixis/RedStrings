@@ -23,7 +23,7 @@ from xml.sax.saxutils import escape
 RACINE = os.path.normpath(os.path.join(os.path.dirname(__file__), "..", "..", ".."))
 SORTIE = os.path.join(RACINE, ".github", "readme")
 
-# ── Palette du jeu (csfml/include/gui.h) ───────────────────────────────
+# ── Palette du jeu (csfml/include/gui_config.h) ───────────────────────────────
 FOND = "#090b18"
 SURFACE = "#161a2e"
 SURFACE_HAUTE = "#212744"
@@ -82,7 +82,7 @@ def lire_classes():
 CATEGORIES = [("CAT_CORPS_A_CORPS", "CORPS À CORPS"), ("CAT_MAGIE", "MAGIE"),
               ("CAT_DISTANCE", "DISTANCE"), ("CAT_SOUTIEN", "SOUTIEN")]
 
-# Valeurs par défaut de l'écran de création (csfml/src/scene_creation.c).
+# Valeurs par défaut de l'écran de création (csfml/src/scenes/creation/scene_creation.c).
 BASE_CREATION = [50, 30, 20, 20]
 
 
@@ -840,10 +840,10 @@ def architecture():
               + noeud(650, 184, 210, 52, "combat.c", "calculer_degats()", ROUGE, .65)
               + noeud(420, 256, 210, 52, "roster.c", "tableau dynamique", ROUGE, .7)
               + noeud(650, 256, 210, 52, "sauvegarde.c", "6 champs + migration", ROUGE, .75)
-              + noeud(976, 112, 260, 52, "scene_bataille.c", "arène, animations", VERT, .8)
-              + noeud(976, 184, 260, 52, "scene_combat.c", "composition des équipes", VERT, .9)
-              + noeud(976, 256, 260, 52, "scene_creation.c", "création, hologramme", VERT, 1.0)
-              + noeud(976, 328, 260, 52, "hud.c · emblemes.c", "panneaux, 20 emblèmes", VERT, 1.1)
+              + noeud(976, 112, 260, 52, "scenes/arene/", "arène : décor, combattants, effets", VERT, .8)
+              + noeud(976, 184, 260, 52, "scenes/selection/", "composition des équipes", VERT, .9)
+              + noeud(976, 256, 260, 52, "scenes/creation/", "création, hologramme", VERT, 1.0)
+              + noeud(976, 328, 260, 52, "rendu/ · ui/", "panneaux, 20 emblèmes, boutons", VERT, 1.1)
               + noeud(420, 418, 440, 52, "lib/libmy.a", "40 fonctions maison : my_strlen, my_strcmp, my_strcpy…", OR, 1.2)
               + noeud(650, 340, 210, 52, "personnages.txt", "nom pv atq def classe soin", DOUX, 1.3)
               + noeud(420, 340, 210, 52, "tests/tests.c", "assert + ASan, sans fenêtre", VERT, 1.35))
