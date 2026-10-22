@@ -7,6 +7,7 @@
  * Création et destruction de l'application.
  */
 
+#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <time.h>
@@ -15,14 +16,16 @@
 #include "gui_config.h"
 #include "gui_scenes.h"
 #include "gui_types.h"
+#include "gui_yugioh.h"
 #include "app_interne.h"
 
-int creer_app(app_t *app)
+int creer_app(app_t *app, mode_visuel_t mode_visuel)
 {
     sfContextSettings reglages = {0, 0, 8, 1, 1, sfContextDefault, sfFalse};
     sfVideoMode mode = {LARGEUR, HAUTEUR, 32};
 
     memset(app, 0, sizeof(app_t));
+    app->mode = mode_visuel;
     roster_init(&app->equipe);
     srand(time(NULL));
     app->fenetre = sfRenderWindow_create(mode, "Redstrings",
@@ -38,6 +41,12 @@ int creer_app(app_t *app)
     app->additif.shader = NULL;
     app_init_poussieres(app);
     app->alpha = 1.f;
+    if (app->mode == MODE_YUGIOH && yugioh_charger(app) != 0) {
+        fprintf(stderr, "redstrings_csfml : mode Yu-Gi-Oh! indisponible, "
+            "affichage normal\n");
+        yugioh_liberer(app);
+        app->mode = MODE_NORMAL;
+    }
     app->t_transition = -1.f;
     app->ouvert = 1;
     app->scene = SCENE_MENU;
@@ -47,6 +56,7 @@ int creer_app(app_t *app)
 
 void detruire_app(app_t *app)
 {
+    yugioh_liberer(app);
     if (app->fenetre)
         sfRenderWindow_destroy(app->fenetre);
     for (int i = 0; i < NB_POLICES; i++) {

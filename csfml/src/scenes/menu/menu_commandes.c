@@ -155,7 +155,7 @@ void menu_commandes(app_t *app, float t)
                 {{OX, y - 9.f}, avec_alpha(C_BLANC, 0.08f * app->alpha), {0, 0}},
                 {{OX + OW, y - 9.f}, avec_alpha(C_BLANC, 0.f), {0, 0}}};
 
-            sfRenderWindow_drawPrimitives(app->fenetre, filet, 2, sfLines, NULL);
+            cible_primitives(app, filet, 2, sfLines, NULL);
         }
         if (dessiner_option(app, i, (sfFloatRect){OX - 40.f * (1.f - e), y, OW,
             i < 3 ? 64.f : 46.f}, &o[i], i == principal))

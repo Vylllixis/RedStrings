@@ -26,38 +26,52 @@ static const char *FICHIERS_POLICES[NB_POLICES] = {
     "DejaVuSans-Bold.ttf"
 };
 
-/** Dossiers où chercher les polices, relatifs à la base (exécutable, puis dossier courant). */
-static const char *DOSSIERS_POLICES[] = {"csfml/assets/fonts", "assets/fonts", "../csfml/assets/fonts"};
-#define NB_DOSSIERS_POLICES (int)(sizeof(DOSSIERS_POLICES) / sizeof(DOSSIERS_POLICES[0]))
+/** Dossiers de ressources, relatifs à la base (exécutable, puis dossier courant). */
+static const char *DOSSIERS_RESSOURCES[] = {"csfml/assets", "assets", "../csfml/assets"};
+#define NB_DOSSIERS (int)(sizeof(DOSSIERS_RESSOURCES) / sizeof(DOSSIERS_RESSOURCES[0]))
 
-static sfFont *police_depuis(const char *base, const char *nom)
+static int chercher_depuis(const char *base, const char *relatif, char *chemin,
+    size_t taille)
 {
-    char chemin[1200];
     int n = 0;
 
-    for (int i = 0; i < NB_DOSSIERS_POLICES; i++) {
-        n = snprintf(chemin, sizeof(chemin), "%s/%s/%s", base, DOSSIERS_POLICES[i], nom);
-        if (n > 0 && (size_t)n < sizeof(chemin) && access(chemin, R_OK) == 0)
-            return sfFont_createFromFile(chemin);
+    for (int i = 0; i < NB_DOSSIERS; i++) {
+        n = snprintf(chemin, taille, "%s/%s/%s", base, DOSSIERS_RESSOURCES[i], relatif);
+        if (n > 0 && (size_t)n < taille && access(chemin, R_OK) == 0)
+            return 0;
     }
-    return NULL;
+    return -1;
 }
 
-/** Cherche la police à côté de l'exécutable, puis depuis le dossier courant. */
-static sfFont *charger_police(const char *nom)
+/**
+ * Chemin d'une ressource (« fonts/X.ttf », « yugioh/X.jpg ») : à côté de
+ * l'exécutable, puis depuis le dossier courant. Renvoie -1 si elle manque.
+ */
+int chemin_ressource(const char *relatif, char *chemin, size_t taille)
 {
     char exe[1024] = {0};
     char *slash = NULL;
     ssize_t n = readlink("/proc/self/exe", exe, sizeof(exe) - 1);
-    sfFont *police = NULL;
 
     if (n <= 0)
         snprintf(exe, sizeof(exe), ".");
     slash = strrchr(exe, '/');
     if (n > 0 && slash)
         *slash = '\0';
-    police = police_depuis(exe, nom);
-    return police != NULL ? police : police_depuis(".", nom);
+    if (chercher_depuis(exe, relatif, chemin, taille) == 0)
+        return 0;
+    return chercher_depuis(".", relatif, chemin, taille);
+}
+
+static sfFont *charger_police(const char *nom)
+{
+    char relatif[128];
+    char chemin[1200];
+
+    snprintf(relatif, sizeof(relatif), "fonts/%s", nom);
+    if (chemin_ressource(relatif, chemin, sizeof(chemin)) != 0)
+        return NULL;
+    return sfFont_createFromFile(chemin);
 }
 
 static float lisser(float a, float b, float x)

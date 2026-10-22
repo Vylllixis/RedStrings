@@ -32,7 +32,9 @@ void avatar(app_t *app, const personnage_t *p, sfVector2f centre, float r,
     hexagone(app, centre, r * 1.08f, 0.f, melanger((sfColor){16, 18, 34, 255}, c, 0.22f),
         avec_alpha(c, 0.9f));
     hexagone(app, centre, r * 0.86f, PI / 6.f, C_TRANSPARENT, avec_alpha(c, 0.25f));
+    app->desature = mort;
     embleme(app, p->classe, centre, r * 0.5f, melanger(c, C_BLANC, 0.55f));
+    app->desature = 0.f;
 }
 
 /** Barre de 20 segments, comme la barre █░ de la version terminal. */

@@ -51,3 +51,7 @@ Thumbs.db
 
 # Sauvegarde du jeu (menu 4)
 /personnages.txt
+
+# Illustrations du mode Yu-Gi-Oh! (droits de leurs ayants droit, téléchargées en local)
+/csfml/assets/yugioh/*.jpg
+/csfml/assets/yugioh/*.tmp

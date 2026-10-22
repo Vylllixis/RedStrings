@@ -38,4 +38,12 @@ float etiquette(app_t *app, const char *s, sfVector2f pos, sfColor c,
     alignement_t a);
 void dessiner_fond(app_t *app);
 
+/* cible.c : dessine dans la fenêtre, ou dans app->cible si elle est posée */
+void cible_primitives(app_t *app, const sfVertex *v, size_t n, sfPrimitiveType type,
+    const sfRenderStates *etats);
+void cible_convexe(app_t *app, const sfConvexShape *forme, const sfRenderStates *etats);
+void cible_cercle(app_t *app, const sfCircleShape *forme, const sfRenderStates *etats);
+void cible_sprite(app_t *app, const sfSprite *sprite, const sfRenderStates *etats);
+void cible_texte(app_t *app, const sfText *t, const sfRenderStates *etats);
+
 #endif /* GUI_DESSIN_H */
