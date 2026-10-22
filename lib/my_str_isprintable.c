@@ -2,6 +2,13 @@
 **
 */
 
+/*
+** ╭─ my_str_isprintable.c ───────────────────────────────────────────────
+** │ But         Vérifier que tous les caractères sont imprimables (ASCII
+** │             32 à 126). Renvoie 1 si c'est vrai, 0 sinon.
+** ╰──────────────────────────────────────────────────────────────────────
+*/
+
 #include "my.h"
 #include "my_string.h"
 
