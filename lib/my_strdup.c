@@ -2,6 +2,15 @@
 **
 */
 
+/*
+** ╭─ my_strdup.c ────────────────────────────────────────────────────────
+** │ But         Copier une chaîne dans une zone allouée avec malloc.
+** │             Renvoie NULL si l'allocation échoue.
+** │ Utilise     my_strlen
+** │ Attention   le résultat est à libérer avec free()
+** ╰──────────────────────────────────────────────────────────────────────
+*/
+
 #include <stdlib.h>
 #include "my.h"
 #include "my_string.h"
