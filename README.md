@@ -509,7 +509,7 @@ sequenceDiagram
 
 <br/>
 
-Le projet a été audité point par point (voir [`AMELIORATIONS.md`](AMELIORATIONS.md)) :
+Le projet a été audité point par point, et chaque problème a été **reproduit**, puis corrigé :
 
 | | Avant | Après |
 |:---:|---|---|
@@ -909,7 +909,7 @@ make tests
 
 ### Le flux de travail
 
-Le dépôt suit **git flow** : chaque changement vit sur sa propre branche partie de `develop`, puis y est fusionné avec `--no-ff`. `main` ne reçoit que les versions publiées (`v0.1.0` → `v1.4.1`).
+Le dépôt suit **git flow** : chaque changement vit sur sa propre branche partie de `develop`, puis y est fusionné avec `--no-ff`. `main` ne reçoit que les versions publiées (`v0.1.0` → `v1.4.2`).
 
 ```mermaid
 gitGraph
