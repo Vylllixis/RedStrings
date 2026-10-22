@@ -1,7 +1,7 @@
 # 🛠️ RedStrings — Suivi des améliorations
 
-> Analyse de la version console : `includes/`, `src/`, `Makefile`.
-> La partie `csfml/` n'est pas analysée ici.
+> Parties 1 à 7 : analyse de la version console (`includes/`, `src/`, `Makefile`).
+> Partie 8 : la version graphique (`csfml/`), traitée avec les mêmes critères.
 >
 > Chaque point marqué **🧪 Prouvé** a été reproduit en lançant vraiment le programme.
 > Ce n'est donc pas une supposition.
@@ -67,6 +67,18 @@
 - [x] **B1** 🟢 ⭐⭐⭐ Allocation dynamique (`malloc` / `realloc`)
 - [x] **B2** 🟢 ⭐⭐ Sauvegarder / charger les personnages dans un fichier
 - [x] **B3** 🟢 ⭐⭐ Tests unitaires avec `assert`
+
+### 🖼️ Version graphique (`csfml/`)
+- [x] **C1** 🟠 ⭐⭐⭐ Un seul header `gui.h` de 462 lignes pour tout le projet
+- [x] **C2** 🟠 ⭐⭐ Seize `.c` à plat dans `src/`
+- [x] **C3** 🟠 ⭐⭐⭐ Des fichiers de 500 à 1 222 lignes
+- [x] **C4** 🔴 ⭐⭐ Encodage et décodage UTF-8 non validés 🧪
+- [x] **C5** 🟠 ⭐ `tronquer()` copie sans connaître la taille du tampon
+- [x] **C6** 🟠 ⭐ `classes[c]` lu sans contrôler l'indice
+- [x] **C7** 🟠 ⭐ Modulo et divisions par une taille qui peut être nulle
+- [x] **C8** 🟡 ⭐ Créations SFML jamais vérifiées
+- [x] **C9** 🟡 ⭐ Tailles de tampons écrites en dur (`30`, `32`, `96`, `256`)
+- [x] **C10** 🟡 ⭐⭐ Aucun test, aucune version `debug`, avertissements du projet principal seulement
 
 ---
 
@@ -846,6 +858,203 @@ int main(void)
 ```
 
 Une règle `make tests` qui compile ce fichier, et tu vérifies en 1 seconde que tes modifications n'ont rien cassé.
+
+---
+
+# 🖼️ Partie 8 : la version graphique (`csfml/`)
+
+Les parties 1 à 7 ne touchaient que la console. La version CSFML avait les mêmes défauts, en plus gros : **tout le projet dans un seul header, des fichiers de plus de 1 000 lignes, aucun test.** Mêmes méthodes, mêmes règles.
+
+| | Avant | Après |
+|---|---|---|
+| Headers | 1 (`gui.h`, 462 lignes) | 14 dans `include/` + 5 privés dans `src/` |
+| Fichiers `.c` | 15, tous dans `src/` | 44, rangés en 5 dossiers |
+| Plus gros fichier | `scene_bataille.c` : **1 222 lignes** | `arene_combattants.c` : **243 lignes** |
+| Fichiers `.c` de plus de 300 lignes | 7 | **0** |
+| Tests | 0 | `make csfml-tests` (avec sanitizers) |
+
+<sub>Chiffres mesurés avec `wc -l` sur `csfml/` avant et après (hors tests). La fonction la plus longue fait encore 62 lignes (`dessiner_option`) : 259 fonctions en tout, 2 au-dessus de 50 lignes.</sub>
+
+---
+
+## C1 🟠 Un seul header pour tout (O3, version CSFML)
+
+**📍 Où :** `csfml/include/gui.h`, inclus par les quinze `.c`.
+
+Comme `my.h` autrefois, `gui.h` contenait *tout* : la palette, les types de chaque scène, la structure `app_t` et les prototypes de huit modules. Changer un champ de l'arène recompilait la fenêtre entière, et on ne voyait pas de quoi dépendait un fichier.
+
+**✅ Un header = un thème :**
+
+| Header | Contenu |
+|---|---|
+| `gui_config.h` | dimensions, limites, palette |
+| `gui_types.h` | énumérations, entrées, composants (`bouton_t`, `champ_t`…) |
+| `gui_etat.h` | état de chaque scène (`menu_t`, `creation_t`, `arene_t`…) |
+| `gui_app.h` | `struct app_s` et le cycle de vie de l'application |
+| `gui_anim.h` · `gui_dessin.h` · `gui_hud.h` · `gui_ui.h` | les modules du même nom |
+| `gui_carte.h` · `gui_emblemes.h` · `gui_particules.h` | cartes, emblèmes, particules |
+| `gui_jeu.h` · `gui_scenes.h` · `gui_utf8.h` | recherche par nom, scènes, texte UTF-8 |
+
+Deux détails qui font la différence :
+- `app_t` est **déclaré à l'avance** dans `gui_types.h` (`typedef struct app_s app_t;`). Un module de dessin n'a besoin que du nom du type, pas de sa définition : seuls les fichiers qui lisent `app->champ` incluent `gui_app.h`.
+- chaque `.c` n'inclut **que** les headers dont il utilise un symbole. Vérifié : les 19 headers (publics et privés) compilent chacun seul, avec `-Werror -pedantic`.
+
+---
+
+## C2 🟡 Ranger `src/` en sous-dossiers (O5, version CSFML)
+
+```
+csfml/src/
+├── main.c
+├── app/        application : création, ressources, événements, boucle
+├── outils/     animation, particules, UTF-8, recherche par nom
+├── rendu/      formes, texte, fond, HUD, jauges, emblemes/
+├── ui/         boutons, champ, glissière, notifications, cartes, libellés
+└── scenes/     menu/ · creation/ · liste/ · selection/ · arene/
+```
+
+Le `Makefile` de `csfml/` cherche maintenant les `.c` avec `find src -name '*.c'` et crée les dossiers d'objets tout seul : **ajouter un fichier ne demande plus de toucher au Makefile**.
+
+---
+
+## C3 🟠 Des fichiers de 500 à 1 222 lignes
+
+| Fichier | Avant | Après |
+|---|:---:|---|
+| `scene_bataille.c` | 1 222 | 7 fichiers dans `scenes/arene/` (de 134 à 243 lignes) |
+| `scene_creation.c` | 665 | 5 fichiers (hologramme, aperçu, classes, logique, scène) |
+| `ui.c` | 533 | `bouton` · `champ` · `glissiere` · `notification` · `entete` |
+| `scene_menu.c` | 537 | 4 fichiers (titre, commandes, équipe, scène) |
+| `dessin.c` | 411 | `formes` · `texte` · `fond` |
+| `emblemes.c` | 359 | `emblemes/` : traits, armes, magie, divers |
+| `app.c` | 348 | `app` · `ressources` · `evenements` · `boucle` |
+
+**La règle de découpe :** un fichier = **une responsabilité** qu'on peut nommer en quelques mots (« l'arène dessine le décor », « l'arène lit les événements du moteur »). Ce qui est partagé entre les fichiers d'une même scène va dans un **header privé** `*_interne.h`, placé à côté des `.c`. Les fonctions qui étaient `static` et deviennent partagées prennent le nom de leur groupe en préfixe (`arene_placer`, `menu_titre`, `emb_trait`…), pour ne jamais entrer en collision avec une autre scène.
+
+> 🧠 **Un découpage ne doit rien changer à ce qu'on voit.** J'ai rejoué le même scénario (menu, création, liste, composition, arène) avant et après chaque étape, et comparé les images pixel à pixel : l'écart moyen reste au niveau du bruit des étoiles tirées au hasard à chaque lancement (moins de 0,02 % de pixels différents).
+
+---
+
+## C4 🔴 UTF-8 mal validé 🧪
+
+**📍 Où :** `encoder_utf8()` (champ de saisie) et `utf8_vers_utf32()` (affichage du texte).
+
+**🧪 Preuve :** j'ai compilé l'ancien code seul et lui ai donné des cas limites.
+
+| Entrée | Ancien code | Attendu |
+|---|---|---|
+| encoder U+D800 (substitut UTF-16) | écrit `ED A0 80` (UTF-8 **invalide**) | refusé |
+| encoder U+110000 | écrit 4 octets (hors Unicode) | refusé |
+| décoder `a` `C0 80` `b` (NUL « trop long ») | 3 points de code, dont un **0 au milieu** : le texte est coupé après `a` | octets ignorés → `ab` |
+| décoder `C3` `x` (séquence tronquée) | **« ø »** : `x` est avalé comme octet de suite | `C3` ignoré, `x` gardé |
+
+**✅ Correction :** un module dédié, `gui_utf8.h` / `outils/utf8.c`, sans aucune dépendance à SFML :
+
+```c
+static int decoder_un(const unsigned char *u, uint32_t *point)
+{
+    int len = longueur_sequence(u[0]);
+    ...
+    for (int i = 1; i < len; i++) {
+        if ((u[i] & 0xC0) != 0x80)      // chaque octet de suite est vérifié
+            return 0;
+        p = (p << 6) | (uint32_t)(u[i] & 0x3F);
+    }
+    if (p < MIN_PAR_LONGUEUR[len] || !point_valide(p))   // trop long, substitut, > U+10FFFF
+        return 0;
+    ...
+}
+```
+
+Un octet invalide est simplement ignoré. Comme le module est indépendant de la fenêtre, il est **testé** (voir C10).
+
+---
+
+## C5 🟠 `tronquer()` copie sans connaître la taille du tampon
+
+```c
+// AVANT : où s'arrête dst ? la fonction l'ignore
+void tronquer(app_t *app, ..., const char *src, float max, char *dst);
+    my_strcpy(dst, src);
+
+// APRÈS : la taille voyage avec le pointeur
+void tronquer(app_t *app, ..., const char *src, float max, char *dst, size_t taille_dst);
+    snprintf(dst, taille_dst, "%.*s…", (int)len, src);
+```
+
+Les six appelants passaient des tampons assez grands : le code marchait. Mais il suffisait qu'un appelant futur déclare un `char nom[16]` pour écrire hors du tableau, sans que le compilateur le voie. Même règle qu'en **S5** : *`strcpy` → la version qui connaît la taille.*
+
+Dans le même esprit, le champ de saisie borne `max` à la taille **réelle** de son tampon (`sizeof(c->texte) - 1`), qui vaut maintenant `NOM_MAX` au lieu d'un `30` écrit en dur, et les copies de noms utilisent `snprintf(..., sizeof(p.nom), ...)`.
+
+---
+
+## C6 🟠 `classes[c]` lu sans contrôler l'indice
+
+La console valide l'identifiant de classe au chargement (voir **B2**). La version graphique, elle, lisait `classes[c].nom`, `classes[c].couleur`… à une quinzaine d'endroits, en faisant confiance à `c`. Un état corrompu aurait lu **hors du tableau**.
+
+**✅** Un seul point d'accès, `classe_info()`, qui retombe sur la première classe si l'identifiant est hors table, utilisé partout ; `nom_stat()` et ses voisines font pareil pour les statistiques :
+
+```c
+const info_classe_t *classe_info(classe_t c)
+{
+    return &classes[(unsigned)c < NB_CLASSES ? c : 0];
+}
+```
+
+Le `(unsigned)` règle aussi le cas d'un identifiant négatif.
+
+---
+
+## C7 🟠 Modulo et divisions par une taille nulle
+
+Trois endroits calculaient `x % n` avec un `n` venu de l'état du jeu : la sélection des équipes (`n = app->equipe.len`), la liste des fiches, et le choix de la cible dans l'arène (`nb_cibles`). Un `n` nul donne un **SIGFPE** (crash immédiat).
+
+Aujourd'hui l'interface les protège déjà (il faut 2 personnages pour combattre, une cible existe toujours quand on la choisit). Mais cette protection est **loin** de la ligne qui divise. Chaque modulo a maintenant sa propre garde (`if (n <= 0) return;`), pour que la sécurité ne dépende pas d'un autre fichier.
+
+---
+
+## C8 🟡 Créations SFML jamais vérifiées
+
+`sfText_create()`, `sfSprite_create()`, `sfClock_create()`, `sfImage_create()`, `sfTexture_createFromImage()`… peuvent renvoyer `NULL` (mémoire, carte graphique). Seules les polices étaient contrôlées ; une texture `NULL` aurait fait planter `sfTexture_setSmooth(NULL, …)`.
+
+**✅** Toutes les créations sont vérifiées. En cas d'échec, le programme écrit un message sur `stderr`, libère ce qui existe déjà (`detruire_app` ignore les `NULL`) et sort avec le code **84**. 🧪 Seul le cas des polices manquantes a été reproduit ci-dessous : un manque de mémoire ou de carte graphique ne se provoque pas facilement.
+
+```text
+$ cp redstrings_csfml /tmp/sans-polices/ && cd /tmp/sans-polices && ./redstrings_csfml
+redstrings_csfml : police introuvable (NotoSans-Bold.ttf)
+$ echo $?
+84
+```
+
+La recherche des polices n'utilise plus un `snprintf` à format variable (`-Wformat-nonliteral`) : le chemin est assemblé avec `"%s/%s/%s"` à partir d'un tableau de dossiers.
+
+---
+
+## C9 🟡 Tailles écrites en dur (L1, version CSFML)
+
+| Avant | Après |
+|---|---|
+| `char texte[30]` (champ de saisie) | `char texte[NOM_MAX]` : même taille que le nom d'un personnage |
+| `sfUint32 texte[32]` et `nb_texte < 32` | `MAX_SAISIE` |
+| `char message[96]`, `icone[8]`, popup `[24]` | `TAILLE_TOAST`, `TAILLE_ICONE`, `TAILLE_POPUP` |
+| `256` (texte), `256` (vignette) | `TAILLE_TEXTE_MAX`, `TAILLE_VIGNETTE` |
+
+---
+
+## C10 🟡 Tests, version `debug` et avertissements (M3 et B3, version CSFML)
+
+```bash
+make csfml-tests      # tests sans fenêtre, avec AddressSanitizer + UBSan
+make csfml-debug      # ./redstrings_csfml_debug : -O0 -g3 + sanitizers
+```
+
+**Les tests** (`csfml/tests/tests.c`) couvrent ce qui ne dépend pas de SFML : UTF-8 (aller-retour sur 8 points de code, séquences invalides, bornes du tampon), courbes d'animation, couleurs (jamais de dépassement d'un octet), recherche par nom, accès sûrs aux classes.
+
+> 🧪 **Un test qui ne peut pas échouer ne prouve rien.** J'ai retiré volontairement le contrôle des substituts dans `point_valide()` : `make csfml-tests` s'arrête aussitôt sur `Assertion 'utf8_encoder(0xD800, o) == 0' failed`. Le contrôle remis, tout repasse.
+
+**Avertissements ajoutés** à ceux du projet principal : `-Wformat=2 -Wcast-qual -Wnull-dereference -Wwrite-strings -Wstrict-prototypes -Wvla -Wundef -Wlogical-op -Wfloat-equal`. Ils ont trouvé deux points réels (le `snprintf` à format variable, et une comparaison de flottants avec `!=` pour détecter le mouvement de la souris, remplacée par une tolérance).
+
+**Ce qui a aussi été vérifié :** le scénario automatisé de 10 écrans (menu, création, liste, composition des équipes, arène en cours de combat, fin) rejoué sous **AddressSanitizer + UBSan avec détection de fuites** : aucune erreur.
 
 ---
 
