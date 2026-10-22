@@ -4,8 +4,13 @@
 */
 
 /*
- * Instruments circulaires : arcs, graduations, ellipses et radar de statistiques.
- */
+** ╭─ jauges.c ───────────────────────────────────────────────────────────
+** │ But         Instruments circulaires : arcs, graduations, ellipses et
+** │             radar de statistiques.
+** │ Contenu     arc_cercle, graduations, ellipse, sommet_radar,
+** │             radar_stats
+** ╰──────────────────────────────────────────────────────────────────────
+*/
 
 #include <math.h>
 #include "personnage.h"
@@ -79,10 +84,19 @@ static sfVector2f sommet_radar(sfVector2f c, float r, int i)
     return (sfVector2f){c.x + cosf(a) * r, c.y + sinf(a) * r};
 }
 
-/**
- * Radar des statistiques : un axe par statistique (PV en haut, puis dans le
- * sens des aiguilles d'une montre). `v` contient des valeurs entre 0 et 1.
- */
+/*
+** ╭─ radar_stats ────────────────────────────────────────────────────────
+** │ Radar des statistiques : un axe par statistique, PV en haut puis dans
+** │ le sens des aiguilles d'une montre.
+** │
+** │ 1. la grille : quatre polygones concentriques et un axe par
+** │    statistique, coloré comme la statistique
+** │ 2. la forme : chaque sommet est placé sur son axe à la distance rayon
+** │    x valeur (`v` entre 0 et 1, au minimum 0,04 pour rester visible),
+** │    remplie en éventail translucide puis cerclée
+** │ 3. un petit halo coloré sur chaque sommet
+** ╰──────────────────────────────────────────────────────────────────────
+*/
 void radar_stats(app_t *app, sfVector2f centre, float rayon,
     const float v[NB_STATS], sfColor c)
 {
