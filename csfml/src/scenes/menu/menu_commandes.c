@@ -7,6 +7,7 @@
  * Menu : les quatre commandes (ajouter, afficher, combat, quitter).
  */
 
+#include <math.h>
 #include <stdio.h>
 #include "gui_anim.h"
 #include "gui_app.h"
@@ -132,8 +133,8 @@ void menu_commandes(app_t *app, float t)
     int principal = menu_option_principale(app);
     const int *k = app->in.touches;
 
-    app->menu.souris_bouge = app->in.souris.x != app->menu.souris_prec.x
-        || app->in.souris.y != app->menu.souris_prec.y;
+    app->menu.souris_bouge = fabsf(app->in.souris.x - app->menu.souris_prec.x) > 0.01f
+        || fabsf(app->in.souris.y - app->menu.souris_prec.y) > 0.01f;
     app->menu.souris_prec = app->in.souris;
     lire_options(app, o);
     if (!o[app->menu.selection].actif)

@@ -11,7 +11,6 @@
 #include <stdio.h>
 #include <string.h>
 #include <unistd.h>
-#include "my_string.h"
 #include "gui_anim.h"
 #include "gui_app.h"
 #include "gui_config.h"
@@ -19,6 +18,7 @@
 #include "app_interne.h"
 
 #define TAILLE_LUEUR 128
+#define TAILLE_VIGNETTE 256
 
 static const char *FICHIERS_POLICES[NB_POLICES] = {
     "NotoSans-Bold.ttf",
@@ -26,32 +26,38 @@ static const char *FICHIERS_POLICES[NB_POLICES] = {
     "DejaVuSans-Bold.ttf"
 };
 
-/** Cherche la police à côté de l'exécutable, puis depuis le dossier courant. */
-static sfFont *charger_police(const char *nom)
-{
-    const char *formats[] = {"%s/csfml/assets/fonts/%s", "%s/assets/fonts/%s",
-        "%s/../csfml/assets/fonts/%s"};
-    char exe[1024] = {0};
-    char chemin[1200];
-    char *slash = NULL;
-    ssize_t n = readlink("/proc/self/exe", exe, sizeof(exe) - 1);
+/** Dossiers où chercher les polices, relatifs à la base (exécutable, puis dossier courant). */
+static const char *DOSSIERS_POLICES[] = {"csfml/assets/fonts", "assets/fonts", "../csfml/assets/fonts"};
+#define NB_DOSSIERS_POLICES (int)(sizeof(DOSSIERS_POLICES) / sizeof(DOSSIERS_POLICES[0]))
 
-    if (n <= 0)
-        my_strcpy(exe, ".");
-    slash = strrchr(exe, '/');
-    if (n > 0 && slash)
-        *slash = '\0';
-    for (int i = 0; i < 3; i++) {
-        if (snprintf(chemin, sizeof(chemin), formats[i], exe, nom)
-            < (int)sizeof(chemin) && access(chemin, R_OK) == 0)
-            return sfFont_createFromFile(chemin);
-    }
-    for (int i = 0; i < 3; i++) {
-        if (snprintf(chemin, sizeof(chemin), formats[i], ".", nom)
-            < (int)sizeof(chemin) && access(chemin, R_OK) == 0)
+static sfFont *police_depuis(const char *base, const char *nom)
+{
+    char chemin[1200];
+    int n = 0;
+
+    for (int i = 0; i < NB_DOSSIERS_POLICES; i++) {
+        n = snprintf(chemin, sizeof(chemin), "%s/%s/%s", base, DOSSIERS_POLICES[i], nom);
+        if (n > 0 && (size_t)n < sizeof(chemin) && access(chemin, R_OK) == 0)
             return sfFont_createFromFile(chemin);
     }
     return NULL;
+}
+
+/** Cherche la police à côté de l'exécutable, puis depuis le dossier courant. */
+static sfFont *charger_police(const char *nom)
+{
+    char exe[1024] = {0};
+    char *slash = NULL;
+    ssize_t n = readlink("/proc/self/exe", exe, sizeof(exe) - 1);
+    sfFont *police = NULL;
+
+    if (n <= 0)
+        snprintf(exe, sizeof(exe), ".");
+    slash = strrchr(exe, '/');
+    if (n > 0 && slash)
+        *slash = '\0';
+    police = police_depuis(exe, nom);
+    return police != NULL ? police : police_depuis(".", nom);
 }
 
 static float lisser(float a, float b, float x)
@@ -70,6 +76,8 @@ static sfTexture *creer_tex_lueur(void)
     float dy = 0.f;
     float d = 0.f;
 
+    if (img == NULL)
+        return NULL;
     for (int y = 0; y < TAILLE_LUEUR; y++) {
         for (int x = 0; x < TAILLE_LUEUR; x++) {
             dx = (x + 0.5f) / (TAILLE_LUEUR / 2.f) - 1.f;
@@ -80,29 +88,33 @@ static sfTexture *creer_tex_lueur(void)
         }
     }
     tex = sfTexture_createFromImage(img, NULL);
-    sfTexture_setSmooth(tex, sfTrue);
     sfImage_destroy(img);
+    if (tex != NULL)
+        sfTexture_setSmooth(tex, sfTrue);
     return tex;
 }
 
 static sfTexture *creer_tex_vignette(void)
 {
-    sfImage *img = sfImage_create(256, 256);
+    sfImage *img = sfImage_create(TAILLE_VIGNETTE, TAILLE_VIGNETTE);
     sfTexture *tex = NULL;
     float dx = 0.f;
     float dy = 0.f;
 
-    for (int y = 0; y < 256; y++) {
-        for (int x = 0; x < 256; x++) {
-            dx = (x + 0.5f) / 128.f - 1.f;
-            dy = (y + 0.5f) / 128.f - 1.f;
+    if (img == NULL)
+        return NULL;
+    for (int y = 0; y < TAILLE_VIGNETTE; y++) {
+        for (int x = 0; x < TAILLE_VIGNETTE; x++) {
+            dx = (x + 0.5f) / (TAILLE_VIGNETTE / 2.f) - 1.f;
+            dy = (y + 0.5f) / (TAILLE_VIGNETTE / 2.f) - 1.f;
             sfImage_setPixel(img, x, y, (sfColor){4, 5, 12,
                 (sfUint8)(lisser(0.45f, 1.45f, sqrtf(dx * dx + dy * dy)) * 210.f)});
         }
     }
     tex = sfTexture_createFromImage(img, NULL);
-    sfTexture_setSmooth(tex, sfTrue);
     sfImage_destroy(img);
+    if (tex != NULL)
+        sfTexture_setSmooth(tex, sfTrue);
     return tex;
 }
 
@@ -145,5 +157,10 @@ int app_creer_ressources(app_t *app)
     app->curseurs[CURSEUR_FLECHE] = sfCursor_createFromSystem(sfCursorArrow);
     app->curseurs[CURSEUR_MAIN] = sfCursor_createFromSystem(sfCursorHand);
     app->curseurs[CURSEUR_TEXTE] = sfCursor_createFromSystem(sfCursorText);
+    if (!app->texte || !app->forme || !app->cercle || !app->sprite || !app->tex_lueur
+        || !app->tex_vignette || !app->horloge || !app->vue) {
+        fprintf(stderr, "redstrings_csfml : ressource graphique impossible à créer\n");
+        return 1;
+    }
     return 0;
 }

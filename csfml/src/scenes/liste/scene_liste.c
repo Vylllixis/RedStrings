@@ -74,7 +74,8 @@ static void valider(app_t *app, liste_t *l, const int *ids, int n)
 
 static void naviguer(app_t *app, liste_t *l, int sens)
 {
-    ouvrir(l, (l->ouvert + sens + app->equipe.len) % app->equipe.len);
+    if (app->equipe.len > 0)
+        ouvrir(l, (l->ouvert + sens + app->equipe.len) % app->equipe.len);
 }
 
 static void clavier_modal(app_t *app, liste_t *l)

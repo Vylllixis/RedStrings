@@ -67,7 +67,8 @@ void arene_clavier(app_t *app, arene_t *ar)
         if (k[sfKeyEnter] || k[sfKeySpace])
             valider_action(app, ar, ar->action);
     } else if (ar->etat == VUE_CHOIX_CIBLE) {
-        ar->cible = (ar->cible + sens + ar->nb_cibles) % ar->nb_cibles;
+        if (ar->nb_cibles > 0)
+            ar->cible = (ar->cible + sens + ar->nb_cibles) % ar->nb_cibles;
         if (k[sfKeyEscape])
             ar->etat = VUE_CHOIX_ACTION;
         else if (k[sfKeyEnter] || k[sfKeySpace])
