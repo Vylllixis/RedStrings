@@ -6,7 +6,17 @@
 #include <math.h>
 #include <stdio.h>
 #include <string.h>
-#include "gui.h"
+#include "personnage.h"
+#include "gui_anim.h"
+#include "gui_app.h"
+#include "gui_carte.h"
+#include "gui_config.h"
+#include "gui_dessin.h"
+#include "gui_etat.h"
+#include "gui_jeu.h"
+#include "gui_scenes.h"
+#include "gui_types.h"
+#include "gui_ui.h"
 
 #define FICHE_L 520.f
 #define FICHE_H 510.f

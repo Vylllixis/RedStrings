@@ -9,7 +9,16 @@
 #include <string.h>
 #include <time.h>
 #include <unistd.h>
-#include "gui.h"
+#include "roster.h"
+#include "my_string.h"
+#include "gui_anim.h"
+#include "gui_app.h"
+#include "gui_config.h"
+#include "gui_dessin.h"
+#include "gui_particules.h"
+#include "gui_scenes.h"
+#include "gui_types.h"
+#include "gui_ui.h"
 
 #define DUREE_SORTIE 0.22f
 #define TAILLE_LUEUR 128

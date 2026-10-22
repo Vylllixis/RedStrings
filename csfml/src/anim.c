@@ -5,7 +5,8 @@
 
 #include <math.h>
 #include <stdlib.h>
-#include "gui.h"
+#include "gui_anim.h"
+#include "gui_types.h"
 
 float bornerf(float v, float min, float max)
 {

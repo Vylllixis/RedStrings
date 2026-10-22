@@ -6,7 +6,21 @@
 #include <math.h>
 #include <stdio.h>
 #include <string.h>
-#include "gui.h"
+#include "personnage.h"
+#include "roster.h"
+#include "my_string.h"
+#include "gui_anim.h"
+#include "gui_app.h"
+#include "gui_carte.h"
+#include "gui_config.h"
+#include "gui_dessin.h"
+#include "gui_emblemes.h"
+#include "gui_etat.h"
+#include "gui_hud.h"
+#include "gui_particules.h"
+#include "gui_scenes.h"
+#include "gui_types.h"
+#include "gui_ui.h"
 
 /* Colonne du formulaire */
 #define FX 64.f

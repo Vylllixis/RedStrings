@@ -14,7 +14,14 @@
  */
 
 #include <math.h>
-#include "gui.h"
+#include "personnage.h"
+#include "gui_anim.h"
+#include "gui_app.h"
+#include "gui_carte.h"
+#include "gui_config.h"
+#include "gui_dessin.h"
+#include "gui_hud.h"
+#include "gui_types.h"
 
 #define MAX_POINTS_ARC 96
 

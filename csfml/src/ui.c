@@ -6,7 +6,15 @@
 #include <math.h>
 #include <stdio.h>
 #include <string.h>
-#include "gui.h"
+#include "personnage.h"
+#include "my_string.h"
+#include "gui_anim.h"
+#include "gui_app.h"
+#include "gui_config.h"
+#include "gui_dessin.h"
+#include "gui_hud.h"
+#include "gui_types.h"
+#include "gui_ui.h"
 
 #define DUREE_TOAST 2.8f
 

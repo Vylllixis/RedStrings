@@ -4,7 +4,8 @@
 */
 
 #include <stdlib.h>
-#include "gui.h"
+#include "gui_app.h"
+#include "gui_types.h"
 
 int main(void)
 {
