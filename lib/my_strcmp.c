@@ -2,6 +2,14 @@
 **
 */
 
+/*
+** ╭─ my_strcmp.c ────────────────────────────────────────────────────────
+** │ But         Comparer deux chaînes. Renvoie 0 si elles sont égales,
+** │             sinon la différence entre les deux premiers caractères
+** │             qui diffèrent (négatif si s1 est avant s2).
+** ╰──────────────────────────────────────────────────────────────────────
+*/
+
 #include "my.h"
 #include "my_string.h"
 

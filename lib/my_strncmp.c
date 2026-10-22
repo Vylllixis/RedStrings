@@ -2,6 +2,13 @@
 **
 */
 
+/*
+** ╭─ my_strncmp.c ───────────────────────────────────────────────────────
+** │ But         Comme my_strcmp, mais en comparant au plus les n premiers
+** │             caractères.
+** ╰──────────────────────────────────────────────────────────────────────
+*/
+
 #include "my.h"
 #include "my_string.h"
 
