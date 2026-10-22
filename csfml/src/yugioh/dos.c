@@ -4,9 +4,13 @@
 */
 
 /*
- * Dos commun à toutes les cartes du mode Yu-Gi-Oh! : tourbillon brun et
- * orangé, ovale noir et logo RedStrings (pas le logo officiel du jeu).
- */
+** ╭─ dos.c ──────────────────────────────────────────────────────────────
+** │ But         Dos commun à toutes les cartes du mode Yu-Gi-Oh! :
+** │             tourbillon brun et orangé, ovale noir et logo RedStrings
+** │             (pas le logo officiel du jeu).
+** │ Contenu     ovale, dessiner_dos
+** ╰──────────────────────────────────────────────────────────────────────
+*/
 
 #include <math.h>
 #include "gui_app.h"
