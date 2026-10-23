@@ -34,7 +34,8 @@ int lire_entier(const char *question, int min, int max, int *resultat);
 int lire_entier_menu(const char *question, int min, int max, int *resultat);
 
 /**
- * Lit un nom de personnage : non vide, sans espace, 29 caractères au plus.
+ * Lit un nom de personnage : non vide, sans espace, 29 caractères au plus,
+ * et pas uniquement des chiffres (voir nom_est_un_id).
  * Un nom refusé est redemandé avec la raison. `nom` doit faire NOM_MAX octets
  * au moins. Renvoie 0, SAISIE_FIN ou SAISIE_ANNULEE (`q` n'est donc pas un nom).
  */

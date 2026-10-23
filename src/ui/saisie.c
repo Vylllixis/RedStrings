@@ -131,8 +131,9 @@ static int contient_espace(const char *s)
 ** │ 1. lire_ligne() lit toute la ligne (tampon borné) : plus de scanf, donc
 ** │    plus de nom coupé en silence à 29 caractères
 ** │ 2. q annule ; une ligne vide est ignorée
-** │ 3. refusé s'il fait plus de NOM_LONGUEUR caractères ou contient une
-** │    espace (le nom sert d'identifiant dans le fichier de sauvegarde)
+** │ 3. refusé s'il fait plus de NOM_LONGUEUR caractères, contient une
+** │    espace (le nom sert d'identifiant dans le fichier de sauvegarde) ou
+** │    n'est fait que de chiffres (il serait confondu avec un ID)
 ** │ Renvoie 0, SAISIE_FIN (Ctrl+D) ou SAISIE_ANNULEE (q).
 ** ╰──────────────────────────────────────────────────────────────────────
 */
@@ -155,6 +156,8 @@ int lire_nom(const char *question, char *nom, size_t taille)
             afficher_erreur("Nom trop long : " STR(NOM_LONGUEUR) " caractères au plus");
         else if (contient_espace(buf))
             afficher_erreur("Le nom ne peut pas contenir d'espace");
+        else if (nom_est_un_id(buf))
+            afficher_erreur("Un nom ne peut pas être un nombre (il serait confondu avec un ID)");
         else
             break;
     }

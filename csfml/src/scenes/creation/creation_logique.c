@@ -33,8 +33,9 @@
 ** │ Pourquoi le personnage ne peut pas être créé, ou NULL s'il peut
 ** │ l'être.
 ** │
-** │ Refuse : un nom vide, un nom déjà pris (trouver_personnage), une
-** │ équipe pleine (MAX_PERSONNAGES).
+** │ Refuse : un nom vide, un nom fait uniquement de chiffres (il serait
+** │ confondu avec un ID dans la console), un nom déjà pris
+** │ (trouver_personnage), une équipe pleine (MAX_PERSONNAGES).
 ** │ C'est la seule source de ces règles à l'écran : le bouton et
 ** │ creation_creer() l'utilisent tous les deux.
 ** ╰──────────────────────────────────────────────────────────────────────
@@ -43,6 +44,8 @@ const char *creation_raison_invalide(app_t *app, const creation_t *c)
 {
     if (c->nom.texte[0] == '\0')
         return "Donne un nom à ton personnage";
+    if (nom_est_un_id(c->nom.texte))
+        return "Un nom ne peut pas être un nombre";
     if (trouver_personnage(app->equipe.data, app->equipe.len, c->nom.texte) != -1)
         return "Ce nom est déjà pris";
     if (app->equipe.len >= MAX_PERSONNAGES)

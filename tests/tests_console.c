@@ -26,6 +26,7 @@
 #include <sys/stat.h>
 #include <unistd.h>
 #include "composition_console.h"
+#include "liste_console.h"
 #include "menu_personnages.h"
 #include "personnage.h"
 #include "roster.h"
@@ -93,15 +94,17 @@ static void test_lire_nom(void)
     assert(lire_nom("Nom", nom, sizeof(nom)) == SAISIE_ANNULEE);
     entree("\n\nAr thur\nArthur\n");
     assert(lire_nom("Nom", nom, sizeof(nom)) == 0 && strcmp(nom, "Arthur") == 0);
-    entree("123456789012345678901234567890\nLong\n");        // 30 caractères : refusé
+    entree("a23456789012345678901234567890\nLong\n");        // 30 caractères : refusé
     assert(lire_nom("Nom", nom, sizeof(nom)) == 0 && strcmp(nom, "Long") == 0);
-    entree("12345678901234567890123456789\n");               // 29 : accepté tel quel
+    entree("a2345678901234567890123456789\n");               // 29 : accepté tel quel
     assert(lire_nom("Nom", nom, sizeof(nom)) == 0 && strlen(nom) == 29);
     memset(trop_long, 'x', sizeof(trop_long) - 1);
     trop_long[sizeof(trop_long) - 1] = '\0';
     snprintf(saisie, sizeof(saisie), "%s\nbon\n", trop_long);
     entree(saisie);                                           // ligne énorme : pas de débordement
     assert(lire_nom("Nom", nom, sizeof(nom)) == 0 && strcmp(nom, "bon") == 0);
+    entree("123\n007\n42\nAda2\n");                          // que des chiffres : refusé (ce serait un ID)
+    assert(lire_nom("Nom", nom, sizeof(nom)) == 0 && strcmp(nom, "Ada2") == 0);
     entree("");
     assert(lire_nom("Nom", nom, sizeof(nom)) == SAISIE_FIN);
     assert(lire_nom("Nom", nom, 5) == SAISIE_FIN);            // tampon trop petit : refusé
@@ -195,7 +198,7 @@ static void test_roster_trouver(void)
 
     remplir(&r, 3, 0);
     assert(roster_trouver(&r, "P1") == 1);           // par le nom
-    assert(roster_trouver(&r, "1") == 0);            // par le numéro (1 = premier)
+    assert(roster_trouver(&r, "1") == 0);            // par l'ID (1 = premier)
     assert(roster_trouver(&r, "3") == 2);
     assert(roster_trouver(&r, "0") == -1 && roster_trouver(&r, "4") == -1);
     assert(roster_trouver(&r, "-1") == -1 && roster_trouver(&r, "") == -1);
@@ -203,7 +206,7 @@ static void test_roster_trouver(void)
     assert(roster_trouver(&r, "99999999999999999999") == -1);   // pas de dépassement d'int
     assert(roster_trouver(&r, "1x") == -1);
     assert(roster_ajouter(&r, &p) == 0);
-    assert(roster_trouver(&r, "2") == 3);            // un nom exact passe avant le numéro
+    assert(roster_trouver(&r, "2") == 3);            // un nom exact passe avant l'ID (cas défensif)
     roster_liberer(&r);
     assert(roster_trouver(&r, "1") == -1);           // roster vide
 }
@@ -342,6 +345,81 @@ static void test_charger_confirmation(void)
     muet_fin(m);
 }
 
+static void test_nom_est_un_id(void)
+{
+    assert(nom_est_un_id("3") && nom_est_un_id("007") && nom_est_un_id("1234567890123"));
+    assert(!nom_est_un_id("") && !nom_est_un_id("Ada") && !nom_est_un_id("Ada2"));
+    assert(!nom_est_un_id("2Ada") && !nom_est_un_id("-3") && !nom_est_un_id("3.5"));
+}
+
+/* Un nom fait de chiffres est refusé au chargement comme à la fusion : il serait confondu avec un ID. */
+static void test_nom_nombre_refuse(void)
+{
+    roster_t r;
+    int ajoutes = 0;
+    int ignores = 0;
+
+    entrer_dossier_jetable();
+    ecrire_fichier_perso("Ada 10 10 10 0 10\n123 10 10 10 0 10\n");
+    roster_init(&r);
+    assert(charger(&r, FICHIER_SAUVEGARDE) == SAUVEGARDE_ERR_FORMAT && r.len == 0);
+    assert(fusionner(&r, FICHIER_SAUVEGARDE, &ajoutes, &ignores) == SAUVEGARDE_ERR_FORMAT);
+    assert(r.len == 0 && ajoutes == 0);                          // pas même « Ada »
+    ecrire_fichier_perso("Ada1 10 10 10 0 10\n");
+    assert(charger(&r, FICHIER_SAUVEGARDE) == SAUVEGARDE_OK && r.len == 1);   // un nom avec un chiffre reste permis
+    roster_liberer(&r);
+    sortir_dossier_jetable();
+}
+
+/* Retire les codes couleur ANSI (ESC [ ... m) : on compare le texte tel que l'œil le lit. */
+static void sans_couleurs(char *texte)
+{
+    size_t j = 0;
+
+    for (size_t i = 0; texte[i] != '\0'; i++) {
+        if (texte[i] == '\033') {
+            while (texte[i] != '\0' && texte[i] != 'm')
+                i++;
+            if (texte[i] == '\0')
+                break;
+        } else {
+            texte[j++] = texte[i];
+        }
+    }
+    texte[j] = '\0';
+}
+
+/* La liste montre bien l'ID de chacun, dans l'ordre, sous un en-tête « ID ». */
+static void test_liste_montre_les_id(void)
+{
+    roster_t r;
+    char texte[2048] = "";
+    int sauve = 0;
+    FILE *f = NULL;
+    size_t n = 0;
+
+    remplir(&r, 3, 1);                                    // P1 est K.O.
+    fflush(stdout);
+    sauve = dup(1);
+    assert(freopen(FICHIER_ENTREE, "w", stdout) != NULL);
+    afficher_liste(&r, NULL, 0);
+    fflush(stdout);
+    dup2(sauve, 1);
+    close(sauve);
+    clearerr(stdout);
+    f = fopen(FICHIER_ENTREE, "r");
+    assert(f != NULL);
+    n = fread(texte, 1, sizeof(texte) - 1, f);
+    texte[n] = '\0';
+    fclose(f);
+    sans_couleurs(texte);
+    assert(strstr(texte, "ID  Nom") != NULL && strstr(texte, "Personnages (3)") != NULL);
+    assert(strstr(texte, " 1  P0") != NULL);                     // l'ID, puis le nom
+    assert(strstr(texte, " 2  P1") != NULL && strstr(texte, " 3  P2") != NULL);
+    assert(strstr(texte, "K.O.") != NULL);
+    roster_liberer(&r);
+}
+
 /* La base livrée dans exemples/ se charge sans erreur et couvre bien les 4 catégories. */
 static void test_base_exemple(void)
 {
@@ -373,5 +451,8 @@ void tests_console(void)
     test_fusionner();
     test_charger_confirmation();
     test_base_exemple();
+    test_nom_est_un_id();
+    test_nom_nombre_refuse();
+    test_liste_montre_les_id();
     remove(FICHIER_ENTREE);
 }

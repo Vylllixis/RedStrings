@@ -51,14 +51,14 @@ const char *menu_indisponible(const roster_t *r, int choix)
     return NULL;
 }
 
-/* Redemande jusqu'à un nom ou un numéro connu. Renvoie l'indice, SAISIE_ANNULEE (q) ou SAISIE_FIN. */
+/* Redemande jusqu'à un nom ou un ID connu. Renvoie l'indice, SAISIE_ANNULEE (q) ou SAISIE_FIN. */
 static int demander_personnage(const roster_t *r, const char *question)
 {
     char saisie[64];
     int idx = 0;
 
     while (1) {
-        printf("  " GRAS "%s" RESET GRIS " (nom ou numéro · " MOT_ANNULER " annule)" RESET CYAN " › " RESET,
+        printf("  " GRAS "%s" RESET GRIS " (nom ou ID · " MOT_ANNULER " annule)" RESET CYAN " › " RESET,
             question);
         if (lire_ligne(saisie, sizeof(saisie)) == -1)
             return SAISIE_FIN;

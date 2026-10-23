@@ -29,7 +29,7 @@ const char *menu_indisponible(const roster_t *r, int choix);
 /** Crée un personnage et l'ajoute ; `q` annule à chaque étape sans rien enregistrer. */
 void menu_ajouter(roster_t *r);
 
-/** Montre la liste puis la fiche du personnage choisi (nom ou numéro). */
+/** Montre la liste puis la fiche du personnage choisi (par son nom ou son ID). */
 void menu_afficher(const roster_t *r);
 
 /** Écrit tous les personnages dans FICHIER_SAUVEGARDE. */

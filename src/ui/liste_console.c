@@ -5,9 +5,8 @@
 
 /*
 ** ╭─ liste_console.c ────────────────────────────────────────────────────
-** │ But         Montrer la liste des personnages avant de demander un
-** │             nom : numéro, nom, classe, PV et état (K.O., dans une
-** │             équipe...).
+** │ But         Montrer la liste des personnages avant d'en demander un :
+** │             ID, nom, classe, PV et état (K.O., dans une équipe...).
 ** │ Contenu     groupe_de, afficher_liste
 ** │ Utilisé par menu_personnages.c (Afficher, Charger) et
 ** │             composition_console.c (choix des équipes)
@@ -35,12 +34,14 @@ static const groupe_liste_t *groupe_de(const groupe_liste_t *groupes, int nb,
 
 /*
 ** ╭─ afficher_liste ─────────────────────────────────────────────────────
-** │ Une ligne par personnage, numérotée à partir de 1.
+** │ Une ligne par personnage, avec son ID : sa position dans la liste, à
+** │ partir de 1. C'est ce que roster_trouver() comprend à la place d'un nom.
 ** │
 ** │ Les colonnes sont alignées avec aligner_texte() (qui compte les
 ** │ colonnes visibles, pas les octets UTF-8) ; l'état vient en dernier,
 ** │ si bien qu'un très long nom décale seulement la fin de sa ligne.
-** │ Le numéro de la liste est celui que roster_trouver() comprend.
+** │ Comme un nom ne peut pas être un nombre (nom_est_un_id), un ID et un
+** │ nom ne se confondent jamais.
 ** ╰──────────────────────────────────────────────────────────────────────
 */
 void afficher_liste(const roster_t *r, const groupe_liste_t *groupes, int nb_groupes)
@@ -50,11 +51,12 @@ void afficher_liste(const roster_t *r, const groupe_liste_t *groupes, int nb_gro
     char classe[64];
 
     printf("  " GRIS "── Personnages (%d) ──" RESET "\n", r->len);
+    printf("  " GRIS "ID  %-14s  %-15s  PV" RESET "\n", "Nom", "Classe");
     for (int i = 0; i < r->len; i++) {
         aligner_texte(nom, sizeof(nom), r->data[i].nom, 14);
         aligner_texte(classe, sizeof(classe), classes[r->data[i].classe].nom, 15);
         g = groupe_de(groupes, nb_groupes, r->data[i].nom);
-        printf("  " GRAS "%2d" RESET "  %s%s" RESET "  %s%s" RESET "  " GRIS "PV %-3d" RESET,
+        printf("  " GRAS "%2d" RESET "  %s%s" RESET "  %s%s" RESET "  " GRIS "%-3d" RESET,
             i + 1, est_ko(&r->data[i]) ? GRIS : GRAS, nom,
             couleur_ansi(r->data[i].classe), classe, r->data[i].pv);
         if (est_ko(&r->data[i]))
