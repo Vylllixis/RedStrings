@@ -54,7 +54,7 @@ Thumbs.db
 !SECURITY.md
 !THIRD_PARTY_NOTICES.md
 !CODE_OF_CONDUCT.md
-!csfml/assets/audio/LICENCES.md
+!csfml/assets/audio/*.md
 !.github/*.md
 !.github/**/*.md
 
