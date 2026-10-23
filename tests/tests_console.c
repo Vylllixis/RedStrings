@@ -19,7 +19,6 @@
 
 #define _POSIX_C_SOURCE 200809L
 
-#include <assert.h>
 #include <fcntl.h>
 #include <stdio.h>
 #include <string.h>
@@ -32,6 +31,7 @@
 #include "roster.h"
 #include "saisie.h"
 #include "sauvegarde.h"
+#include "lanceur.h"
 #include "tests_console.h"
 
 #define FICHIER_ENTREE "tests_entree_tmp.txt"
@@ -42,10 +42,10 @@ static void entree(const char *texte)
 {
     FILE *f = fopen(FICHIER_ENTREE, "w");
 
-    assert(f != NULL);
+    V_CMP_BLOQUANT(f, !=, NULL);
     fputs(texte, f);
     fclose(f);
-    assert(freopen(FICHIER_ENTREE, "r", stdin) != NULL);
+    V_CMP_BLOQUANT(freopen(FICHIER_ENTREE, "r", stdin), !=, NULL);
 }
 
 static int muet_debut(void)
@@ -73,13 +73,16 @@ static void test_lire_entier(void)
     int m = muet_debut();
 
     entree("q\n");
-    assert(lire_entier("x", 0, 99, &v) == SAISIE_ANNULEE && v == -1);
+    V_CMP(lire_entier("x", 0, 99, &v), ==, SAISIE_ANNULEE);
+    V_CMP(v, ==, -1);
     entree("abc\n150\n-3\n12\n");
-    assert(lire_entier("x", 0, 99, &v) == 0 && v == 12);   // refusés, puis accepté
+    V_CMP(lire_entier("x", 0, 99, &v), ==, 0);  // refusés, puis accepté
+    V_CMP(v, ==, 12);  // refusés, puis accepté
     entree("");
-    assert(lire_entier("x", 0, 99, &v) == SAISIE_FIN);      // Ctrl+D n'est pas q
+    V_CMP(lire_entier("x", 0, 99, &v), ==, SAISIE_FIN);  // Ctrl+D n'est pas q
     entree("q\n3\n");
-    assert(lire_entier_menu("x", 0, 5, &v) == 0 && v == 3);  // q refusé dans un menu
+    V_CMP(lire_entier_menu("x", 0, 5, &v), ==, 0);  // q refusé dans un menu
+    V_CMP(v, ==, 3);  // q refusé dans un menu
     muet_fin(m);
 }
 
@@ -91,23 +94,28 @@ static void test_lire_nom(void)
     int m = muet_debut();
 
     entree("q\n");
-    assert(lire_nom("Nom", nom, sizeof(nom)) == SAISIE_ANNULEE);
+    V_CMP(lire_nom("Nom", nom, sizeof(nom)), ==, SAISIE_ANNULEE);
     entree("\n\nAr thur\nArthur\n");
-    assert(lire_nom("Nom", nom, sizeof(nom)) == 0 && strcmp(nom, "Arthur") == 0);
+    V_CMP(lire_nom("Nom", nom, sizeof(nom)), ==, 0);
+    V_TEXTE_EGAL(nom, "Arthur");
     entree("a23456789012345678901234567890\nLong\n");        // 30 caractères : refusé
-    assert(lire_nom("Nom", nom, sizeof(nom)) == 0 && strcmp(nom, "Long") == 0);
+    V_CMP(lire_nom("Nom", nom, sizeof(nom)), ==, 0);
+    V_TEXTE_EGAL(nom, "Long");
     entree("a2345678901234567890123456789\n");               // 29 : accepté tel quel
-    assert(lire_nom("Nom", nom, sizeof(nom)) == 0 && strlen(nom) == 29);
+    V_CMP(lire_nom("Nom", nom, sizeof(nom)), ==, 0);
+    V_CMP(strlen(nom), ==, 29);
     memset(trop_long, 'x', sizeof(trop_long) - 1);
     trop_long[sizeof(trop_long) - 1] = '\0';
     snprintf(saisie, sizeof(saisie), "%s\nbon\n", trop_long);
     entree(saisie);                                           // ligne énorme : pas de débordement
-    assert(lire_nom("Nom", nom, sizeof(nom)) == 0 && strcmp(nom, "bon") == 0);
+    V_CMP(lire_nom("Nom", nom, sizeof(nom)), ==, 0);
+    V_TEXTE_EGAL(nom, "bon");
     entree("123\n007\n42\nAda2\n");                          // que des chiffres : refusé (ce serait un ID)
-    assert(lire_nom("Nom", nom, sizeof(nom)) == 0 && strcmp(nom, "Ada2") == 0);
+    V_CMP(lire_nom("Nom", nom, sizeof(nom)), ==, 0);
+    V_TEXTE_EGAL(nom, "Ada2");
     entree("");
-    assert(lire_nom("Nom", nom, sizeof(nom)) == SAISIE_FIN);
-    assert(lire_nom("Nom", nom, 5) == SAISIE_FIN);            // tampon trop petit : refusé
+    V_CMP(lire_nom("Nom", nom, sizeof(nom)), ==, SAISIE_FIN);
+    V_CMP(lire_nom("Nom", nom, 5), ==, SAISIE_FIN);  // tampon trop petit : refusé
     muet_fin(m);
 }
 
@@ -116,19 +124,19 @@ static void test_confirmer(void)
     int m = muet_debut();
 
     entree("o\n");
-    assert(confirmer("?") == 1);
+    V_CMP(confirmer("?"), ==, 1);
     entree("OUI\n");
-    assert(confirmer("?") == 1);
+    V_CMP(confirmer("?"), ==, 1);
     entree("n\n");
-    assert(confirmer("?") == 0);
+    V_CMP(confirmer("?"), ==, 0);
     entree("\n");
-    assert(confirmer("?") == 0);       // Entrée seule : non, le choix sûr
+    V_CMP(confirmer("?"), ==, 0);  // Entrée seule : non, le choix sûr
     entree("q\n");
-    assert(confirmer("?") == 0);
+    V_CMP(confirmer("?"), ==, 0);
     entree("peut-être\n42\no\n");
-    assert(confirmer("?") == 1);       // réponse bizarre : on redemande
+    V_CMP(confirmer("?"), ==, 1);  // réponse bizarre : on redemande
     entree("");
-    assert(confirmer("?") == 0);       // Ctrl+D : non
+    V_CMP(confirmer("?"), ==, 0);  // Ctrl+D : non
     muet_fin(m);
 }
 
@@ -139,19 +147,21 @@ static void test_creation_annulable(void)
     int m = muet_debut();
 
     entree("q\n");
-    assert(creer_personnage(&p, tab, 1) == SAISIE_ANNULEE);          // au nom
+    V_CMP(creer_personnage(&p, tab, 1), ==, SAISIE_ANNULEE);  // au nom
     entree("Ada\nq\n");
-    assert(creer_personnage(&p, tab, 1) == SAISIE_ANNULEE);          // à la 1re statistique
+    V_CMP(creer_personnage(&p, tab, 1), ==, SAISIE_ANNULEE);  // à la 1re statistique
     entree("Ada\n50\n40\nq\n");
-    assert(creer_personnage(&p, tab, 1) == SAISIE_ANNULEE);          // à la 3e
+    V_CMP(creer_personnage(&p, tab, 1), ==, SAISIE_ANNULEE);  // à la 3e
     entree("Ada\n50\n40\n30\n20\nq\n");
-    assert(creer_personnage(&p, tab, 1) == SAISIE_ANNULEE);          // au choix de classe
+    V_CMP(creer_personnage(&p, tab, 1), ==, SAISIE_ANNULEE);  // au choix de classe
     entree("Ada\n50\n40\n30\n");
-    assert(creer_personnage(&p, tab, 1) == SAISIE_FIN);              // Ctrl+D en cours de route
+    V_CMP(creer_personnage(&p, tab, 1), ==, SAISIE_FIN);  // Ctrl+D en cours de route
     entree("Zed\nAda\n50\n40\n30\n20\n1\n");
     memset(&p, 0, sizeof(p));
-    assert(creer_personnage(&p, tab, 1) == 0);                       // « Zed » refusé, « Ada » créé
-    assert(strcmp(p.nom, "Ada") == 0 && p.pv >= STAT_MIN && p.pv <= STAT_MAX);
+    V_CMP(creer_personnage(&p, tab, 1), ==, 0);  // « Zed » refusé, « Ada » créé
+    V_TEXTE_EGAL(p.nom, "Ada");
+    V_CMP(p.pv, >=, STAT_MIN);
+    V_CMP(p.pv, <=, STAT_MAX);
     muet_fin(m);
 }
 
@@ -164,16 +174,17 @@ static void test_composition_annulable(void)
     int m = muet_debut();
 
     roster_init(&r);
-    assert(roster_ajouter(&r, &a) == 0 && roster_ajouter(&r, &b) == 0);
+    V_CMP(roster_ajouter(&r, &a), ==, 0);
+    V_CMP(roster_ajouter(&r, &b), ==, 0);
     entree("q\n");
-    assert(choisir_equipe(&r, "Équipe", equipe, NULL, 0) == SAISIE_ANNULEE);
+    V_CMP(choisir_equipe(&r, "Équipe", equipe, NULL, 0), ==, SAISIE_ANNULEE);
     entree("Ada\nq\n");
-    assert(choisir_equipe(&r, "Équipe", equipe, NULL, 0) == SAISIE_ANNULEE);   // même après un choix
+    V_CMP(choisir_equipe(&r, "Équipe", equipe, NULL, 0), ==, SAISIE_ANNULEE);  // même après un choix
     entree("Ada\n\n");
-    assert(choisir_equipe(&r, "Équipe", equipe, NULL, 0) == 1);
+    V_CMP(choisir_equipe(&r, "Équipe", equipe, NULL, 0), ==, 1);
     entree("");
-    assert(choisir_equipe(&r, "Équipe", equipe, NULL, 0) == SAISIE_FIN);
-    assert(r.len == 2);                                                        // le roster est intact
+    V_CMP(choisir_equipe(&r, "Équipe", equipe, NULL, 0), ==, SAISIE_FIN);
+    V_CMP(r.len, ==, 2);  // le roster est intact
     roster_liberer(&r);
     muet_fin(m);
 }
@@ -187,7 +198,7 @@ static void remplir(roster_t *r, int n, int ko)
     for (int i = 0; i < n; i++) {
         snprintf(p.nom, sizeof(p.nom), "P%d", i);
         p.pv = ko && i % 2 == 1 ? 0 : 50;
-        assert(roster_ajouter(r, &p) == 0);
+        V_CMP(roster_ajouter(r, &p), ==, 0);
     }
 }
 
@@ -197,18 +208,20 @@ static void test_roster_trouver(void)
     personnage_t p = {"2", 50, 40, 20, MAGE, 10};
 
     remplir(&r, 3, 0);
-    assert(roster_trouver(&r, "P1") == 1);           // par le nom
-    assert(roster_trouver(&r, "1") == 0);            // par l'ID (1 = premier)
-    assert(roster_trouver(&r, "3") == 2);
-    assert(roster_trouver(&r, "0") == -1 && roster_trouver(&r, "4") == -1);
-    assert(roster_trouver(&r, "-1") == -1 && roster_trouver(&r, "") == -1);
-    assert(roster_trouver(&r, "p1") == -1);          // sensible à la casse, comme le reste
-    assert(roster_trouver(&r, "99999999999999999999") == -1);   // pas de dépassement d'int
-    assert(roster_trouver(&r, "1x") == -1);
-    assert(roster_ajouter(&r, &p) == 0);
-    assert(roster_trouver(&r, "2") == 3);            // un nom exact passe avant l'ID (cas défensif)
+    V_CMP(roster_trouver(&r, "P1"), ==, 1);  // par le nom
+    V_CMP(roster_trouver(&r, "1"), ==, 0);  // par l'ID (1 = premier)
+    V_CMP(roster_trouver(&r, "3"), ==, 2);
+    V_CMP(roster_trouver(&r, "0"), ==, -1);
+    V_CMP(roster_trouver(&r, "4"), ==, -1);
+    V_CMP(roster_trouver(&r, "-1"), ==, -1);
+    V_CMP(roster_trouver(&r, ""), ==, -1);
+    V_CMP(roster_trouver(&r, "p1"), ==, -1);  // sensible à la casse, comme le reste
+    V_CMP(roster_trouver(&r, "99999999999999999999"), ==, -1);  // pas de dépassement d'int
+    V_CMP(roster_trouver(&r, "1x"), ==, -1);
+    V_CMP(roster_ajouter(&r, &p), ==, 0);
+    V_CMP(roster_trouver(&r, "2"), ==, 3);  // un nom exact passe avant l'ID (cas défensif)
     roster_liberer(&r);
-    assert(roster_trouver(&r, "1") == -1);           // roster vide
+    V_CMP(roster_trouver(&r, "1"), ==, -1);  // roster vide
 }
 
 static void test_menu_indisponible(void)
@@ -216,22 +229,24 @@ static void test_menu_indisponible(void)
     roster_t r;
 
     remplir(&r, 0, 0);
-    assert(menu_indisponible(&r, CHOIX_AFFICHER) != NULL);
-    assert(menu_indisponible(&r, CHOIX_COMBAT) != NULL);
-    assert(menu_indisponible(&r, CHOIX_SAUVEGARDER) != NULL);   // pas de sauvegarde vide
-    assert(menu_indisponible(&r, CHOIX_AJOUTER) == NULL);
-    assert(menu_indisponible(&r, CHOIX_CHARGER) == NULL);
-    assert(menu_indisponible(&r, CHOIX_FUSIONNER) == NULL);
+    V_CMP_BLOQUANT(menu_indisponible(&r, CHOIX_AFFICHER), !=, NULL);
+    V_CMP_BLOQUANT(menu_indisponible(&r, CHOIX_COMBAT), !=, NULL);
+    V_CMP_BLOQUANT(menu_indisponible(&r, CHOIX_SAUVEGARDER), !=, NULL);  // pas de sauvegarde vide
+    V_CMP(menu_indisponible(&r, CHOIX_AJOUTER), ==, NULL);
+    V_CMP(menu_indisponible(&r, CHOIX_CHARGER), ==, NULL);
+    V_CMP(menu_indisponible(&r, CHOIX_FUSIONNER), ==, NULL);
     roster_liberer(&r);
     remplir(&r, 1, 0);
-    assert(menu_indisponible(&r, CHOIX_AFFICHER) == NULL);
-    assert(menu_indisponible(&r, CHOIX_SAUVEGARDER) == NULL);
-    assert(menu_indisponible(&r, CHOIX_COMBAT) != NULL);         // 1 seul : pas de combat
+    V_CMP(menu_indisponible(&r, CHOIX_AFFICHER), ==, NULL);
+    V_CMP(menu_indisponible(&r, CHOIX_SAUVEGARDER), ==, NULL);
+    V_CMP_BLOQUANT(menu_indisponible(&r, CHOIX_COMBAT), !=, NULL);  // 1 seul : pas de combat
     roster_liberer(&r);
     remplir(&r, 4, 1);                                           // 2 en forme, 2 K.O.
-    assert(roster_nb_en_forme(&r) == 2 && menu_indisponible(&r, CHOIX_COMBAT) == NULL);
+    V_CMP(roster_nb_en_forme(&r), ==, 2);
+    V_CMP(menu_indisponible(&r, CHOIX_COMBAT), ==, NULL);
     r.data[0].pv = 0;
-    assert(roster_nb_en_forme(&r) == 1 && menu_indisponible(&r, CHOIX_COMBAT) != NULL);
+    V_CMP(roster_nb_en_forme(&r), ==, 1);
+    V_CMP_BLOQUANT(menu_indisponible(&r, CHOIX_COMBAT), !=, NULL);
     roster_liberer(&r);
 }
 
@@ -243,13 +258,14 @@ static void test_composition_par_numero(void)
 
     remplir(&r, 4, 1);                                           // P1 et P3 sont K.O.
     entree("1\n2\n3\n\n");                                     // P0, puis P1 (K.O. : refusé), P2
-    assert(choisir_equipe(&r, "Équipe", equipe, NULL, 0) == 2);
-    assert(strcmp(equipe[0].nom, "P0") == 0 && strcmp(equipe[1].nom, "P2") == 0);
+    V_CMP(choisir_equipe(&r, "Équipe", equipe, NULL, 0), ==, 2);
+    V_TEXTE_EGAL(equipe[0].nom, "P0");
+    V_TEXTE_EGAL(equipe[1].nom, "P2");
     entree("P0\n1\n9\nP2\n");                                 // doublon par numéro, hors liste
-    assert(choisir_equipe(&r, "Équipe", equipe, NULL, 0) == 2);
+    V_CMP(choisir_equipe(&r, "Équipe", equipe, NULL, 0), ==, 2);
     entree("1\n3\n");                                            // P0 est déjà engagé chez l'autre équipe
-    assert(choisir_equipe(&r, "Équipe", equipe, &r.data[0], 1) == 1);
-    assert(strcmp(equipe[0].nom, "P2") == 0);
+    V_CMP(choisir_equipe(&r, "Équipe", equipe, &r.data[0], 1), ==, 1);
+    V_TEXTE_EGAL(equipe[0].nom, "P2");
     muet_fin(m);
     roster_liberer(&r);
 }
@@ -258,7 +274,7 @@ static void ecrire_fichier_perso(const char *contenu)
 {
     FILE *f = fopen(FICHIER_SAUVEGARDE, "w");
 
-    assert(f != NULL);
+    V_CMP_BLOQUANT(f, !=, NULL);
     fputs(contenu, f);
     fclose(f);
 }
@@ -269,16 +285,16 @@ static void entrer_dossier_jetable(void)
     remove(DOSSIER_TEST "/" FICHIER_SAUVEGARDE);    // reste d'une exécution interrompue
     remove(DOSSIER_TEST "/" FICHIER_ENTREE);
     rmdir(DOSSIER_TEST);
-    assert(mkdir(DOSSIER_TEST, 0700) == 0);
-    assert(chdir(DOSSIER_TEST) == 0);
+    V_CMP(mkdir(DOSSIER_TEST, 0700), ==, 0);
+    V_CMP(chdir(DOSSIER_TEST), ==, 0);
 }
 
 static void sortir_dossier_jetable(void)
 {
     remove(FICHIER_SAUVEGARDE);
     remove(FICHIER_ENTREE);                 // celui d'ici : entree() écrit dans le dossier courant
-    assert(chdir("..") == 0);
-    assert(rmdir(DOSSIER_TEST) == 0);
+    V_CMP(chdir(".."), ==, 0);
+    V_CMP(rmdir(DOSSIER_TEST), ==, 0);
 }
 
 static void test_fusionner(void)
@@ -290,18 +306,24 @@ static void test_fusionner(void)
     entrer_dossier_jetable();
     remplir(&r, 2, 0);                                   // P0 et P1 existent déjà
     ecrire_fichier_perso("P1 99 99 99 0 99\nZed 10 10 10 0 10\nAda 20 20 20 1 20\n");
-    assert(fusionner(&r, FICHIER_SAUVEGARDE, &ajoutes, &ignores) == SAUVEGARDE_OK);
-    assert(ajoutes == 2 && ignores == 1 && r.len == 4);
-    assert(r.data[1].pv == 50);                          // P1 n'a pas été écrasé
-    assert(strcmp(r.data[2].nom, "Zed") == 0 && strcmp(r.data[3].nom, "Ada") == 0);
-    assert(fusionner(&r, FICHIER_SAUVEGARDE, &ajoutes, &ignores) == SAUVEGARDE_OK);
-    assert(ajoutes == 0 && ignores == 3 && r.len == 4);  // rejouer ne duplique rien
+    V_CMP(fusionner(&r, FICHIER_SAUVEGARDE, &ajoutes, &ignores), ==, SAUVEGARDE_OK);
+    V_CMP(ajoutes, ==, 2);
+    V_CMP(ignores, ==, 1);
+    V_CMP(r.len, ==, 4);
+    V_CMP(r.data[1].pv, ==, 50);  // P1 n'a pas été écrasé
+    V_TEXTE_EGAL(r.data[2].nom, "Zed");
+    V_TEXTE_EGAL(r.data[3].nom, "Ada");
+    V_CMP(fusionner(&r, FICHIER_SAUVEGARDE, &ajoutes, &ignores), ==, SAUVEGARDE_OK);
+    V_CMP(ajoutes, ==, 0);  // rejouer ne duplique rien
+    V_CMP(ignores, ==, 3);  // rejouer ne duplique rien
+    V_CMP(r.len, ==, 4);  // rejouer ne duplique rien
     ecrire_fichier_perso("Bob 10 10 10 0 10\nCaro 10 10 10 999 10\n");
-    assert(fusionner(&r, FICHIER_SAUVEGARDE, &ajoutes, &ignores) == SAUVEGARDE_ERR_FORMAT);
-    assert(r.len == 4 && ajoutes == 0);                  // fichier invalide : rien n'est ajouté, même Bob
+    V_CMP(fusionner(&r, FICHIER_SAUVEGARDE, &ajoutes, &ignores), ==, SAUVEGARDE_ERR_FORMAT);
+    V_CMP(r.len, ==, 4);  // fichier invalide : rien n'est ajouté, même Bob
+    V_CMP(ajoutes, ==, 0);  // fichier invalide : rien n'est ajouté, même Bob
     remove(FICHIER_SAUVEGARDE);
-    assert(fusionner(&r, FICHIER_SAUVEGARDE, &ajoutes, &ignores) == SAUVEGARDE_ERR_OUVERTURE);
-    assert(r.len == 4);
+    V_CMP(fusionner(&r, FICHIER_SAUVEGARDE, &ajoutes, &ignores), ==, SAUVEGARDE_ERR_OUVERTURE);
+    V_CMP(r.len, ==, 4);
     roster_liberer(&r);
     sortir_dossier_jetable();
 }
@@ -316,30 +338,33 @@ static void test_charger_confirmation(void)
     remplir(&r, 3, 0);
     entree("n\n");
     menu_charger(&r);
-    assert(r.len == 3 && strcmp(r.data[0].nom, "P0") == 0);        // refusé : rien n'est écrasé
+    V_CMP(r.len, ==, 3);  // refusé : rien n'est écrasé
+    V_TEXTE_EGAL(r.data[0].nom, "P0");  // refusé : rien n'est écrasé
     entree("\n");
     menu_charger(&r);
-    assert(r.len == 3);                                             // Entrée seule = non
+    V_CMP(r.len, ==, 3);  // Entrée seule = non
     entree("q\n");
     menu_charger(&r);
-    assert(r.len == 3);
+    V_CMP(r.len, ==, 3);
     entree("");
     menu_charger(&r);
-    assert(r.len == 3);                                             // Ctrl+D = non
+    V_CMP(r.len, ==, 3);  // Ctrl+D = non
     entree("oui\n");
     menu_charger(&r);
-    assert(r.len == 1 && strcmp(r.data[0].nom, "Zed") == 0);        // confirmé : remplacé
+    V_CMP(r.len, ==, 1);  // confirmé : remplacé
+    V_TEXTE_EGAL(r.data[0].nom, "Zed");  // confirmé : remplacé
     roster_liberer(&r);
     remplir(&r, 0, 0);
     entree("");                                                     // liste vide : aucune question
     menu_charger(&r);
-    assert(r.len == 1);
+    V_CMP(r.len, ==, 1);
     roster_liberer(&r);
     ecrire_fichier_perso("Zed 10 10 10 0 10\nCaro 10 10 10 999 10\n");
     remplir(&r, 2, 0);
     entree("o\n");
     menu_charger(&r);
-    assert(r.len == 2 && strcmp(r.data[0].nom, "P0") == 0);        // fichier invalide : intact
+    V_CMP(r.len, ==, 2);  // fichier invalide : intact
+    V_TEXTE_EGAL(r.data[0].nom, "P0");  // fichier invalide : intact
     roster_liberer(&r);
     sortir_dossier_jetable();
     muet_fin(m);
@@ -347,9 +372,15 @@ static void test_charger_confirmation(void)
 
 static void test_nom_est_un_id(void)
 {
-    assert(nom_est_un_id("3") && nom_est_un_id("007") && nom_est_un_id("1234567890123"));
-    assert(!nom_est_un_id("") && !nom_est_un_id("Ada") && !nom_est_un_id("Ada2"));
-    assert(!nom_est_un_id("2Ada") && !nom_est_un_id("-3") && !nom_est_un_id("3.5"));
+    V_VRAI(nom_est_un_id("3"));
+    V_VRAI(nom_est_un_id("007"));
+    V_VRAI(nom_est_un_id("1234567890123"));
+    V_FAUX(nom_est_un_id(""));
+    V_FAUX(nom_est_un_id("Ada"));
+    V_FAUX(nom_est_un_id("Ada2"));
+    V_FAUX(nom_est_un_id("2Ada"));
+    V_FAUX(nom_est_un_id("-3"));
+    V_FAUX(nom_est_un_id("3.5"));
 }
 
 /* Un nom fait de chiffres est refusé au chargement comme à la fusion : il serait confondu avec un ID. */
@@ -362,11 +393,14 @@ static void test_nom_nombre_refuse(void)
     entrer_dossier_jetable();
     ecrire_fichier_perso("Ada 10 10 10 0 10\n123 10 10 10 0 10\n");
     roster_init(&r);
-    assert(charger(&r, FICHIER_SAUVEGARDE) == SAUVEGARDE_ERR_FORMAT && r.len == 0);
-    assert(fusionner(&r, FICHIER_SAUVEGARDE, &ajoutes, &ignores) == SAUVEGARDE_ERR_FORMAT);
-    assert(r.len == 0 && ajoutes == 0);                          // pas même « Ada »
+    V_CMP(charger(&r, FICHIER_SAUVEGARDE), ==, SAUVEGARDE_ERR_FORMAT);
+    V_CMP(r.len, ==, 0);
+    V_CMP(fusionner(&r, FICHIER_SAUVEGARDE, &ajoutes, &ignores), ==, SAUVEGARDE_ERR_FORMAT);
+    V_CMP(r.len, ==, 0);  // pas même « Ada »
+    V_CMP(ajoutes, ==, 0);  // pas même « Ada »
     ecrire_fichier_perso("Ada1 10 10 10 0 10\n");
-    assert(charger(&r, FICHIER_SAUVEGARDE) == SAUVEGARDE_OK && r.len == 1);   // un nom avec un chiffre reste permis
+    V_CMP(charger(&r, FICHIER_SAUVEGARDE), ==, SAUVEGARDE_OK);  // un nom avec un chiffre reste permis
+    V_CMP(r.len, ==, 1);  // un nom avec un chiffre reste permis
     roster_liberer(&r);
     sortir_dossier_jetable();
 }
@@ -401,22 +435,24 @@ static void test_liste_montre_les_id(void)
     remplir(&r, 3, 1);                                    // P1 est K.O.
     fflush(stdout);
     sauve = dup(1);
-    assert(freopen(FICHIER_ENTREE, "w", stdout) != NULL);
+    V_CMP_BLOQUANT(freopen(FICHIER_ENTREE, "w", stdout), !=, NULL);
     afficher_liste(&r, NULL, 0);
     fflush(stdout);
     dup2(sauve, 1);
     close(sauve);
     clearerr(stdout);
     f = fopen(FICHIER_ENTREE, "r");
-    assert(f != NULL);
+    V_CMP_BLOQUANT(f, !=, NULL);
     n = fread(texte, 1, sizeof(texte) - 1, f);
     texte[n] = '\0';
     fclose(f);
     sans_couleurs(texte);
-    assert(strstr(texte, "ID  Nom") != NULL && strstr(texte, "Personnages (3)") != NULL);
-    assert(strstr(texte, " 1  P0") != NULL);                     // l'ID, puis le nom
-    assert(strstr(texte, " 2  P1") != NULL && strstr(texte, " 3  P2") != NULL);
-    assert(strstr(texte, "K.O.") != NULL);
+    V_CMP_BLOQUANT(strstr(texte, "ID  Nom"), !=, NULL);
+    V_CMP_BLOQUANT(strstr(texte, "Personnages (3)"), !=, NULL);
+    V_CMP_BLOQUANT(strstr(texte, " 1  P0"), !=, NULL);  // l'ID, puis le nom
+    V_CMP_BLOQUANT(strstr(texte, " 2  P1"), !=, NULL);
+    V_CMP_BLOQUANT(strstr(texte, " 3  P2"), !=, NULL);
+    V_CMP_BLOQUANT(strstr(texte, "K.O."), !=, NULL);
     roster_liberer(&r);
 }
 
@@ -427,32 +463,32 @@ static void test_base_exemple(void)
     int vues[NB_CATEGORIES] = {0};
 
     roster_init(&r);
-    assert(charger(&r, "exemples/personnages_base.txt") == SAUVEGARDE_OK);
-    assert(r.len == 8);
+    V_CMP(charger(&r, "exemples/personnages_base.txt"), ==, SAUVEGARDE_OK);
+    V_CMP(r.len, ==, 8);
     for (int i = 0; i < r.len; i++) {
-        assert(!est_ko(&r.data[i]));
+        V_FAUX(est_ko(&r.data[i]));
         vues[classes[r.data[i].classe].categorie]++;
     }
     for (int c = 0; c < NB_CATEGORIES; c++)
-        assert(vues[c] == 2);
+        V_CMP(vues[c], ==, 2);
     roster_liberer(&r);
 }
 
 void tests_console(void)
 {
-    test_lire_entier();
-    test_lire_nom();
-    test_confirmer();
-    test_creation_annulable();
-    test_composition_annulable();
-    test_roster_trouver();
-    test_menu_indisponible();
-    test_composition_par_numero();
-    test_fusionner();
-    test_charger_confirmation();
-    test_base_exemple();
-    test_nom_est_un_id();
-    test_nom_nombre_refuse();
-    test_liste_montre_les_id();
+    LANCER(test_lire_entier);
+    LANCER(test_lire_nom);
+    LANCER(test_confirmer);
+    LANCER(test_creation_annulable);
+    LANCER(test_composition_annulable);
+    LANCER(test_roster_trouver);
+    LANCER(test_menu_indisponible);
+    LANCER(test_composition_par_numero);
+    LANCER(test_fusionner);
+    LANCER(test_charger_confirmation);
+    LANCER(test_base_exemple);
+    LANCER(test_nom_est_un_id);
+    LANCER(test_nom_nombre_refuse);
+    LANCER(test_liste_montre_les_id);
     remove(FICHIER_ENTREE);
 }
