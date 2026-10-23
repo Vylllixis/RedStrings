@@ -5,13 +5,12 @@
 
 /*
 ** ╭─ bataille_console.c ─────────────────────────────────────────────────
-** │ But         Le combat en équipe dans le terminal : composer les
-** │             équipes, demander les actions du joueur, afficher l'état
-** │             et le journal.
+** │ But         Le combat en équipe dans le terminal : demander les
+** │             actions du joueur, afficher l'état et le journal.
 ** │ Règle       toutes les règles viennent du moteur (bataille.c) ; ce
 ** │             fichier ne fait que demander et afficher
-** │ Sections    Constitution des équipes · Affichage · Tour du joueur ·
-** │             Boucle de combat
+** │ Sections    Affichage · Tour du joueur · Boucle de combat
+** │ Voir aussi  composition_console.c : le choix des deux équipes
 ** ╰──────────────────────────────────────────────────────────────────────
 */
 
@@ -19,8 +18,8 @@
 #include "bataille.h"
 #include "bataille_console.h"
 #include "boite.h"
+#include "composition_console.h"
 #include "couleurs.h"
-#include "my_string.h"
 #include "saisie.h"
 
 #define CASES_PV 12
@@ -30,69 +29,6 @@ static const char *NOMS_ACTIONS[NB_ACTIONS] = {
     [ACTION_SOIGNER] = "Soigner",
     [ACTION_DEFENDRE] = "Défendre",
 };
-
-/* ------------------------------------------------------------------ */
-/*  Constitution des équipes                                           */
-/* ------------------------------------------------------------------ */
-
-static int deja_choisi(const personnage_t *choisis, int n, const char *nom)
-{
-    for (int i = 0; i < n; i++) {
-        if (my_strcmp(choisis[i].nom, nom) == 0)
-            return 1;
-    }
-    return 0;
-}
-
-/** Personnages encore engageables : en forme et pas déjà choisis. */
-static int nb_disponibles(const roster_t *r, const personnage_t *equipe, int n,
-    const personnage_t *autre, int nb_autre)
-{
-    int dispo = 0;
-
-    for (int i = 0; i < r->len; i++)
-        dispo += !est_ko(&r->data[i]) && !deja_choisi(equipe, n, r->data[i].nom)
-            && !deja_choisi(autre, nb_autre, r->data[i].nom);
-    return dispo;
-}
-
-/*
-** ╭─ choisir_equipe ─────────────────────────────────────────────────────
-** │ Demande jusqu'à TAILLE_EQUIPE_MAX noms (une ligne vide termine).
-** │
-** │ Refuse un nom introuvable, un personnage K.O., ou un personnage déjà
-** │ engagé dans l'une des deux équipes.
-** │ Renvoie la taille de l'équipe, ou -1 sur Ctrl+D.
-** ╰──────────────────────────────────────────────────────────────────────
-*/
-static int choisir_equipe(const roster_t *r, const char *titre,
-    personnage_t equipe[TAILLE_EQUIPE_MAX], const personnage_t *autre, int nb_autre)
-{
-    char nom[NOM_MAX];
-    int n = 0;
-    int idx = 0;
-
-    printf("  " GRAS "%s" RESET GRIS " (1 à %d, ligne vide pour terminer)" RESET "\n",
-        titre, TAILLE_EQUIPE_MAX);
-    while (n < TAILLE_EQUIPE_MAX && nb_disponibles(r, equipe, n, autre, nb_autre) > 0) {
-        printf("  " GRIS "%d." RESET CYAN " › " RESET, n + 1);
-        if (lire_ligne(nom, sizeof(nom)) == -1)
-            return -1;
-        if (nom[0] == '\0' && n > 0)
-            break;
-        idx = trouver_personnage(r->data, r->len, nom);
-        if (idx == -1)
-            afficher_erreur("Personnage introuvable");
-        else if (est_ko(&r->data[idx]))
-            afficher_erreur("Ce personnage est K.O.");
-        else if (deja_choisi(equipe, n, nom) || deja_choisi(autre, nb_autre, nom))
-            afficher_erreur("Ce personnage est déjà engagé");
-        else
-            equipe[n++] = r->data[idx];
-    }
-    printf("\n");
-    return n;
-}
 
 /* ------------------------------------------------------------------ */
 /*  Affichage                                                          */
