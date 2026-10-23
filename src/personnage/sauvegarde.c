@@ -30,7 +30,7 @@ static int personnage_valide(const personnage_t *p, int classe,
     if (!stat_valide(p->pv) || !stat_valide(p->atq) || !stat_valide(p->def)
         || !stat_valide(p->soin))
         return 0;
-    if (!classe_valide(classe))
+    if (!classe_valide(classe) || nom_est_un_id(p->nom))
         return 0;
     return trouver_personnage(deja_lus->data, deja_lus->len, p->nom) == -1;
 }
