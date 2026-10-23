@@ -44,6 +44,7 @@ Ouvrir ensuite `docs/index.html` dans un navigateur : la page d'accueil présent
 | `src/ui/`, `src/redstrings.c` | la version terminal |
 | `csfml/` | la version graphique : `src/` rangé par thème, `include/` un en-tête par thème |
 | `lib/` | `libmy.a`, 40 fonctions de bibliothèque réécrites |
+| `csfml/src/audio/`, `csfml/assets/audio/` | le système audio (moteur, packs de sons, manifestes `sons.txt`) et le générateur des sons |
 | `tests/`, `csfml/tests/` | les tests unitaires |
 | `Makefile`, `csfml/Makefile` | compilation avec `-std=c11 -Wall -Wextra -Werror -pedantic -Wshadow -Wmissing-prototypes` |
 
@@ -52,6 +53,7 @@ Ouvrir ensuite `docs/index.html` dans un navigateur : la page d'accueil présent
 - Création de personnages (28 classes en 4 catégories), sauvegarde et chargement dans `personnages.txt`.
 - Combat en équipe de 1 à 4 contre l'ordinateur : attaquer, soigner, se mettre en garde.
 - Version graphique : arène animée, fenêtre redimensionnable, plein écran (touche <kbd>F11</kbd>).
+- Son (version graphique) : musiques et bruitages originaux, deux identités sonores (standard et Yu-Gi-Oh!), réglages <kbd>F2</kbd> et coupure <kbd>F3</kbd>. Guide : `csfml/assets/audio/AUDIO.md`.
 - Mode caché `./redstrings_csfml "Yu-Gi-Oh!"` : les classes deviennent des cartes. Il demande des illustrations qui ne sont pas incluses (droits), à télécharger avec `sh csfml/assets/yugioh/telecharger.sh` ; sans elles, le mode fonctionne avec les emblèmes des classes.
 
 ## Limites connues
