@@ -17,6 +17,7 @@
 */
 
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 #include <time.h>
 #include "audio_interne.h"
@@ -145,6 +146,7 @@ void audio_init(app_t *app)
 
     reglages_defaut(&a->reglages);
     reglages_lire(&a->reglages, FICHIER_REGLAGES_AUDIO);
+    a->trace = getenv("REDSTRINGS_AUDIO_TRACE") != NULL;
     a->graine = (unsigned int)time(NULL) | 1u;
     a->attenuation = 1.f;
     for (int i = 0; i < NB_SONS; i++) {

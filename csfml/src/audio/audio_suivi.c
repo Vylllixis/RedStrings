@@ -71,8 +71,10 @@ static void suivre_konami(app_t *app, audio_suivi_t *v)
         return;
     if (k[KONAMI[v->konami]])
         v->konami++;
+    else if (k[sfKeyUp])                // « ↑ ↑ ↑ » : les deux derniers ↑ restent un bon début
+        v->konami = v->konami == 2 ? 2 : 1;
     else
-        v->konami = k[KONAMI[0]] ? 1 : 0;
+        v->konami = 0;
     if (v->konami < NB_KONAMI)
         return;
     v->konami = 0;
@@ -214,7 +216,9 @@ void audio_suivre(app_t *app)
 ** │ Le son d'un événement du moteur, au moment de son impact à l'écran.
 ** │
 ** │ - attaque : coup paré si la cible était en garde, coup lourd s'il
-** │   retire au moins un quart des PV max, coup normal sinon
+** │   retire au moins la moitié des PV max (un moment marquant, pas la
+** │   règle : avec des statistiques ordinaires, un coup en retire
+** │   souvent 40 à 50 %), coup normal sinon
 ** │ - soin, garde, fin de garde, K.O. : leur son propre
 ** │ - le son vient du côté de la cible (ton équipe à gauche)
 ** ╰──────────────────────────────────────────────────────────────────────
@@ -226,7 +230,7 @@ void audio_impact(app_t *app, const evenement_t *ev, int pv_max)
 
     if (ev->type == EV_ATTAQUE && ev->garde)
         s = SON_COMBAT_IMPACT_GARDE;
-    else if (ev->type == EV_ATTAQUE && ev->valeur * 4 >= pv_max)
+    else if (ev->type == EV_ATTAQUE && ev->valeur * 2 >= pv_max)
         s = SON_COMBAT_IMPACT_LOURD;
     else if (ev->type == EV_SOIN)
         s = SON_COMBAT_SOIN;

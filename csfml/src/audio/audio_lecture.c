@@ -15,6 +15,7 @@
 */
 
 #include <math.h>
+#include <stdio.h>
 #include "audio_interne.h"
 #include "gui_app.h"
 
@@ -80,8 +81,12 @@ static void jouer(app_t *app, son_t s, float hauteur, float pan, int secondaire)
     if (!a->pret || info == NULL || a->reglages.coupe || (secondaire && a->important))
         return;
     e = son_resoudre(&a->pack, &a->standard, s, &source);
-    if (e == NULL || !son_autorise(s, a->derniere[s], actives(a, s), a->temps))
+    if (e == NULL || !son_autorise(s, a->derniere[s], actives(a, s), a->temps)) {
+        if (a->trace)
+            fprintf(stderr, "audio %7.2f  %-20s %s\n", a->temps, info->nom,
+                e == NULL ? "muet (aucun pack)" : "refusé (rythme)");
         return;
+    }
     var = variante_choisir(e, a->precedente[s], &a->graine, &rare);
     t = tampon_obtenir(a, source, rare ? e->rare : e->fichiers[var]);
     i = t != NULL ? voix_libre(a, info->priorite) : -1;
@@ -96,6 +101,10 @@ static void jouer(app_t *app, son_t s, float hauteur, float pan, int secondaire)
     sfSound_setPosition(v->son, (sfVector3f){pan, 0.f, fabsf(pan) > 0.001f ? -1.f : 0.f});
     sfSound_setAttenuation(v->son, ATTENUATION_SON);
     sfSound_play(v->son);
+    if (a->trace)
+        fprintf(stderr, "audio %7.2f  %-20s %s%s\n", a->temps, info->nom,
+            rare ? e->rare : e->fichiers[var], source == &a->standard && a->theme
+            != THEME_STANDARD ? "  (repli standard)" : "");
     *v = (voix_t){v->son, (int)s, info->priorite, a->temps};
     a->derniere[s] = a->temps;
     a->precedente[s] = rare ? a->precedente[s] : var;

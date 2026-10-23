@@ -14,6 +14,7 @@
 */
 
 #include <assert.h>
+#include <dirent.h>
 #include <stdio.h>
 #include <string.h>
 #include "gui_sons.h"
@@ -193,6 +194,69 @@ static void test_reglages(void)
     assert(theme_effectif(CHOIX_THEME_STANDARD, 1) == THEME_STANDARD);
 }
 
+/* Le fichier `nom` est-il cité par le pack (bruitage, variante rare ou musique) ? */
+static int cite(const pack_t *p, const char *nom)
+{
+    for (int s = 0; s < NB_SONS; s++) {
+        for (int v = 0; v < p->sons[s].nb; v++)
+            if (strcmp(p->sons[s].fichiers[v], nom) == 0)
+                return 1;
+        if (strcmp(p->sons[s].rare, nom) == 0)
+            return 1;
+    }
+    for (int m = 0; m < NB_MUSIQUES; m++)
+        if (strcmp(p->musiques[m].fichier, nom) == 0)
+            return 1;
+    return 0;
+}
+
+static void verifier_fichiers(const pack_t *p)
+{
+    char chemin[SON_CHEMIN_MAX];
+    DIR *d = opendir(p->dossier);
+    struct dirent *e = NULL;
+    FILE *f = NULL;
+
+    for (int s = 0; s < NB_SONS; s++) {
+        for (int v = 0; v < p->sons[s].nb; v++) {
+            assert(pack_chemin(p, p->sons[s].fichiers[v], chemin, sizeof(chemin)) == 0);
+            f = fopen(chemin, "rb");
+            assert(f != NULL);                  // chaque fichier cité existe
+            fclose(f);
+        }
+    }
+    assert(d != NULL);
+    while ((e = readdir(d)) != NULL) {
+        size_t n = strlen(e->d_name);
+
+        if (n > 4 && strcmp(e->d_name + n - 4, ".ogg") == 0)
+            assert(cite(p, e->d_name));         // aucun fichier oublié dans le dossier
+    }
+    closedir(d);
+}
+
+/* Les packs livrés : manifestes valides, fichiers présents, repli voulu. */
+static void test_packs_livres(void)
+{
+    static pack_t standard;
+    static pack_t yugioh;
+    const pack_t *source = NULL;
+    char msg[300];
+
+    assert(pack_charger(&standard, "assets/audio/standard", "sons.txt", msg, sizeof(msg)) == 0);
+    assert(pack_charger(&yugioh, "assets/audio/yugioh", "sons.txt", msg, sizeof(msg)) == 0);
+    verifier_fichiers(&standard);
+    verifier_fichiers(&yugioh);
+    for (int s = 0; s < NB_SONS; s++) {
+        assert(standard.sons[s].nb > 0);        // le standard couvre tout : repli complet
+        son_resoudre(&yugioh, &standard, (son_t)s, &source);
+        assert(source == ((s == SON_UI_SAISIE || s == SON_UI_EFFACEMENT || s == SON_UI_VALEUR)
+            ? &standard : &yugioh));            // Yu-Gi-Oh! a ses propres sons
+    }
+    for (int m = 0; m < NB_MUSIQUES; m++)
+        assert(standard.musiques[m].fichier[0] != '\0' && yugioh.musiques[m].fichier[0] != '\0');
+}
+
 void tests_audio(void)
 {
     test_evenements();
@@ -203,4 +267,5 @@ void tests_audio(void)
     test_volumes();
     test_rythme_et_voix();
     test_reglages();
+    test_packs_livres();
 }

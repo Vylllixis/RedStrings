@@ -26,7 +26,7 @@
 #include "gui_ui.h"
 
 #define PW 620.f
-#define PH 470.f
+#define PH 500.f
 #define PX ((LARGEUR - PW) / 2.f)
 #define PY ((HAUTEUR - PH) / 2.f)
 #define NB_LIGNES 5     /* 3 volumes, son coupé, thème */
@@ -131,9 +131,18 @@ static void volumes(app_t *app, panneau_audio_t *p, float y)
     }
 }
 
+/* Barre d'accent à gauche de la ligne choisie au clavier (comme les glissières). */
+static void repere(app_t *app, const panneau_audio_t *p, int ligne, float y)
+{
+    if (p->ligne == ligne)
+        rect_arrondi(app, (sfFloatRect){PX + 42.f, y + 8.f, 3.f, 32.f}, 0.f, C_CYAN);
+}
+
 static void ligne_coupe(app_t *app, panneau_audio_t *p, float y)
 {
     int coupe = app->audio.reglages.coupe;
+
+    repere(app, p, 3, y);
 
     if (bouton(app, &p->boutons[0], (sfFloatRect){PX + 56.f, y, PW - 112.f, 48.f},
         coupe ? "Son coupé" : "Son activé", "F3", coupe ? "cliquer pour rétablir"
@@ -145,14 +154,17 @@ static void ligne_coupe(app_t *app, panneau_audio_t *p, float y)
 
 static void ligne_theme(app_t *app, panneau_audio_t *p, float y)
 {
-    char auto_libelle[48];
-    const char *libelles[NB_CHOIX_THEMES] = {auto_libelle, "Standard", "Yu-Gi-Oh!"};
+    char legende[96];
+    const char *libelles[NB_CHOIX_THEMES] = {"Auto", "Standard", "Yu-Gi-Oh!"};
     float w = (PW - 112.f - 2 * 12.f) / NB_CHOIX_THEMES;
     sfFloatRect r;
     int clic = 0;
 
-    snprintf(auto_libelle, sizeof(auto_libelle), "Auto (%s)",
+    repere(app, p, 4, y);
+    snprintf(legende, sizeof(legende), "Auto suit le mode de lancement : thème %s",
         nom_theme(theme_effectif(CHOIX_THEME_AUTO, app->mode == MODE_YUGIOH)));
+    texte(app, POLICE_NORMALE, legende, 13, (sfVector2f){PX + 56.f, y + 66.f},
+        C_TEXTE_FAIBLE, ALIGNE_GAUCHE);
     for (int i = 0; i < NB_CHOIX_THEMES; i++) {
         r = (sfFloatRect){PX + 56.f + i * (w + 12.f), y, w, 48.f};
         clic = (int)app->audio.reglages.theme == i
@@ -203,7 +215,7 @@ void audio_panneau(app_t *app)
     etiquette(app, "THÈME SONORE", (sfVector2f){PX + 56.f, PY + 345.f}, C_TEXTE_DOUX,
         ALIGNE_GAUCHE);
     ligne_theme(app, p, PY + 362.f);
-    texte(app, POLICE_NORMALE, "↑↓ choisir   ←→ régler   F2 ou Échap : fermer", 13,
+    texte(app, POLICE_NORMALE, "Flèches : choisir et régler   ·   F2 ou Échap : fermer", 13,
         (sfVector2f){LARGEUR / 2.f, PY + PH - 26.f}, C_TEXTE_FAIBLE, ALIGNE_CENTRE);
     app->alpha = a;
 }

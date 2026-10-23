@@ -82,6 +82,7 @@ typedef struct {
 
 typedef struct {
     int pret;                   /**< 0 : pas d'audio, tous les appels sont sans effet */
+    int trace;                  /**< REDSTRINGS_AUDIO_TRACE=1 : chaque décision sur stderr */
     reglages_audio_t reglages;
     theme_son_t theme;
     pack_t standard;
