@@ -51,7 +51,7 @@ Ouvrir ensuite `docs/index.html` dans un navigateur : la page d'accueil présent
 ## Fonctionnalités
 
 - Création de personnages (28 classes en 4 catégories), sauvegarde et chargement dans `personnages.txt`.
-- Version terminal : `q` annule n'importe quelle étape sans rien enregistrer, la liste numérotée des personnages s'affiche avant de choisir (par nom ou par numéro), les entrées sans effet sont grisées, *Charger* demande confirmation avant d'écraser et *Ajouter depuis le fichier* fusionne sans rien écraser. Une base de 8 personnages est dans `exemples/personnages_base.txt`.
+- Version terminal : `q` annule n'importe quelle étape sans rien enregistrer, la liste des personnages avec leur ID s'affiche avant de choisir (par nom ou par ID, donc un nom ne peut pas être fait que de chiffres), les entrées sans effet sont grisées, *Charger* demande confirmation avant d'écraser et *Ajouter depuis le fichier* fusionne sans rien écraser. Une base de 8 personnages est dans `exemples/personnages_base.txt`.
 - Combat en équipe de 1 à 4 contre l'ordinateur : attaquer, soigner, se mettre en garde.
 - Version graphique : arène animée, fenêtre redimensionnable, plein écran (touche <kbd>F11</kbd>).
 - Son (version graphique) : musiques et bruitages originaux, deux identités sonores (standard et Yu-Gi-Oh!), réglages <kbd>F2</kbd> et coupure <kbd>F3</kbd>. Guide : `csfml/assets/audio/AUDIO.md`.

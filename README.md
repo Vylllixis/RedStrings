@@ -372,8 +372,8 @@ Le combat s'arrête dès qu'une équipe n'a plus personne debout. Il travaille s
 | Touche | Action | Ce qui se passe |
 |:---:|---|---|
 | <kbd>1</kbd> | **Ajouter** | Nom → PV → Attaque → Défense → Soin → Classe. Le nom doit être unique (un nom pris est redemandé). |
-| <kbd>2</kbd> | **Afficher** | La liste numérotée des personnages, puis la fiche de celui que tu choisis (par son nom ou son numéro). |
-| <kbd>3</kbd> | **Combat** | La liste, ton équipe (noms ou numéros), puis celle de l'ordinateur, puis le combat au tour par tour. |
+| <kbd>2</kbd> | **Afficher** | La liste des personnages avec leur **ID**, puis la fiche de celui que tu choisis (par son nom ou son ID). |
+| <kbd>3</kbd> | **Combat** | La liste, ton équipe (par noms ou IDs), puis celle de l'ordinateur, puis le combat au tour par tour. |
 | <kbd>4</kbd> | **Sauvegarder** | Écrit tous les personnages dans `personnages.txt`. |
 | <kbd>5</kbd> | **Charger** | **Remplace** tous les personnages par ceux de `personnages.txt`, après un avertissement et une confirmation s'il y en a déjà. |
 | <kbd>6</kbd> | **Ajouter depuis le fichier** | **Ajoute** les personnages du fichier sans toucher à ceux qui existent ; un nom déjà pris est ignoré (le tien est gardé). |
@@ -381,6 +381,9 @@ Le combat s'arrête dès qu'une équipe n'a plus personne debout. Il travaille s
 
 > [!TIP]
 > **Annuler à chaque étape.** À n'importe quelle question (création, choix d'un personnage, composition des équipes, tour de combat), tape <kbd>q</kbd> : tu reviens au menu **sans rien avoir enregistré**. Le menu lui-même n'accepte pas `q` : il n'y a rien à annuler.
+
+> [!NOTE]
+> **L'ID d'un personnage** est sa position dans la liste (colonne `ID`, de 1 à N). Tape-le à la place du nom : `3` désigne le troisième. C'est pour cela qu'un nom **ne peut pas être fait uniquement de chiffres** : il serait confondu avec un ID. Cette règle vaut aussi au chargement (un fichier qui en contient un est refusé) et dans la version graphique. `Ada2` ou `2Ada` restent permis.
 
 > [!NOTE]
 > **Les entrées sans effet sont grisées.** *Afficher* et *Sauvegarder* demandent au moins 1 personnage, *Combat* au moins 2 personnages en forme (non K.O.). Les choisir quand même affiche la raison au lieu de lancer l'action. *Sauvegarder* sans personnage est refusé exprès : il aurait écrasé ton fichier par un fichier vide.
@@ -424,13 +427,13 @@ stateDiagram-v2
 
 | Saisie | Règle | Si c'est faux |
 |---|---|---|
-| Nom | 1 mot, 29 caractères max, **unique** ; `q` est réservé (annuler) | `✗ Ce nom est déjà pris`, `✗ Le nom ne peut pas contenir d'espace`, `✗ Nom trop long` : le nom est **redemandé** |
+| Nom | 1 mot, 29 caractères max, **unique**, **pas uniquement des chiffres** ; `q` est réservé (annuler) | `✗ Ce nom est déjà pris`, `✗ Le nom ne peut pas contenir d'espace`, `✗ Nom trop long`, `✗ Un nom ne peut pas être un nombre` : le nom est **redemandé** |
 | PV / Attaque / Défense / Soin | entier de **0 à 99** (statistiques de base, avant la classe) | `✗ Valeur invalide`, puis la question est reposée |
 | Classe | de 1 à 28, listées par catégorie | `✗ Valeur invalide` |
 | `12abc`, `abc`, `99999999999` | refusés : `strtol` contrôle **toute** la ligne | `✗ Valeur invalide` |
 | <kbd>q</kbd> à n'importe quelle question | annule l'étape en cours, **rien n'est enregistré** | `↩ Création annulée : rien n'a été enregistré.` |
 | <kbd>Ctrl</kbd>+<kbd>D</kbd> pendant une création | la création est annulée | `✗ Saisie interrompue` |
-| Personnage choisi par numéro | de 1 à N, comme dans la liste affichée ; un nom exact passe avant | `✗ Personnage introuvable`, puis la question est reposée |
+| Personnage choisi par ID | de 1 à N, la colonne `ID` de la liste affichée | `✗ Personnage introuvable`, puis la question est reposée |
 | Confirmation avant d'écraser | `o` ou `oui` pour accepter ; `n`, `q`, Entrée seule ou Ctrl+D refusent | `↩ Chargement annulé : tes personnages sont conservés.` |
 
 </details>
@@ -600,7 +603,7 @@ RedStrings/
 │   ├── bataille.h            combat en équipe : tours, actions, effets, événements
 │   ├── bataille_console.h    menu_bataille()
 │   ├── composition_console.h choisir_equipe() : le choix des deux équipes
-│   ├── liste_console.h       afficher_liste() : la liste numérotée des noms
+│   ├── liste_console.h       afficher_liste() : la liste des personnages avec leur ID
 │   ├── menu_personnages.h    les actions du menu (ajouter, afficher, charger, fusionner…)
 │   ├── roster.h              tableau dynamique de personnages
 │   ├── sauvegarde.h          sauvegarder / charger / fusionner + codes d'erreur
