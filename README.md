@@ -7,6 +7,7 @@
 [![C11](https://img.shields.io/badge/C-11-38bdf8?style=for-the-badge&logo=c&logoColor=white&labelColor=0e1230)](#architecture)
 [![CSFML](https://img.shields.io/badge/GUI-CSFML%202.6-34d399?style=for-the-badge&logo=sfml&logoColor=white&labelColor=0e1230)](#csfml)
 [![Classes](https://img.shields.io/badge/classes-28-f43f5e?style=for-the-badge&labelColor=0e1230)](#personnages)
+[![Audio](https://img.shields.io/badge/audio-2%20th%C3%A8mes%20originaux-38bdf8?style=for-the-badge&labelColor=0e1230)](#lidentité-sonore)
 [![Tests](https://img.shields.io/badge/tests-assert%20%2B%20ASan-fbbf24?style=for-the-badge&labelColor=0e1230)](#tests)
 [![Licence MIT](https://img.shields.io/badge/licence-MIT-34d399?style=for-the-badge&labelColor=0e1230)](#licence)
 [![ESGI](https://img.shields.io/badge/ESGI-C%20avanc%C3%A9-d946ef?style=for-the-badge&labelColor=0e1230)](#concept)
@@ -115,12 +116,18 @@ Le nom **RedStrings** vient d'une image : des **fils rouges** qui relient les pe
 | Radar des statistiques | aperçu de la création | losange PV / ATQ / DEF / SOIN, animé avec les vraies valeurs finales |
 | Catalogue | création | 4 onglets de catégorie, grille de tuiles colorées, 20 emblèmes vectoriels (`emblemes.c`) |
 | Mouvements organiques | boutons, cartes | ressorts amortis (`ressort_t`) |
+| Survol des cartes | liste, composition des équipes, main de cartes Yu-Gi-Oh! | la carte se soulève, grossit (+7 %, +11 % dans la main) et s'incline vers la souris ; halo de la couleur de classe, ombre restée au sol ; elle passe au-dessus de ses voisines (`grille.c`, `creation_cartes.c`) |
 | Courbes d'animation | entrées et sorties de scène | `sortie_cubique`, `entree_cubique`, `sortie_rebond` |
 | Particules | création, impacts, K.O. | jusqu'à 900 particules (`MAX_PARTICULES`), avec gravité |
 | Poussière d'ambiance | fond | 70 grains qui flottent (`NB_POUSSIERES`) |
 | Notifications | haut de l'écran | toasts empilables |
 
 </details>
+
+<div align="center">
+<img src=".github/readme/captures/survol.png" alt="Image du jeu : la liste des personnages, la carte de Merlin survolée se soulève, grossit et s'incline au-dessus de ses voisines" width="100%"/>
+<sub>🎥 <b>Image réelle du jeu</b>, recadrée : la carte survolée se soulève, grossit et s'incline vers la souris, sans masquer ses voisines.</sub>
+</div>
 
 ### L'identité sonore
 

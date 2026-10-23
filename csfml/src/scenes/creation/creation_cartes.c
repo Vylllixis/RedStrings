@@ -54,6 +54,12 @@ static int cartes_de_categorie(categorie_t cat, classe_t ids[NB_CLASSES])
     return n;
 }
 
+/* Survol d'une carte de la main : même intention que la grille (ui/grille.c). Les
+ * onglets de catégorie sont juste au-dessus : la carte survolée grandit vers le bas,
+ * où le bouton « Créer » laisse de la place, et ne monte que de quelques pixels. */
+#define MAIN_SURVOL_ECHELLE 0.11f
+#define MAIN_SURVOL_LEVEE 7.f
+
 /** Pose d'une carte de la main : donne, éventail, survol, sélection. */
 static carte3d_t pose_main(app_t *app, creation_t *c, classe_t cl, int i, int n,
     sfVector2f origine, float pas)
@@ -64,10 +70,11 @@ static carte3d_t pose_main(app_t *app, creation_t *c, classe_t cl, int i, int n,
     float s = c->tuiles[cl].survol;
     float sel = c->tuiles[cl].appui;
     float m = fmaxf(s, sel);
-    float echelle = 1.f + 0.06f * s + 0.14f * sel;
+    float echelle = 1.f + MAIN_SURVOL_ECHELLE * s + 0.14f * sel;
     carte3d_t p = carte3d_pose((sfVector2f){origine.x + i * pas + 320.f * (1.f - d),
-        origine.y + MAIN_H / 2.f + k * k * MAIN_ARC - 8.f * s * (1.f - sel)
-        - MAIN_H * (echelle - 1.f) / 2.f}, MAIN_L * echelle);
+        origine.y + MAIN_H / 2.f + k * k * MAIN_ARC - MAIN_SURVOL_LEVEE * s * (1.f - sel)
+        - MAIN_H * 0.14f * sel / 2.f + MAIN_H * MAIN_SURVOL_ECHELLE * s / 2.f},
+        MAIN_L * echelle);
 
     p.rot_z = k * 0.05f * (1.f - m);
     p.rot_y = PI * (1.f - d);
@@ -80,7 +87,7 @@ static carte3d_t pose_main(app_t *app, creation_t *c, classe_t cl, int i, int n,
     p.reflet = 0.12f + 0.88f * sel;
     p.bord = sel;
     p.ombre = 0.35f + 0.65f * m;
-    p.halo = avec_alpha(couleur_classe(cl), 0.15f * s + 0.5f * sel);
+    p.halo = avec_alpha(couleur_classe(cl), 0.4f * s * (1.f - sel) + 0.5f * sel);
     return p;
 }
 
