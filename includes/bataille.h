@@ -25,6 +25,7 @@
     #define JOURNAL_MAX 8               /**< lignes de journal conservées */
     #define JOURNAL_LIGNE 96
     #define GARDE_REDUCTION 50          /**< % de dégâts absorbés en garde */
+    #define DEFENSIFS_MAX 3             /**< soins/gardes d'affilée permis à l'ordinateur */
     #define GARDE_DUREE 1               /**< expire au début du tour suivant */
 
 typedef enum {
@@ -51,6 +52,7 @@ typedef struct {
     int pv_max;             /**< PV au début du combat (statistique PV). */
     effet_t effets[MAX_EFFETS];
     int nb_effets;
+    int defensifs;          /**< Soins / gardes d'affilée (remis à 0 par une attaque). */
 } combattant_t;
 
 typedef struct {
@@ -128,7 +130,9 @@ int bataille_action_possible(const bataille_t *b, action_t a);
 int bataille_agir(bataille_t *b, action_t a, ref_t cible,
     evenement_t ev[MAX_EVENEMENTS]);
 
-/** Choix déterministe de l'ordinateur pour le combattant actif. */
+/** Choix de l'ordinateur pour le combattant actif : raisonnable mais pas
+ *  parfait (un peu de hasard, et il se lasse de se soigner ou de se garder
+ *  sans arrêt). Utilise rand() : l'appelant peut appeler srand() une fois. */
 void bataille_ia(const bataille_t *b, action_t *a, ref_t *cible);
 
 /** Ligne de journal, de la plus récente (0) à la plus ancienne ; NULL au-delà. */
