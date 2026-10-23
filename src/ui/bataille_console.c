@@ -97,7 +97,7 @@ static int choisir_action(const bataille_t *b, action_t *a)
             bataille_action_possible(b, (action_t)i) ? "" : GRIS,
             NOMS_ACTIONS[i]);
     while (1) {
-        if (lire_entier("Action", 1, NB_ACTIONS, &choix) == -1)
+        if (lire_entier("Action", 1, NB_ACTIONS, &choix) != 0)
             return -1;
         *a = (action_t)(choix - 1);
         if (bataille_action_possible(b, *a))
@@ -128,7 +128,7 @@ static int choisir_cible(const bataille_t *b, action_t a, ref_t *cible)
             ? -bataille_degats(acteur, c) : bataille_soin(acteur, c));
     }
     printf("    " GRAS "0" RESET "  " GRIS "Retour" RESET "\n");
-    if (lire_entier("Cible", 0, n, &choix) == -1)
+    if (lire_entier("Cible", 0, n, &choix) != 0)
         return -1;
     if (choix == 0)
         return 0;
@@ -181,7 +181,7 @@ static void jouer(bataille_t *b)
     while (b->gagnant == -1) {
         afficher_bataille(b);
         if (bataille_actif(b).equipe == 0 && tour_joueur(b, &a, &cible) == -1) {
-            afficher_erreur("Combat abandonné");
+            printf("  " GRIS "↩ Combat abandonné (« " MOT_ANNULER " » ou Ctrl+D)." RESET "\n\n");
             return;
         }
         if (bataille_actif(b).equipe == 1)
@@ -215,6 +215,8 @@ static int nb_vivants(const roster_t *r)
 ** │ 3. l'adversaire (l'ordinateur) est composé parmi les personnages
 ** │    restants
 ** │ 4. bataille_init() puis jouer()
+** │ `q` annule à tout moment (composition ou tour de jeu) ; le roster n'est
+** │ jamais modifié, le combat travaille sur des copies.
 ** ╰──────────────────────────────────────────────────────────────────────
 */
 void menu_bataille(const roster_t *r)
@@ -230,14 +232,18 @@ void menu_bataille(const roster_t *r)
         return;
     }
     nj = choisir_equipe(r, "Ton équipe", joueurs, NULL, 0);
-    if (nj == -1 || nj == nb_vivants(r)) {
-        if (nj != -1)
+    if (nj < 0 || nj == nb_vivants(r)) {
+        if (nj >= 0)
             afficher_erreur("Garde au moins un personnage pour l'adversaire");
+        else if (nj == SAISIE_ANNULEE)
+            printf("  " GRIS "↩ Combat annulé." RESET "\n\n");
         return;
     }
     na = choisir_equipe(r, "Équipe adverse (jouée par l'ordinateur)", adversaires,
         joueurs, nj);
-    if (na == -1 || bataille_init(&b, joueurs, nj, adversaires, na) == -1)
+    if (na == SAISIE_ANNULEE)
+        printf("  " GRIS "↩ Combat annulé." RESET "\n\n");
+    if (na < 0 || bataille_init(&b, joueurs, nj, adversaires, na) == -1)
         return;
     jouer(&b);
 }

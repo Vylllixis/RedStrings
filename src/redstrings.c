@@ -19,6 +19,7 @@
 #include "bataille_console.h"
 #include "boite.h"
 #include "couleurs.h"
+#include "my_string.h"
 #include "personnage.h"
 #include "redstrings.h"
 #include "roster.h"
@@ -39,21 +40,26 @@ static void afficher_menu(void)
     boite_bas(CYAN);
 }
 
+/* Redemande jusqu'à un nom connu. Renvoie son indice, SAISIE_ANNULEE (q) ou SAISIE_FIN. */
 static int demander_personnage(const roster_t *r, const char *question)
 {
-    char nom[30] = "";
+    char nom[64];
     int idx = 0;
 
-    printf("  " GRAS "%s" RESET CYAN " › " RESET, question);
-    if (scanf("%" STR(NOM_LONGUEUR) "s", nom) != 1) {
-        afficher_erreur("Saisie interrompue");
-        return -1;
-    }
-    vider_buffer();
-    idx = trouver_personnage(r->data, r->len, nom);
-    if (idx == -1)
+    while (1) {
+        printf("  " GRAS "%s" RESET GRIS " (" MOT_ANNULER " annule)" RESET CYAN " › " RESET,
+            question);
+        if (lire_ligne(nom, sizeof(nom)) == -1)
+            return SAISIE_FIN;
+        if (my_strcmp(nom, MOT_ANNULER) == 0)
+            return SAISIE_ANNULEE;
+        if (nom[0] == '\0')
+            continue;
+        idx = trouver_personnage(r->data, r->len, nom);
+        if (idx != -1)
+            return idx;
         afficher_erreur("Personnage introuvable");
-    return idx;
+    }
 }
 
 static void menu_ajouter(roster_t *r)
@@ -70,8 +76,10 @@ static void menu_afficher(const roster_t *r)
 {
     int idx = demander_personnage(r, "Nom du personnage");
 
-    if (idx != -1)
+    if (idx >= 0)
         afficher_personnage(&r->data[idx]);
+    else if (idx == SAISIE_ANNULEE)
+        printf("  " GRIS "↩ Annulé." RESET "\n\n");
 }
 
 static void menu_sauvegarder(const roster_t *r)
@@ -116,7 +124,7 @@ int redstrings(void)
 
     while (choix != 0) {
         afficher_menu();
-        if (lire_entier("Choix", 0, 5, &choix) == -1)
+        if (lire_entier_menu("Choix", 0, 5, &choix) != 0)
             choix = 0;
         printf("\n");
         if (choix == 1)

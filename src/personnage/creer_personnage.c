@@ -7,8 +7,8 @@
 ** ╭─ creer_personnage.c ─────────────────────────────────────────────────
 ** │ But         Guider le joueur pour créer un personnage : un nom, des
 ** │             statistiques de base, puis une classe qui les modifie.
-** │ Contenu     lire_stat, ecrire_mod, afficher_choix_classe,
-** │             choisir_classe, creer_personnage
+** │ Contenu     fin_saisie, lire_stat, lire_stats, ecrire_mod,
+** │             afficher_choix_classe, choisir_classe, creer_personnage
 ** │ Utilise     saisie.c (lire_entier), la table classes[] de
 ** │             personnage.c
 ** ╰──────────────────────────────────────────────────────────────────────
@@ -20,10 +20,14 @@
 #include "personnage.h"
 #include "saisie.h"
 
-static int saisie_interrompue(void)
+/* Dit pourquoi la création s'arrête, puis renvoie le code reçu. */
+static int fin_saisie(int code)
 {
-    afficher_erreur("Saisie interrompue");
-    return -1;
+    if (code == SAISIE_ANNULEE)
+        printf("\n  " GRIS "↩ Création annulée : rien n'a été enregistré." RESET "\n");
+    else
+        afficher_erreur("Saisie interrompue");
+    return code;
 }
 
 static int lire_stat(const char *libelle, int *stat)
@@ -33,6 +37,18 @@ static int lire_stat(const char *libelle, int *stat)
     aligner_texte(libelle_aligne, sizeof(libelle_aligne), libelle,
         LARGEUR_LIBELLE);
     return lire_entier(libelle_aligne, STAT_MIN, STAT_MAX, stat);
+}
+
+/* Les quatre statistiques de base, dans l'ordre ; s'arrête au premier refus. */
+static int lire_stats(personnage_t *p)
+{
+    static const char *libelles[NB_STATS] = {"Points de vie", "Attaque", "Défense", "Soin"};
+    int *champs[NB_STATS] = {&p->pv, &p->atq, &p->def, &p->soin};
+    int code = 0;
+
+    for (int i = 0; i < NB_STATS && code == 0; i++)
+        code = lire_stat(libelles[i], champs[i]);
+    return code;
 }
 
 /** « +10 » en vert, « -5 » en rouge, « 0 » en gris. */
@@ -56,11 +72,12 @@ static void afficher_choix_classe(int numero, classe_t c)
         mods[STAT_SOIN]);
 }
 
-/** Liste le catalogue par catégorie ; renvoie la classe choisie ou -1. */
+/** Liste le catalogue par catégorie ; renvoie 0 (classe choisie), SAISIE_FIN ou SAISIE_ANNULEE. */
 static int choisir_classe(classe_t *classe)
 {
     classe_t ordre[NB_CLASSES];
     int choix = 1;
+    int code = 0;
 
     ordre_classes(ordre);
     printf("  " GRIS "── Classe ──" RESET "\n");
@@ -69,56 +86,59 @@ static int choisir_classe(classe_t *classe)
             printf("  " GRAS "%s" RESET "\n", nom_categorie(classes[ordre[i]].categorie));
         afficher_choix_classe(i + 1, ordre[i]);
     }
-    if (lire_entier("Choix", 1, NB_CLASSES, &choix) == -1)
-        return -1;
+    code = lire_entier("Choix", 1, NB_CLASSES, &choix);
+    if (code != 0)
+        return code;
     *classe = ordre[choix - 1];
     return 0;
 }
 
 /*
 ** ╭─ creer_personnage ───────────────────────────────────────────────────
-** │ Crée un personnage en trois temps.
+** │ Crée un personnage en trois temps, que l'on peut annuler à chacun.
 ** │
-** │ 1. le nom : lu avec une taille limite, refusé s'il existe déjà dans
-** │    tab
+** │ 1. le nom : lu avec lire_nom() ; un nom déjà pris dans tab est redemandé
 ** │ 2. les statistiques de base (PV, attaque, défense, soin)
 ** │ 3. la classe, puis appliquer_classe() ajoute ses modificateurs
-** │ Renvoie 0 si le personnage est créé, -1 s'il est annulé (nom pris,
-** │ Ctrl+D). L'ajout dans la liste est fait par l'appelant.
+** │ À chaque question, `q` annule : le personnage n'existe que dans *p, et
+** │ c'est l'appelant qui l'ajoute à la liste, donc rien n'est enregistré.
+** │ Renvoie 0 si le personnage est créé, SAISIE_ANNULEE (q) ou SAISIE_FIN
+** │ (Ctrl+D) sinon.
 ** ╰──────────────────────────────────────────────────────────────────────
 */
 int creer_personnage(personnage_t *p, personnage_t *tab, int len)
 {
+    int code = 0;
+
     //en-tête
     printf("\n");
     boite_haut(CYAN);
     boite_ligne(CYAN, "  " GRAS "✦ Création d'un personnage" RESET);
     boite_bas(CYAN);
-    printf("\n");
+    printf("  " GRIS "Tape " MOT_ANNULER " à n'importe quelle question pour annuler." RESET "\n\n");
 
     //choix du nom
-    printf("  " GRAS "Nom" RESET CYAN " › " RESET);
-    if (scanf("%" STR(NOM_LONGUEUR) "s", p->nom) != 1)
-        return saisie_interrompue();
-    vider_buffer();
-    if (trouver_personnage(tab, len, p->nom) != -1) {
+    while (1) {
+        code = lire_nom("Nom", p->nom, sizeof(p->nom));
+        if (code != 0)
+            return fin_saisie(code);
+        if (trouver_personnage(tab, len, p->nom) == -1)
+            break;
         afficher_erreur("Ce nom est déjà pris");
-        return -1;
     }
     printf("\n");
 
     //choix des statistiques de base (la classe les modifie ensuite)
     printf("  " GRIS "── Statistiques de base ──" RESET "\n");
-    if (lire_stat("Points de vie", &p->pv) == -1
-        || lire_stat("Attaque", &p->atq) == -1
-        || lire_stat("Défense", &p->def) == -1
-        || lire_stat("Soin", &p->soin) == -1)
-        return saisie_interrompue();
+    code = lire_stats(p);
+    if (code != 0)
+        return fin_saisie(code);
     printf("\n");
 
     //choix de la classe, puis ses modificateurs sur les statistiques de base
-    if (choisir_classe(&p->classe) == -1)
-        return saisie_interrompue();
+    code = choisir_classe(&p->classe);
+    if (code != 0)
+        return fin_saisie(code);
     appliquer_classe(p);
     printf("\n  " VERT "✔ %s a été créé !" RESET "\n", p->nom);
     afficher_personnage(p);
