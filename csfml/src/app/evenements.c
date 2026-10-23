@@ -73,6 +73,9 @@ void evenements(app_t *app)
 {
     sfEvent e;
 
+    if (app == NULL)
+        return;
+
     app->in.clic = 0;
     app->in.nb_texte = 0;
     memset(app->in.touches, 0, sizeof(app->in.touches));

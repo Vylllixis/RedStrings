@@ -25,6 +25,9 @@
 
 void rect_arrondi(app_t *app, sfFloatRect r, float rayon, sfColor fond)
 {
+    if (app == NULL)
+        return;
+
     rect_arrondi_bord(app, r, rayon, fond, C_TRANSPARENT);
 }
 
@@ -41,6 +44,8 @@ void rect_arrondi_bord(app_t *app, sfFloatRect r, float rayon, sfColor fond,
     float angle = 0.f;
     int k = 0;
 
+    if (app == NULL)
+        return;
     rayon = rc;
     sfConvexShape_setPointCount(app->forme, 4 * POINTS_COIN);
     for (int c = 0; c < 4; c++) {
@@ -62,6 +67,9 @@ void ombre(app_t *app, sfFloatRect r, float rayon, float force)
 {
     float e = 0.f;
 
+    if (app == NULL)
+        return;
+
     for (int i = 6; i >= 1; i--) {
         e = i * 3.f;
         rect_arrondi(app, (sfFloatRect){r.left - e, r.top - e + 6.f + i,
@@ -73,6 +81,9 @@ void ombre(app_t *app, sfFloatRect r, float rayon, float force)
 /** Halo lumineux (dégradé radial en mélange additif). */
 void lueur(app_t *app, sfVector2f centre, sfVector2f rayon, sfColor c)
 {
+    if (app == NULL)
+        return;
+
     if (c.a == 0 || app->alpha <= 0.f)
         return;
     sfSprite_setTexture(app->sprite, app->tex_lueur, sfTrue);
@@ -88,6 +99,9 @@ void lueur(app_t *app, sfVector2f centre, sfVector2f rayon, sfColor c)
 void cercle(app_t *app, sfVector2f centre, float r, sfColor fond,
     sfColor bord, float epaisseur)
 {
+    if (app == NULL)
+        return;
+
     sfCircleShape_setRadius(app->cercle, r);
     sfCircleShape_setPointCount(app->cercle, r > 24.f ? 64 : 32);
     sfCircleShape_setOrigin(app->cercle, (sfVector2f){r, r});
@@ -102,6 +116,9 @@ void cercle(app_t *app, sfVector2f centre, float r, sfColor fond,
 void polygone(app_t *app, const float *pts, int n, sfVector2f centre,
     float taille, float angle, sfColor c)
 {
+    if (app == NULL || pts == NULL)
+        return;
+
     float ca = cosf(angle);
     float sa = sinf(angle);
 
@@ -125,6 +142,9 @@ void ligne_epaisse(app_t *app, const sfVector2f *pts, int n, float epaisseur,
     float len = 0.f;
     int a = 0;
     int b = 0;
+
+    if (app == NULL || pts == NULL)
+        return;
 
     if (n > MAX_POINTS_LIGNE)
         n = MAX_POINTS_LIGNE;

@@ -115,24 +115,36 @@ static void jouer(app_t *app, son_t s, float hauteur, float pan, int secondaire)
 
 void son(app_t *app, son_t s)
 {
+    if (app == NULL)
+        return;
+
     jouer(app, s, 1.f, 0.f, 0);
 }
 
 /* Retour sonore de repli : seulement si rien de plus parlant n'a sonné dans l'image. */
 void son_secondaire(app_t *app, son_t s)
 {
+    if (app == NULL)
+        return;
+
     jouer(app, s, 1.f, 0.f, 1);
 }
 
 /* `hauteur` multiplie la hauteur (1 = normale) ; `pan` va de -1 (gauche) à 1 (droite). */
 void son_regle(app_t *app, son_t s, float hauteur, float pan)
 {
+    if (app == NULL)
+        return;
+
     jouer(app, s, hauteur > 0.f ? hauteur : 1.f, pan < -1.f ? -1.f : (pan > 1.f ? 1.f : pan),
         0);
 }
 
 void audio_couper_voix(app_t *app)
 {
+    if (app == NULL)
+        return;
+
     for (int i = 0; i < NB_VOIX; i++) {
         if (app->audio.voix[i].son != NULL)
             sfSound_stop(app->audio.voix[i].son);

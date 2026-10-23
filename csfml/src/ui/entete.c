@@ -28,6 +28,13 @@
 void en_tete_surtitre(app_t *app, bouton_t *retour, const char *surtitre,
     const char *titre, const char *sous_titre)
 {
+    surtitre = surtitre != NULL ? surtitre : "";
+
+    if (app == NULL || retour == NULL)
+        return;
+    titre = titre != NULL ? titre : "";
+    sous_titre = sous_titre != NULL ? sous_titre : "";
+
     float t = app->t_scene;
     float e1 = sortie_cubique(progression(t, 0.f, 0.5f));
     float e2 = sortie_cubique(progression(t, 0.08f, 0.5f));
@@ -59,5 +66,10 @@ void en_tete_surtitre(app_t *app, bouton_t *retour, const char *surtitre,
 void en_tete(app_t *app, bouton_t *retour, const char *titre,
     const char *sous_titre)
 {
+    if (app == NULL || retour == NULL)
+        return;
+    titre = titre != NULL ? titre : "";
+    sous_titre = sous_titre != NULL ? sous_titre : "";
+
     en_tete_surtitre(app, retour, NULL, titre, sous_titre);
 }

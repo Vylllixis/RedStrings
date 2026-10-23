@@ -151,12 +151,21 @@ void appliquer_classe(personnage_t *p);
 /** Cherche un personnage par son nom, renvoie son indice ou -1. */
 int trouver_personnage(const personnage_t *tab, int size, const char *nom);
 
+/**
+ * 1 si `nom` ne contient que des chiffres (« 3 », « 007 »), sinon 0. Un tel nom
+ * est interdit : dans la console, un nombre tapé désigne l'ID d'un personnage
+ * (sa position dans la liste affichée), il ne doit pas pouvoir aussi être un nom.
+ */
+int nom_est_un_id(const char *nom);
+
 #define STR_(x) #x
 #define STR(x)  STR_(x)
 #define NOM_LONGUEUR 29   /**< NOM_MAX - 1 */
 
 /** Demande le nom, les stats et la classe au joueur (nom unique dans tab).
- *  Renvoie 0 si le personnage est créé, -1 si la saisie a échoué. */
+ *  `q` annule à chaque question ; *p n'est alors jamais ajouté nulle part.
+ *  Renvoie 0 si le personnage est créé, SAISIE_ANNULEE (q) ou SAISIE_FIN
+ *  (Ctrl+D) sinon (codes de saisie.h). */
 int creer_personnage(personnage_t *p, personnage_t *tab, int len);
 
 /** Affiche la fiche du personnage avec ses barres de stats. */

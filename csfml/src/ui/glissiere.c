@@ -60,6 +60,13 @@ static void piste(app_t *app, float tx, float tw, float cy, float f, sfColor col
 int glissiere_bornee(app_t *app, glissiere_t *g, sfFloatRect r, const char *label,
     const int bornes[2], int *valeur, sfColor col, int focus)
 {
+    if (app == NULL)
+        return 0;
+
+    if (g == NULL || bornes == NULL || valeur == NULL)
+        return 0;
+    label = label != NULL ? label : "";
+
     float cy = r.top + r.height / 2.f;
     float tx = r.left + GL_LABEL;
     float tw = r.width - GL_LABEL - GL_VALEUR;
@@ -119,6 +126,10 @@ int glissiere(app_t *app, glissiere_t *g, sfFloatRect r, const char *label,
     int *valeur, sfColor col, int focus)
 {
     static const int bornes[2] = {STAT_MIN, STAT_MAX};
+
+    if (app == NULL || g == NULL || valeur == NULL)
+        return 0;
+    label = label != NULL ? label : "";
 
     return glissiere_bornee(app, g, r, label, bornes, valeur, col, focus);
 }

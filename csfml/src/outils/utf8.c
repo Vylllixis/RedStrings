@@ -14,6 +14,7 @@
 ** ╰──────────────────────────────────────────────────────────────────────
 */
 
+#include <stddef.h>
 #include "gui_utf8.h"
 
 #define POINT_MAX 0x10FFFF
@@ -76,7 +77,7 @@ static int decoder_un(const unsigned char *u, uint32_t *point)
 
 int utf8_encoder(uint32_t point, char sortie[4])
 {
-    if (!point_valide(point))
+    if (sortie == NULL || !point_valide(point))
         return 0;
     if (point < 0x80) {
         sortie[0] = (char)point;
@@ -111,13 +112,14 @@ int utf8_encoder(uint32_t point, char sortie[4])
 */
 int utf8_decoder(const char *s, uint32_t *dst, int max)
 {
+    if (s == NULL || dst == NULL || max <= 0)
+        return 0;
+
     const unsigned char *u = (const unsigned char *)s;
     uint32_t p = 0;
     int len = 0;
     int n = 0;
 
-    if (max <= 0)
-        return 0;
     while (*u && n < max - 1) {
         len = decoder_un(u, &p);
         if (len == 0) {
@@ -135,6 +137,8 @@ int utf8_nb_caracteres(const char *s)
 {
     int n = 0;
 
+    if (s == NULL)
+        return 0;
     for (int i = 0; s[i] != '\0'; i++)
         n += ((unsigned char)s[i] & 0xC0) != 0x80;
     return n;
@@ -144,6 +148,8 @@ void utf8_supprimer_dernier(char *s)
 {
     int len = 0;
 
+    if (s == NULL)
+        return;
     while (s[len] != '\0')
         len++;
     if (len == 0)
@@ -156,6 +162,9 @@ void utf8_supprimer_dernier(char *s)
 
 void utf8_majuscules(char *s)
 {
+    if (s == NULL)
+        return;
+
     unsigned char *u = (unsigned char *)s;
 
     for (int i = 0; u[i] != '\0'; i++) {

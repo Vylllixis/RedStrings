@@ -15,13 +15,15 @@
 
 int my_put_nbr(int nb)
 {
-    if (nb < 0) {
+    long long n = nb;
+
+    if (n < 0) {
         my_putchar('-');
-        nb = -nb;
+        n = -n;
     }
-    if (nb >= 10) {
-        my_put_nbr(nb / 10);
+    if (n >= 10) {
+        my_put_nbr((int)(n / 10));
     }
-    my_putchar(nb % 10 + '0');
+    my_putchar((char)(n % 10 + '0'));
     return 0;
 }

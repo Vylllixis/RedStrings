@@ -8,7 +8,7 @@
 [![CSFML](https://img.shields.io/badge/GUI-CSFML%202.6-34d399?style=for-the-badge&logo=sfml&logoColor=white&labelColor=0e1230)](#csfml)
 [![Classes](https://img.shields.io/badge/classes-28-f43f5e?style=for-the-badge&labelColor=0e1230)](#personnages)
 [![Audio](https://img.shields.io/badge/audio-2%20th%C3%A8mes%20originaux-38bdf8?style=for-the-badge&labelColor=0e1230)](#lidentité-sonore)
-[![Tests](https://img.shields.io/badge/tests-assert%20%2B%20ASan-fbbf24?style=for-the-badge&labelColor=0e1230)](#tests)
+[![Tests](https://img.shields.io/badge/tests-292%20%2B%20ASan-fbbf24?style=for-the-badge&labelColor=0e1230)](#tests)
 [![Licence MIT](https://img.shields.io/badge/licence-MIT-34d399?style=for-the-badge&labelColor=0e1230)](#licence)
 [![ESGI](https://img.shields.io/badge/ESGI-C%20avanc%C3%A9-d946ef?style=for-the-badge&labelColor=0e1230)](#concept)
 
@@ -295,7 +295,7 @@ $$
 
 Le combat s'arrête dès qu'une équipe n'a plus personne debout. Il travaille sur des **copies** des personnages : les PV perdus et les gardes disparaissent à la fin, le roster n'est jamais modifié.
 
-**L'ordinateur** ([`bataille_ia`](src/personnage/bataille.c)) suit trois règles simples et prévisibles : soigner l'allié le plus blessé s'il est sous la moitié de ses PV, se mettre en garde sous le quart de ses PV, sinon attaquer l'ennemi qui a le moins de PV.
+**L'ordinateur** ([`bataille_ia`](src/personnage/bataille_ia.c)) joue de façon raisonnable mais **pas parfaite** : il achève toujours un ennemi qu'une attaque peut tuer ; sinon il soigne l'allié le plus blessé (sous la moitié de ses PV) ou se met en garde (sous le quart), mais avec une envie qui baisse à chaque soin ou garde d'affilée (100 % → 65 % → 30 % → 0 %), si bien qu'il ne se soigne jamais à l'infini. Le reste du temps il attaque, en visant d'habitude l'ennemi le plus faible, avec une chance sur cinq de se tromper de cible.
 
 ### Le même combat, dans le terminal
 
@@ -356,43 +356,62 @@ Le combat s'arrête dès qu'une équipe n'a plus personne debout. Il travaille s
 
 ```
 ╭────────────────────────────────────╮
-│  ✦ Menu principal                  │
+│  ✦ Menu principal  8 personnages   │
 ├────────────────────────────────────┤
 │  1  Ajouter un personnage          │
 │  2  Afficher un personnage         │
 │  3  Combat                         │
 │  4  Sauvegarder                    │
-│  5  Charger                        │
+│  5  Charger (remplace tout)        │
+│  6  Ajouter depuis le fichier      │
 │  0  Quitter                        │
 ╰────────────────────────────────────╯
-  Choix (0-5) ›
+  Choix (0-6) ›
 ```
 
 | Touche | Action | Ce qui se passe |
 |:---:|---|---|
-| <kbd>1</kbd> | **Ajouter** | Nom → PV → Attaque → Défense → Soin → Classe. Le nom doit être unique. |
-| <kbd>2</kbd> | **Afficher** | Fiche avec barres de statistiques et couleur de la classe. |
-| <kbd>3</kbd> | **Combat** | Ton équipe, puis celle de l'ordinateur, puis le combat au tour par tour. |
+| <kbd>1</kbd> | **Ajouter** | Nom → PV → Attaque → Défense → Soin → Classe. Le nom doit être unique (un nom pris est redemandé). |
+| <kbd>2</kbd> | **Afficher** | La liste des personnages avec leur **ID**, puis la fiche de celui que tu choisis (par son nom ou son ID). |
+| <kbd>3</kbd> | **Combat** | La liste, ton équipe (par noms ou IDs), puis celle de l'ordinateur, puis le combat au tour par tour. |
 | <kbd>4</kbd> | **Sauvegarder** | Écrit tous les personnages dans `personnages.txt`. |
-| <kbd>5</kbd> | **Charger** | Remplace l'équipe par le contenu de `personnages.txt`. |
+| <kbd>5</kbd> | **Charger** | **Remplace** tous les personnages par ceux de `personnages.txt`, après un avertissement et une confirmation s'il y en a déjà. |
+| <kbd>6</kbd> | **Ajouter depuis le fichier** | **Ajoute** les personnages du fichier sans toucher à ceux qui existent ; un nom déjà pris est ignoré (le tien est gardé). |
 | <kbd>0</kbd> ou <kbd>Ctrl</kbd>+<kbd>D</kbd> | **Quitter** | Libère la mémoire, puis « À bientôt ! ». |
+
+> [!TIP]
+> **Annuler à chaque étape.** À n'importe quelle question (création, choix d'un personnage, composition des équipes, tour de combat), tape <kbd>q</kbd> : tu reviens au menu **sans rien avoir enregistré**. Le menu lui-même n'accepte pas `q` : il n'y a rien à annuler.
+
+> [!NOTE]
+> **L'ID d'un personnage** est sa position dans la liste (colonne `ID`, de 1 à N). Tape-le à la place du nom : `3` désigne le troisième. C'est pour cela qu'un nom **ne peut pas être fait uniquement de chiffres** : il serait confondu avec un ID. Cette règle vaut aussi au chargement (un fichier qui en contient un est refusé) et dans la version graphique. `Ada2` ou `2Ada` restent permis.
+
+> [!NOTE]
+> **Les entrées sans effet sont grisées.** *Afficher* et *Sauvegarder* demandent au moins 1 personnage, *Combat* au moins 2 personnages en forme (non K.O.). Les choisir quand même affiche la raison au lieu de lancer l'action. *Sauvegarder* sans personnage est refusé exprès : il aurait écrasé ton fichier par un fichier vide.
+
+**Une base prête à jouer.** [`exemples/personnages_base.txt`](exemples/personnages_base.txt) contient 8 personnages qui couvrent les 4 catégories (Arthur et Galahad, Merlin et Morgane, Robin et Tristan, Viviane et Perceval). Ta sauvegarde `personnages.txt` n'est pas versionnée (c'est ton fichier de jeu) : pour partir de cette base, copie-la, puis <kbd>5</kbd> et <kbd>3</kbd> permettent de combattre en 30 secondes.
+
+```bash
+cp exemples/personnages_base.txt personnages.txt
+```
 
 ```mermaid
 stateDiagram-v2
     direction LR
     [*] --> Menu
     Menu --> Creation: 1
-    Menu --> Fiche: 2
-    Menu --> Combat: 3
-    Menu --> Sauvegarde: 4
+    Menu --> Fiche: 2 (≥ 1 perso)
+    Menu --> Combat: 3 (≥ 2 en forme)
+    Menu --> Sauvegarde: 4 (≥ 1 perso)
     Menu --> Chargement: 5
+    Menu --> Fusion: 6
     Menu --> [*]: 0 ou Ctrl+D
 
-    Creation --> Menu: créé / nom pris / Ctrl+D
-    Fiche --> Menu
-    Combat --> Menu: victoire / défaite / Ctrl+D
+    Creation --> Menu: créé / q
+    Fiche --> Menu: fiche vue / q
+    Combat --> Menu: victoire / défaite / q
     Sauvegarde --> Menu
-    Chargement --> Menu: chargé / fichier refusé
+    Chargement --> Menu: chargé / refusé (n) / fichier invalide
+    Fusion --> Menu: ajoutés / fichier invalide
 
     note right of Combat
         équipes de 1 à 4
@@ -408,11 +427,14 @@ stateDiagram-v2
 
 | Saisie | Règle | Si c'est faux |
 |---|---|---|
-| Nom | 1 mot, 29 caractères max, **unique** | `✗ Ce nom est déjà pris` |
+| Nom | 1 mot, 29 caractères max, **unique**, **pas uniquement des chiffres** ; `q` est réservé (annuler) | `✗ Ce nom est déjà pris`, `✗ Le nom ne peut pas contenir d'espace`, `✗ Nom trop long`, `✗ Un nom ne peut pas être un nombre` : le nom est **redemandé** |
 | PV / Attaque / Défense / Soin | entier de **0 à 99** (statistiques de base, avant la classe) | `✗ Valeur invalide`, puis la question est reposée |
 | Classe | de 1 à 28, listées par catégorie | `✗ Valeur invalide` |
 | `12abc`, `abc`, `99999999999` | refusés : `strtol` contrôle **toute** la ligne | `✗ Valeur invalide` |
+| <kbd>q</kbd> à n'importe quelle question | annule l'étape en cours, **rien n'est enregistré** | `↩ Création annulée : rien n'a été enregistré.` |
 | <kbd>Ctrl</kbd>+<kbd>D</kbd> pendant une création | la création est annulée | `✗ Saisie interrompue` |
+| Personnage choisi par ID | de 1 à N, la colonne `ID` de la liste affichée | `✗ Personnage introuvable`, puis la question est reposée |
+| Confirmation avant d'écraser | `o` ou `oui` pour accepter ; `n`, `q`, Entrée seule ou Ctrl+D refusent | `↩ Chargement annulé : tes personnages sont conservés.` |
 
 </details>
 
@@ -463,6 +485,8 @@ Elara 55 15 10 22 40
 
 Le chargement est **transactionnel** : tout le fichier est lu dans un roster temporaire, qui remplace l'équipe seulement s'il est entièrement valide.
 
+**Charger remplace, Ajouter fusionne.** Avant de remplacer des personnages existants, le jeu affiche un avertissement et demande `o/n` (le défaut est *non* : appuyer sur Entrée par réflexe ne détruit rien). L'option 6 (`fusionner()`) fait le contraire : elle ajoute les personnages du fichier à ceux qui existent, ignore ceux dont le nom est déjà pris, et reste « tout ou rien » (un fichier invalide n'ajoute personne).
+
 ```mermaid
 sequenceDiagram
     autonumber
@@ -471,6 +495,8 @@ sequenceDiagram
     participant S as sauvegarde.c
     participant F as personnages.txt
     J->>M: 5 (Charger)
+    M->>J: ◆ Attention : écrasement. Remplacer ? (o/n)
+    J->>M: o
     M->>S: charger(&roster, "personnages.txt")
     S->>F: fopen("r")
     alt fichier absent
@@ -576,10 +602,13 @@ RedStrings/
 │   ├── personnage.h          personnage_t, classe_t, catalogue classes[], statistiques
 │   ├── bataille.h            combat en équipe : tours, actions, effets, événements
 │   ├── bataille_console.h    menu_bataille()
+│   ├── composition_console.h choisir_equipe() : le choix des deux équipes
+│   ├── liste_console.h       afficher_liste() : la liste des personnages avec leur ID
+│   ├── menu_personnages.h    les actions du menu (ajouter, afficher, charger, fusionner…)
 │   ├── roster.h              tableau dynamique de personnages
-│   ├── sauvegarde.h          sauvegarder / charger + codes d'erreur
+│   ├── sauvegarde.h          sauvegarder / charger / fusionner + codes d'erreur
 │   ├── boite.h               boîtes Unicode, alignement des libellés
-│   ├── saisie.h              lire_ligne, lire_entier, vider_buffer
+│   ├── saisie.h              lire_ligne, lire_entier, lire_nom, confirmer, q pour annuler
 │   ├── couleurs.h            codes ANSI (ROUGE, VERT, GRAS…)
 │   ├── my.h · my_string.h    prototypes de libmy.a
 │   └── redstrings.h          point d'entrée du menu
@@ -588,7 +617,8 @@ RedStrings/
 │   ├── redstrings.c          boucle du menu
 │   ├── 📁 personnage/        moteur : personnage · combat · bataille · roster · sauvegarde
 │   │                         console : creer_personnage · afficher_personnage
-│   └── 📁 ui/                boite.c · saisie.c · bataille_console.c
+│   └── 📁 ui/                boite.c · saisie.c · liste_console.c · menu_personnages.c
+│                             composition_console.c · bataille_console.c
 ├── 📁 lib/                   40 fonctions maison → libmy.a
 ├── 📁 csfml/                 version graphique
 │   ├── include/              14 headers gui_*.h, un par thème (config, types, anim, dessin, ui…)
@@ -596,7 +626,8 @@ RedStrings/
 │   ├── tests/                tests.c : UTF-8, animation, classes (sans fenêtre)
 │   ├── assets/fonts/         polices
 │   └── Makefile
-├── 📁 tests/                 tests.c (assert)
+├── 📁 exemples/              personnages_base.txt : 8 personnages prêts à charger
+├── 📁 tests/                 lanceur de tests (rapport détaillé) et suites par domaine (libmy, moteur, console, robustesse, fuzz)
 ├── 📁 .github/readme/        images de ce README et leur générateur
 └── Makefile
 ```
@@ -864,7 +895,7 @@ Sans elles, le mode fonctionne quand même : chaque carte montre l'emblème de s
 | `make csfml` | compile `./redstrings_csfml` |
 | `make doc` | génère la documentation de l'API en HTML dans `docs/` (demande Doxygen : `sudo apt install doxygen`) |
 | `make csfml-debug` | `./redstrings_csfml_debug` avec les sanitizers |
-| `make csfml-tests` | tests de la version graphique, sans fenêtre (UTF-8, animation, classes) |
+| `make csfml-tests` | tests de la version graphique, sans fenêtre (UTF-8, animation, classes, audio, NULL partout) |
 | `make clean` | supprime les `.o` |
 | `make fclean` | supprime aussi les exécutables et `libmy.a` |
 | `make re` | `fclean` puis `make` |
@@ -915,6 +946,10 @@ make tests
 
 `tests/tests.c` est compilé avec **tout le jeu sauf `main.c`**, plus AddressSanitizer et UBSan : un débordement, un comportement indéfini **ou une fuite mémoire** fait échouer les tests. Aucune fenêtre n'est ouverte : le moteur de combat se teste seul.
 
+**173 tests** pour la console et le moteur, **119** pour la version graphique. Chaque fonction a ses propres tests, et chaque fonction publique est aussi appelée avec des `NULL`, des tailles négatives et des indices hors limites (`tests_null.c`), plus des fichiers de sauvegarde corrompus et des combats aléatoires (`tests_fuzz.c`).
+
+**Le rapport** montre pour chaque test son fichier et sa ligne, le nombre de vérifications et le temps. Un échec affiche la vérification ratée, la valeur **obtenue** et la valeur **attendue**, la ligne de code ; un plantage affiche en plus sa cause probable, la pile d'appels réduite à ton code et la dernière vérification réussie. Chaque test tourne dans son propre processus : un plantage, une fuite ou une boucle infinie (10 s au plus) ne bloque pas les autres.
+
 | Domaine | Ce qui est vérifié |
 |---|---|
 | `my_strcmp` | égalité, différence, préfixe, chaînes vides |
@@ -937,7 +972,7 @@ make tests
 
 ### Le flux de travail
 
-Le dépôt suit **git flow** : chaque changement vit sur sa propre branche partie de `develop`, puis y est fusionné avec `--no-ff`. `main` ne reçoit que les versions publiées (`v0.1.0` → `v1.6.0`).
+Le dépôt suit **git flow** : chaque changement vit sur sa propre branche partie de `develop`, puis y est fusionné avec `--no-ff`. `main` ne reçoit que les versions publiées (`v0.1.0` → `v1.7.0`).
 
 ```mermaid
 gitGraph

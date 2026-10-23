@@ -2,7 +2,7 @@
 # Génère docs/index.html à partir des en-têtes publics (make doc).
 
 PROJECT_NAME           = "RedStrings"
-PROJECT_NUMBER         = 1.6.0
+PROJECT_NUMBER         = 1.7.0
 PROJECT_BRIEF          = "Jeu de combat tactique en équipe, au tour par tour, en C11"
 OUTPUT_LANGUAGE        = French
 OUTPUT_DIRECTORY       = docs

@@ -167,6 +167,9 @@ static void poussieres(app_t *app)
 
 void dessiner_fond(app_t *app)
 {
+    if (app == NULL)
+        return;
+
     degrade(app);
     etoiles(app);
     aurores(app);

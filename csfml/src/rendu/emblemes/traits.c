@@ -32,6 +32,9 @@ float emb_ep(float t, float f)
 void emb_trait(app_t *app, sfVector2f c, float t, const float xy[4], float e,
     sfColor col)
 {
+    if (app == NULL || xy == NULL)
+        return;
+
     sfVector2f p[2] = {emb_pt(c, t, xy[0], xy[1]), emb_pt(c, t, xy[2], xy[3])};
 
     ligne_epaisse(app, p, 2, emb_ep(t, e), col, 0);
@@ -46,6 +49,9 @@ void emb_epee(app_t *app, sfVector2f c, float t, float angle, sfColor col)
     static const float POIGNEE[] = {-0.055f, 0.42f, 0.055f, 0.42f, 0.055f, 0.74f,
         -0.055f, 0.74f};
 
+    if (app == NULL)
+        return;
+
     polygone(app, LAME, 5, c, t, angle, col);
     polygone(app, GARDE, 4, c, t, angle, col);
     polygone(app, POIGNEE, 4, c, t, angle, col);
@@ -57,6 +63,9 @@ void emb_etoile(app_t *app, sfVector2f c, float t, float angle, sfColor col)
 {
     float pts[16];
     float a = 0.f;
+
+    if (app == NULL)
+        return;
 
     for (int k = 0; k < 8; k++) {
         a = k * PI / 4.f - PI / 2.f;
@@ -71,6 +80,9 @@ void emb_flamme(app_t *app, sfVector2f c, float t, sfColor col)
 {
     float pts[24];
     float a = 0.f;
+
+    if (app == NULL)
+        return;
 
     pts[0] = 0.f;
     pts[1] = -0.95f;

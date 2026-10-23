@@ -21,14 +21,12 @@ OBJS		=	$(SRCS:src/%.c=$(OBJ_DIR)/%.o)
 
 #moteur du jeu partagé avec la version console (aucun affichage dedans)
 MOTEUR_DIR	=	../src/personnage
-MOTEUR		=	personnage.c combat.c bataille.c roster.c sauvegarde.c
+MOTEUR		=	personnage.c combat.c bataille.c bataille_ia.c roster.c sauvegarde.c
 OBJS_MOTEUR	=	$(MOTEUR:%.c=$(OBJ_DIR)/moteur/%.o)
 
-#fonctions de la version graphique qui ne dépendent pas de SFML : testables sans fenêtre
-TEST_SRCS	=	tests/tests.c src/outils/anim.c src/outils/jeu.c src/outils/utf8.c \
-			src/ui/libelles.c src/yugioh/cartes.c $(MOTEUR_DIR)/personnage.c \
-			tests/tests_audio.c src/audio/audio_evenements.c src/audio/audio_manifeste.c \
-			src/audio/audio_regles.c src/audio/audio_reglages.c
+#tests : tout le code sauf main.c, plus le moteur ; SFML est liée mais aucune fenêtre n'est ouverte
+TEST_SRCS	=	$(wildcard ../tests/lanceur*.c) $(wildcard tests/*.c) $(filter-out src/main.c,$(SRCS)) \
+			$(MOTEUR:%=$(MOTEUR_DIR)/%)
 
 DEPS		=	$(OBJS:.o=.d) $(OBJS_MOTEUR:.o=.d)
 
@@ -110,9 +108,8 @@ debug:	verifier lib
 #tests unitaires sans fenêtre, avec les sanitizers
 tests:	lib
 	$(LOG) "TESTS" "$(notdir $(NAME_TESTS))  ($(SANITIZE))"
-	$(Q)$(CC) $(CFLAGS_DEBUG) $(CPPFLAGS) $(TEST_SRCS) $(LDFLAGS) -lmy -lm -o $(NAME_TESTS)
+	$(Q)$(CC) $(CFLAGS_DEBUG) $(CPPFLAGS) $(TEST_SRCS) $(LDFLAGS) $(LDLIBS) -o $(NAME_TESTS)
 	$(Q)./$(NAME_TESTS)
-	$(LOG_OK) "Tous les tests de la version graphique passent"
 
 clean:
 	$(LOG_RM) "RM" "csfml/$(OBJ_DIR)/ csfml/$(OBJ_DEBUG)/"

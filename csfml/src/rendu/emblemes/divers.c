@@ -28,6 +28,9 @@ void emb_d_ancre(app_t *app, sfVector2f c, float t, sfColor col)
     static const float PATTE_D[] = {0.5f, 0.22f, 0.86f, 0.06f, 0.74f, 0.42f};
     static const float PATTE_G[] = {-0.5f, 0.22f, -0.74f, 0.42f, -0.86f, 0.06f};
 
+    if (app == NULL)
+        return;
+
     arc_cercle(app, emb_pt(c, t, 0.f, -0.72f), 0.16f * t, emb_ep(t, 0.09f),
         (sfVector2f){0.f, 2.f * PI}, col, 0);
     emb_trait(app, c, t, TIGE, 0.12f, col);
@@ -45,6 +48,9 @@ void emb_d_croix(app_t *app, sfVector2f c, float t, sfColor col)
     static const float HORIZONTALE[] = {-0.62f, -0.4f, 0.62f, -0.4f, 0.62f, -0.08f,
         -0.62f, -0.08f};
 
+    if (app == NULL)
+        return;
+
     lueur(app, emb_pt(c, t, 0.f, -0.24f), (sfVector2f){t, t}, avec_alpha(col, 0.35f));
     polygone(app, VERTICALE, 4, c, t, 0.f, col);
     polygone(app, HORIZONTALE, 4, c, t, 0.f, col);
@@ -55,6 +61,9 @@ void emb_d_note(app_t *app, sfVector2f c, float t, sfColor col)
     static const float HAMPE[4] = {0.f, 0.5f, 0.f, -0.84f};
     static const float FANION[] = {0.f, -0.86f, 0.52f, -0.56f, 0.46f, -0.3f, 0.f,
         -0.56f};
+
+    if (app == NULL)
+        return;
 
     cercle(app, emb_pt(c, t, -0.24f, 0.52f), 0.27f * t, col, C_TRANSPARENT, 0.f);
     emb_trait(app, c, t, HAMPE, 0.1f, col);
@@ -67,6 +76,9 @@ void emb_d_fiole(app_t *app, sfVector2f c, float t, sfColor col)
         -0.18f};
     static const float BOUCHON[] = {-0.22f, -0.92f, 0.22f, -0.92f, 0.22f, -0.74f, -0.22f,
         -0.74f};
+
+    if (app == NULL)
+        return;
 
     cercle(app, emb_pt(c, t, 0.f, 0.3f), 0.56f * t, avec_alpha(col, 0.22f), col,
         emb_ep(t, 0.08f));
@@ -81,6 +93,9 @@ void emb_d_engrenage(app_t *app, sfVector2f c, float t, sfColor col)
 {
     static const float DENT[] = {-0.13f, -0.9f, 0.13f, -0.9f, 0.17f, -0.55f, -0.17f,
         -0.55f};
+
+    if (app == NULL)
+        return;
 
     for (int k = 0; k < 8; k++)
         polygone(app, DENT, 4, c, t, app->temps * 0.4f + k * PI / 4.f, col);

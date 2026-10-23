@@ -35,6 +35,9 @@ static const char *LABELS_STATS[NB_STATS] = {"Points de vie", "Attaque", "Défen
 
 void entrer_creation(app_t *app)
 {
+    if (app == NULL)
+        return;
+
     creation_t *c = &app->creation;
 
     memset(c, 0, sizeof(creation_t));
@@ -159,6 +162,9 @@ static void aide_clavier(app_t *app, float a)
 */
 void creation_geometrie(app_t *app, creation_t *c)
 {
+    if (app == NULL || c == NULL)
+        return;
+
     float g = fmaxf(COMPO_G, app->ecran.left + MARGE_ECRAN);
     float d = fminf(COMPO_D, app->ecran.left + app->ecran.width - MARGE_ECRAN);
     float k = (d - g) / (COMPO_D - COMPO_G);
@@ -172,6 +178,9 @@ void creation_geometrie(app_t *app, creation_t *c)
 
 void scene_creation(app_t *app)
 {
+    if (app == NULL)
+        return;
+
     creation_t *c = &app->creation;
     float a = app->alpha;
     int actif = c->sortie < 0.f;

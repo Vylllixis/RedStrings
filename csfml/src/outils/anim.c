@@ -23,6 +23,12 @@
 
 float bornerf(float v, float min, float max)
 {
+    if (min > max) {
+        float tmp = min;
+
+        min = max;
+        max = tmp;
+    }
     if (v < min)
         return min;
     if (v > max)
@@ -38,6 +44,8 @@ float lerpf(float a, float b, float t)
 /** Avancement 0..1 d'une animation qui commence à `debut` et dure `duree`. */
 float progression(float t, float debut, float duree)
 {
+    if (duree <= 0.f)
+        return t >= debut ? 1.f : 0.f;
     return bornerf((t - debut) / duree, 0.f, 1.f);
 }
 
@@ -83,6 +91,8 @@ float sortie_rebond(float t)
 */
 float approcher(float actuel, float cible, float vitesse, float dt)
 {
+    if (dt <= 0.f || vitesse <= 0.f)
+        return actuel;
     return cible + (actuel - cible) * expf(-vitesse * dt);
 }
 
@@ -100,14 +110,23 @@ float approcher(float actuel, float cible, float vitesse, float dt)
 void maj_ressort(ressort_t *r, float cible, float raideur, float amorti,
     float dt)
 {
-    float acc = (cible - r->x) * raideur - r->v * amorti;
+    float acc = 0.f;
 
+    if (r == NULL || dt <= 0.f)
+        return;
+    acc = (cible - r->x) * raideur - r->v * amorti;
     r->v += acc * dt;
     r->x += r->v * dt;
 }
 
 float aleatoire(float min, float max)
 {
+    if (min > max) {
+        float tmp = min;
+
+        min = max;
+        max = tmp;
+    }
     return min + (max - min) * ((float)rand() / (float)RAND_MAX);
 }
 

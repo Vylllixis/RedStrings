@@ -52,6 +52,9 @@ static const dessin_embleme_t DESSINS[NB_EMBLEMES] = {
 void embleme(app_t *app, classe_t c, sfVector2f centre, float taille,
     sfColor couleur)
 {
+    if (app == NULL)
+        return;
+
     if (yugioh_portrait(app, c, centre, taille * PORTRAIT_PAR_EMBLEME))
         return;
     DESSINS[classe_info(c)->embleme](app, centre, taille, couleur);

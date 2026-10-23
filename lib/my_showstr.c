@@ -10,12 +10,15 @@
 ** ╰──────────────────────────────────────────────────────────────────────
 */
 
+#include <stddef.h>
 #include "my.h"
 
 int my_showstr(char const *str)
 {
     int i = 0;
 
+    if (str == NULL)
+        return 0;
     while (str[i] != '\0') {
         if (str[i] < 32 || str[i] > 126) {
             my_putchar('\\');

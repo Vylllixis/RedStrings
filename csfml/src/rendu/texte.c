@@ -58,6 +58,10 @@ static float preparer_texte(app_t *app, police_t p, const char *s,
 
 float largeur_texte(app_t *app, police_t p, const char *s, unsigned int taille)
 {
+    if (app == NULL)
+        return 0.f;
+    s = s != NULL ? s : "";
+
     float r = preparer_texte(app, p, s, taille);
 
     return sfText_getLocalBounds(app->texte).width / r;
@@ -67,6 +71,10 @@ float largeur_texte(app_t *app, police_t p, const char *s, unsigned int taille)
 float position_caractere(app_t *app, police_t p, const char *s,
     unsigned int taille, int index)
 {
+    if (app == NULL)
+        return 0.f;
+    s = s != NULL ? s : "";
+
     float r = preparer_texte(app, p, s, taille);
 
     sfText_setPosition(app->texte, (sfVector2f){0.f, 0.f});
@@ -83,6 +91,10 @@ float position_caractere(app_t *app, police_t p, const char *s,
 float texte_echelle(app_t *app, police_t p, const char *s, unsigned int taille,
     sfVector2f pos, sfColor c, alignement_t a, float echelle)
 {
+    if (app == NULL)
+        return 0.f;
+    s = s != NULL ? s : "";
+
     sfFloatRect b;
     sfGlyph h;
     float ox = 0.f;
@@ -111,6 +123,10 @@ float texte_echelle(app_t *app, police_t p, const char *s, unsigned int taille,
 float texte(app_t *app, police_t p, const char *s, unsigned int taille,
     sfVector2f pos, sfColor c, alignement_t a)
 {
+    if (app == NULL)
+        return 0.f;
+    s = s != NULL ? s : "";
+
     return texte_echelle(app, p, s, taille, pos, c, a, 1.f);
 }
 
@@ -131,6 +147,10 @@ float texte(app_t *app, police_t p, const char *s, unsigned int taille,
 void tronquer(app_t *app, police_t p, unsigned int taille, const char *src,
     float max, char *dst, size_t taille_dst)
 {
+    if (app == NULL || dst == NULL)
+        return;
+    src = src != NULL ? src : "";
+
     size_t len = strlen(src);
 
     if (taille_dst == 0)
@@ -153,6 +173,10 @@ float etiquette(app_t *app, const char *s, sfVector2f pos, sfColor c,
     alignement_t a)
 {
     float l = 0.f;
+
+    if (app == NULL)
+        return 0.f;
+    s = s != NULL ? s : "";
 
     app->espacement = 2.2f;
     l = texte(app, POLICE_GRAS, s, 12, pos, c, a);

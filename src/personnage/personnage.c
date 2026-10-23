@@ -7,10 +7,10 @@
 ** ╭─ personnage.c ───────────────────────────────────────────────────────
 ** │ But         Le catalogue des classes et les règles qui s'y
 ** │             rattachent : modificateurs de statistiques, couleurs,
-** │             catégories, recherche par nom.
+** │             catégories, recherche par nom, règle des noms interdits.
 ** │ Contenu     classes[] (la table), nom_categorie, couleur_ansi,
 ** │             classe_valide, ordre_classes, valeur_stat, stat_finale,
-** │             appliquer_classe, trouver_personnage
+** │             appliquer_classe, trouver_personnage, nom_est_un_id
 ** │ Utilisé par creer_personnage.c, afficher_personnage.c, sauvegarde.c,
 ** │             bataille.c et la version graphique
 ** ╰──────────────────────────────────────────────────────────────────────
@@ -102,6 +102,8 @@ static const char *NOMS_CATEGORIES[NB_CATEGORIES] = {
 
 const char *nom_categorie(categorie_t c)
 {
+    if ((unsigned)c >= NB_CATEGORIES)
+        return "?";
     return NOMS_CATEGORIES[c];
 }
 
@@ -119,6 +121,8 @@ const char *couleur_ansi(classe_t c)
 {
     static char sequences[NB_CLASSES][24];
 
+    if (!classe_valide((int)c))
+        c = GUERRIER;
     if (sequences[c][0] == '\0')
         snprintf(sequences[c], sizeof(sequences[c]), "\033[38;2;%d;%d;%dm",
             classes[c].couleur.r, classes[c].couleur.g, classes[c].couleur.b);
@@ -134,6 +138,8 @@ void ordre_classes(classe_t ordre[NB_CLASSES])
 {
     int n = 0;
 
+    if (ordre == NULL)
+        return;
     for (int cat = 0; cat < NB_CATEGORIES; cat++) {
         for (int i = 0; i < NB_CLASSES; i++) {
             if (classes[i].categorie == (categorie_t)cat)
@@ -144,6 +150,8 @@ void ordre_classes(classe_t ordre[NB_CLASSES])
 
 int valeur_stat(const personnage_t *p, stat_t s)
 {
+    if (p == NULL || (unsigned)s >= NB_STATS)
+        return 0;
     const int valeurs[NB_STATS] = {p->pv, p->atq, p->def, p->soin};
 
     return valeurs[s];
@@ -158,8 +166,13 @@ int valeur_stat(const personnage_t *p, stat_t s)
 */
 int stat_finale(classe_t c, stat_t s, int base)
 {
-    int v = base + classes[c].mods[s];
+    int v = base;
 
+    if (base < STAT_MIN)
+        base = STAT_MIN;
+    if (!classe_valide((int)c) || (unsigned)s >= NB_STATS)
+        return base > STAT_MAX ? STAT_MAX : base;
+    v = base + classes[c].mods[s];
     if (v < STAT_MIN)
         return STAT_MIN;
     return v > STAT_MAX ? STAT_MAX : v;
@@ -167,6 +180,8 @@ int stat_finale(classe_t c, stat_t s, int base)
 
 void appliquer_classe(personnage_t *p)
 {
+    if (p == NULL || !classe_valide((int)p->classe))
+        return;
     p->pv = stat_finale(p->classe, STAT_PV, p->pv);
     p->atq = stat_finale(p->classe, STAT_ATQ, p->atq);
     p->def = stat_finale(p->classe, STAT_DEF, p->def);
@@ -175,9 +190,25 @@ void appliquer_classe(personnage_t *p)
 
 int trouver_personnage(const personnage_t *tab, int size, const char *nom)
 {
+    if (tab == NULL || nom == NULL)
+        return -1;
     for (int i = 0; i < size; i++) {
         if (my_strcmp(tab[i].nom, nom) == 0)
             return i;
     }
     return -1;
+}
+
+/*
+** ╭─ nom_est_un_id ──────────────────────────────────────────────────────
+** │ Un nom fait uniquement de chiffres est interdit, parce qu'il serait
+** │ ambigu : « 3 » désignerait à la fois le personnage nommé 3 et le
+** │ troisième de la liste (son ID). Interdire ces noms à la création, au
+** │ chargement et dans la fenêtre rend la recherche par ID sans équivoque.
+** │ Un nom vide n'est pas un ID (il est refusé ailleurs).
+** ╰──────────────────────────────────────────────────────────────────────
+*/
+int nom_est_un_id(const char *nom)
+{
+    return nom != NULL && nom[0] != '\0' && my_str_isnum(nom);
 }

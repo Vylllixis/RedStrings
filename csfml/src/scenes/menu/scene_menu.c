@@ -36,6 +36,9 @@
 
 void entrer_menu(app_t *app)
 {
+    if (app == NULL)
+        return;
+
     memset(&app->menu, 0, sizeof(menu_t));
     app->menu.selection = menu_option_principale(app);
 }
@@ -85,6 +88,9 @@ static void charger_equipe(app_t *app)
 
 void menu_action(app_t *app, int choix)
 {
+    if (app == NULL)
+        return;
+
     if (choix == CHOIX_SAUVEGARDER)
         sauvegarder_equipe(app);
     if (choix == CHOIX_CHARGER)
@@ -107,6 +113,9 @@ void menu_action(app_t *app, int choix)
 
 int menu_touche_menu(app_t *app)
 {
+    if (app == NULL)
+        return -1;
+
     const int *k = app->in.touches;
 
     if (k[sfKeyNum1] || k[sfKeyNumpad1])
@@ -130,6 +139,9 @@ int menu_nb_ko(app_t *app)
 {
     int n = 0;
 
+    if (app == NULL)
+        return 0;
+
     for (int i = 0; i < app->equipe.len; i++)
         n += est_ko(&app->equipe.data[i]);
     return n;
@@ -137,6 +149,9 @@ int menu_nb_ko(app_t *app)
 
 void scene_menu(app_t *app)
 {
+    if (app == NULL)
+        return;
+
     menu_titre(app, app->t_scene);
     menu_commandes(app, app->t_scene);
     menu_panneau_equipe(app, app->t_scene);
@@ -146,6 +161,9 @@ void scene_menu(app_t *app)
 
 void scene_au_revoir(app_t *app)
 {
+    if (app == NULL)
+        return;
+
     float t = app->t_scene;
     float e = sortie_rebond(progression(t, 0.05f, 0.6f));
     float a = app->alpha;

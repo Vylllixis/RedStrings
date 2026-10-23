@@ -9,7 +9,7 @@
 ** │             contient AUCUN affichage : il décide, les interfaces
 ** │             montrent.
 ** │ Sections    Journal · Combattants et effets · Initialisation et tours
-** │             · Règles des actions · Résolution · Ordinateur
+** │             · Règles des actions · Résolution
 ** │ Utilisé par bataille_console.c (terminal) et l'arène de la version
 ** │             graphique
 ** ╰──────────────────────────────────────────────────────────────────────
@@ -39,6 +39,9 @@ static void noter(bataille_t *b, const char *format, ...)
 {
     va_list args;
 
+    if (b == NULL || format == NULL)
+        return;
+
     va_start(args, format);
     vsnprintf(b->journal[b->nb_journal % JOURNAL_MAX], JOURNAL_LIGNE, format, args);
     va_end(args);
@@ -47,7 +50,7 @@ static void noter(bataille_t *b, const char *format, ...)
 
 const char *bataille_journal(const bataille_t *b, int i)
 {
-    if (i < 0 || i >= b->nb_journal || i >= JOURNAL_MAX)
+    if (b == NULL || i < 0 || i >= b->nb_journal || i >= JOURNAL_MAX)
         return NULL;
     return b->journal[(b->nb_journal - 1 - i) % JOURNAL_MAX];
 }
@@ -56,24 +59,35 @@ const char *bataille_journal(const bataille_t *b, int i)
 /*  Combattants et effets                                              */
 /* ------------------------------------------------------------------ */
 
+/** 1 si r désigne un combattant qui existe dans ce combat. */
+static int ref_valide(const bataille_t *b, ref_t r)
+{
+    return b != NULL && r.equipe >= 0 && r.equipe < NB_EQUIPES
+        && b->equipes[r.equipe].taille >= 0
+        && b->equipes[r.equipe].taille <= TAILLE_EQUIPE_MAX
+        && r.index >= 0 && r.index < b->equipes[r.equipe].taille;
+}
+
 const combattant_t *bataille_lire(const bataille_t *b, ref_t r)
 {
-    return &b->equipes[r.equipe].membres[r.index];
+    return ref_valide(b, r) ? &b->equipes[r.equipe].membres[r.index] : NULL;
 }
 
 combattant_t *bataille_combattant(bataille_t *b, ref_t r)
 {
-    return &b->equipes[r.equipe].membres[r.index];
+    return ref_valide(b, r) ? &b->equipes[r.equipe].membres[r.index] : NULL;
 }
 
 int combattant_vivant(const combattant_t *c)
 {
-    return c->pv > 0;
+    return c != NULL && c->pv > 0;
 }
 
 static int chercher_effet(const combattant_t *c, type_effet_t type)
 {
-    for (int i = 0; i < c->nb_effets; i++) {
+    if (c == NULL)
+        return -1;
+    for (int i = 0; i < c->nb_effets && i < MAX_EFFETS; i++) {
         if (c->effets[i].type == type)
             return i;
     }
@@ -90,6 +104,8 @@ static void poser_effet(combattant_t *c, type_effet_t type, int tours)
 {
     int i = chercher_effet(c, type);
 
+    if (c == NULL)
+        return;
     if (i == -1 && c->nb_effets < MAX_EFFETS)
         i = c->nb_effets++;
     if (i == -1)
@@ -112,7 +128,9 @@ static int vieillir_effets(bataille_t *b, ref_t r, evenement_t *ev, int n)
     combattant_t *c = bataille_combattant(b, r);
     int i = 0;
 
-    while (i < c->nb_effets) {
+    if (c == NULL)
+        return n;
+    while (i < c->nb_effets && c->nb_effets <= MAX_EFFETS) {
         if (--c->effets[i].tours > 0) {
             i++;
             continue;
@@ -143,7 +161,7 @@ static void preparer_equipe(equipe_t *e, const personnage_t *persos, int n)
 
 static int equipe_valide(const personnage_t *persos, int n)
 {
-    if (n < 1 || n > TAILLE_EQUIPE_MAX)
+    if (persos == NULL || n < 1 || n > TAILLE_EQUIPE_MAX)
         return 0;
     for (int i = 0; i < n; i++) {
         if (persos[i].pv <= 0)
@@ -174,7 +192,7 @@ static void calculer_ordre(bataille_t *b)
 int bataille_init(bataille_t *b, const personnage_t *joueurs, int nb_joueurs,
     const personnage_t *adversaires, int nb_adversaires)
 {
-    if (!equipe_valide(joueurs, nb_joueurs)
+    if (b == NULL || !equipe_valide(joueurs, nb_joueurs)
         || !equipe_valide(adversaires, nb_adversaires))
         return -1;
     *b = (bataille_t){0};
@@ -188,6 +206,9 @@ int bataille_init(bataille_t *b, const personnage_t *joueurs, int nb_joueurs,
 
 ref_t bataille_actif(const bataille_t *b)
 {
+    if (b == NULL || b->tour < 0 || b->tour >= b->nb_ordre
+        || b->nb_ordre > NB_EQUIPES * TAILLE_EQUIPE_MAX)
+        return (ref_t){-1, -1};
     return b->ordre[b->tour];
 }
 
@@ -212,6 +233,8 @@ static int equipe_vivante(const equipe_t *e)
 */
 static int tour_suivant(bataille_t *b, evenement_t *ev, int n)
 {
+    if (b->nb_ordre <= 0)
+        return n;
     for (int k = 0; k < b->nb_ordre; k++) {
         b->tour++;
         if (b->tour >= b->nb_ordre) {
@@ -239,8 +262,11 @@ static int tour_suivant(bataille_t *b, evenement_t *ev, int n)
 */
 int bataille_degats(const combattant_t *attaquant, const combattant_t *cible)
 {
-    int degats = calculer_degats(&attaquant->perso, &cible->perso);
+    int degats = 0;
 
+    if (attaquant == NULL || cible == NULL)
+        return 0;
+    degats = calculer_degats(&attaquant->perso, &cible->perso);
     if (combattant_en_garde(cible))
         degats = degats * (100 - GARDE_REDUCTION) / 100;
     return degats < 1 ? 1 : degats;
@@ -248,9 +274,16 @@ int bataille_degats(const combattant_t *attaquant, const combattant_t *cible)
 
 int bataille_soin(const combattant_t *soigneur, const combattant_t *cible)
 {
-    int manque = cible->pv_max - cible->pv;
+    int manque = 0;
+    int soin = 0;
 
-    return soigneur->perso.soin < manque ? soigneur->perso.soin : manque;
+    if (soigneur == NULL || cible == NULL)
+        return 0;
+    manque = cible->pv_max - cible->pv;
+    soin = soigneur->perso.soin;
+    if (manque <= 0 || soin <= 0)
+        return 0;
+    return soin < manque ? soin : manque;
 }
 
 /*
@@ -269,13 +302,10 @@ int bataille_cible_valide(const bataille_t *b, action_t a, ref_t cible)
 {
     ref_t r = bataille_actif(b);
     const combattant_t *acteur = bataille_lire(b, r);
-    const combattant_t *c = NULL;
+    const combattant_t *c = bataille_lire(b, cible);
 
-    if (b->gagnant != -1 || cible.equipe < 0 || cible.equipe >= NB_EQUIPES
-        || cible.index < 0 || cible.index >= b->equipes[cible.equipe].taille)
-        return 0;
-    c = bataille_lire(b, cible);
-    if (!combattant_vivant(c))
+    if (b == NULL || b->gagnant != -1 || !combattant_vivant(acteur)
+        || !combattant_vivant(c) || (unsigned)a >= NB_ACTIONS)
         return 0;
     if (a == ACTION_ATTAQUER)
         return cible.equipe != r.equipe;
@@ -289,8 +319,10 @@ int bataille_cibles(const bataille_t *b, action_t a,
 {
     int n = 0;
 
+    if (b == NULL || cibles == NULL)
+        return 0;
     for (int e = 0; e < NB_EQUIPES; e++) {
-        for (int i = 0; i < b->equipes[e].taille; i++) {
+        for (int i = 0; i < b->equipes[e].taille && i < TAILLE_EQUIPE_MAX; i++) {
             if (bataille_cible_valide(b, a, (ref_t){e, i}))
                 cibles[n++] = (ref_t){e, i};
         }
@@ -317,6 +349,8 @@ static int attaquer_cible(bataille_t *b, ref_t r, ref_t cible, evenement_t *ev,
     int garde = combattant_en_garde(c);
     int degats = bataille_degats(a, c);
 
+    if (a == NULL || c == NULL)
+        return n;
     c->pv = degats >= c->pv ? 0 : c->pv - degats;
     ev[n++] = (evenement_t){EV_ATTAQUE, r, cible, degats, c->pv, garde};
     noter(b, "%s attaque %s et inflige %d dégât%s%s.", a->perso.nom, c->perso.nom,
@@ -335,6 +369,8 @@ static int soigner_cible(bataille_t *b, ref_t r, ref_t cible, evenement_t *ev,
     combattant_t *c = bataille_combattant(b, cible);
     int rendu = bataille_soin(s, c);
 
+    if (s == NULL || c == NULL)
+        return n;
     c->pv += rendu;
     ev[n++] = (evenement_t){EV_SOIN, r, cible, rendu, c->pv, 0};
     if (r.index == cible.index)
@@ -348,6 +384,8 @@ static int se_defendre(bataille_t *b, ref_t r, evenement_t *ev, int n)
 {
     combattant_t *c = bataille_combattant(b, r);
 
+    if (c == NULL)
+        return n;
     poser_effet(c, EFFET_GARDE, GARDE_DUREE);
     ev[n++] = (evenement_t){EV_GARDE, r, r, GARDE_REDUCTION, c->pv, 0};
     noter(b, "%s adopte une posture défensive.", c->perso.nom);
@@ -370,10 +408,15 @@ int bataille_agir(bataille_t *b, action_t a, ref_t cible,
     evenement_t ev[MAX_EVENEMENTS])
 {
     ref_t r = bataille_actif(b);
+    combattant_t *acteur = NULL;
     int n = 0;
 
-    if (!bataille_cible_valide(b, a, cible))
+    if (ev == NULL || !bataille_cible_valide(b, a, cible))
         return -1;
+    acteur = bataille_combattant(b, r);
+    if (acteur == NULL)
+        return -1;
+    acteur->defensifs = a == ACTION_ATTAQUER ? 0 : acteur->defensifs + 1;
     if (a == ACTION_ATTAQUER)
         n = attaquer_cible(b, r, cible, ev, n);
     else if (a == ACTION_SOIGNER)
@@ -390,55 +433,4 @@ int bataille_agir(bataille_t *b, action_t a, ref_t cible,
         }
     }
     return tour_suivant(b, ev, n);
-}
-
-/* ------------------------------------------------------------------ */
-/*  Ordinateur                                                         */
-/* ------------------------------------------------------------------ */
-
-/*
-** ╭─ bataille_ia ────────────────────────────────────────────────────────
-** │ L'ordinateur joue avec des règles simples et prévisibles, dans
-** │ l'ordre :
-** │
-** │ 1. soigner l'allié vivant le plus blessé, s'il est sous la moitié de
-** │    ses PV
-** │ 2. se mettre en garde sous le quart de ses PV (si pas déjà en garde)
-** │ 3. sinon attaquer l'ennemi vivant qui a le moins de PV
-** ╰──────────────────────────────────────────────────────────────────────
-*/
-void bataille_ia(const bataille_t *b, action_t *a, ref_t *cible)
-{
-    ref_t r = bataille_actif(b);
-    const combattant_t *moi = bataille_lire(b, r);
-    ref_t cibles[NB_EQUIPES * TAILLE_EQUIPE_MAX];
-    const combattant_t *c = NULL;
-    int n = bataille_cibles(b, ACTION_SOIGNER, cibles);
-    int choix = -1;
-
-    for (int i = 0; i < n; i++) {
-        c = bataille_lire(b, cibles[i]);
-        if (c->pv * 2 < c->pv_max && (choix == -1
-            || c->pv * bataille_lire(b, cibles[choix])->pv_max
-            < bataille_lire(b, cibles[choix])->pv * c->pv_max))
-            choix = i;
-    }
-    if (choix != -1) {
-        *a = ACTION_SOIGNER;
-        *cible = cibles[choix];
-        return;
-    }
-    if (moi->pv * 4 < moi->pv_max && !combattant_en_garde(moi)) {
-        *a = ACTION_DEFENDRE;
-        *cible = r;
-        return;
-    }
-    n = bataille_cibles(b, ACTION_ATTAQUER, cibles);
-    choix = 0;
-    for (int i = 1; i < n; i++) {
-        if (bataille_lire(b, cibles[i])->pv < bataille_lire(b, cibles[choix])->pv)
-            choix = i;
-    }
-    *a = ACTION_ATTAQUER;
-    *cible = cibles[choix];
 }

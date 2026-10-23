@@ -64,6 +64,9 @@ void arene_cartes_invocation(app_t *app, arene_t *ar)
 {
     float t = 0.f;
 
+    if (app == NULL || ar == NULL)
+        return;
+
     if (!yugioh_actif(app) || ar->t_cartes > INVOC_FIN)
         return;
     for (int e = 0; e < NB_EQUIPES; e++) {
@@ -89,6 +92,9 @@ static int action_de(type_evenement_t type)
 /** Carte de l'acteur, activée à côté de lui pendant l'événement en cours. */
 void arene_carte_action(app_t *app, arene_t *ar)
 {
+    if (app == NULL || ar == NULL)
+        return;
+
     const evenement_t *ev = NULL;
     visuel_t *v = NULL;
     float entre = 0.f;
@@ -123,6 +129,9 @@ void arene_carte_action(app_t *app, arene_t *ar)
 /** Fin du combat : les cartes de ton équipe brillent (victoire) ou se grisent (défaite). */
 void arene_cartes_fin(app_t *app, arene_t *ar, float cy)
 {
+    if (app == NULL || ar == NULL)
+        return;
+
     int gagne = ar->bataille.gagnant == 0;
     int n = ar->bataille.equipes[0].taille;
     const combattant_t *c = NULL;

@@ -7,19 +7,30 @@
 ** ╭─ roster.c ───────────────────────────────────────────────────────────
 ** │ But         La liste des personnages (roster) : un tableau qui
 ** │             grandit tout seul avec realloc.
-** │ Contenu     roster_init, roster_ajouter, roster_liberer
+** │ Contenu     roster_init, roster_ajouter, roster_liberer, roster_trouver,
+** │             roster_nb_en_forme
 ** │ Utilisé par redstrings.c, sauvegarde.c, bataille_console.c
 ** ╰──────────────────────────────────────────────────────────────────────
 */
 
 #include <stdlib.h>
+#include "my.h"
+#include "my_string.h"
 #include "roster.h"
 
 void roster_init(roster_t *r)
 {
+    if (r == NULL)
+        return;
     r->data = NULL;
     r->len = 0;
     r->capacite = 0;
+}
+
+int roster_valide(const roster_t *r)
+{
+    return r != NULL && r->len >= 0 && r->len <= r->capacite
+        && (r->len == 0 || r->data != NULL);
 }
 
 /*
@@ -39,6 +50,8 @@ int roster_ajouter(roster_t *r, const personnage_t *p)
     int nouvelle = 0;
     personnage_t *tmp = NULL;
 
+    if (!roster_valide(r) || p == NULL)
+        return -1;
     if (r->len == r->capacite) {
         nouvelle = r->capacite == 0 ? ROSTER_CAPACITE_INITIALE
             : r->capacite * 2;
@@ -54,6 +67,47 @@ int roster_ajouter(roster_t *r, const personnage_t *p)
 
 void roster_liberer(roster_t *r)
 {
+    if (r == NULL)
+        return;
     free(r->data);
     roster_init(r);
+}
+
+/*
+** ╭─ roster_trouver ─────────────────────────────────────────────────────
+** │ Retrouve un personnage à partir de ce que le joueur a tapé.
+** │
+** │ 1. le nom exact (même casse) : il a toujours priorité. La saisie et le
+** │    chargement refusent les noms-nombres, mais la fonction reste sûre si
+** │    un roster en contient quand même
+** │ 2. sinon un ID de 1 à len : sa position dans la liste affichée
+** │ L'ID n'est lu que s'il ne fait que des chiffres et au plus 9 :
+** │ my_getnbr() ne protège pas contre un dépassement d'int.
+** ╰──────────────────────────────────────────────────────────────────────
+*/
+int roster_trouver(const roster_t *r, const char *saisie)
+{
+    int numero = 0;
+
+    if (!roster_valide(r) || saisie == NULL)
+        return -1;
+    for (int i = 0; i < r->len; i++) {
+        if (my_strcmp(r->data[i].nom, saisie) == 0)
+            return i;
+    }
+    if (saisie[0] == '\0' || my_strlen(saisie) > 9 || !my_str_isnum(saisie))
+        return -1;
+    numero = my_getnbr(saisie);
+    return numero >= 1 && numero <= r->len ? numero - 1 : -1;
+}
+
+int roster_nb_en_forme(const roster_t *r)
+{
+    int n = 0;
+
+    if (!roster_valide(r))
+        return 0;
+    for (int i = 0; i < r->len; i++)
+        n += !est_ko(&r->data[i]);
+    return n;
 }

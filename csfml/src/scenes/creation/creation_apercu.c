@@ -86,6 +86,9 @@ static void stats_apercu(app_t *app, creation_t *c, sfColor col)
 
 void creation_apercu(app_t *app, creation_t *c, float a)
 {
+    if (app == NULL || c == NULL)
+        return;
+
     personnage_t p = {0};
     float e = sortie_cubique(progression(app->t_scene, 0.2f, 0.7f));
     float envol = c->sortie >= 0.f

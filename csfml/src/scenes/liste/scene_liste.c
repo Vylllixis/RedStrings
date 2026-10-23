@@ -39,6 +39,9 @@
 
 void entrer_liste(app_t *app)
 {
+    if (app == NULL)
+        return;
+
     liste_t *l = &app->liste;
 
     memset(l, 0, sizeof(liste_t));
@@ -212,6 +215,9 @@ static void recherche(app_t *app, liste_t *l, float a, int actif)
 
 void scene_liste(app_t *app)
 {
+    if (app == NULL)
+        return;
+
     liste_t *l = &app->liste;
     int ids[MAX_PERSONNAGES];
     int bloque = app->souris_bloquee;

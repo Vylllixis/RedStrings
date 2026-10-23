@@ -37,6 +37,9 @@
 
 visuel_t *arene_vis(arene_t *ar, ref_t r)
 {
+    if (ar == NULL)
+        return NULL;
+
     return &ar->vis[r.equipe][r.index];
 }
 
@@ -54,11 +57,14 @@ sfColor arene_couleur_action(int a)
 {
     const sfColor couleurs[NB_ACTIONS] = {C_ROUGE, C_SOIN, C_BLEU};
 
-    return couleurs[a];
+    return couleurs[(unsigned)a < NB_ACTIONS ? a : 0];
 }
 
 void arene_demarrer(app_t *app, arene_t *ar)
 {
+    if (app == NULL || ar == NULL)
+        return;
+
     bataille_t *b = &ar->bataille;
     const combattant_t *c = NULL;
     visuel_t *v = NULL;
@@ -90,6 +96,9 @@ void arene_demarrer(app_t *app, arene_t *ar)
 
 void entrer_arene(app_t *app)
 {
+    if (app == NULL)
+        return;
+
     arene_t *ar = &app->arene;
     selection_t *s = &app->selection;
 
@@ -104,6 +113,9 @@ void entrer_arene(app_t *app)
 
 void arene_debut_tour(arene_t *ar)
 {
+    if (ar == NULL)
+        return;
+
     ar->t_tour = 0.f;
     ar->t_etat = 0.f;
     ar->etat = bataille_actif(&ar->bataille).equipe == 0 ? VUE_CHOIX_ACTION
@@ -126,6 +138,9 @@ void arene_debut_tour(arene_t *ar)
 */
 void arene_lancer(app_t *app, arene_t *ar, action_t a, ref_t cible)
 {
+    if (app == NULL || ar == NULL)
+        return;
+
     int n = bataille_agir(&ar->bataille, a, cible, ar->file);
 
     if (n < 0) {
@@ -177,11 +192,17 @@ static void maj_etat(app_t *app, arene_t *ar)
 */
 float arene_echelle_monde(const app_t *app)
 {
+    if (app == NULL)
+        return 0.f;
+
     return fmaxf(0.5f, fminf(app->ecran.width / LARGEUR, app->ecran.height / HAUTEUR));
 }
 
 void scene_arene(app_t *app)
 {
+    if (app == NULL)
+        return;
+
     arene_t *ar = &app->arene;
     ref_t ordre[NB_EQUIPES * TAILLE_EQUIPE_MAX];
     ref_t actif = bataille_actif(&ar->bataille);

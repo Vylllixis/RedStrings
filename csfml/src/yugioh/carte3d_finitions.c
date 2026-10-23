@@ -44,6 +44,9 @@ static sfVector2f tour(const carte3d_t *k, float t)
 /** Liseré lumineux, et un éclat qui fait le tour du cadre. */
 void carte3d_bord_lumineux(app_t *app, const carte3d_t *k, float a)
 {
+    if (app == NULL || k == NULL)
+        return;
+
     sfVector2f p[TOUR_CADRE + 1];
     sfVector2f eclat[10];
     sfColor col = k->halo.a ? k->halo : C_BLANC;
@@ -65,6 +68,9 @@ void carte3d_bord_lumineux(app_t *app, const carte3d_t *k, float a)
  */
 void carte3d_titre(app_t *app, classe_t c, const carte3d_t *k)
 {
+    if (app == NULL || k == NULL)
+        return;
+
     const carte_classe_t *carte = carte_de_classe(c);
     sfVector2f coins[4] = {carte3d_point(k, 0.06f, 0.044f), carte3d_point(k, 0.94f, 0.044f),
         carte3d_point(k, 0.94f, 0.122f), carte3d_point(k, 0.06f, 0.122f)};

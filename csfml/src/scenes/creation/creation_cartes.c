@@ -144,6 +144,9 @@ static void dessiner_main(app_t *app, creation_t *c, const classe_t *ids, int n,
 
 void creation_main_cartes(app_t *app, creation_t *c, float y)
 {
+    if (app == NULL || c == NULL)
+        return;
+
     categorie_t cat = classe_info(c->classe)->categorie;
     classe_t ids[NB_CLASSES];
     int n = cartes_de_categorie(cat, ids);
@@ -204,6 +207,12 @@ static void cercle_invocation(app_t *app, sfColor col)
 */
 void creation_carte_apercu(app_t *app, creation_t *c)
 {
+    if (app == NULL)
+        return;
+
+    if (c == NULL)
+        return;
+
     float f = progression(c->t_classe, 0.f, DUREE_RETOURNEMENT);
     float tour = 2.f * PI * entree_sortie_cubique(f);
     float e = sortie_cubique(progression(app->t_scene, 0.2f, 0.8f));

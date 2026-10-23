@@ -29,6 +29,8 @@ static const char *CHOIX[NB_CHOIX_THEMES] = {
 
 void reglages_defaut(reglages_audio_t *r)
 {
+    if (r == NULL)
+        return;
     r->general = 80;
     r->musique = 55;
     r->effets = 80;
@@ -45,8 +47,11 @@ const char *nom_choix_theme(choix_theme_t c)
 static int lire_entier(const char *texte, int min, int max, int *v)
 {
     char *fin = NULL;
-    long x = strtol(texte, &fin, 10);
+    long x = 0;
 
+    if (texte == NULL)
+        return -1;
+    x = strtol(texte, &fin, 10);
     while (*fin == ' ' || *fin == '\r' || *fin == '\n')
         fin++;
     if (fin == texte || *fin != '\0')
@@ -88,9 +93,12 @@ static void lire_ligne(reglages_audio_t *r, char *ligne)
 /* Remplace dans `r` les valeurs lues dans le fichier ; -1 s'il ne s'ouvre pas. */
 int reglages_lire(reglages_audio_t *r, const char *chemin)
 {
-    FILE *f = fopen(chemin, "r");
+    FILE *f = NULL;
     char ligne[LIGNE_REGLAGE];
 
+    if (r == NULL || chemin == NULL || chemin[0] == '\0')
+        return -1;
+    f = fopen(chemin, "r");
     if (f == NULL)
         return -1;
     while (fgets(ligne, sizeof(ligne), f) != NULL)
@@ -101,9 +109,12 @@ int reglages_lire(reglages_audio_t *r, const char *chemin)
 
 int reglages_ecrire(const reglages_audio_t *r, const char *chemin)
 {
-    FILE *f = fopen(chemin, "w");
+    FILE *f = NULL;
     int erreur = 0;
 
+    if (r == NULL || chemin == NULL || chemin[0] == '\0')
+        return -1;
+    f = fopen(chemin, "w");
     if (f == NULL)
         return -1;
     erreur = fprintf(f, "# Réglages audio de RedStrings (panneau F2 du jeu)\n"

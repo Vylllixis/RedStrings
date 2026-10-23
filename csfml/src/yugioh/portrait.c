@@ -30,6 +30,9 @@
 
 int yugioh_portrait(app_t *app, classe_t c, sfVector2f centre, float rayon)
 {
+    if (app == NULL)
+        return 0;
+
     const sfTexture *art = NULL;
     sfVector2u t;
     sfVertex v[8];

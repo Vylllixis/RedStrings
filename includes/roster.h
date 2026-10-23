@@ -20,11 +20,28 @@ typedef struct {
 /** Prépare un roster vide, sans allocation. */
 void roster_init(roster_t *r);
 
+/** 1 si le roster est utilisable : non NULL, len entre 0 et capacite, data
+ *  non NULL dès qu'il contient quelqu'un. Toute fonction qui lit un roster
+ *  commence par là. */
+int roster_valide(const roster_t *r);
+
 /** Copie p à la fin du roster. Renvoie -1 si l'allocation échoue
  *  (le roster reste alors intact). */
 int roster_ajouter(roster_t *r, const personnage_t *p);
 
 /** Libère la mémoire et remet le roster à vide. */
 void roster_liberer(roster_t *r);
+
+/**
+ * Indice du personnage désigné par `saisie` : son nom exact, ou son ID
+ * (1 à r->len, sa position dans la liste affichée). Comme les noms ne peuvent
+ * pas être des nombres, les deux ne se confondent pas ; si un roster en
+ * contient pourtant un, le nom exact a priorité sur l'ID.
+ * @return l'indice dans r->data, ou -1 si rien ne correspond
+ */
+int roster_trouver(const roster_t *r, const char *saisie);
+
+/** Nombre de personnages qui ne sont pas K.O. (donc engageables en combat). */
+int roster_nb_en_forme(const roster_t *r);
 
 #endif /* ROSTER_H */

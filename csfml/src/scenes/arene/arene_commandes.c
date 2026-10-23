@@ -60,6 +60,9 @@ static void valider_action(app_t *app, arene_t *ar, int a)
 
 void arene_clavier(app_t *app, arene_t *ar)
 {
+    if (app == NULL || ar == NULL)
+        return;
+
     const int *k = app->in.touches;
     const int touches[NB_ACTIONS] = {sfKeyNum1, sfKeyNum2, sfKeyNum3};
     int sens = k[sfKeyRight] || k[sfKeyDown] ? 1 : (k[sfKeyLeft] || k[sfKeyUp] ? -1 : 0);
@@ -91,6 +94,9 @@ void arene_clavier(app_t *app, arene_t *ar)
 /** Souris : survoler une cible la choisit, cliquer confirme. */
 void arene_souris_cibles(app_t *app, arene_t *ar)
 {
+    if (app == NULL || ar == NULL)
+        return;
+
     visuel_t *v = NULL;
     float dx = 0.f;
     float dy = 0.f;
@@ -167,6 +173,9 @@ static int bouton_action(app_t *app, arene_t *ar, int a, sfFloatRect r, int disp
 
 void arene_panneau_commandes(app_t *app, arene_t *ar, float e)
 {
+    if (app == NULL || ar == NULL)
+        return;
+
     sfFloatRect v = ecran_visible(app);
     sfFloatRect r = {v.left + v.width - MARGE - CMD_L + 60.f * (1.f - e), v.top + v.height
         - MARGE - CMD_H + 12.f, CMD_L, CMD_H};

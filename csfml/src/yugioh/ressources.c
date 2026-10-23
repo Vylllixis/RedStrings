@@ -25,6 +25,9 @@
 
 int yugioh_actif(const app_t *app)
 {
+    if (app == NULL)
+        return 0;
+
     return app->mode == MODE_YUGIOH;
 }
 
@@ -90,6 +93,9 @@ static sfRenderTexture *imprimer(app_t *app, int c)
 */
 int yugioh_charger(app_t *app)
 {
+    if (app == NULL)
+        return -1;
+
     yugioh_t *y = &app->yugioh;
 
     for (int c = 0; c < NB_CLASSES; c++) {
@@ -113,6 +119,9 @@ int yugioh_charger(app_t *app)
 
 void yugioh_liberer(app_t *app)
 {
+    if (app == NULL)
+        return;
+
     yugioh_t *y = &app->yugioh;
 
     for (int c = 0; c < NB_CLASSES; c++) {
