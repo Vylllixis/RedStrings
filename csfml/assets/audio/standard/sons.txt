@@ -1,0 +1,60 @@
+# ╭─ Pack audio « Standard » de RedStrings ─────────────────────────────
+# │ Une ligne par événement :
+# │   evenement  [volume=0..1]  [hauteur=0..0.5]  [rare=fichier.ogg@proba]  fichier.ogg [fichier2.ogg…]
+# │ - plusieurs fichiers : l'un d'eux au hasard, jamais deux fois de suite
+# │ - hauteur : variation aléatoire de hauteur (remplace celle du moteur)
+# │ - rare : variante jouée avec la probabilité donnée (0.05 = 1 fois sur 20)
+# │ Ce pack sert aussi de repli : un événement absent d'un autre thème
+# │ prend le son d'ici ; absent ici aussi, il reste muet.
+# │ Les noms d'événements sont listés dans csfml/src/audio/audio_evenements.c.
+# ╰─────────────────────────────────────────────────────────────────────
+
+# ── Musique ──────────────────────────────────────────────────────────
+musique.menu          volume=0.70  musique_menu.ogg
+musique.combat        volume=0.70  musique_combat.ogg
+
+# ── Interface ────────────────────────────────────────────────────────
+ui.survol             volume=0.25  survol_1.ogg survol_2.ogg
+ui.valider            volume=0.55  valider.ogg
+ui.deplacement        volume=0.35  deplacement_1.ogg deplacement_2.ogg
+ui.ouverture          volume=0.55  ouverture.ogg
+ui.fermeture          volume=0.50  fermeture.ogg
+ui.onglet             volume=0.45  onglet.ogg
+ui.saisie             volume=0.35  saisie_1.ogg saisie_2.ogg saisie_3.ogg saisie_4.ogg
+ui.effacement         volume=0.40  effacement.ogg
+ui.refus              volume=0.45  refus.ogg
+ui.valeur             volume=0.30  valeur.ogg
+ui.erreur             volume=0.55  rare=erreur_rare.ogg@0.03  erreur.ogg
+ui.succes             volume=0.55  succes.ogg
+ui.info               volume=0.50  info.ogg
+ecran.transition      volume=0.45  transition.ogg
+ecran.retour          volume=0.40  retour.ogg
+app.ouverture         volume=0.85  app_ouverture.ogg
+app.fermeture         volume=0.80  app_fermeture.ogg
+secret.konami         volume=0.80  konami.ogg
+
+# ── Cartes et données ────────────────────────────────────────────────
+carte.selection       volume=0.65  carte_selection_1.ogg carte_selection_2.ogg
+carte.retrait         volume=0.55  carte_retrait.ogg
+carte.ouverture       volume=0.60  carte_ouverture.ogg
+carte.defilement      volume=0.50  defilement_1.ogg defilement_2.ogg
+classe.changement     volume=0.45  classe.ogg
+equipe.validee        volume=0.80  equipe.ogg
+personnage.cree       volume=0.85  rare=personnage_cree_rare.ogg@0.05  personnage_cree.ogg
+recherche.vide        volume=0.50  recherche_vide.ogg
+sauvegarde.ok         volume=0.75  sauvegarde.ogg
+chargement.ok         volume=0.75  chargement.ogg
+
+# ── Combat ───────────────────────────────────────────────────────────
+combat.debut          volume=0.90  combat_debut.ogg
+combat.tour           volume=0.55  combat_tour.ogg
+combat.action         volume=0.55  action_1.ogg action_2.ogg
+combat.impact         volume=0.80  impact_1.ogg impact_2.ogg impact_3.ogg
+combat.impact_garde   volume=0.80  impact_garde.ogg
+combat.impact_lourd   volume=0.95  impact_lourd.ogg
+combat.soin           volume=0.70  soin.ogg
+combat.garde          volume=0.70  garde.ogg
+combat.garde_fin      volume=0.50  garde_fin.ogg
+combat.ko             volume=0.95  ko.ogg
+combat.victoire       volume=0.95  rare=victoire_rare.ogg@0.05  victoire.ogg
+combat.defaite        volume=0.90  defaite.ogg
