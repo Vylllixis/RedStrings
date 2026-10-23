@@ -29,6 +29,7 @@ static void entrer_scene(app_t *app, scene_t s)
 {
     app->scene = s;
     app->t_scene = 0.f;
+    audio_entrer_scene(app, s);
     if (s == SCENE_MENU)
         entrer_menu(app);
     if (s == SCENE_CREATION)
@@ -47,6 +48,10 @@ void changer_scene(app_t *app, scene_t scene)
         return;
     app->scene_suivante = scene;
     app->t_transition = 0.f;
+    if (scene == SCENE_AU_REVOIR)
+        son(app, SON_APP_FERMETURE);
+    else
+        son(app, scene == SCENE_MENU ? SON_ECRAN_RETOUR : SON_ECRAN_TRANSITION);
 }
 
 /*
@@ -95,6 +100,16 @@ static void dessiner_scene(app_t *app)
         scene_au_revoir(app);
 }
 
+/* Le panneau audio est ouvert : l'écran derrière ne reçoit ni clavier ni souris. */
+static void cacher_entrees(app_t *app)
+{
+    app->in.clic = 0;
+    app->in.bas = 0;
+    app->in.nb_texte = 0;
+    app->in.souris = (sfVector2f){-10000.f, -10000.f};
+    memset(app->in.touches, 0, sizeof(app->in.touches));
+}
+
 static void maj_curseur(app_t *app)
 {
     if (app->curseur_voulu == app->curseur_actuel
@@ -111,18 +126,21 @@ static void maj_curseur(app_t *app)
 ** │ 1. met à jour les temps : dt est borné à 1/30 s (pas de saut après un
 ** │    blocage) ; à chaque K.O., le « hitstop » ralentit le jeu un court
 ** │    instant
-** │ 2. maj_transition() calcule le fondu entre deux scènes ; pendant ce
-** │    temps, la souris et le clavier sont ignorés
-** │ 3. dessine le fond (vue fixe), puis la scène (vue qui tremble quand
-** │    app->secousse > 0)
-** │ 4. particules, puis notifications par-dessus, en vue fixe
-** │ 5. règle le curseur de la souris (flèche, main, texte)
+** │ 2. audio : fondus de musique, raccourcis F2 (réglages) et F3 (coupure)
+** │ 3. maj_transition() calcule le fondu entre deux scènes ; pendant ce
+** │    temps, ou quand le panneau audio est ouvert, l'écran ne reçoit ni
+** │    clavier ni souris
+** │ 4. dessine le fond (vue fixe), puis la scène (vue qui tremble quand
+** │    app->secousse > 0) ; audio_suivre() en tire les sons
+** │ 5. particules, notifications, puis panneau audio, en vue fixe
+** │ 6. règle le curseur de la souris (flèche, main, texte)
 ** ╰──────────────────────────────────────────────────────────────────────
 */
 void maj_app(app_t *app, float dt)
 {
     float alpha = 1.f;
     float decalage = 0.f;
+    entree_t entrees;
 
     app->dt = bornerf(dt, 0.f, 1.f / 30.f);
     app->temps += app->dt;
@@ -131,6 +149,8 @@ void maj_app(app_t *app, float dt)
     app->hitstop -= app->dt;
     app->secousse = approcher(app->secousse, 0.f, 7.f, app->dt);
     app->curseur_voulu = CURSEUR_FLECHE;
+    audio_maj(app);
+    audio_raccourcis(app);
     maj_transition(app, &alpha, &decalage);
     app->souris_bloquee = app->t_transition >= 0.f;
     if (app->souris_bloquee) {
@@ -138,6 +158,9 @@ void maj_app(app_t *app, float dt)
         app->in.nb_texte = 0;
         memset(app->in.touches, 0, sizeof(app->in.touches));
     }
+    entrees = app->in;
+    if (audio_panneau_ouvert(app))
+        cacher_entrees(app);
     sfRenderWindow_clear(app->fenetre, C_FOND);
     sfRenderWindow_setView(app->fenetre, app->vue_fixe);
     app->alpha = 1.f;
@@ -148,10 +171,13 @@ void maj_app(app_t *app, float dt)
     sfRenderWindow_setView(app->fenetre, app->vue);
     app->alpha = alpha;
     dessiner_scene(app);
+    audio_suivre(app);
     app->alpha = 1.f;
     maj_particules(app);
     dessiner_particules(app);
     sfRenderWindow_setView(app->fenetre, app->vue_fixe);
     dessiner_toasts(app);
+    app->in = entrees;
+    audio_panneau(app);
     maj_curseur(app);
 }

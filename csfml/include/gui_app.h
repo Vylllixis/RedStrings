@@ -16,6 +16,7 @@
     #include "gui_config.h"
     #include "gui_types.h"
     #include "gui_etat.h"
+    #include "gui_audio.h"
 
 struct app_s {
     mode_visuel_t mode;     /**< Fixé au lancement, jamais modifié ensuite. */
@@ -71,6 +72,7 @@ struct app_s {
     liste_t liste;
     selection_t selection;
     arene_t arene;
+    audio_t audio;      /**< Sons, musique et réglages audio (src/audio/). */
     int ouvert;
 };
 

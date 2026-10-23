@@ -133,7 +133,7 @@ void mini_carte(app_t *app, const personnage_t *p, sfFloatRect r,
 {
     float mort = est_ko(p) ? 1.f : 0.f;
     sfColor c = griser(couleur_classe(p->classe), mort * 0.8f);
-    sfColor bord = melanger(C_BORD, avec_alpha(c, 0.8f), survol);
+    sfColor bord = melanger(C_BORD, c, survol);
     float cx = r.left + r.width / 2.f;
     char buf[64];
 
@@ -143,17 +143,20 @@ void mini_carte(app_t *app, const personnage_t *p, sfFloatRect r,
         lueur(app, (sfVector2f){cx, r.top + r.height / 2.f}, (sfVector2f){r.width * 0.85f,
             r.height * 0.75f}, avec_alpha(marque->couleur, 0.2f));
     }
-    lueur(app, (sfVector2f){cx, r.top + r.height}, (sfVector2f){r.width * 0.7f, 50.f},
-        avec_alpha(c, 0.3f * survol));
-    ombre_biseau(app, r, 18.f, 0.9f + 0.6f * survol);
-    panneau(app, r, 18.f, melanger(C_SURFACE_HAUTE, melanger(C_SURFACE_HAUTE, c, 0.2f),
+    if (survol > 0.01f)         // halo de la couleur de classe autour de la carte survolée
+        lueur(app, (sfVector2f){cx, r.top + r.height / 2.f}, (sfVector2f){r.width * 0.95f,
+            r.height * 0.8f}, avec_alpha(c, 0.18f * survol));
+    lueur(app, (sfVector2f){cx, r.top + r.height}, (sfVector2f){r.width * 0.8f, 64.f},
+        avec_alpha(c, 0.5f * survol));
+    ombre_biseau(app, r, 18.f, 0.9f + 1.1f * survol);
+    panneau(app, r, 18.f, melanger(C_SURFACE_HAUTE, melanger(C_SURFACE_HAUTE, c, 0.3f),
         survol), C_SURFACE, bord);
     if (marque)
         crochets(app, (sfFloatRect){r.left - 5.f, r.top - 5.f, r.width + 10.f,
             r.height + 10.f}, 16.f, marque->couleur);
     else if (survol > 0.01f)
         crochets(app, (sfFloatRect){r.left - 5.f, r.top - 5.f, r.width + 10.f,
-            r.height + 10.f}, 14.f * survol, avec_alpha(c, survol));
+            r.height + 10.f}, 18.f * survol, avec_alpha(c, survol));
     avatar(app, p, (sfVector2f){cx, r.top + 64.f}, 36.f, mort);
     tronquer(app, POLICE_GRAS, 19, p->nom, r.width - 28.f, buf, sizeof(buf));
     texte(app, POLICE_GRAS, buf, 19, (sfVector2f){cx, r.top + 122.f}, C_TEXTE,

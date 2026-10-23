@@ -7,6 +7,7 @@
 [![C11](https://img.shields.io/badge/C-11-38bdf8?style=for-the-badge&logo=c&logoColor=white&labelColor=0e1230)](#architecture)
 [![CSFML](https://img.shields.io/badge/GUI-CSFML%202.6-34d399?style=for-the-badge&logo=sfml&logoColor=white&labelColor=0e1230)](#csfml)
 [![Classes](https://img.shields.io/badge/classes-28-f43f5e?style=for-the-badge&labelColor=0e1230)](#personnages)
+[![Audio](https://img.shields.io/badge/audio-2%20th%C3%A8mes%20originaux-38bdf8?style=for-the-badge&labelColor=0e1230)](#lidentité-sonore)
 [![Tests](https://img.shields.io/badge/tests-assert%20%2B%20ASan-fbbf24?style=for-the-badge&labelColor=0e1230)](#tests)
 [![Licence MIT](https://img.shields.io/badge/licence-MIT-34d399?style=for-the-badge&labelColor=0e1230)](#licence)
 [![ESGI](https://img.shields.io/badge/ESGI-C%20avanc%C3%A9-d946ef?style=for-the-badge&labelColor=0e1230)](#concept)
@@ -115,12 +116,35 @@ Le nom **RedStrings** vient d'une image : des **fils rouges** qui relient les pe
 | Radar des statistiques | aperçu de la création | losange PV / ATQ / DEF / SOIN, animé avec les vraies valeurs finales |
 | Catalogue | création | 4 onglets de catégorie, grille de tuiles colorées, 20 emblèmes vectoriels (`emblemes.c`) |
 | Mouvements organiques | boutons, cartes | ressorts amortis (`ressort_t`) |
+| Survol des cartes | liste, composition des équipes, main de cartes Yu-Gi-Oh! | la carte se soulève, grossit (+7 %, +11 % dans la main) et s'incline vers la souris ; halo de la couleur de classe, ombre restée au sol ; elle passe au-dessus de ses voisines (`grille.c`, `creation_cartes.c`) |
 | Courbes d'animation | entrées et sorties de scène | `sortie_cubique`, `entree_cubique`, `sortie_rebond` |
 | Particules | création, impacts, K.O. | jusqu'à 900 particules (`MAX_PARTICULES`), avec gravité |
 | Poussière d'ambiance | fond | 70 grains qui flottent (`NB_POUSSIERES`) |
 | Notifications | haut de l'écran | toasts empilables |
 
 </details>
+
+<div align="center">
+<img src=".github/readme/captures/survol.png" alt="Image du jeu : la liste des personnages, la carte de Merlin survolée se soulève, grossit et s'incline au-dessus de ses voisines" width="100%"/>
+<sub>🎥 <b>Image réelle du jeu</b>, recadrée : la carte survolée se soulève, grossit et s'incline vers la souris, sans masquer ses voisines.</sub>
+</div>
+
+### L'identité sonore
+
+La fenêtre a sa propre identité sonore : **une musique par situation** (menu, combat) et un retour sonore pour chaque interaction utile. Les cartes qu'on ajoute, les fiches qu'on ouvre, les coups, les soins, la garde, les K.O., la victoire et les erreurs ont chacun leur son. Les sons fréquents (survol, saisie, déplacement) restent discrets et varient légèrement à chaque lecture pour ne pas lasser.
+
+| Thème | Ambiance | Quelques clins d'œil |
+|---|---|---|
+| **Standard** | synthwave, rétro, « fil rouge » | validation de menu de JRPG, arpèges 8 bits, « Round 1 » de jeu de combat, fanfare de victoire en triolets |
+| **Yu-Gi-Oh!** | cartes, disque de duel, mysticisme égyptien | carte claquée sur le disque, compteur de LP qui défile, carte piège révélée, « Duel ! », cinq coups pour l'Interdit |
+
+- **F2** ouvre les réglages audio (général, musique, effets, thème sonore) ; **F3** coupe ou rétablit le son.
+- Le thème suit le mode de lancement (`./redstrings_csfml "Yu-Gi-Oh!"`), ou se choisit à chaud dans F2.
+- Quelques variantes rares (de 1 fois sur 33 à 1 fois sur 20) et un code secret sur le menu attendent les curieux.
+- **Tous les sons et les quatre musiques sont des créations originales**, synthétisées par les scripts de `csfml/assets/audio/outils/` : aucun son de jeu commercial n'est utilisé ([provenance et licence](csfml/assets/audio/LICENCES.md)).
+
+> [!TIP]
+> Pour changer un son, en ajouter un ou créer un nouveau thème sans lire le moteur : [`csfml/assets/audio/AUDIO.md`](csfml/assets/audio/AUDIO.md). Un son se remplace en éditant une ligne de `sons.txt`, sans recompiler.
 
 <img src=".github/readme/fil-rouge.svg" width="100%" alt=""/>
 
@@ -417,7 +441,7 @@ stateDiagram-v2
 | **Personnages** | taper pour rechercher · <kbd>Entrée</kbd> ouvrir · <kbd>←</kbd> <kbd>→</kbd> changer de fiche | clic sur une carte |
 | **Composition** | <kbd>←</kbd> <kbd>→</kbd> <kbd>↑</kbd> <kbd>↓</kbd> choisir une carte · <kbd>Espace</kbd> ajouter / retirer · <kbd>Entrée</kbd> valider l'équipe · <kbd>Échap</kbd> étape précédente | clic sur une carte, bouton *Valider* / *Lancer le combat* |
 | **Arène** | <kbd>1</kbd> <kbd>2</kbd> <kbd>3</kbd> ou <kbd>←</kbd> <kbd>→</kbd> + <kbd>Entrée</kbd> action · <kbd>←</kbd> <kbd>→</kbd> cible · <kbd>Entrée</kbd> confirmer · <kbd>Échap</kbd> retour · fin : <kbd>Entrée</kbd>/<kbd>R</kbd> rejouer, <kbd>Échap</kbd> menu | boutons d'action, survol / clic sur une cible |
-| **Partout** | <kbd>F11</kbd> ou <kbd>Alt</kbd>+<kbd>Entrée</kbd> : fenêtré ↔ plein écran · <kbd>Maj</kbd>+<kbd>F11</kbd> : plein écran natif ou sans bordure | bords de la fenêtre pour la redimensionner |
+| **Partout** | <kbd>F11</kbd> ou <kbd>Alt</kbd>+<kbd>Entrée</kbd> : fenêtré ↔ plein écran · <kbd>Maj</kbd>+<kbd>F11</kbd> : plein écran natif ou sans bordure · <kbd>F2</kbd> réglages audio · <kbd>F3</kbd> couper le son | bords de la fenêtre pour la redimensionner |
 
 > [!NOTE]
 > **Fenêtre libre.** La fenêtre se redimensionne à la souris (800 × 600 au minimum), et passe en plein écran sans bordure (par défaut) ou natif sans redémarrer : la partie en cours, les animations et la saisie sont conservées. L'interface garde au moins 1024 × 720 unités visibles et grossit au plus ×2 : en dessous, la création se réorganise et les grilles de cartes choisissent leurs colonnes ; au-delà, l'espace en plus sert à respirer. Le combat garde sa composition (mise à l'échelle uniforme) et ses panneaux s'ancrent aux coins réels de la fenêtre. Le texte est tramé à sa taille réelle, donc net à toute taille.
@@ -756,7 +780,7 @@ make csfml            # compile ./redstrings_csfml
 > `✗ CSFML introuvable, installe-la avec : sudo apt install libcsfml-dev`
 
 > [!NOTE]
-> Les polices (Noto Sans, DejaVu Sans) sont cherchées à côté de l'exécutable, puis depuis le dossier courant : tu peux lancer le jeu depuis n'importe où dans le projet.
+> Les polices (Noto Sans, DejaVu Sans) et les sons (`csfml/assets/audio/`) sont cherchés à côté de l'exécutable, puis depuis le dossier courant : tu peux lancer le jeu depuis n'importe où dans le projet. Sans carte son, le jeu reste muet et fonctionne normalement.
 
 <details>
 <summary><b>🃏 Un mode caché…</b></summary>
@@ -903,7 +927,7 @@ make tests
 | `roster_t` | 100 ajouts d'affilée, ordre conservé, libération complète |
 | Sauvegarde | aller-retour fichier → mémoire identique |
 | Chargement refusé | fichier absent · classe inconnue · stat > 99 · nom en double · ligne tronquée · texte au lieu d'un nombre (et l'équipe reste intacte) |
-| Version graphique (`make csfml-tests`) | UTF-8 : aller-retour, séquences tronquées / trop longues / substituts refusés, bornes du tampon · courbes d'animation · couleurs jamais hors d'un octet · recherche par nom · identifiant de classe hors table |
+| Version graphique (`make csfml-tests`) | UTF-8 : aller-retour, séquences tronquées / trop longues / substituts refusés, bornes du tampon · courbes d'animation · couleurs jamais hors d'un octet · recherche par nom · identifiant de classe hors table · **audio** : manifestes (lignes refusées, rien d'enregistré à moitié), repli thème → standard → silence, variantes jamais répétées, volumes et coupure, rythme et choix des voix, réglages relus, packs livrés complets (aucun fichier manquant ni oublié) |
 
 <img src=".github/readme/fil-rouge.svg" width="100%" alt=""/>
 
@@ -913,7 +937,7 @@ make tests
 
 ### Le flux de travail
 
-Le dépôt suit **git flow** : chaque changement vit sur sa propre branche partie de `develop`, puis y est fusionné avec `--no-ff`. `main` ne reçoit que les versions publiées (`v0.1.0` → `v1.5.2`).
+Le dépôt suit **git flow** : chaque changement vit sur sa propre branche partie de `develop`, puis y est fusionné avec `--no-ff`. `main` ne reçoit que les versions publiées (`v0.1.0` → `v1.6.0`).
 
 ```mermaid
 gitGraph

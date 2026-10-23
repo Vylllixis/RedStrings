@@ -23,6 +23,14 @@ et renvoie la liste des **événements** déjà résolus : dégâts, soin, garde
 K.O., victoire. Les deux interfaces se contentent de les représenter. Une
 animation ne décide donc jamais d'un résultat.
 
+@section accueil_audio Le système audio
+
+La version graphique a son identité sonore (@ref audio) : les écrans déclenchent
+des **événements** (`son(app, SON_CARTE_SELECTION)`), et le pack du thème actif
+(standard ou Yu-Gi-Oh!) dit quel fichier jouer, selon son manifeste `sons.txt`.
+Les règles qui ne dépendent pas de SFML (repli entre thèmes, variantes,
+volumes, rythme des lectures) sont dans `gui_sons.h` et testées sans carte son.
+
 @section accueil_demarrer Pour lire l'API dans l'ordre
 
 1. `personnage.h` : les 28 classes, leurs statistiques et le personnage.

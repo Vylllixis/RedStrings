@@ -103,6 +103,14 @@ tests:
 	$(Q)./$(NAME_TESTS)
 
 #documentation HTML (Doxygen) -> docs/index.html
+#régénère les sons et les musiques de csfml/assets/audio/ (Python 3 et CSFML Audio)
+sons:
+	@command -v python3 >/dev/null 2>&1 || { printf "  $(C_ROUGE)✗$(C_RESET)      %s\n" \
+		"Python 3 introuvable : il sert à synthétiser les sons"; exit 1; }
+	$(LOG) "SONS" "csfml/assets/audio/"
+	$(Q)python3 csfml/assets/audio/outils/generer_sons.py > /dev/null
+	$(LOG_OK) "sons et musiques régénérés (csfml/assets/audio/)"
+
 doc:
 	@command -v doxygen >/dev/null 2>&1 || { printf "  $(C_ROUGE)✗$(C_RESET)      %s\n" \
 		"Doxygen introuvable, installe-le avec : sudo apt install doxygen"; exit 1; }
@@ -148,6 +156,7 @@ help:
 	@printf "  $(C_BLEU)make debug$(C_RESET)      compile ./$(NAME_DEBUG) (gdb + sanitizers)\n"
 	@printf "  $(C_BLEU)make tests$(C_RESET)      lance les tests unitaires (assert)\n"
 	@printf "  $(C_BLEU)make doc$(C_RESET)         génère la documentation HTML (docs/index.html)\n"
+	@printf "  $(C_BLEU)make sons$(C_RESET)        régénère les sons et musiques de la version graphique\n"
 	@printf "  $(C_BLEU)make csfml$(C_RESET)      compile la version graphique\n"
 	@printf "  $(C_BLEU)make csfml-debug$(C_RESET) compile la version graphique avec les sanitizers\n"
 	@printf "  $(C_BLEU)make csfml-tests$(C_RESET) lance les tests de la version graphique\n"
@@ -158,4 +167,4 @@ help:
 
 -include $(DEPS)
 
-.PHONY: all lib debug tests doc csfml csfml-debug csfml-tests clean fclean re build help
+.PHONY: all lib debug tests doc sons csfml csfml-debug csfml-tests clean fclean re build help

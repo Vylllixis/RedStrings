@@ -126,19 +126,19 @@ void menu_titre(app_t *app, float t)
 /** Rappel des touches en bas de l'écran. */
 void menu_aide_menu(app_t *app, float t)
 {
-    static const char *touches[4] = {"↑", "↓", "Entrée", "Échap"};
-    static const char *actions[4] = {"", "choisir", "valider", "quitter"};
+    static const char *touches[5] = {"↑", "↓", "Entrée", "Échap", "F2"};
+    static const char *actions[5] = {"", "choisir", "valider", "quitter", "audio"};
     float a = app->alpha;
     float total = 0.f;
     float x = 0.f;
     float w = 0.f;
 
-    for (int i = 0; i < 4; i++)
+    for (int i = 0; i < 5; i++)
         total += largeur_touche(app, touches[i]) + 8.f + (actions[i][0]
             ? largeur_texte(app, POLICE_NORMALE, actions[i], 13) + 24.f : 0.f);
     x = LARGEUR / 2.f - total / 2.f;
     app->alpha = a * progression(t, 1.f, 0.4f);
-    for (int i = 0; i < 4; i++) {
+    for (int i = 0; i < 5; i++) {
         w = largeur_touche(app, touches[i]);
         touche_clavier(app, touches[i], (sfVector2f){x + w / 2.f, 628.f}, C_CYAN, 0.f);
         x += w + 8.f;

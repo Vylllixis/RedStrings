@@ -24,6 +24,8 @@ int champ_texte(app_t *app, champ_t *c, sfFloatRect r, const char *aide,
     int max);
 int glissiere(app_t *app, glissiere_t *g, sfFloatRect r, const char *label,
     int *valeur, sfColor couleur, int focus);
+int glissiere_bornee(app_t *app, glissiere_t *g, sfFloatRect r, const char *label,
+    const int bornes[2], int *valeur, sfColor couleur, int focus);
 float pastille(app_t *app, const char *s, sfVector2f pos, sfColor c,
     int plein);
 void notifier(app_t *app, const char *icone, const char *message,

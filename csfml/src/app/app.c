@@ -58,11 +58,15 @@ int creer_app(app_t *app, mode_visuel_t mode_visuel)
     app->ouvert = 1;
     app->scene = SCENE_MENU;
     entrer_menu(app);
+    audio_init(app);
+    audio_entrer_scene(app, SCENE_MENU);
+    son(app, SON_APP_OUVERTURE);
     return 0;
 }
 
 void detruire_app(app_t *app)
 {
+    audio_liberer(app);
     yugioh_liberer(app);
     if (app->fenetre)
         sfRenderWindow_destroy(app->fenetre);

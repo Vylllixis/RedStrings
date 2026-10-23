@@ -49,6 +49,10 @@ void notifier(app_t *app, const char *icone, const char *message, sfColor c)
     t->t = 0.f;
     t->y = app->ecran.top - 50.f;
     t->actif = 1;
+    if (strcmp(icone, "✗") == 0)
+        son_secondaire(app, SON_UI_ERREUR);
+    else
+        son_secondaire(app, strcmp(icone, "✔") == 0 ? SON_UI_SUCCES : SON_UI_INFO);
 }
 
 static void dessiner_toast(app_t *app, toast_t *t)

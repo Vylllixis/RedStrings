@@ -26,7 +26,9 @@ OBJS_MOTEUR	=	$(MOTEUR:%.c=$(OBJ_DIR)/moteur/%.o)
 
 #fonctions de la version graphique qui ne dépendent pas de SFML : testables sans fenêtre
 TEST_SRCS	=	tests/tests.c src/outils/anim.c src/outils/jeu.c src/outils/utf8.c \
-			src/ui/libelles.c src/yugioh/cartes.c $(MOTEUR_DIR)/personnage.c
+			src/ui/libelles.c src/yugioh/cartes.c $(MOTEUR_DIR)/personnage.c \
+			tests/tests_audio.c src/audio/audio_evenements.c src/audio/audio_manifeste.c \
+			src/audio/audio_regles.c src/audio/audio_reglages.c
 
 DEPS		=	$(OBJS:.o=.d) $(OBJS_MOTEUR:.o=.d)
 
@@ -48,7 +50,7 @@ CFLAGS_DEBUG	=	-std=c11 -Wall -Wextra -Werror -pedantic -Wshadow \
 CPPFLAGS	=	-I./include -I../includes -D_POSIX_C_SOURCE=200809L
 DEPFLAGS	=	-MMD -MP
 LDFLAGS		=	-L$(LIB_DIR)
-LDLIBS		=	-lmy -lcsfml-graphics -lcsfml-window -lcsfml-system -lm
+LDLIBS		=	-lmy -lcsfml-graphics -lcsfml-audio -lcsfml-window -lcsfml-system -lm
 
 # ─── Affichage (même style que le Makefile principal) ────────────────
 
@@ -80,7 +82,7 @@ lib:
 	$(Q)$(MAKE) -C .. lib
 
 verifier:
-	@echo '#include <SFML/Graphics.h>' | $(CC) $(CPPFLAGS) -E -x c - \
+	@printf '#include <SFML/Graphics.h>\n#include <SFML/Audio.h>\n' | $(CC) $(CPPFLAGS) -E -x c - \
 		> /dev/null 2>&1 || { printf "  $(C_ROUGE)✗$(C_RESET)      %s\n" \
 		"CSFML introuvable, installe-la avec : sudo apt install libcsfml-dev"; \
 		exit 1; }
