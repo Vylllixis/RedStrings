@@ -7,10 +7,10 @@
 ** ╭─ personnage.c ───────────────────────────────────────────────────────
 ** │ But         Le catalogue des classes et les règles qui s'y
 ** │             rattachent : modificateurs de statistiques, couleurs,
-** │             catégories, recherche par nom.
+** │             catégories, recherche par nom, règle des noms interdits.
 ** │ Contenu     classes[] (la table), nom_categorie, couleur_ansi,
 ** │             classe_valide, ordre_classes, valeur_stat, stat_finale,
-** │             appliquer_classe, trouver_personnage
+** │             appliquer_classe, trouver_personnage, nom_est_un_id
 ** │ Utilisé par creer_personnage.c, afficher_personnage.c, sauvegarde.c,
 ** │             bataille.c et la version graphique
 ** ╰──────────────────────────────────────────────────────────────────────
@@ -180,4 +180,18 @@ int trouver_personnage(const personnage_t *tab, int size, const char *nom)
             return i;
     }
     return -1;
+}
+
+/*
+** ╭─ nom_est_un_id ──────────────────────────────────────────────────────
+** │ Un nom fait uniquement de chiffres est interdit, parce qu'il serait
+** │ ambigu : « 3 » désignerait à la fois le personnage nommé 3 et le
+** │ troisième de la liste (son ID). Interdire ces noms à la création, au
+** │ chargement et dans la fenêtre rend la recherche par ID sans équivoque.
+** │ Un nom vide n'est pas un ID (il est refusé ailleurs).
+** ╰──────────────────────────────────────────────────────────────────────
+*/
+int nom_est_un_id(const char *nom)
+{
+    return nom[0] != '\0' && my_str_isnum(nom);
 }

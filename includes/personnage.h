@@ -151,6 +151,13 @@ void appliquer_classe(personnage_t *p);
 /** Cherche un personnage par son nom, renvoie son indice ou -1. */
 int trouver_personnage(const personnage_t *tab, int size, const char *nom);
 
+/**
+ * 1 si `nom` ne contient que des chiffres (« 3 », « 007 »), sinon 0. Un tel nom
+ * est interdit : dans la console, un nombre tapé désigne l'ID d'un personnage
+ * (sa position dans la liste affichée), il ne doit pas pouvoir aussi être un nom.
+ */
+int nom_est_un_id(const char *nom);
+
 #define STR_(x) #x
 #define STR(x)  STR_(x)
 #define NOM_LONGUEUR 29   /**< NOM_MAX - 1 */
