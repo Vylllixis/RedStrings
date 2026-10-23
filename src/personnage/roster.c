@@ -20,9 +20,17 @@
 
 void roster_init(roster_t *r)
 {
+    if (r == NULL)
+        return;
     r->data = NULL;
     r->len = 0;
     r->capacite = 0;
+}
+
+int roster_valide(const roster_t *r)
+{
+    return r != NULL && r->len >= 0 && r->len <= r->capacite
+        && (r->len == 0 || r->data != NULL);
 }
 
 /*
@@ -42,6 +50,8 @@ int roster_ajouter(roster_t *r, const personnage_t *p)
     int nouvelle = 0;
     personnage_t *tmp = NULL;
 
+    if (!roster_valide(r) || p == NULL)
+        return -1;
     if (r->len == r->capacite) {
         nouvelle = r->capacite == 0 ? ROSTER_CAPACITE_INITIALE
             : r->capacite * 2;
@@ -57,6 +67,8 @@ int roster_ajouter(roster_t *r, const personnage_t *p)
 
 void roster_liberer(roster_t *r)
 {
+    if (r == NULL)
+        return;
     free(r->data);
     roster_init(r);
 }
@@ -77,6 +89,8 @@ int roster_trouver(const roster_t *r, const char *saisie)
 {
     int numero = 0;
 
+    if (!roster_valide(r) || saisie == NULL)
+        return -1;
     for (int i = 0; i < r->len; i++) {
         if (my_strcmp(r->data[i].nom, saisie) == 0)
             return i;
@@ -91,6 +105,8 @@ int roster_nb_en_forme(const roster_t *r)
 {
     int n = 0;
 
+    if (!roster_valide(r))
+        return 0;
     for (int i = 0; i < r->len; i++)
         n += !est_ko(&r->data[i]);
     return n;

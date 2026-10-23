@@ -25,6 +25,8 @@ static void repeter(char *dest, size_t taille, const char *motif, int fois)
 {
     size_t n = 0;
 
+    if (dest == NULL || taille == 0 || motif == NULL)
+        return;
     dest[0] = '\0';
     for (int i = 0; i < fois && n < taille; i++)
         n += (size_t)snprintf(dest + n, taille - n, "%s", motif);
@@ -42,8 +44,10 @@ static void repeter(char *dest, size_t taille, const char *motif, int fois)
 */
 static void afficher_stat(const char *nom, int valeur, const char *couleur)
 {
-    int remplies = (valeur + 4) / 5;
+    int remplies = valeur <= 0 ? 0 : (valeur + 4) / 5;
     char pleine[64];
+    if (nom == NULL || couleur == NULL)
+        return;
     char vide[64];
 
     if (remplies > LARGEUR_BARRE)
@@ -56,13 +60,16 @@ static void afficher_stat(const char *nom, int valeur, const char *couleur)
 
 void afficher_personnage(const personnage_t *p)
 {
-    const info_classe_t *c = &classes[p->classe];
+    const info_classe_t *c = NULL;
 
+    if (p == NULL)
+        return;
+    c = &classes[classe_valide((int)p->classe) ? p->classe : GUERRIER];
     printf("\n");
     boite_haut(GRIS);
     boite_ligne(GRIS, "  " GRAS "%s" RESET, p->nom);
     boite_separateur(GRIS);
-    boite_champ(GRIS, "Classe", GRAS "%s%s" RESET, couleur_ansi(p->classe), c->nom);
+    boite_champ(GRIS, "Classe", GRAS "%s%s" RESET, couleur_ansi(c - classes), c->nom);
     boite_champ(GRIS, "Catégorie", "%s", nom_categorie(c->categorie));
     boite_ligne(GRIS, "  " GRIS "%s" RESET, c->description);
     boite_separateur(GRIS);

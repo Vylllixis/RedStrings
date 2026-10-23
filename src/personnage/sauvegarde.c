@@ -15,9 +15,14 @@
 ** ╰──────────────────────────────────────────────────────────────────────
 */
 
+#include <errno.h>
+#include <limits.h>
 #include <stdio.h>
+#include <stdlib.h>
 #include "my_string.h"
 #include "sauvegarde.h"
+
+#define CHEMIN_MAX 256      /* chemin de sauvegarde, « .tmp » compris */
 
 static int stat_valide(int valeur)
 {
@@ -27,7 +32,7 @@ static int stat_valide(int valeur)
 static int personnage_valide(const personnage_t *p, int classe,
     const roster_t *deja_lus)
 {
-    if (!stat_valide(p->pv) || !stat_valide(p->atq) || !stat_valide(p->def)
+    if (p == NULL || deja_lus == NULL || !stat_valide(p->pv) || !stat_valide(p->atq) || !stat_valide(p->def)
         || !stat_valide(p->soin))
         return 0;
     if (!classe_valide(classe) || nom_est_un_id(p->nom))
@@ -35,11 +40,23 @@ static int personnage_valide(const personnage_t *p, int classe,
     return trouver_personnage(deja_lus->data, deja_lus->len, p->nom) == -1;
 }
 
+/*
+** ╭─ sauvegarder ────────────────────────────────────────────────────────
+** │ Écrit d'abord dans « chemin.tmp », puis renomme : si l'écriture
+** │ échoue (disque plein…), l'ancienne sauvegarde reste intacte.
+** ╰──────────────────────────────────────────────────────────────────────
+*/
 sauvegarde_t sauvegarder(const roster_t *r, const char *chemin)
 {
-    FILE *f = fopen(chemin, "w");
+    char temporaire[CHEMIN_MAX];
+    FILE *f = NULL;
     int erreur = 0;
 
+    if (!roster_valide(r) || chemin == NULL || chemin[0] == '\0'
+        || my_strlen(chemin) > CHEMIN_MAX - 5)
+        return SAUVEGARDE_ERR_OUVERTURE;
+    snprintf(temporaire, sizeof(temporaire), "%s.tmp", chemin);
+    f = fopen(temporaire, "w");
     if (f == NULL)
         return SAUVEGARDE_ERR_OUVERTURE;
     for (int i = 0; i < r->len && !erreur; i++) {
@@ -49,6 +66,10 @@ sauvegarde_t sauvegarder(const roster_t *r, const char *chemin)
     }
     if (fclose(f) == EOF)
         erreur = 1;
+    if (!erreur && rename(temporaire, chemin) != 0)
+        erreur = 1;
+    if (erreur)
+        remove(temporaire);
     return erreur ? SAUVEGARDE_ERR_ECRITURE : SAUVEGARDE_OK;
 }
 
@@ -56,6 +77,8 @@ sauvegarde_t sauvegarder(const roster_t *r, const char *chemin)
 
 static int ligne_vide(const char *s)
 {
+    if (s == NULL)
+        return 1;
     for (int i = 0; s[i] != '\0'; i++) {
         if (s[i] != ' ' && s[i] != '\t' && s[i] != '\n' && s[i] != '\r')
             return 0;
@@ -74,25 +97,50 @@ static int ligne_vide(const char *s)
 ** │ Renvoie 0 si la ligne est valide, -1 sinon.
 ** ╰──────────────────────────────────────────────────────────────────────
 */
+/* Lit un entier décimal à *s (espaces avant autorisés), avance *s après lui.
+ * Refuse le vide, le texte et les dépassements d'int. */
+static int lire_entier_fichier(const char **s, int *valeur)
+{
+    char *fin = NULL;
+    long v = 0;
+
+    while (**s == ' ' || **s == '\t')
+        (*s)++;
+    if (**s != '-' && (**s < '0' || **s > '9'))
+        return -1;
+    errno = 0;
+    v = strtol(*s, &fin, 10);
+    if (errno != 0 || v < INT_MIN || v > INT_MAX)
+        return -1;
+    *valeur = (int)v;
+    *s = fin;
+    return 0;
+}
+
 static int lire_ligne_perso(const char *ligne, personnage_t *p)
 {
     int classe = 0;
     int fin = 0;
-    int fin_soin = 0;
-    int champs = sscanf(ligne, "%" STR(NOM_LONGUEUR) "s %d %d %d %d %n", p->nom,
-        &p->pv, &p->atq, &p->def, &classe, &fin);
-    const char *reste = ligne + fin;
+    const char *reste = NULL;
 
-    if (champs != 5 || !classe_valide(classe))
+    if (ligne == NULL || p == NULL
+        || sscanf(ligne, "%" STR(NOM_LONGUEUR) "s %n", p->nom, &fin) < 1)
+        return -1;
+    reste = ligne + fin;
+    if (lire_entier_fichier(&reste, &p->pv) == -1
+        || lire_entier_fichier(&reste, &p->atq) == -1
+        || lire_entier_fichier(&reste, &p->def) == -1
+        || lire_entier_fichier(&reste, &classe) == -1
+        || !classe_valide(classe))
         return -1;
     p->classe = (classe_t)classe;
     if (ligne_vide(reste)) {
         p->soin = stat_finale(p->classe, STAT_SOIN, SOIN_MIGRATION);
         return 0;
     }
-    if (sscanf(reste, "%d %n", &p->soin, &fin_soin) != 1)
+    if (lire_entier_fichier(&reste, &p->soin) == -1)
         return -1;
-    return ligne_vide(reste + fin_soin) ? 0 : -1;
+    return ligne_vide(reste) ? 0 : -1;
 }
 
 /* Lit tout le fichier dans lus ; renvoie SAUVEGARDE_OK si chaque ligne est
@@ -103,6 +151,8 @@ static sauvegarde_t lire_fichier(FILE *f, roster_t *lus)
     personnage_t p = {0};
     int longueur = 0;
 
+    if (f == NULL || lus == NULL)
+        return SAUVEGARDE_ERR_FORMAT;
     while (fgets(ligne, sizeof(ligne), f) != NULL) {
         longueur = my_strlen(ligne);
         if (longueur == LIGNE_MAX - 1 && ligne[longueur - 1] != '\n')
@@ -146,13 +196,17 @@ static sauvegarde_t lire_fichier(FILE *f, roster_t *lus)
 */
 sauvegarde_t fusionner(roster_t *r, const char *chemin, int *ajoutes, int *ignores)
 {
-    FILE *f = fopen(chemin, "r");
+    FILE *f = NULL;
     roster_t lus;
     sauvegarde_t code = SAUVEGARDE_OK;
-    int len_depart = r->len;
+    int len_depart = 0;
+    int nb_ajoutes = 0;
+    int nb_ignores = 0;
 
-    *ajoutes = 0;
-    *ignores = 0;
+    if (!roster_valide(r) || chemin == NULL)
+        return SAUVEGARDE_ERR_OUVERTURE;
+    len_depart = r->len;
+    f = fopen(chemin, "r");
     if (f == NULL)
         return SAUVEGARDE_ERR_OUVERTURE;
     roster_init(&lus);
@@ -160,27 +214,34 @@ sauvegarde_t fusionner(roster_t *r, const char *chemin, int *ajoutes, int *ignor
     fclose(f);
     for (int i = 0; code == SAUVEGARDE_OK && i < lus.len; i++) {
         if (trouver_personnage(r->data, r->len, lus.data[i].nom) != -1)
-            ++*ignores;
+            nb_ignores++;
         else if (roster_ajouter(r, &lus.data[i]) == 0)
-            ++*ajoutes;
+            nb_ajoutes++;
         else
             code = SAUVEGARDE_ERR_MEMOIRE;
     }
     if (code != SAUVEGARDE_OK) {
         r->len = len_depart;
-        *ajoutes = 0;
-        *ignores = 0;
+        nb_ajoutes = 0;
+        nb_ignores = 0;
     }
+    if (ajoutes != NULL)
+        *ajoutes = nb_ajoutes;
+    if (ignores != NULL)
+        *ignores = nb_ignores;
     roster_liberer(&lus);
     return code;
 }
 
 sauvegarde_t charger(roster_t *r, const char *chemin)
 {
-    FILE *f = fopen(chemin, "r");
+    FILE *f = NULL;
     roster_t lus;
     sauvegarde_t code = SAUVEGARDE_OK;
 
+    if (r == NULL || chemin == NULL)
+        return SAUVEGARDE_ERR_OUVERTURE;
+    f = fopen(chemin, "r");
     if (f == NULL)
         return SAUVEGARDE_ERR_OUVERTURE;
     roster_init(&lus);
@@ -205,5 +266,7 @@ const char *sauvegarde_message(sauvegarde_t code)
         [SAUVEGARDE_ERR_MEMOIRE] = "Mémoire insuffisante",
     };
 
+    if ((unsigned)code >= sizeof(messages) / sizeof(messages[0]))
+        return "Erreur inconnue";
     return messages[code];
 }

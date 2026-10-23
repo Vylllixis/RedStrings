@@ -34,6 +34,8 @@ static int lire_stat(const char *libelle, int *stat)
 {
     char libelle_aligne[64];
 
+    if (libelle == NULL || stat == NULL)
+        return SAISIE_FIN;
     aligner_texte(libelle_aligne, sizeof(libelle_aligne), libelle,
         LARGEUR_LIBELLE);
     return lire_entier(libelle_aligne, STAT_MIN, STAT_MAX, stat);
@@ -110,6 +112,8 @@ int creer_personnage(personnage_t *p, personnage_t *tab, int len)
 {
     int code = 0;
 
+    if (p == NULL || len < 0 || (tab == NULL && len > 0))
+        return SAISIE_FIN;
     //en-tête
     printf("\n");
     boite_haut(CYAN);

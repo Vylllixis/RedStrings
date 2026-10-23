@@ -12,6 +12,8 @@
 ** ╰──────────────────────────────────────────────────────────────────────
 */
 
+#include <limits.h>
+#include <stddef.h>
 #include "personnage.h"
 
 /*
@@ -25,12 +27,17 @@
 */
 int calculer_degats(const personnage_t *attaquant, const personnage_t *cible)
 {
-    int degats = attaquant->atq * (100 - cible->def) / 100;
+    long long degats = 0;
 
-    return degats < 0 ? 0 : degats;
+    if (attaquant == NULL || cible == NULL)
+        return 0;
+    degats = (long long)attaquant->atq * (100 - (long long)cible->def) / 100;
+    if (degats < 0)
+        return 0;
+    return degats > INT_MAX ? INT_MAX : (int)degats;
 }
 
 int est_ko(const personnage_t *p)
 {
-    return p->pv == 0;
+    return p == NULL || p->pv <= 0;
 }
