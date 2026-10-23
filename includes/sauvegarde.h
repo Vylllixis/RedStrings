@@ -27,6 +27,15 @@ sauvegarde_t sauvegarder(const roster_t *r, const char *chemin);
  *  pas modifié. */
 sauvegarde_t charger(roster_t *r, const char *chemin);
 
+/**
+ * Ajoute à r les personnages du fichier `chemin`, sans toucher à ceux qui y
+ * sont déjà. Un personnage dont le nom existe déjà dans r est ignoré (celui
+ * de r est gardé). Tout ou rien : si le fichier est invalide ou si la mémoire
+ * manque, r reste exactement comme avant. `ajoutes` et `ignores` reçoivent le
+ * nombre de personnages ajoutés et ignorés (0 et 0 en cas d'erreur).
+ */
+sauvegarde_t fusionner(roster_t *r, const char *chemin, int *ajoutes, int *ignores);
+
 /** Message en français pour un code de retour. */
 const char *sauvegarde_message(sauvegarde_t code);
 

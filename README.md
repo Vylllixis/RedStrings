@@ -356,43 +356,59 @@ Le combat s'arrête dès qu'une équipe n'a plus personne debout. Il travaille s
 
 ```
 ╭────────────────────────────────────╮
-│  ✦ Menu principal                  │
+│  ✦ Menu principal  8 personnages   │
 ├────────────────────────────────────┤
 │  1  Ajouter un personnage          │
 │  2  Afficher un personnage         │
 │  3  Combat                         │
 │  4  Sauvegarder                    │
-│  5  Charger                        │
+│  5  Charger (remplace tout)        │
+│  6  Ajouter depuis le fichier      │
 │  0  Quitter                        │
 ╰────────────────────────────────────╯
-  Choix (0-5) ›
+  Choix (0-6) ›
 ```
 
 | Touche | Action | Ce qui se passe |
 |:---:|---|---|
-| <kbd>1</kbd> | **Ajouter** | Nom → PV → Attaque → Défense → Soin → Classe. Le nom doit être unique. |
-| <kbd>2</kbd> | **Afficher** | Fiche avec barres de statistiques et couleur de la classe. |
-| <kbd>3</kbd> | **Combat** | Ton équipe, puis celle de l'ordinateur, puis le combat au tour par tour. |
+| <kbd>1</kbd> | **Ajouter** | Nom → PV → Attaque → Défense → Soin → Classe. Le nom doit être unique (un nom pris est redemandé). |
+| <kbd>2</kbd> | **Afficher** | La liste numérotée des personnages, puis la fiche de celui que tu choisis (par son nom ou son numéro). |
+| <kbd>3</kbd> | **Combat** | La liste, ton équipe (noms ou numéros), puis celle de l'ordinateur, puis le combat au tour par tour. |
 | <kbd>4</kbd> | **Sauvegarder** | Écrit tous les personnages dans `personnages.txt`. |
-| <kbd>5</kbd> | **Charger** | Remplace l'équipe par le contenu de `personnages.txt`. |
+| <kbd>5</kbd> | **Charger** | **Remplace** tous les personnages par ceux de `personnages.txt`, après un avertissement et une confirmation s'il y en a déjà. |
+| <kbd>6</kbd> | **Ajouter depuis le fichier** | **Ajoute** les personnages du fichier sans toucher à ceux qui existent ; un nom déjà pris est ignoré (le tien est gardé). |
 | <kbd>0</kbd> ou <kbd>Ctrl</kbd>+<kbd>D</kbd> | **Quitter** | Libère la mémoire, puis « À bientôt ! ». |
+
+> [!TIP]
+> **Annuler à chaque étape.** À n'importe quelle question (création, choix d'un personnage, composition des équipes, tour de combat), tape <kbd>q</kbd> : tu reviens au menu **sans rien avoir enregistré**. Le menu lui-même n'accepte pas `q` : il n'y a rien à annuler.
+
+> [!NOTE]
+> **Les entrées sans effet sont grisées.** *Afficher* et *Sauvegarder* demandent au moins 1 personnage, *Combat* au moins 2 personnages en forme (non K.O.). Les choisir quand même affiche la raison au lieu de lancer l'action. *Sauvegarder* sans personnage est refusé exprès : il aurait écrasé ton fichier par un fichier vide.
+
+**Une base prête à jouer.** [`exemples/personnages_base.txt`](exemples/personnages_base.txt) contient 8 personnages qui couvrent les 4 catégories (Arthur et Galahad, Merlin et Morgane, Robin et Tristan, Viviane et Perceval). Ta sauvegarde `personnages.txt` n'est pas versionnée (c'est ton fichier de jeu) : pour partir de cette base, copie-la, puis <kbd>5</kbd> et <kbd>3</kbd> permettent de combattre en 30 secondes.
+
+```bash
+cp exemples/personnages_base.txt personnages.txt
+```
 
 ```mermaid
 stateDiagram-v2
     direction LR
     [*] --> Menu
     Menu --> Creation: 1
-    Menu --> Fiche: 2
-    Menu --> Combat: 3
-    Menu --> Sauvegarde: 4
+    Menu --> Fiche: 2 (≥ 1 perso)
+    Menu --> Combat: 3 (≥ 2 en forme)
+    Menu --> Sauvegarde: 4 (≥ 1 perso)
     Menu --> Chargement: 5
+    Menu --> Fusion: 6
     Menu --> [*]: 0 ou Ctrl+D
 
-    Creation --> Menu: créé / nom pris / Ctrl+D
-    Fiche --> Menu
-    Combat --> Menu: victoire / défaite / Ctrl+D
+    Creation --> Menu: créé / q
+    Fiche --> Menu: fiche vue / q
+    Combat --> Menu: victoire / défaite / q
     Sauvegarde --> Menu
-    Chargement --> Menu: chargé / fichier refusé
+    Chargement --> Menu: chargé / refusé (n) / fichier invalide
+    Fusion --> Menu: ajoutés / fichier invalide
 
     note right of Combat
         équipes de 1 à 4
@@ -408,11 +424,14 @@ stateDiagram-v2
 
 | Saisie | Règle | Si c'est faux |
 |---|---|---|
-| Nom | 1 mot, 29 caractères max, **unique** | `✗ Ce nom est déjà pris` |
+| Nom | 1 mot, 29 caractères max, **unique** ; `q` est réservé (annuler) | `✗ Ce nom est déjà pris`, `✗ Le nom ne peut pas contenir d'espace`, `✗ Nom trop long` : le nom est **redemandé** |
 | PV / Attaque / Défense / Soin | entier de **0 à 99** (statistiques de base, avant la classe) | `✗ Valeur invalide`, puis la question est reposée |
 | Classe | de 1 à 28, listées par catégorie | `✗ Valeur invalide` |
 | `12abc`, `abc`, `99999999999` | refusés : `strtol` contrôle **toute** la ligne | `✗ Valeur invalide` |
+| <kbd>q</kbd> à n'importe quelle question | annule l'étape en cours, **rien n'est enregistré** | `↩ Création annulée : rien n'a été enregistré.` |
 | <kbd>Ctrl</kbd>+<kbd>D</kbd> pendant une création | la création est annulée | `✗ Saisie interrompue` |
+| Personnage choisi par numéro | de 1 à N, comme dans la liste affichée ; un nom exact passe avant | `✗ Personnage introuvable`, puis la question est reposée |
+| Confirmation avant d'écraser | `o` ou `oui` pour accepter ; `n`, `q`, Entrée seule ou Ctrl+D refusent | `↩ Chargement annulé : tes personnages sont conservés.` |
 
 </details>
 
@@ -463,6 +482,8 @@ Elara 55 15 10 22 40
 
 Le chargement est **transactionnel** : tout le fichier est lu dans un roster temporaire, qui remplace l'équipe seulement s'il est entièrement valide.
 
+**Charger remplace, Ajouter fusionne.** Avant de remplacer des personnages existants, le jeu affiche un avertissement et demande `o/n` (le défaut est *non* : appuyer sur Entrée par réflexe ne détruit rien). L'option 6 (`fusionner()`) fait le contraire : elle ajoute les personnages du fichier à ceux qui existent, ignore ceux dont le nom est déjà pris, et reste « tout ou rien » (un fichier invalide n'ajoute personne).
+
 ```mermaid
 sequenceDiagram
     autonumber
@@ -471,6 +492,8 @@ sequenceDiagram
     participant S as sauvegarde.c
     participant F as personnages.txt
     J->>M: 5 (Charger)
+    M->>J: ◆ Attention : écrasement. Remplacer ? (o/n)
+    J->>M: o
     M->>S: charger(&roster, "personnages.txt")
     S->>F: fopen("r")
     alt fichier absent
@@ -576,10 +599,13 @@ RedStrings/
 │   ├── personnage.h          personnage_t, classe_t, catalogue classes[], statistiques
 │   ├── bataille.h            combat en équipe : tours, actions, effets, événements
 │   ├── bataille_console.h    menu_bataille()
+│   ├── composition_console.h choisir_equipe() : le choix des deux équipes
+│   ├── liste_console.h       afficher_liste() : la liste numérotée des noms
+│   ├── menu_personnages.h    les actions du menu (ajouter, afficher, charger, fusionner…)
 │   ├── roster.h              tableau dynamique de personnages
-│   ├── sauvegarde.h          sauvegarder / charger + codes d'erreur
+│   ├── sauvegarde.h          sauvegarder / charger / fusionner + codes d'erreur
 │   ├── boite.h               boîtes Unicode, alignement des libellés
-│   ├── saisie.h              lire_ligne, lire_entier, vider_buffer
+│   ├── saisie.h              lire_ligne, lire_entier, lire_nom, confirmer, q pour annuler
 │   ├── couleurs.h            codes ANSI (ROUGE, VERT, GRAS…)
 │   ├── my.h · my_string.h    prototypes de libmy.a
 │   └── redstrings.h          point d'entrée du menu
@@ -588,7 +614,8 @@ RedStrings/
 │   ├── redstrings.c          boucle du menu
 │   ├── 📁 personnage/        moteur : personnage · combat · bataille · roster · sauvegarde
 │   │                         console : creer_personnage · afficher_personnage
-│   └── 📁 ui/                boite.c · saisie.c · bataille_console.c
+│   └── 📁 ui/                boite.c · saisie.c · liste_console.c · menu_personnages.c
+│                             composition_console.c · bataille_console.c
 ├── 📁 lib/                   40 fonctions maison → libmy.a
 ├── 📁 csfml/                 version graphique
 │   ├── include/              14 headers gui_*.h, un par thème (config, types, anim, dessin, ui…)
@@ -596,7 +623,8 @@ RedStrings/
 │   ├── tests/                tests.c : UTF-8, animation, classes (sans fenêtre)
 │   ├── assets/fonts/         polices
 │   └── Makefile
-├── 📁 tests/                 tests.c (assert)
+├── 📁 exemples/              personnages_base.txt : 8 personnages prêts à charger
+├── 📁 tests/                 tests.c et tests_console.c (assert, stdin simulé)
 ├── 📁 .github/readme/        images de ce README et leur générateur
 └── Makefile
 ```

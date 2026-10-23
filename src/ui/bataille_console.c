@@ -196,15 +196,6 @@ static void jouer(bataille_t *b)
         : ROUGE GRAS "✗ Défaite…");
 }
 
-static int nb_vivants(const roster_t *r)
-{
-    int n = 0;
-
-    for (int i = 0; i < r->len; i++)
-        n += !est_ko(&r->data[i]);
-    return n;
-}
-
 /*
 ** ╭─ menu_bataille ──────────────────────────────────────────────────────
 ** │ Prépare puis lance un combat.
@@ -227,12 +218,12 @@ void menu_bataille(const roster_t *r)
     int nj = 0;
     int na = 0;
 
-    if (nb_vivants(r) < 2) {
+    if (roster_nb_en_forme(r) < 2) {
         afficher_erreur("Il faut au moins 2 personnages en forme");
         return;
     }
     nj = choisir_equipe(r, "Ton équipe", joueurs, NULL, 0);
-    if (nj < 0 || nj == nb_vivants(r)) {
+    if (nj < 0 || nj == roster_nb_en_forme(r)) {
         if (nj >= 0)
             afficher_erreur("Garde au moins un personnage pour l'adversaire");
         else if (nj == SAISIE_ANNULEE)

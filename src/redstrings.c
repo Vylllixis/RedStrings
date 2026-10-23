@@ -5,13 +5,11 @@
 
 /*
 ** ╭─ redstrings.c ───────────────────────────────────────────────────────
-** │ But         Menu principal du jeu en terminal : affiche les choix,
-** │             lit le choix du joueur, puis appelle l'action demandée.
-** │ Contenu     afficher_menu, demander_personnage, menu_ajouter /
-** │             afficher / sauvegarder / charger, et redstrings() qui
-** │             boucle sur le menu.
-** │ Utilise     roster.c (la liste des personnages), creer_personnage.c,
-** │             bataille_console.c, sauvegarde.c, saisie.c
+** │ But         Menu principal du jeu en terminal : affiche les choix, lit
+** │             le choix du joueur, puis appelle l'action demandée.
+** │ Contenu     ligne_menu, afficher_menu, redstrings
+** │ Utilise     menu_personnages.c (les actions), roster.c (la liste des
+** │             personnages), bataille_console.c (le combat), saisie.c
 ** ╰──────────────────────────────────────────────────────────────────────
 */
 
@@ -19,89 +17,34 @@
 #include "bataille_console.h"
 #include "boite.h"
 #include "couleurs.h"
-#include "my_string.h"
-#include "personnage.h"
+#include "menu_personnages.h"
 #include "redstrings.h"
 #include "roster.h"
-#include "sauvegarde.h"
 #include "saisie.h"
 
-static void afficher_menu(void)
+/* Une ligne du menu ; grisée quand l'entrée n'a pas de sens pour l'instant. */
+static void ligne_menu(int numero, const char *libelle, int disponible)
+{
+    boite_ligne(CYAN, "  %s%d" RESET "  %s%s" RESET, disponible ? GRAS : GRIS, numero,
+        disponible ? "" : GRIS, libelle);
+}
+
+static void afficher_menu(const roster_t *r)
 {
     boite_haut(CYAN);
-    boite_ligne(CYAN, "  " GRAS "✦ Menu principal" RESET);
+    boite_ligne(CYAN, "  " GRAS "✦ Menu principal" RESET GRIS "  %d personnage%s" RESET,
+        r->len, r->len > 1 ? "s" : "");
     boite_separateur(CYAN);
-    boite_ligne(CYAN, "  " GRAS "1" RESET "  Ajouter un personnage");
-    boite_ligne(CYAN, "  " GRAS "2" RESET "  Afficher un personnage");
-    boite_ligne(CYAN, "  " GRAS "3" RESET "  Combat");
-    boite_ligne(CYAN, "  " GRAS "4" RESET "  Sauvegarder");
-    boite_ligne(CYAN, "  " GRAS "5" RESET "  Charger");
-    boite_ligne(CYAN, "  " GRAS "0" RESET "  Quitter");
+    ligne_menu(CHOIX_AJOUTER, "Ajouter un personnage", 1);
+    ligne_menu(CHOIX_AFFICHER, "Afficher un personnage",
+        menu_indisponible(r, CHOIX_AFFICHER) == NULL);
+    ligne_menu(CHOIX_COMBAT, "Combat", menu_indisponible(r, CHOIX_COMBAT) == NULL);
+    ligne_menu(CHOIX_SAUVEGARDER, "Sauvegarder",
+        menu_indisponible(r, CHOIX_SAUVEGARDER) == NULL);
+    ligne_menu(CHOIX_CHARGER, "Charger (remplace tout)", 1);
+    ligne_menu(CHOIX_FUSIONNER, "Ajouter depuis le fichier", 1);
+    ligne_menu(CHOIX_QUITTER, "Quitter", 1);
     boite_bas(CYAN);
-}
-
-/* Redemande jusqu'à un nom connu. Renvoie son indice, SAISIE_ANNULEE (q) ou SAISIE_FIN. */
-static int demander_personnage(const roster_t *r, const char *question)
-{
-    char nom[64];
-    int idx = 0;
-
-    while (1) {
-        printf("  " GRAS "%s" RESET GRIS " (" MOT_ANNULER " annule)" RESET CYAN " › " RESET,
-            question);
-        if (lire_ligne(nom, sizeof(nom)) == -1)
-            return SAISIE_FIN;
-        if (my_strcmp(nom, MOT_ANNULER) == 0)
-            return SAISIE_ANNULEE;
-        if (nom[0] == '\0')
-            continue;
-        idx = trouver_personnage(r->data, r->len, nom);
-        if (idx != -1)
-            return idx;
-        afficher_erreur("Personnage introuvable");
-    }
-}
-
-static void menu_ajouter(roster_t *r)
-{
-    personnage_t nouveau = {0};
-
-    if (creer_personnage(&nouveau, r->data, r->len) == 0
-        && roster_ajouter(r, &nouveau) == -1)
-        afficher_erreur("Mémoire insuffisante");
-    printf("\n");
-}
-
-static void menu_afficher(const roster_t *r)
-{
-    int idx = demander_personnage(r, "Nom du personnage");
-
-    if (idx >= 0)
-        afficher_personnage(&r->data[idx]);
-    else if (idx == SAISIE_ANNULEE)
-        printf("  " GRIS "↩ Annulé." RESET "\n\n");
-}
-
-static void menu_sauvegarder(const roster_t *r)
-{
-    sauvegarde_t code = sauvegarder(r, FICHIER_SAUVEGARDE);
-
-    if (code != SAUVEGARDE_OK)
-        afficher_erreur(sauvegarde_message(code));
-    else
-        printf("  " VERT "✔ %d personnage(s) sauvegardé(s) dans %s" RESET "\n\n",
-            r->len, FICHIER_SAUVEGARDE);
-}
-
-static void menu_charger(roster_t *r)
-{
-    sauvegarde_t code = charger(r, FICHIER_SAUVEGARDE);
-
-    if (code != SAUVEGARDE_OK)
-        afficher_erreur(sauvegarde_message(code));
-    else
-        printf("  " VERT "✔ %d personnage(s) chargé(s) depuis %s" RESET "\n\n",
-            r->len, FICHIER_SAUVEGARDE);
 }
 
 /*
@@ -109,8 +52,10 @@ static void menu_charger(roster_t *r)
 ** │ Boucle du menu principal, jusqu'à ce que le joueur choisisse 0.
 ** │
 ** │ 1. roster_init() prépare la liste des personnages (vide)
-** │ 2. affiche le menu et lit un choix entre 0 et 5 (Ctrl+D = quitter)
-** │ 3. appelle la fonction menu_* qui correspond au choix
+** │ 2. affiche le menu (les entrées sans effet sont grisées) et lit un choix
+** │    entre 0 et 6 (Ctrl+D = quitter)
+** │ 3. si l'entrée est indisponible, menu_indisponible() donne la raison et
+** │    rien ne se lance ; sinon appelle l'action qui correspond
 ** │ 4. en sortant, roster_liberer() rend la mémoire : aucune fuite
 ** │ Renvoie 0, le code de sortie du programme.
 ** ╰──────────────────────────────────────────────────────────────────────
@@ -119,24 +64,29 @@ int redstrings(void)
 {
     roster_t roster;
     int choix = -1;
+    const char *raison = NULL;
 
     roster_init(&roster);
-
-    while (choix != 0) {
-        afficher_menu();
-        if (lire_entier_menu("Choix", 0, 5, &choix) != 0)
-            choix = 0;
+    while (choix != CHOIX_QUITTER) {
+        afficher_menu(&roster);
+        if (lire_entier_menu("Choix", 0, NB_CHOIX - 1, &choix) != 0)
+            choix = CHOIX_QUITTER;
         printf("\n");
-        if (choix == 1)
+        raison = menu_indisponible(&roster, choix);
+        if (raison != NULL)
+            afficher_erreur(raison);
+        else if (choix == CHOIX_AJOUTER)
             menu_ajouter(&roster);
-        else if (choix == 2)
+        else if (choix == CHOIX_AFFICHER)
             menu_afficher(&roster);
-        else if (choix == 3)
+        else if (choix == CHOIX_COMBAT)
             menu_bataille(&roster);
-        else if (choix == 4)
+        else if (choix == CHOIX_SAUVEGARDER)
             menu_sauvegarder(&roster);
-        else if (choix == 5)
+        else if (choix == CHOIX_CHARGER)
             menu_charger(&roster);
+        else if (choix == CHOIX_FUSIONNER)
+            menu_fusionner(&roster);
     }
     roster_liberer(&roster);
     printf("  " GRIS "À bientôt !" RESET "\n");

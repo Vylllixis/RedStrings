@@ -8,9 +8,12 @@
 ** │ But         Tester les saisies de la console avec un vrai stdin : le
 ** │             clavier est remplacé par un fichier, et l'affichage est
 ** │             muet pendant le test.
-** │ Contenu     entree, muet_debut / muet_fin, un test_* par comportement
+** │ Contenu     entree, muet_debut / muet_fin, remplir, dossier jetable,
+** │             un test_* par comportement
 ** │ Vérifie     q annule à chaque étape, rien n'est enregistré, les noms
-** │             refusés sont redemandés, Ctrl+D est distinct de q
+** │             refusés sont redemandés, Ctrl+D est distinct de q, les
+** │             options du menu sans sens sont refusées, charger demande
+** │             confirmation avant d'écraser, fusionner n'écrase rien
 ** ╰──────────────────────────────────────────────────────────────────────
 */
 
@@ -20,14 +23,18 @@
 #include <fcntl.h>
 #include <stdio.h>
 #include <string.h>
+#include <sys/stat.h>
 #include <unistd.h>
 #include "composition_console.h"
+#include "menu_personnages.h"
 #include "personnage.h"
 #include "roster.h"
 #include "saisie.h"
+#include "sauvegarde.h"
 #include "tests_console.h"
 
 #define FICHIER_ENTREE "tests_entree_tmp.txt"
+#define DOSSIER_TEST "tests_dossier_tmp"
 
 /* Le prochain scanf / fgets lira `texte` ; un texte vide simule Ctrl+D. */
 static void entree(const char *texte)
@@ -168,6 +175,191 @@ static void test_composition_annulable(void)
     muet_fin(m);
 }
 
+/* Un roster de n personnages « P0 », « P1 »... ; ceux d'indice impair sont K.O. si ko vaut 1. */
+static void remplir(roster_t *r, int n, int ko)
+{
+    personnage_t p = {"", 50, 40, 20, GUERRIER, 10};
+
+    roster_init(r);
+    for (int i = 0; i < n; i++) {
+        snprintf(p.nom, sizeof(p.nom), "P%d", i);
+        p.pv = ko && i % 2 == 1 ? 0 : 50;
+        assert(roster_ajouter(r, &p) == 0);
+    }
+}
+
+static void test_roster_trouver(void)
+{
+    roster_t r;
+    personnage_t p = {"2", 50, 40, 20, MAGE, 10};
+
+    remplir(&r, 3, 0);
+    assert(roster_trouver(&r, "P1") == 1);           // par le nom
+    assert(roster_trouver(&r, "1") == 0);            // par le numéro (1 = premier)
+    assert(roster_trouver(&r, "3") == 2);
+    assert(roster_trouver(&r, "0") == -1 && roster_trouver(&r, "4") == -1);
+    assert(roster_trouver(&r, "-1") == -1 && roster_trouver(&r, "") == -1);
+    assert(roster_trouver(&r, "p1") == -1);          // sensible à la casse, comme le reste
+    assert(roster_trouver(&r, "99999999999999999999") == -1);   // pas de dépassement d'int
+    assert(roster_trouver(&r, "1x") == -1);
+    assert(roster_ajouter(&r, &p) == 0);
+    assert(roster_trouver(&r, "2") == 3);            // un nom exact passe avant le numéro
+    roster_liberer(&r);
+    assert(roster_trouver(&r, "1") == -1);           // roster vide
+}
+
+static void test_menu_indisponible(void)
+{
+    roster_t r;
+
+    remplir(&r, 0, 0);
+    assert(menu_indisponible(&r, CHOIX_AFFICHER) != NULL);
+    assert(menu_indisponible(&r, CHOIX_COMBAT) != NULL);
+    assert(menu_indisponible(&r, CHOIX_SAUVEGARDER) != NULL);   // pas de sauvegarde vide
+    assert(menu_indisponible(&r, CHOIX_AJOUTER) == NULL);
+    assert(menu_indisponible(&r, CHOIX_CHARGER) == NULL);
+    assert(menu_indisponible(&r, CHOIX_FUSIONNER) == NULL);
+    roster_liberer(&r);
+    remplir(&r, 1, 0);
+    assert(menu_indisponible(&r, CHOIX_AFFICHER) == NULL);
+    assert(menu_indisponible(&r, CHOIX_SAUVEGARDER) == NULL);
+    assert(menu_indisponible(&r, CHOIX_COMBAT) != NULL);         // 1 seul : pas de combat
+    roster_liberer(&r);
+    remplir(&r, 4, 1);                                           // 2 en forme, 2 K.O.
+    assert(roster_nb_en_forme(&r) == 2 && menu_indisponible(&r, CHOIX_COMBAT) == NULL);
+    r.data[0].pv = 0;
+    assert(roster_nb_en_forme(&r) == 1 && menu_indisponible(&r, CHOIX_COMBAT) != NULL);
+    roster_liberer(&r);
+}
+
+static void test_composition_par_numero(void)
+{
+    roster_t r;
+    personnage_t equipe[TAILLE_EQUIPE_MAX];
+    int m = muet_debut();
+
+    remplir(&r, 4, 1);                                           // P1 et P3 sont K.O.
+    entree("1\n2\n3\n\n");                                     // P0, puis P1 (K.O. : refusé), P2
+    assert(choisir_equipe(&r, "Équipe", equipe, NULL, 0) == 2);
+    assert(strcmp(equipe[0].nom, "P0") == 0 && strcmp(equipe[1].nom, "P2") == 0);
+    entree("P0\n1\n9\nP2\n");                                 // doublon par numéro, hors liste
+    assert(choisir_equipe(&r, "Équipe", equipe, NULL, 0) == 2);
+    entree("1\n3\n");                                            // P0 est déjà engagé chez l'autre équipe
+    assert(choisir_equipe(&r, "Équipe", equipe, &r.data[0], 1) == 1);
+    assert(strcmp(equipe[0].nom, "P2") == 0);
+    muet_fin(m);
+    roster_liberer(&r);
+}
+
+static void ecrire_fichier_perso(const char *contenu)
+{
+    FILE *f = fopen(FICHIER_SAUVEGARDE, "w");
+
+    assert(f != NULL);
+    fputs(contenu, f);
+    fclose(f);
+}
+
+/* Ces tests écrivent « personnages.txt » : ils le font dans un dossier jetable. */
+static void entrer_dossier_jetable(void)
+{
+    remove(DOSSIER_TEST "/" FICHIER_SAUVEGARDE);    // reste d'une exécution interrompue
+    remove(DOSSIER_TEST "/" FICHIER_ENTREE);
+    rmdir(DOSSIER_TEST);
+    assert(mkdir(DOSSIER_TEST, 0700) == 0);
+    assert(chdir(DOSSIER_TEST) == 0);
+}
+
+static void sortir_dossier_jetable(void)
+{
+    remove(FICHIER_SAUVEGARDE);
+    remove(FICHIER_ENTREE);                 // celui d'ici : entree() écrit dans le dossier courant
+    assert(chdir("..") == 0);
+    assert(rmdir(DOSSIER_TEST) == 0);
+}
+
+static void test_fusionner(void)
+{
+    roster_t r;
+    int ajoutes = -1;
+    int ignores = -1;
+
+    entrer_dossier_jetable();
+    remplir(&r, 2, 0);                                   // P0 et P1 existent déjà
+    ecrire_fichier_perso("P1 99 99 99 0 99\nZed 10 10 10 0 10\nAda 20 20 20 1 20\n");
+    assert(fusionner(&r, FICHIER_SAUVEGARDE, &ajoutes, &ignores) == SAUVEGARDE_OK);
+    assert(ajoutes == 2 && ignores == 1 && r.len == 4);
+    assert(r.data[1].pv == 50);                          // P1 n'a pas été écrasé
+    assert(strcmp(r.data[2].nom, "Zed") == 0 && strcmp(r.data[3].nom, "Ada") == 0);
+    assert(fusionner(&r, FICHIER_SAUVEGARDE, &ajoutes, &ignores) == SAUVEGARDE_OK);
+    assert(ajoutes == 0 && ignores == 3 && r.len == 4);  // rejouer ne duplique rien
+    ecrire_fichier_perso("Bob 10 10 10 0 10\nCaro 10 10 10 999 10\n");
+    assert(fusionner(&r, FICHIER_SAUVEGARDE, &ajoutes, &ignores) == SAUVEGARDE_ERR_FORMAT);
+    assert(r.len == 4 && ajoutes == 0);                  // fichier invalide : rien n'est ajouté, même Bob
+    remove(FICHIER_SAUVEGARDE);
+    assert(fusionner(&r, FICHIER_SAUVEGARDE, &ajoutes, &ignores) == SAUVEGARDE_ERR_OUVERTURE);
+    assert(r.len == 4);
+    roster_liberer(&r);
+    sortir_dossier_jetable();
+}
+
+static void test_charger_confirmation(void)
+{
+    roster_t r;
+    int m = muet_debut();
+
+    entrer_dossier_jetable();
+    ecrire_fichier_perso("Zed 10 10 10 0 10\n");
+    remplir(&r, 3, 0);
+    entree("n\n");
+    menu_charger(&r);
+    assert(r.len == 3 && strcmp(r.data[0].nom, "P0") == 0);        // refusé : rien n'est écrasé
+    entree("\n");
+    menu_charger(&r);
+    assert(r.len == 3);                                             // Entrée seule = non
+    entree("q\n");
+    menu_charger(&r);
+    assert(r.len == 3);
+    entree("");
+    menu_charger(&r);
+    assert(r.len == 3);                                             // Ctrl+D = non
+    entree("oui\n");
+    menu_charger(&r);
+    assert(r.len == 1 && strcmp(r.data[0].nom, "Zed") == 0);        // confirmé : remplacé
+    roster_liberer(&r);
+    remplir(&r, 0, 0);
+    entree("");                                                     // liste vide : aucune question
+    menu_charger(&r);
+    assert(r.len == 1);
+    roster_liberer(&r);
+    ecrire_fichier_perso("Zed 10 10 10 0 10\nCaro 10 10 10 999 10\n");
+    remplir(&r, 2, 0);
+    entree("o\n");
+    menu_charger(&r);
+    assert(r.len == 2 && strcmp(r.data[0].nom, "P0") == 0);        // fichier invalide : intact
+    roster_liberer(&r);
+    sortir_dossier_jetable();
+    muet_fin(m);
+}
+
+/* La base livrée dans exemples/ se charge sans erreur et couvre bien les 4 catégories. */
+static void test_base_exemple(void)
+{
+    roster_t r;
+    int vues[NB_CATEGORIES] = {0};
+
+    roster_init(&r);
+    assert(charger(&r, "exemples/personnages_base.txt") == SAUVEGARDE_OK);
+    assert(r.len == 8);
+    for (int i = 0; i < r.len; i++) {
+        assert(!est_ko(&r.data[i]));
+        vues[classes[r.data[i].classe].categorie]++;
+    }
+    for (int c = 0; c < NB_CATEGORIES; c++)
+        assert(vues[c] == 2);
+    roster_liberer(&r);
+}
+
 void tests_console(void)
 {
     test_lire_entier();
@@ -175,5 +367,11 @@ void tests_console(void)
     test_confirmer();
     test_creation_annulable();
     test_composition_annulable();
+    test_roster_trouver();
+    test_menu_indisponible();
+    test_composition_par_numero();
+    test_fusionner();
+    test_charger_confirmation();
+    test_base_exemple();
     remove(FICHIER_ENTREE);
 }
