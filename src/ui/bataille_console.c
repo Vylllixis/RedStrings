@@ -38,15 +38,24 @@ static void afficher_combattant(const bataille_t *b, ref_t r)
 {
     const combattant_t *c = bataille_lire(b, r);
     ref_t actif = bataille_actif(b);
-    int pleines = c->pv_max > 0 ? (c->pv * CASES_PV + c->pv_max - 1) / c->pv_max : 0;
+    int pleines = 0;
     char nom[64];
     char classe[64];
+    classe_t id_classe = GUERRIER;
 
+    if (c == NULL)
+        return;
+    if (c->pv_max > 0 && c->pv > 0)
+        pleines = (c->pv * CASES_PV + c->pv_max - 1) / c->pv_max;
+    if (pleines > CASES_PV)
+        pleines = CASES_PV;
+    if (classe_valide((int)c->perso.classe))
+        id_classe = c->perso.classe;
     aligner_texte(nom, sizeof(nom), c->perso.nom, 14);
-    aligner_texte(classe, sizeof(classe), classes[c->perso.classe].nom, 15);
+    aligner_texte(classe, sizeof(classe), classes[id_classe].nom, 15);
     printf("  %s%d %s%s" RESET "%s%s" RESET, actif.equipe == r.equipe
         && actif.index == r.index ? GRAS "▶" : " ", r.index + 1,
-        combattant_vivant(c) ? GRAS : GRIS, nom, couleur_ansi(c->perso.classe), classe);
+        combattant_vivant(c) ? GRAS : GRIS, nom, couleur_ansi(id_classe), classe);
     printf(" %s", combattant_vivant(c) ? VERT : GRIS);
     for (int i = 0; i < CASES_PV; i++)
         printf(i < pleines ? "■" : GRIS "□");
@@ -62,6 +71,8 @@ static void afficher_bataille(const bataille_t *b)
 {
     static const char *titres[NB_EQUIPES] = {"Ton équipe", "Équipe adverse"};
 
+    if (b == NULL)
+        return;
     for (int e = NB_EQUIPES - 1; e >= 0; e--) {
         printf("  " GRIS "── %s ──" RESET "\n", titres[e]);
         for (int i = 0; i < b->equipes[e].taille; i++)
@@ -75,6 +86,8 @@ static void afficher_nouveautes(const bataille_t *b, int avant)
 {
     const char *ligne = NULL;
 
+    if (b == NULL)
+        return;
     for (int i = b->nb_journal - avant - 1; i >= 0; i--) {
         ligne = bataille_journal(b, i);
         if (ligne)
@@ -92,6 +105,8 @@ static int choisir_action(const bataille_t *b, action_t *a)
 {
     int choix = 0;
 
+    if (b == NULL || a == NULL)
+        return -1;
     for (int i = 0; i < NB_ACTIONS; i++)
         printf("    " GRAS "%d" RESET "  %s%s" RESET "\n", i + 1,
             bataille_action_possible(b, (action_t)i) ? "" : GRIS,
@@ -116,6 +131,8 @@ static int choisir_cible(const bataille_t *b, action_t a, ref_t *cible)
     int n = bataille_cibles(b, a, cibles);
     int choix = 0;
 
+    if (acteur == NULL || cible == NULL || n <= 0)
+        return -1;
     if (a == ACTION_DEFENDRE) {
         *cible = cibles[0];
         return 1;
@@ -140,11 +157,13 @@ static int choisir_cible(const bataille_t *b, action_t a, ref_t *cible)
 static int tour_joueur(const bataille_t *b, action_t *a, ref_t *cible)
 {
     int ok = 0;
+    const combattant_t *actif = b != NULL ? bataille_lire(b, bataille_actif(b)) : NULL;
 
+    if (actif == NULL || a == NULL || cible == NULL)
+        return -1;
     while (ok == 0) {
         printf("  " GRAS "Tour de %s%s" RESET "\n",
-            couleur_ansi(bataille_lire(b, bataille_actif(b))->perso.classe),
-            bataille_lire(b, bataille_actif(b))->perso.nom);
+            couleur_ansi(actif->perso.classe), actif->perso.nom);
         if (choisir_action(b, a) == -1)
             return -1;
         ok = choisir_cible(b, *a, cible);
@@ -178,6 +197,8 @@ static void jouer(bataille_t *b)
     ref_t cible = {0, 0};
     int avant = 0;
 
+    if (b == NULL)
+        return;
     while (b->gagnant == -1) {
         afficher_bataille(b);
         if (bataille_actif(b).equipe == 0 && tour_joueur(b, &a, &cible) == -1) {
@@ -187,8 +208,10 @@ static void jouer(bataille_t *b)
         if (bataille_actif(b).equipe == 1)
             bataille_ia(b, &a, &cible);
         avant = b->nb_journal;
-        if (bataille_agir(b, a, cible, ev) == -1)
+        if (bataille_agir(b, a, cible, ev) == -1) {
             afficher_erreur("Action refusée");
+            return;                 // sinon on referait le même refus sans fin
+        }
         afficher_nouveautes(b, avant);
     }
     afficher_bataille(b);
@@ -218,7 +241,7 @@ void menu_bataille(const roster_t *r)
     int nj = 0;
     int na = 0;
 
-    if (roster_nb_en_forme(r) < 2) {
+    if (!roster_valide(r) || roster_nb_en_forme(r) < 2) {
         afficher_erreur("Il faut au moins 2 personnages en forme");
         return;
     }

@@ -42,6 +42,8 @@
 */
 const char *menu_indisponible(const roster_t *r, int choix)
 {
+    if (!roster_valide(r))
+        return "Liste de personnages indisponible";
     if (choix == CHOIX_AFFICHER && r->len < 1)
         return "Aucun personnage : crée-en un d'abord (option 1)";
     if (choix == CHOIX_COMBAT && roster_nb_en_forme(r) < 2)
@@ -57,6 +59,8 @@ static int demander_personnage(const roster_t *r, const char *question)
     char saisie[64];
     int idx = 0;
 
+    if (!roster_valide(r) || question == NULL)
+        return SAISIE_FIN;
     while (1) {
         printf("  " GRAS "%s" RESET GRIS " (nom ou ID · " MOT_ANNULER " annule)" RESET CYAN " › " RESET,
             question);
@@ -77,6 +81,8 @@ void menu_ajouter(roster_t *r)
 {
     personnage_t nouveau = {0};
 
+    if (!roster_valide(r))
+        return;
     if (creer_personnage(&nouveau, r->data, r->len) == 0
         && roster_ajouter(r, &nouveau) == -1)
         afficher_erreur("Mémoire insuffisante");
@@ -87,6 +93,8 @@ void menu_afficher(const roster_t *r)
 {
     int idx = 0;
 
+    if (!roster_valide(r))
+        return;
     afficher_liste(r, NULL, 0);
     idx = demander_personnage(r, "Quel personnage ?");
     if (idx >= 0)
@@ -99,6 +107,10 @@ void menu_sauvegarder(const roster_t *r)
 {
     sauvegarde_t code = sauvegarder(r, FICHIER_SAUVEGARDE);
 
+    if (!roster_valide(r)) {
+        afficher_erreur("Liste de personnages indisponible");
+        return;
+    }
     if (code != SAUVEGARDE_OK)
         afficher_erreur(sauvegarde_message(code));
     else
@@ -135,6 +147,8 @@ void menu_charger(roster_t *r)
 {
     sauvegarde_t code = SAUVEGARDE_OK;
 
+    if (!roster_valide(r))
+        return;
     if (r->len > 0) {
         avertir_ecrasement(r);
         if (!confirmer("Remplacer quand même ?")) {
@@ -156,8 +170,11 @@ void menu_fusionner(roster_t *r)
 {
     int ajoutes = 0;
     int ignores = 0;
-    sauvegarde_t code = fusionner(r, FICHIER_SAUVEGARDE, &ajoutes, &ignores);
+    sauvegarde_t code = SAUVEGARDE_OK;
 
+    if (!roster_valide(r))
+        return;
+    code = fusionner(r, FICHIER_SAUVEGARDE, &ajoutes, &ignores);
     if (code != SAUVEGARDE_OK) {
         afficher_erreur(sauvegarde_message(code));
         return;

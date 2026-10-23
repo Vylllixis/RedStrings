@@ -26,6 +26,8 @@
 
 static int deja_choisi(const personnage_t *choisis, int n, const char *nom)
 {
+    if (choisis == NULL || nom == NULL)
+        return 0;
     for (int i = 0; i < n; i++) {
         if (my_strcmp(choisis[i].nom, nom) == 0)
             return 1;
@@ -64,6 +66,8 @@ static void montrer_liste(const roster_t *r, const personnage_t *equipe, int n,
 /* « ✔ Arthur · Merlin » : l'équipe en cours, d'un coup d'œil. */
 static void montrer_equipe(const personnage_t *equipe, int n)
 {
+    if (equipe == NULL)
+        return;
     printf("  " VERT "✔" RESET);
     for (int i = 0; i < n; i++)
         printf("%s %s", i > 0 ? " ·" : "", equipe[i].nom);
@@ -91,6 +95,10 @@ int choisir_equipe(const roster_t *r, const char *titre,
     int n = 0;
     int idx = 0;
 
+    if (!roster_valide(r) || titre == NULL || equipe == NULL
+        || nb_autre < 0 || nb_autre > TAILLE_EQUIPE_MAX
+        || (autre == NULL && nb_autre > 0))
+        return SAISIE_FIN;
     montrer_liste(r, equipe, n, autre, nb_autre);
     printf("  " GRAS "%s" RESET GRIS " (1 à %d · nom ou ID · ligne vide = terminer · "
         MOT_ANNULER " = annuler)" RESET "\n", titre, TAILLE_EQUIPE_MAX);
