@@ -20,6 +20,11 @@ typedef struct {
 /** Prépare un roster vide, sans allocation. */
 void roster_init(roster_t *r);
 
+/** 1 si le roster est utilisable : non NULL, len entre 0 et capacite, data
+ *  non NULL dès qu'il contient quelqu'un. Toute fonction qui lit un roster
+ *  commence par là. */
+int roster_valide(const roster_t *r);
+
 /** Copie p à la fin du roster. Renvoie -1 si l'allocation échoue
  *  (le roster reste alors intact). */
 int roster_ajouter(roster_t *r, const personnage_t *p);
