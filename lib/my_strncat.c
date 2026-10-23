@@ -11,6 +11,7 @@
 ** ╰──────────────────────────────────────────────────────────────────────
 */
 
+#include <stddef.h>
 #include "my.h"
 #include "my_string.h"
 
@@ -19,6 +20,10 @@ char *my_strncat(char *dest, char const *src, int n)
     int dest_len = my_strlen(dest);
     int i = 0;
 
+    if (dest == NULL)
+        return NULL;
+    if (src == NULL || n <= 0)
+        return dest;
     while (src[i] != '\0' && i < n) {
         dest[dest_len + i] = src[i];
         i++;

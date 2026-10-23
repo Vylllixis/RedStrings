@@ -10,6 +10,7 @@
 ** ╰──────────────────────────────────────────────────────────────────────
 */
 
+#include <stddef.h>
 #include "my.h"
 #include "my_string.h"
 
@@ -18,6 +19,10 @@ char *my_strcat(char *dest, char const *src)
     int dest_len = my_strlen(dest);
     int i = 0;
 
+    if (dest == NULL)
+        return NULL;
+    if (src == NULL)
+        return dest;
     while (src[i] != '\0') {
         dest[dest_len + i] = src[i];
         i++;

@@ -9,11 +9,16 @@
 ** ╰──────────────────────────────────────────────────────────────────────
 */
 
+#include <stddef.h>
 #include "my.h"
 
 void my_swap_params(char **a, char **b)
 {
-    char *temp = *a;
+    char *temp = NULL;
+
+    if (a == NULL || b == NULL)
+        return;
+    temp = *a;
     *a = *b;
     *b = temp;
 }
