@@ -14,6 +14,7 @@
 */
 
 #include <errno.h>
+#include <limits.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include "couleurs.h"
@@ -21,6 +22,12 @@
 #include "personnage.h"
 #include "saisie.h"
 
+
+/*
+** ╭─ vider_buffer ──────────────────────────────────────────────────────
+** │ utilisé pour évité les boucle infini de scnaf sur CTRL+D
+** ╰─────────────────────────────────────────────────────────────────────
+*/
 void vider_buffer(void)
 {
     int c = getchar();
@@ -31,6 +38,8 @@ void vider_buffer(void)
 
 void afficher_erreur(const char *message)
 {
+    if (message == NULL)
+        message = "Erreur";
     printf("  " ROUGE "✗ %s" RESET "\n\n", message);
 }
 
@@ -58,12 +67,17 @@ int lire_ligne(char *buf, size_t taille)
 {
     size_t len = 0;
 
-    if (fgets(buf, (int)taille, stdin) == NULL)
-        return -1;
-    len = my_strlen(buf);
+    if (buf == NULL || taille < 2 || taille > INT_MAX)
+        return SAISIE_FIN;
+    buf[0] = '\0';
+    if (fgets(buf, (int)taille, stdin) == NULL) {
+        buf[0] = '\0';
+        return SAISIE_FIN;
+    }
+    len = (size_t)my_strlen(buf);
     if (len > 0 && buf[len - 1] == '\n')
         buf[len - 1] = '\0';         // on retire le '\n'
-    else
+    else if (len == taille - 1)
         vider_buffer();               // ligne trop longue : on jette la fin
     return 0;
 }
@@ -89,6 +103,10 @@ static int lire_entier_interne(const char *question, int min, int max,
     char *fin = NULL;
     long valeur = 0;
 
+    if (resultat == NULL || min > max)
+        return SAISIE_FIN;
+    if (question == NULL)
+        question = "";
     while (1) {
         afficher_question(question, min, max, annulable);
         if (lire_ligne(buf, sizeof(buf)) == -1)
@@ -117,6 +135,8 @@ int lire_entier_menu(const char *question, int min, int max, int *resultat)
 
 static int contient_espace(const char *s)
 {
+    if (s == NULL)
+        return 0;
     for (int i = 0; s[i] != '\0'; i++) {
         if (s[i] == ' ' || s[i] == '\t')
             return 1;
@@ -141,8 +161,10 @@ int lire_nom(const char *question, char *nom, size_t taille)
 {
     char buf[LIGNE_NOM];
 
-    if (taille < NOM_MAX)
+    if (nom == NULL || taille < NOM_MAX)
         return SAISIE_FIN;
+    if (question == NULL)
+        question = "";
     while (1) {
         printf("  " GRAS "%s" RESET GRIS " (" MOT_ANNULER " annule)" RESET CYAN " › " RESET,
             question);
@@ -179,6 +201,8 @@ int confirmer(const char *question)
 {
     char buf[16];
 
+    if (question == NULL)
+        question = "";
     while (1) {
         printf("  " GRAS "%s" RESET GRIS " (o/n)" RESET CYAN " › " RESET, question);
         if (lire_ligne(buf, sizeof(buf)) == -1)

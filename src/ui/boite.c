@@ -33,6 +33,8 @@ int largeur_visible(const char *texte)
 {
     int largeur = 0;
 
+    if (texte == NULL)
+        return 0;
     // [largeur_visible]
     for (int i = 0; texte[i] != '\0'; i++) {
         if (texte[i] == '\033') {
@@ -50,16 +52,19 @@ int largeur_visible(const char *texte)
 
 void boite_haut(const char *couleur)
 {
+    couleur = couleur != NULL ? couleur : "";
     printf("%s╭" LIGNE "╮" RESET "\n", couleur);
 }
 
 void boite_separateur(const char *couleur)
 {
+    couleur = couleur != NULL ? couleur : "";
     printf("%s├" LIGNE "┤" RESET "\n", couleur);
 }
 
 void boite_bas(const char *couleur)
 {
+    couleur = couleur != NULL ? couleur : "";
     printf("%s╰" LIGNE "╯" RESET "\n", couleur);
 }
 
@@ -76,12 +81,15 @@ void boite_bas(const char *couleur)
 */
 void boite_ligne(const char *couleur, const char *format, ...)
 {
-    char texte[512];
+    char texte[512] = "";
     va_list args;
 
-    va_start(args, format);
-    vsnprintf(texte, sizeof(texte), format, args);
-    va_end(args);
+    couleur = couleur != NULL ? couleur : "";
+    if (format != NULL) {
+        va_start(args, format);
+        vsnprintf(texte, sizeof(texte), format, args);
+        va_end(args);
+    }
     printf("%s│" RESET "%s", couleur, texte);
     for (int i = largeur_visible(texte); i < LARGEUR_BOITE; i++)
         printf(" ");
@@ -90,9 +98,17 @@ void boite_ligne(const char *couleur, const char *format, ...)
 
 void aligner_texte(char *dst, size_t taille, const char *texte, int largeur)
 {
-    int visible = largeur_visible(texte);
-    int pad = visible < largeur ? largeur - visible : 0;
+    int visible = 0;
+    int pad = 0;
 
+    if (dst == NULL || taille == 0)
+        return;
+    if (texte == NULL)
+        texte = "";
+    visible = largeur_visible(texte);
+    pad = visible < largeur ? largeur - visible : 0;
+    if (pad > LARGEUR_BOITE * 4)
+        pad = LARGEUR_BOITE * 4;
     snprintf(dst, taille, "%s%*s", texte, pad, "");
 }
 
@@ -100,13 +116,15 @@ void boite_champ(const char *couleur, const char *libelle,
     const char *format, ...)
 {
     char libelle_aligne[64];
-    char valeur[256];
+    char valeur[256] = "";
     va_list args;
 
     aligner_texte(libelle_aligne, sizeof(libelle_aligne), libelle,
         LARGEUR_LIBELLE);
-    va_start(args, format);
-    vsnprintf(valeur, sizeof(valeur), format, args);
-    va_end(args);
+    if (format != NULL) {
+        va_start(args, format);
+        vsnprintf(valeur, sizeof(valeur), format, args);
+        va_end(args);
+    }
     boite_ligne(couleur, "  %s%s", libelle_aligne, valeur);
 }

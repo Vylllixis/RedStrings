@@ -31,6 +31,8 @@ static void ligne_menu(int numero, const char *libelle, int disponible)
 
 static void afficher_menu(const roster_t *r)
 {
+    if (!roster_valide(r))
+        return;
     boite_haut(CYAN);
     boite_ligne(CYAN, "  " GRAS "✦ Menu principal" RESET GRIS "  %d personnage%s" RESET,
         r->len, r->len > 1 ? "s" : "");
