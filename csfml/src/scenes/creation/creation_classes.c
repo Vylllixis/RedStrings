@@ -35,6 +35,9 @@
 /** Onglets de catégorie : celui de la classe choisie est allumé. */
 void creation_onglets(app_t *app, creation_t *c, float y)
 {
+    if (app == NULL || c == NULL)
+        return;
+
     float w = (FW - TUILE_ECART * (NB_CATEGORIES - 1)) / NB_CATEGORIES;
     categorie_t actuelle = classe_info(c->classe)->categorie;
     sfFloatRect r;
@@ -110,6 +113,9 @@ static void tuile_classe(app_t *app, creation_t *c, classe_t i, sfFloatRect r)
 /** Classes de la catégorie de la classe choisie, en grille. */
 void creation_grille_classes(app_t *app, creation_t *c, float y)
 {
+    if (app == NULL || c == NULL)
+        return;
+
     float w = (FW - TUILE_ECART * (GRILLE_COLONNES - 1)) / GRILLE_COLONNES;
     categorie_t cat = classe_info(c->classe)->categorie;
     sfFloatRect r;

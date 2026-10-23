@@ -81,6 +81,9 @@ static void disposer_grille(const app_t *app, grille_t *g, int n, float y0)
 /** Position à l'écran d'un point de la grille (la grille est peut-être réduite). */
 sfVector2f grille_vers_ecran(const grille_t *g, sfVector2f p)
 {
+    if (g == NULL)
+        return (sfVector2f){0.f, 0.f};
+
     float k = g->zoom > 0.f ? g->zoom : 1.f;
 
     return (sfVector2f){g->pivot.x + (p.x - g->pivot.x) * k,
@@ -169,6 +172,13 @@ static void carte_dessus(app_t *app, const grille_t *g, const pose_carte_t *p,
 int grille_cartes(app_t *app, grille_t *g, const int *ids, int n, float y0,
     const marque_t *marques, int nb_marques)
 {
+    if (app == NULL || g == NULL || (ids == NULL && n > 0))
+        return -1;
+    if (marques == NULL || nb_marques < 0)
+        nb_marques = 0;
+    if (n < 0)
+        n = 0;
+
     pose_carte_t poses[MAX_PERSONNAGES];
     int clique = -1;
     int dessus = -1;

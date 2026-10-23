@@ -94,6 +94,8 @@ const info_son_t *son_info(son_t s)
 /* Indice de l'événement nommé `nom`, ou -1 s'il n'existe pas. */
 int son_depuis_nom(const char *nom)
 {
+    if (nom == NULL)
+        return -1;
     for (int i = 0; i < NB_SONS; i++) {
         if (strcmp(EVENEMENTS[i].nom, nom) == 0)
             return i;
@@ -103,6 +105,8 @@ int son_depuis_nom(const char *nom)
 
 int musique_depuis_nom(const char *nom)
 {
+    if (nom == NULL)
+        return -1;
     for (int i = 0; i < NB_MUSIQUES; i++) {
         if (strcmp(MUSIQUES[i], nom) == 0)
             return i;

@@ -42,6 +42,9 @@ void dessiner_dos(app_t *app)
     sfVector2f fil[24];
     float u = 0.f;
 
+    if (app == NULL)
+        return;
+
     rect_arrondi(app, (sfFloatRect){0.f, 0.f, FACE_L, FACE_H}, 14.f,
         (sfColor){16, 9, 4, 255});
     yugioh_degrade(app, (sfFloatRect){10.f, 10.f, FACE_L - 20.f, FACE_H - 20.f},

@@ -155,6 +155,9 @@ static void projecteur(app_t *app, sfColor col)
 /** Suit les changements de classe pour déclencher la transition. */
 void creation_suivre_classe(app_t *app, creation_t *c)
 {
+    if (app == NULL || c == NULL)
+        return;
+
     c->t_classe += app->dt;
     if (c->classe == c->classe_vue)
         return;
@@ -167,6 +170,9 @@ void creation_suivre_classe(app_t *app, creation_t *c)
 
 void creation_hologramme(app_t *app, creation_t *c)
 {
+    if (app == NULL || c == NULL)
+        return;
+
     float t = app->temps;
     float m = progression(c->t_classe, 0.f, 0.35f);
     float pop = 0.75f + 0.25f * sortie_rebond(progression(c->t_classe, 0.f, 0.5f));

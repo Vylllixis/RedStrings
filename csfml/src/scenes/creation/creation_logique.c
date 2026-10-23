@@ -42,6 +42,8 @@
 */
 const char *creation_raison_invalide(app_t *app, const creation_t *c)
 {
+    if (app == NULL || c == NULL)
+        return "Création indisponible";
     if (c->nom.texte[0] == '\0')
         return "Donne un nom à ton personnage";
     if (nom_est_un_id(c->nom.texte))
@@ -67,6 +69,9 @@ const char *creation_raison_invalide(app_t *app, const creation_t *c)
 */
 void creation_creer(app_t *app, creation_t *c)
 {
+    if (app == NULL || c == NULL)
+        return;
+
     const char *raison = creation_raison_invalide(app, c);
     personnage_t p = {0};
     char msg[96];
@@ -139,6 +144,9 @@ static void ajuster(int *v, int delta)
 
 void creation_clavier(app_t *app, creation_t *c)
 {
+    if (app == NULL || c == NULL)
+        return;
+
     const int *k = app->in.touches;
     int pas = app->in.shift ? 10 : 1;
 

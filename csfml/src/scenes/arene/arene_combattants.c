@@ -48,6 +48,9 @@ static float rayon_base(int e, int n)
 
 void arene_placer(app_t *app, arene_t *ar)
 {
+    if (app == NULL || ar == NULL)
+        return;
+
     const bataille_t *b = &ar->bataille;
     float intro = ar->etat == VUE_INTRO ? ar->t_etat : DUREE_INTRO;
     int n = 0;
@@ -82,6 +85,9 @@ int arene_ordre_dessin(const arene_t *ar, ref_t ordre[NB_EQUIPES * TAILLE_EQUIPE
     int n = 0;
     ref_t tmp;
 
+    if (ar == NULL || ordre == NULL)
+        return 0;
+
     for (int e = 0; e < NB_EQUIPES; e++)
         for (int i = 0; i < ar->bataille.equipes[e].taille; i++)
             ordre[n++] = (ref_t){e, i};
@@ -106,6 +112,9 @@ static sfColor couleur_pv(float ratio)
 /** Barre de PV animée : piste, trace des PV perdus, PV actuels. */
 void arene_barre_pv(app_t *app, sfFloatRect r, const visuel_t *v, int pv_max)
 {
+    if (app == NULL || v == NULL)
+        return;
+
     float f = pv_max > 0 ? bornerf(v->pv_barre / pv_max, 0.f, 1.f) : 0.f;
     float g = pv_max > 0 ? bornerf(v->pv_fantome / pv_max, 0.f, 1.f) : 0.f;
 
@@ -156,6 +165,9 @@ static void bouclier(app_t *app, sfVector2f p, float r, const visuel_t *v)
 
 void arene_dessiner_combattant(app_t *app, arene_t *ar, ref_t r, int actif)
 {
+    if (app == NULL || ar == NULL)
+        return;
+
     const combattant_t *c = bataille_lire(&ar->bataille, r);
     visuel_t *v = arene_vis(ar, r);
     float mort = v->ko_vis ? sortie_cubique(progression(v->t_ko, 0.f, 0.6f)) : 0.f;
@@ -189,6 +201,9 @@ void arene_dessiner_combattant(app_t *app, arene_t *ar, ref_t r, int actif)
 /** Nom et barre de PV flottant au-dessus du personnage. */
 void arene_plaque(app_t *app, arene_t *ar, ref_t r, int actif)
 {
+    if (app == NULL || ar == NULL)
+        return;
+
     const combattant_t *c = bataille_lire(&ar->bataille, r);
     visuel_t *v = arene_vis(ar, r);
     float w = fmaxf(84.f, v->rayon * 2.4f);
@@ -220,6 +235,9 @@ void arene_plaque(app_t *app, arene_t *ar, ref_t r, int actif)
 /** Réticule autour des cibles valides ; la cible choisie affiche l'effet prévu. */
 void arene_reticules(app_t *app, arene_t *ar)
 {
+    if (app == NULL || ar == NULL)
+        return;
+
     const combattant_t *acteur = bataille_lire(&ar->bataille,
         bataille_actif(&ar->bataille));
     sfColor col = arene_couleur_action(ar->action);

@@ -63,6 +63,9 @@ static int chercher_depuis(const char *base, const char *relatif, char *chemin,
 */
 int chemin_ressource(const char *relatif, char *chemin, size_t taille)
 {
+    if (relatif == NULL || chemin == NULL || taille == 0)
+        return -1;
+
     char exe[1024] = {0};
     char *slash = NULL;
     ssize_t n = readlink("/proc/self/exe", exe, sizeof(exe) - 1);
@@ -148,6 +151,9 @@ static sfTexture *creer_tex_vignette(void)
 
 void app_init_poussieres(app_t *app)
 {
+    if (app == NULL)
+        return;
+
     for (int i = 0; i < NB_POUSSIERES; i++) {
         app->poussieres[i].x = aleatoire(0.f, LARGEUR);
         app->poussieres[i].y = aleatoire(0.f, HAUTEUR);
@@ -177,6 +183,9 @@ void app_init_poussieres(app_t *app)
 */
 int app_creer_ressources(app_t *app)
 {
+    if (app == NULL)
+        return 1;
+
     for (int i = 0; i < NB_POLICES; i++) {
         app->polices[i] = charger_police(FICHIERS_POLICES[i]);
         if (app->polices[i] == NULL) {

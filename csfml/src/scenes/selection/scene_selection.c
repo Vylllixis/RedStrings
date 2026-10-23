@@ -41,6 +41,9 @@ static const char *BADGES[NB_EQUIPES][TAILLE_EQUIPE_MAX] = {
 
 void entrer_selection(app_t *app)
 {
+    if (app == NULL)
+        return;
+
     selection_t *s = &app->selection;
 
     memset(s, 0, sizeof(selection_t));
@@ -183,6 +186,9 @@ static void curseur(app_t *app, selection_t *s)
 
 void scene_selection(app_t *app)
 {
+    if (app == NULL)
+        return;
+
     selection_t *s = &app->selection;
     int ids[MAX_PERSONNAGES];
     marque_t marques[NB_EQUIPES * TAILLE_EQUIPE_MAX];

@@ -19,7 +19,11 @@
 /* Nombre pseudo-aléatoire dans [0, 1) (xorshift 32 bits, graine jamais nulle). */
 float hasard(unsigned int *graine)
 {
-    unsigned int x = *graine != 0 ? *graine : 0x9E3779B9u;
+    unsigned int x = 0;
+
+    if (graine == NULL)
+        return 0.f;
+    x = *graine != 0 ? *graine : 0x9E3779B9u;
 
     x ^= x << 13;
     x ^= x >> 17;
@@ -43,12 +47,14 @@ const entree_son_t *son_resoudre(const pack_t *theme, const pack_t *standard, so
 {
     const pack_t *ordre[2] = {theme, standard};
 
-    *source = NULL;
+    if (source != NULL)
+        *source = NULL;
     if ((int)s < 0 || s >= NB_SONS)
         return NULL;
     for (int i = 0; i < 2; i++) {
         if (ordre[i] != NULL && ordre[i]->sons[s].nb > 0) {
-            *source = ordre[i];
+            if (source != NULL)
+                *source = ordre[i];
             return &ordre[i]->sons[s];
         }
     }
@@ -69,10 +75,17 @@ int variante_choisir(const entree_son_t *e, int precedente, unsigned int *graine
     int *rare)
 {
     int i = 0;
+    int rare_local = 0;
 
+    if (e == NULL || graine == NULL)
+        return -1;
+    if (rare == NULL)
+        rare = &rare_local;
     *rare = e->rare[0] != '\0' && hasard(graine) < e->proba_rare;
     if (*rare || e->nb <= 1)
         return 0;
+    if (e->nb > SON_VARIANTES_MAX)
+        return -1;
     if (precedente < 0 || precedente >= e->nb)
         return (int)(hasard(graine) * (float)e->nb) % e->nb;
     i = (int)(hasard(graine) * (float)(e->nb - 1)) % (e->nb - 1);
@@ -99,7 +112,7 @@ float volume_effectif(const reglages_audio_t *r, int musique, float gain)
 {
     float v = 0.f;
 
-    if (r->coupe)
+    if (r == NULL || r->coupe || !(gain > 0.f))
         return 0.f;
     v = courbe(r->general) * courbe(musique ? r->musique : r->effets) * gain * 100.f;
     if (v < 0.f)
@@ -132,6 +145,8 @@ int voix_choisir(const voix_info_t *voix, int n, int priorite)
 {
     int choix = -1;
 
+    if (voix == NULL || n <= 0)
+        return -1;
     for (int i = 0; i < n; i++) {
         if (!voix[i].active)
             return i;

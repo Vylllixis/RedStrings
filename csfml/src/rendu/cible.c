@@ -22,6 +22,9 @@
 void cible_primitives(app_t *app, const sfVertex *v, size_t n, sfPrimitiveType type,
     const sfRenderStates *etats)
 {
+    if (app == NULL || v == NULL)
+        return;
+
     if (app->cible != NULL)
         sfRenderTexture_drawPrimitives(app->cible, v, n, type, etats);
     else
@@ -30,6 +33,9 @@ void cible_primitives(app_t *app, const sfVertex *v, size_t n, sfPrimitiveType t
 
 void cible_convexe(app_t *app, const sfConvexShape *forme, const sfRenderStates *etats)
 {
+    if (app == NULL || forme == NULL)
+        return;
+
     if (app->cible != NULL)
         sfRenderTexture_drawConvexShape(app->cible, forme, etats);
     else
@@ -38,6 +44,9 @@ void cible_convexe(app_t *app, const sfConvexShape *forme, const sfRenderStates 
 
 void cible_cercle(app_t *app, const sfCircleShape *forme, const sfRenderStates *etats)
 {
+    if (app == NULL || forme == NULL)
+        return;
+
     if (app->cible != NULL)
         sfRenderTexture_drawCircleShape(app->cible, forme, etats);
     else
@@ -46,6 +55,9 @@ void cible_cercle(app_t *app, const sfCircleShape *forme, const sfRenderStates *
 
 void cible_sprite(app_t *app, const sfSprite *sprite, const sfRenderStates *etats)
 {
+    if (app == NULL || sprite == NULL)
+        return;
+
     if (app->cible != NULL)
         sfRenderTexture_drawSprite(app->cible, sprite, etats);
     else
@@ -54,6 +66,9 @@ void cible_sprite(app_t *app, const sfSprite *sprite, const sfRenderStates *etat
 
 void cible_texte(app_t *app, const sfText *t, const sfRenderStates *etats)
 {
+    if (app == NULL || t == NULL)
+        return;
+
     if (app->cible != NULL)
         sfRenderTexture_drawText(app->cible, t, etats);
     else

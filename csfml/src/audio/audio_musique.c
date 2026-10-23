@@ -54,6 +54,9 @@ static sfMusic *ouvrir(audio_t *a, musique_t m, float *gain)
 */
 void musique(app_t *app, musique_t m)
 {
+    if (app == NULL)
+        return;
+
     audio_t *a = &app->audio;
     piste_t *p = &a->pistes[0];
     float gain = 1.f;
@@ -78,6 +81,9 @@ void musique(app_t *app, musique_t m)
 /* La musique courante s'éteint en `duree` secondes (écran d'au revoir, changement). */
 void musique_arreter(app_t *app, float duree)
 {
+    if (app == NULL)
+        return;
+
     audio_t *a = &app->audio;
 
     if (a->pistes[1].flux != NULL)
@@ -117,6 +123,9 @@ static void maj_piste(audio_t *a, piste_t *p, float dt)
 */
 void audio_maj(app_t *app)
 {
+    if (app == NULL)
+        return;
+
     audio_t *a = &app->audio;
     float cible = 1.f;
 

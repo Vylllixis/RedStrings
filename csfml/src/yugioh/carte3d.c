@@ -76,6 +76,9 @@ static sfVector3f tourner(const carte3d_t *k, float x, float y)
 */
 sfVector2f carte3d_point(const carte3d_t *k, float u, float v)
 {
+    if (k == NULL)
+        return (sfVector2f){0.f, 0.f};
+
     float l = k->largeur;
     float h = l * FACE_H / FACE_L;
     sfVector3f p = tourner(k, (u - 0.5f) * l, (v - 0.5f) * h);
@@ -87,6 +90,9 @@ sfVector2f carte3d_point(const carte3d_t *k, float u, float v)
 /** La face est tournée vers nous si la normale pointe vers la caméra. */
 int carte3d_face_visible(const carte3d_t *k)
 {
+    if (k == NULL)
+        return 0;
+
     return cosf(k->rot_y) * cosf(k->rot_x) > 0.f;
 }
 
@@ -218,6 +224,9 @@ static void reflet(app_t *app, const carte3d_t *k, const sfVector2f p[NB_POINTS]
 
 void carte3d(app_t *app, classe_t c, const carte3d_t *k)
 {
+    if (app == NULL || k == NULL)
+        return;
+
     sfVector2f p[NB_POINTS];
     float a = bornerf(k->alpha, 0.f, 1.f);
     float h = k->largeur * FACE_H / FACE_L;

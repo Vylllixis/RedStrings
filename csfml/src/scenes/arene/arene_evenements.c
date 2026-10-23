@@ -138,6 +138,12 @@ static void elan_attaque(arene_t *ar, const evenement_t *ev, float t)
 */
 void arene_jouer_evenements(app_t *app, arene_t *ar)
 {
+    if (ar == NULL)
+        return;
+
+    if (app == NULL)
+        return;
+
     const evenement_t *ev = NULL;
 
     if (ar->etat != VUE_ANIMATION)
@@ -171,6 +177,9 @@ void arene_jouer_evenements(app_t *app, arene_t *ar)
 /** Animations continues : barres, bouclier, éclats, K.O. (pilotées par le temps). */
 void arene_maj_visuels(app_t *app, arene_t *ar)
 {
+    if (app == NULL || ar == NULL)
+        return;
+
     visuel_t *v = NULL;
     float dt = app->dt;
 

@@ -23,22 +23,34 @@
 
 sfFloatRect ecran_visible(const app_t *app)
 {
+    if (app == NULL)
+        return (sfFloatRect){0.f, 0.f, 0.f, 0.f};
+
     return app->ecran;
 }
 
 sfFloatRect ecran_couvrant(const app_t *app)
 {
+    if (app == NULL)
+        return (sfFloatRect){0.f, 0.f, 0.f, 0.f};
+
     return (sfFloatRect){app->ecran.left - DEBORD_VOILE, app->ecran.top - DEBORD_VOILE,
         app->ecran.width + 2.f * DEBORD_VOILE, app->ecran.height + 2.f * DEBORD_VOILE};
 }
 
 float decal_gauche(const app_t *app)
 {
+    if (app == NULL)
+        return 0.f;
+
     return app->ecran.left > 0.f ? app->ecran.left : 0.f;
 }
 
 float decal_droite(const app_t *app)
 {
+    if (app == NULL)
+        return 0.f;
+
     float d = app->ecran.left + app->ecran.width - LARGEUR;
 
     return d < 0.f ? d : 0.f;
@@ -46,12 +58,18 @@ float decal_droite(const app_t *app)
 
 sfVector2f vers_ecran(const app_t *app, float x, float y)
 {
+    if (app == NULL)
+        return (sfVector2f){0.f, 0.f};
+
     return (sfVector2f){app->ecran.left + x * app->ecran.width / LARGEUR,
         app->ecran.top + y * app->ecran.height / HAUTEUR};
 }
 
 void zoom_debut(app_t *app, sfVector2f pivot, float k)
 {
+    if (app == NULL)
+        return;
+
     sfVector2f c = sfView_getCenter(app->vue);
     sfVector2f t = sfView_getSize(app->vue);
 
@@ -69,6 +87,9 @@ void zoom_debut(app_t *app, sfVector2f pivot, float k)
 
 void zoom_fin(app_t *app)
 {
+    if (app == NULL)
+        return;
+
     sfRenderWindow_setView(app->fenetre, app->vue);
     app->in.souris = app->souris_hors_zoom;
     app->zoom = 1.f;

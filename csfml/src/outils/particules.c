@@ -26,6 +26,9 @@
 void emettre(app_t *app, sfVector2f pos, int n, sfColor c, float vitesse,
     float taille)
 {
+    if (app == NULL)
+        return;
+
     particule_t *p = NULL;
     float angle = 0.f;
     float v = 0.f;
@@ -49,6 +52,9 @@ void emettre(app_t *app, sfVector2f pos, int n, sfColor c, float vitesse,
 
 void maj_particules(app_t *app)
 {
+    if (app == NULL)
+        return;
+
     particule_t *p = NULL;
     float frein = expf(-3.2f * app->dt_jeu);
 
@@ -66,6 +72,9 @@ void maj_particules(app_t *app)
 
 void dessiner_particules(app_t *app)
 {
+    if (app == NULL)
+        return;
+
     particule_t *p = NULL;
     float t = 0.f;
     float s = 0.f;

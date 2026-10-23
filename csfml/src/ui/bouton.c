@@ -23,6 +23,9 @@
 
 int survole(app_t *app, sfFloatRect r)
 {
+    if (app == NULL)
+        return 0;
+
     return !app->souris_bloquee
         && sfFloatRect_contains(&r, app->in.souris.x, app->in.souris.y);
 }
@@ -44,6 +47,13 @@ static int interaction(app_t *app, bouton_t *b, sfFloatRect r, int actif)
 int bouton(app_t *app, bouton_t *b, sfFloatRect r, const char *label,
     const char *touche, const char *info, sfColor accent, int actif)
 {
+    touche = touche != NULL ? touche : "";
+    info = info != NULL ? info : "";
+
+    if (app == NULL || b == NULL)
+        return 0;
+    label = label != NULL ? label : "";
+
     int clic = interaction(app, b, r, actif);
     float h = b->survol;
     float a = app->alpha;
@@ -137,6 +147,10 @@ static void reflet(app_t *app, sfFloatRect r, float rayon)
 int bouton_plein(app_t *app, bouton_t *b, sfFloatRect r, const char *label,
     const char *touche, sfColor accent, int actif)
 {
+    if (app == NULL || b == NULL)
+        return 0;
+    label = label != NULL ? label : "";
+
     int clic = interaction(app, b, r, actif);
     float h = b->survol;
     float pulse = 0.5f + 0.5f * sinf(app->temps * 3.f);
@@ -179,6 +193,9 @@ int bouton_plein(app_t *app, bouton_t *b, sfFloatRect r, const char *label,
 
 int bouton_retour(app_t *app, bouton_t *b, sfVector2f pos)
 {
+    if (app == NULL || b == NULL)
+        return 0;
+
     sfFloatRect r = {pos.x, pos.y, 126.f, 40.f};
     int clic = interaction(app, b, r, 1);
     float h = b->survol;
@@ -200,6 +217,10 @@ int bouton_retour(app_t *app, bouton_t *b, sfVector2f pos)
 
 int bouton_rond(app_t *app, bouton_t *b, sfVector2f centre, const char *sym)
 {
+    if (app == NULL || b == NULL)
+        return 0;
+    sym = sym != NULL ? sym : "";
+
     sfFloatRect r = {centre.x - 24.f, centre.y - 24.f, 48.f, 48.f};
     int clic = interaction(app, b, r, 1);
     float h = b->survol;

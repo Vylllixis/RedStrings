@@ -28,6 +28,10 @@ float pastille(app_t *app, const char *s, sfVector2f pos, sfColor c, int plein)
 {
     float w = 0.f;
 
+    if (app == NULL)
+        return 0.f;
+    s = s != NULL ? s : "";
+
     app->espacement = 1.7f;
     w = largeur_texte(app, POLICE_GRAS, s, 12) + 26.f;
     rect_arrondi_bord(app, (sfFloatRect){pos.x - w / 2.f, pos.y - 13.f, w, 26.f}, 13.f,
@@ -40,6 +44,11 @@ float pastille(app_t *app, const char *s, sfVector2f pos, sfColor c, int plein)
 
 void notifier(app_t *app, const char *icone, const char *message, sfColor c)
 {
+    if (app == NULL)
+        return;
+    icone = icone != NULL ? icone : "";
+    message = message != NULL ? message : "";
+
     toast_t *t = &app->toasts[0];
 
     memmove(&app->toasts[1], &app->toasts[0], sizeof(toast_t) * (MAX_TOASTS - 1));
@@ -82,6 +91,9 @@ static void dessiner_toast(app_t *app, toast_t *t)
 
 void dessiner_toasts(app_t *app)
 {
+    if (app == NULL)
+        return;
+
     toast_t *t = NULL;
 
     for (int i = MAX_TOASTS - 1; i >= 0; i--) {

@@ -26,6 +26,9 @@
 void arene_disque(app_t *app, sfVector2f c, sfVector2f r, sfColor centre,
     sfColor bord)
 {
+    if (app == NULL)
+        return;
+
     sfVertex v[34];
     float a = 0.f;
 
@@ -136,6 +139,9 @@ static void stade(app_t *app)
 /** Voile qui assombrit le fond : il couvre toute la fenêtre, quelle que soit sa forme. */
 void arene_voile(app_t *app)
 {
+    if (app == NULL)
+        return;
+
     sfFloatRect r = ecran_visible(app);
     sfVertex voile[4] = {
         {{r.left, r.top}, (sfColor){4, 5, 12, 170}, {0, 0}},
@@ -149,6 +155,9 @@ void arene_voile(app_t *app)
 
 void arene_dessiner_arene(app_t *app, arene_t *ar)
 {
+    if (app == NULL || ar == NULL)
+        return;
+
     float intro = ar->etat == VUE_INTRO ? ar->t_etat : DUREE_INTRO;
     float e = sortie_cubique(progression(intro, 0.f, 0.7f));
     float a = app->alpha;

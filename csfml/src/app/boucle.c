@@ -44,6 +44,9 @@ static void entrer_scene(app_t *app, scene_t s)
 
 void changer_scene(app_t *app, scene_t scene)
 {
+    if (app == NULL)
+        return;
+
     if (app->t_transition >= 0.f)
         return;
     app->scene_suivante = scene;
@@ -141,6 +144,9 @@ void maj_app(app_t *app, float dt)
     float alpha = 1.f;
     float decalage = 0.f;
     entree_t entrees;
+
+    if (app == NULL)
+        return;
 
     app->dt = bornerf(dt, 0.f, 1.f / 30.f);
     app->temps += app->dt;

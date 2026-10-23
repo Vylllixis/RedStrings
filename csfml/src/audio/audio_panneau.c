@@ -72,6 +72,9 @@ static void choix_suivant(app_t *app, int sens)
 /* Raccourcis valables sur tous les écrans, appelés avant eux. */
 void audio_raccourcis(app_t *app)
 {
+    if (app == NULL)
+        return;
+
     int *k = app->in.touches;
 
     if (!app->audio.pret)
@@ -88,6 +91,9 @@ void audio_raccourcis(app_t *app)
 
 int audio_panneau_ouvert(const app_t *app)
 {
+    if (app == NULL)
+        return 0;
+
     return app->audio.panneau.ouvert;
 }
 
@@ -191,6 +197,9 @@ static void ligne_theme(app_t *app, panneau_audio_t *p, float y)
 */
 void audio_panneau(app_t *app)
 {
+    if (app == NULL)
+        return;
+
     panneau_audio_t *p = &app->audio.panneau;
     float a = app->alpha;
     float e = 0.f;

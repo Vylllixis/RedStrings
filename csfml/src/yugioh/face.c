@@ -41,6 +41,9 @@ static const char *STATS[NB_STATS] = {"PV", "ATQ", "DEF", "SOIN"};
 /** Rectangle en dégradé vertical. */
 void yugioh_degrade(app_t *app, sfFloatRect r, sfColor haut, sfColor bas)
 {
+    if (app == NULL)
+        return;
+
     sfVertex v[4] = {
         {{r.left, r.top}, haut, {0, 0}},
         {{r.left + r.width, r.top}, haut, {0, 0}},
@@ -197,6 +200,9 @@ void dessiner_face(app_t *app, classe_t c)
     const carte_classe_t *k = carte_de_classe(c);
     sfFloatRect corps = {8.f, 8.f, FACE_L - 16.f, FACE_H - 16.f};
     char code[24];
+
+    if (app == NULL)
+        return;
 
     rect_arrondi(app, (sfFloatRect){0.f, 0.f, FACE_L, FACE_H}, 14.f,
         (sfColor){22, 17, 11, 255});

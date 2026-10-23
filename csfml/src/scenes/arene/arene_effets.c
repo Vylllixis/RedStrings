@@ -112,6 +112,9 @@ static void rayon_soin(app_t *app, sfVector2f a, sfVector2f b, float t)
 /** Effets dessinés pendant l'événement en cours (traînée, impact, rayon). */
 void arene_dessiner_effet(app_t *app, arene_t *ar)
 {
+    if (app == NULL || ar == NULL)
+        return;
+
     const evenement_t *ev = NULL;
     visuel_t *a = NULL;
     visuel_t *c = NULL;

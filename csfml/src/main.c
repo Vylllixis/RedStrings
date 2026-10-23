@@ -31,6 +31,9 @@
 */
 int main(int argc, char **argv)
 {
+    if (argv == NULL)
+        return 84;
+
     mode_visuel_t mode = MODE_NORMAL;
     app_t *app = NULL;
 

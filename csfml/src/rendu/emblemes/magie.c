@@ -23,6 +23,9 @@
 
 void emb_d_etoile(app_t *app, sfVector2f c, float t, sfColor col)
 {
+    if (app == NULL)
+        return;
+
     emb_etoile(app, emb_pt(c, t, -0.08f, 0.08f), t * 0.85f, sinf(app->temps * 0.8f) * 0.12f,
         col);
     emb_etoile(app, emb_pt(c, t, 0.62f, -0.6f), t * 0.3f, app->temps * 0.9f, col);
@@ -32,6 +35,9 @@ void emb_d_etoile(app_t *app, sfVector2f c, float t, sfColor col)
 
 void emb_d_flamme(app_t *app, sfVector2f c, float t, sfColor col)
 {
+    if (app == NULL)
+        return;
+
     float s = 1.f + 0.05f * sinf(app->temps * 9.f);
 
     emb_flamme(app, c, t * s, col);
@@ -46,6 +52,9 @@ void emb_d_crane(app_t *app, sfVector2f c, float t, sfColor col)
     static const float DENTS[3][4] = {{-0.12f, 0.46f, -0.12f, 0.72f}, {0.f, 0.46f, 0.f,
         0.72f}, {0.12f, 0.46f, 0.12f, 0.72f}};
 
+    if (app == NULL)
+        return;
+
     cercle(app, emb_pt(c, t, 0.f, -0.18f), 0.62f * t, col, C_TRANSPARENT, 0.f);
     polygone(app, MACHOIRE, 4, c, t, 0.f, col);
     cercle(app, emb_pt(c, t, -0.25f, -0.14f), 0.17f * t, emb_TROU, C_TRANSPARENT, 0.f);
@@ -57,6 +66,9 @@ void emb_d_crane(app_t *app, sfVector2f c, float t, sfColor col)
 
 void emb_d_portail(app_t *app, sfVector2f c, float t, sfColor col)
 {
+    if (app == NULL)
+        return;
+
     hexagone(app, c, 0.88f * t, app->temps * 0.6f, C_TRANSPARENT, col);
     hexagone(app, c, 0.58f * t, -app->temps, C_TRANSPARENT, avec_alpha(col, 0.75f));
     lueur(app, c, (sfVector2f){0.9f * t, 0.9f * t}, avec_alpha(col, 0.5f));
@@ -68,6 +80,9 @@ void emb_d_feuille(app_t *app, sfVector2f c, float t, sfColor col)
     static const float NERVURE[4] = {-0.5f, 0.68f, 0.5f, -0.68f};
     float pts[36];
     float u = 0.f;
+
+    if (app == NULL)
+        return;
 
     for (int k = 0; k < 9; k++) {
         u = k * PI / 8.f;
@@ -82,6 +97,9 @@ void emb_d_feuille(app_t *app, sfVector2f c, float t, sfColor col)
 
 void emb_d_lune(app_t *app, sfVector2f c, float t, sfColor col)
 {
+    if (app == NULL)
+        return;
+
     arc_cercle(app, c, 0.6f * t, emb_ep(t, 0.3f), (sfVector2f){0.95f, 5.33f}, col, 0);
     losange(app, emb_pt(c, t, 0.46f, -0.34f), 0.16f * t, melanger(col, C_BLANC, 0.4f));
 }
@@ -93,6 +111,9 @@ void emb_d_sablier(app_t *app, sfVector2f c, float t, sfColor col)
     static const float BARRES[2][4] = {{-0.72f, -0.84f, 0.72f, -0.84f}, {-0.72f, 0.84f,
         0.72f, 0.84f}};
 
+    if (app == NULL)
+        return;
+
     polygone(app, HAUT, 3, c, t, 0.f, avec_alpha(col, 0.45f));
     polygone(app, BAS, 3, c, t, 0.f, col);
     for (int k = 0; k < 2; k++)
@@ -102,6 +123,9 @@ void emb_d_sablier(app_t *app, sfVector2f c, float t, sfColor col)
 void emb_d_orbe(app_t *app, sfVector2f c, float t, sfColor col)
 {
     float a = 0.f;
+
+    if (app == NULL)
+        return;
 
     lueur(app, c, (sfVector2f){1.2f * t, 1.2f * t}, avec_alpha(col, 0.5f));
     cercle(app, c, 0.38f * t, col, C_TRANSPARENT, 0.f);
