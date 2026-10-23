@@ -22,6 +22,7 @@
 #include "gui_jeu.h"
 #include "gui_utf8.h"
 #include "gui_yugioh.h"
+#include "tests_audio.h"
 
 static int proche(float a, float b)
 {
@@ -210,5 +211,6 @@ int main(void)
     test_classes_sures();
     test_mode_arguments();
     test_cartes_yugioh();
+    tests_audio();
     return 0;
 }

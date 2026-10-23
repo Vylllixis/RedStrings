@@ -130,6 +130,8 @@ int grille_cartes(app_t *app, grille_t *g, const int *ids, int n, float y0,
             app->curseur_voulu = CURSEUR_MAIN;
         if (s && app->in.clic)
             clique = id;
+        if (s && g->survol[id] < 0.02f && !app->souris_bloquee)
+            son(app, SON_UI_SURVOL);
         g->survol[id] = approcher(g->survol[id], s ? 1.f : 0.f, 14.f, app->dt);
         maj_ressort(&g->lift[id], s ? -10.f : 0.f, 280.f, 18.f, app->dt);
         app->alpha = a * progression(app->t_scene, 0.15f + i * 0.05f, 0.3f);

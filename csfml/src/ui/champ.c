@@ -51,15 +51,19 @@ static void saisir(app_t *app, champ_t *c, int max)
         len = (int)strlen(c->texte);
         if (n == 0 || len + n > max) {
             c->secousse = 1.f;
+            if (app->in.texte[i] >= 32)         // espace ou nom trop long, pas Entrée
+                son(app, SON_UI_REFUS);
             continue;
         }
         memcpy(c->texte + len, u, (size_t)n);
         c->texte[len + n] = '\0';
         c->tape = 0.f;
+        son(app, SON_UI_SAISIE);
     }
     if (app->in.touches[sfKeyBackspace] && c->texte[0] != '\0') {
         utf8_supprimer_dernier(c->texte);
         c->tape = 1.f;
+        son(app, SON_UI_EFFACEMENT);
     }
 }
 

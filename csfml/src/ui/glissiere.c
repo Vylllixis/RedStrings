@@ -6,7 +6,7 @@
 /*
 ** ╭─ glissiere.c ────────────────────────────────────────────────────────
 ** │ But         Glissière de valeur avec piste graduée et poignée animée.
-** │ Contenu     piste, glissiere
+** │ Contenu     piste, glissiere_bornee, glissiere (bornes des statistiques)
 ** ╰──────────────────────────────────────────────────────────────────────
 */
 
@@ -48,15 +48,17 @@ static void piste(app_t *app, float tx, float tw, float cy, float f, sfColor col
 }
 
 /*
-** ╭─ glissiere ──────────────────────────────────────────────────────────
-** │ Glissière d'une statistique : libellé, piste en cases avec un curseur
+** ╭─ glissiere_bornee ───────────────────────────────────────────────────
+** │ Glissière d'une valeur : libellé, piste en cases avec un curseur
 ** │ en losange, puis valeur dans un cadran.
 ** │
 ** │ Se manipule à la souris ; le clavier est géré par l'écran appelant.
+** │ `bornes` donne le minimum et le maximum (0..99 pour une statistique,
+** │ 0..100 pour un volume).
 ** ╰──────────────────────────────────────────────────────────────────────
 */
-int glissiere(app_t *app, glissiere_t *g, sfFloatRect r, const char *label,
-    int *valeur, sfColor col, int focus)
+int glissiere_bornee(app_t *app, glissiere_t *g, sfFloatRect r, const char *label,
+    const int bornes[2], int *valeur, sfColor col, int focus)
 {
     float cy = r.top + r.height / 2.f;
     float tx = r.left + GL_LABEL;
@@ -68,6 +70,8 @@ int glissiere(app_t *app, glissiere_t *g, sfFloatRect r, const char *label,
     sfFloatRect cadran = {r.left + r.width - GL_VALEUR + 18.f, cy - 18.f,
         GL_VALEUR - 18.f, 36.f};
     char buf[8];
+    char max[8];
+    float etendue = (float)(bornes[1] > bornes[0] ? bornes[1] - bornes[0] : 1);
 
     if (s)
         app->curseur_voulu = CURSEUR_MAIN;
@@ -76,12 +80,12 @@ int glissiere(app_t *app, glissiere_t *g, sfFloatRect r, const char *label,
     if (!app->in.bas)
         g->glisse = 0;
     if (g->glisse)
-        *valeur = STAT_MIN + (int)roundf(bornerf((app->in.souris.x - tx) / tw, 0.f, 1.f)
-            * (STAT_MAX - STAT_MIN));
+        *valeur = bornes[0] + (int)roundf(bornerf((app->in.souris.x - tx) / tw, 0.f, 1.f)
+            * etendue);
     g->survol = approcher(g->survol, s || g->glisse || focus ? 1.f : 0.f, 14.f, app->dt);
     g->affiche = approcher(g->affiche, *valeur, 16.f, app->dt);
     act = g->survol;
-    f = (g->affiche - STAT_MIN) / (STAT_MAX - STAT_MIN);
+    f = (g->affiche - (float)bornes[0]) / etendue;
     panneau(app, (sfFloatRect){r.left - 14.f, r.top, r.width + 28.f, r.height}, 10.f,
         avec_alpha(col, 0.07f * act), avec_alpha(C_BLANC, 0.015f * act),
         avec_alpha(col, focus ? 0.35f : 0.f));
@@ -102,10 +106,19 @@ int glissiere(app_t *app, glissiere_t *g, sfFloatRect r, const char *label,
     snprintf(buf, sizeof(buf), "%d", (int)roundf(g->affiche));
     texte_echelle(app, POLICE_GRAS, buf, 22, (sfVector2f){cadran.left + 38.f, cy},
         melanger(col, C_BLANC, 0.15f), ALIGNE_DROITE, 1.f + 0.1f * g->glisse);
-    texte(app, POLICE_NORMALE, "/99", 12, (sfVector2f){cadran.left + 42.f, cy + 2.f},
+    snprintf(max, sizeof(max), "/%d", bornes[1]);
+    texte(app, POLICE_NORMALE, max, 12, (sfVector2f){cadran.left + 42.f, cy + 2.f},
         C_TEXTE_FAIBLE, ALIGNE_GAUCHE);
     if (focus)
         texte(app, POLICE_GRAS, "‹ ›", 15, (sfVector2f){cadran.left - 22.f, cy - 1.f},
             avec_alpha(col, 0.5f + 0.5f * sinf(app->temps * 5.f)), ALIGNE_CENTRE);
     return s && app->in.clic;
+}
+
+int glissiere(app_t *app, glissiere_t *g, sfFloatRect r, const char *label,
+    int *valeur, sfColor col, int focus)
+{
+    static const int bornes[2] = {STAT_MIN, STAT_MAX};
+
+    return glissiere_bornee(app, g, r, label, bornes, valeur, col, focus);
 }
