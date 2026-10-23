@@ -19,6 +19,10 @@ Le fichier [`LICENSE`](LICENSE) (MIT, © 2026 Vyllixis) couvre **le code source 
 
 Ces polices sont utilisées telles quelles, non modifiées.
 
+### Sons et musiques (`csfml/assets/audio/`)
+
+Aucune ressource tierce : les 96 bruitages (53 standard, 43 Yu-Gi-Oh!) et les 4 musiques sont des **créations originales**, synthétisées par les scripts Python de [`csfml/assets/audio/outils/`](csfml/assets/audio/outils/) (sans échantillon extérieur) et encodés en OGG Vorbis par l'encodeur intégré à SFML. Ils sont couverts par la licence MIT du dépôt. Les clins d'œil aux jeux vidéo (dont le thème « Yu-Gi-Oh! ») reprennent des gestes et des styles, jamais un son ni une mélodie existants : détail dans [`csfml/assets/audio/LICENCES.md`](csfml/assets/audio/LICENCES.md).
+
 ### Images du README (`.github/readme/`)
 
 Les illustrations SVG sont générées par [`generer_svg.py`](.github/readme/outils/generer_svg.py) à partir du code du projet. Les captures `.webp` sont des enregistrements de RedStrings lui-même, en mode normal.
@@ -27,7 +31,8 @@ Les illustrations SVG sont générées par [`generer_svg.py`](.github/readme/out
 
 | Dépendance | Rôle | Licence |
 |---|---|---|
-| **CSFML 2.6** (binding C de SFML) | fenêtre, dessin, entrées (version graphique uniquement) | zlib/libpng |
+| **CSFML 2.6** (binding C de SFML) | fenêtre, dessin, entrées, sons et musique (version graphique uniquement) | zlib/libpng |
+| **OpenAL Soft**, **libvorbis**, **libogg**, **libFLAC** (installées avec SFML Audio) | sortie audio, lecture et encodage OGG / FLAC | LGPL 2.1 (OpenAL Soft, liée dynamiquement) · BSD (Xiph) |
 | **SFML 2.6** | utilisée par CSFML | zlib/libpng |
 | `gcc`, `make`, `ar` (GNU) | compilation | outils de construction, rien n'est lié au jeu |
 
