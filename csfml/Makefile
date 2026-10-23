@@ -50,7 +50,7 @@ CFLAGS_DEBUG	=	-std=c11 -Wall -Wextra -Werror -pedantic -Wshadow \
 CPPFLAGS	=	-I./include -I../includes -D_POSIX_C_SOURCE=200809L
 DEPFLAGS	=	-MMD -MP
 LDFLAGS		=	-L$(LIB_DIR)
-LDLIBS		=	-lmy -lcsfml-graphics -lcsfml-window -lcsfml-system -lm
+LDLIBS		=	-lmy -lcsfml-graphics -lcsfml-audio -lcsfml-window -lcsfml-system -lm
 
 # ─── Affichage (même style que le Makefile principal) ────────────────
 
@@ -82,7 +82,7 @@ lib:
 	$(Q)$(MAKE) -C .. lib
 
 verifier:
-	@echo '#include <SFML/Graphics.h>' | $(CC) $(CPPFLAGS) -E -x c - \
+	@printf '#include <SFML/Graphics.h>\n#include <SFML/Audio.h>\n' | $(CC) $(CPPFLAGS) -E -x c - \
 		> /dev/null 2>&1 || { printf "  $(C_ROUGE)✗$(C_RESET)      %s\n" \
 		"CSFML introuvable, installe-la avec : sudo apt install libcsfml-dev"; \
 		exit 1; }
