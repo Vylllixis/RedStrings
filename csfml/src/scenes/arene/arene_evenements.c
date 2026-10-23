@@ -68,6 +68,7 @@ static void impact(app_t *app, arene_t *ar, const evenement_t *ev)
     visuel_t *c = arene_vis(ar, ev->cible);
     char buf[24];
 
+    audio_impact(app, ev, bataille_lire(&ar->bataille, ev->cible)->pv_max);
     ar->journal_vu++;
     if (ev->type == EV_ATTAQUE) {
         c->pv_vis = ev->pv_apres;

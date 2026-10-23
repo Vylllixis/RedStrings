@@ -52,6 +52,7 @@ static void sauvegarder_equipe(app_t *app)
     }
     snprintf(msg, sizeof(msg), "%d personnage%s sauvegardé%s", app->equipe.len,
         app->equipe.len > 1 ? "s" : "", app->equipe.len > 1 ? "s" : "");
+    son(app, SON_SAUVEGARDE_OK);
     notifier(app, "✔", msg, C_VERT);
 }
 
@@ -78,6 +79,7 @@ static void charger_equipe(app_t *app)
     app->equipe = lus;
     snprintf(msg, sizeof(msg), "%d personnage%s chargé%s", lus.len,
         lus.len > 1 ? "s" : "", lus.len > 1 ? "s" : "");
+    son(app, SON_CHARGEMENT_OK);
     notifier(app, "✔", msg, C_VERT);
 }
 

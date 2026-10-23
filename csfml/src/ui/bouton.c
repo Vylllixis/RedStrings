@@ -34,6 +34,8 @@ static int interaction(app_t *app, bouton_t *b, sfFloatRect r, int actif)
 
     if (s)
         app->curseur_voulu = CURSEUR_MAIN;
+    if (s && actif && b->survol < 0.02f && !app->souris_bloquee)
+        son(app, SON_UI_SURVOL);
     b->survol = approcher(b->survol, s && actif ? 1.f : 0.f, 14.f, app->dt);
     b->appui = approcher(b->appui, s && app->in.bas ? 1.f : 0.f, 30.f, app->dt);
     return s && app->in.clic;
