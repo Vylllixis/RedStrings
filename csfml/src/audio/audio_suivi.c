@@ -31,6 +31,9 @@ static const int KONAMI[] = {sfKeyUp, sfKeyUp, sfKeyDown, sfKeyDown, sfKeyLeft,
 /* Nouvel écran : la musique suit, et le premier état observé ne fait pas de bruit. */
 void audio_entrer_scene(app_t *app, scene_t s)
 {
+    if (app == NULL)
+        return;
+
     app->audio.suivi.scene = -1;
     if (s == SCENE_ARENE)
         musique(app, MUSIQUE_COMBAT);
@@ -189,6 +192,9 @@ static void suivre_arene(app_t *app, audio_suivi_t *v)
 /* Une fois par image, après le dessin de l'écran. */
 void audio_suivre(app_t *app)
 {
+    if (app == NULL)
+        return;
+
     audio_suivi_t *v = &app->audio.suivi;
 
     if (!app->audio.pret)
@@ -225,6 +231,9 @@ void audio_suivre(app_t *app)
 */
 void audio_impact(app_t *app, const evenement_t *ev, int pv_max)
 {
+    if (app == NULL || ev == NULL)
+        return;
+
     float pan = ev->cible.equipe == 0 ? -PAN_EQUIPE : PAN_EQUIPE;
     son_t s = SON_COMBAT_IMPACT;
 

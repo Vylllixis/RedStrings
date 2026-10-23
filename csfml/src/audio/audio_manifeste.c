@@ -27,8 +27,10 @@
 
 void pack_vider(pack_t *p, const char *dossier)
 {
+    if (p == NULL)
+        return;
     memset(p, 0, sizeof(*p));
-    snprintf(p->dossier, sizeof(p->dossier), "%s", dossier);
+    snprintf(p->dossier, sizeof(p->dossier), "%s", dossier != NULL ? dossier : "");
     for (int i = 0; i < NB_SONS; i++) {
         p->sons[i].volume = 1.f;
         p->sons[i].hauteur = -1.f;
@@ -91,7 +93,8 @@ static int lire_reel(const char *s, float min, float max, float *v)
 
 static int erreur(char *msg, size_t taille, const char *texte, const char *mot)
 {
-    snprintf(msg, taille, "%s « %s »", texte, mot);
+    if (msg != NULL && taille > 0)
+        snprintf(msg, taille, "%s « %s »", texte, mot != NULL ? mot : "");
     return -1;
 }
 
@@ -179,6 +182,8 @@ int pack_lire_ligne(pack_t *p, const char *ligne, char *msg, size_t taille)
     int n = 0;
     int id = 0;
 
+    if (p == NULL || ligne == NULL)
+        return erreur(msg, taille, "ligne absente", "");
     if (strlen(ligne) >= sizeof(copie))
         return erreur(msg, taille, "ligne trop longue", "…");
     snprintf(copie, sizeof(copie), "%s", ligne);
@@ -219,10 +224,13 @@ int pack_charger(pack_t *p, const char *dossier, const char *manifeste, char *ms
     int num = 0;
     int refus = 0;
 
+    if (p == NULL || dossier == NULL || manifeste == NULL)
+        return -1;
     pack_vider(p, dossier);
     if (snprintf(chemin, sizeof(chemin), "%s/%s", dossier, manifeste)
         >= (int)sizeof(chemin) || (f = fopen(chemin, "r")) == NULL) {
-        snprintf(msg, taille, "manifeste introuvable : %s", chemin);
+        if (msg != NULL && taille > 0)
+            snprintf(msg, taille, "manifeste introuvable : %s", chemin);
         return -1;
     }
     while (fgets(ligne, sizeof(ligne), f) != NULL) {
@@ -234,7 +242,7 @@ int pack_charger(pack_t *p, const char *dossier, const char *manifeste, char *ms
         } else if (pack_lire_ligne(p, ligne, detail, sizeof(detail)) == 0) {
             continue;
         }
-        if (refus++ == 0)
+        if (refus++ == 0 && msg != NULL && taille > 0)
             snprintf(msg, taille, "%s, ligne %d : %s", chemin, num, detail);
     }
     fclose(f);
@@ -243,7 +251,10 @@ int pack_charger(pack_t *p, const char *dossier, const char *manifeste, char *ms
 
 int pack_chemin(const pack_t *p, const char *fichier, char *chemin, size_t taille)
 {
-    int n = snprintf(chemin, taille, "%s/%s", p->dossier, fichier);
+    int n = 0;
 
+    if (p == NULL || fichier == NULL || chemin == NULL || taille == 0)
+        return -1;
+    n = snprintf(chemin, taille, "%s/%s", p->dossier, fichier);
     return n < 0 || (size_t)n >= taille ? -1 : 0;
 }

@@ -26,6 +26,9 @@
 /* Dossier du pack d'un thème : csfml/assets/audio/<thème>, trouvé comme les polices. */
 int audio_chemin_pack(theme_son_t t, char *dossier, size_t taille)
 {
+    if (dossier == NULL || taille == 0)
+        return -1;
+
     char relatif[96];
     char chemin[SON_CHEMIN_MAX];
     char *slash = NULL;
@@ -69,6 +72,10 @@ static void charger_pack(pack_t *p, theme_son_t t)
 */
 sfSoundBuffer *tampon_obtenir(audio_t *a, const pack_t *p, const char *fichier)
 {
+    if (a == NULL || p == NULL)
+        return NULL;
+    fichier = fichier != NULL ? fichier : "";
+
     char chemin[SON_CHEMIN_MAX];
     tampon_t *t = NULL;
 
@@ -142,6 +149,9 @@ static void charger_theme(audio_t *a, theme_son_t t)
 */
 void audio_init(app_t *app)
 {
+    if (app == NULL)
+        return;
+
     audio_t *a = &app->audio;
 
     reglages_defaut(&a->reglages);
@@ -173,6 +183,9 @@ void audio_init(app_t *app)
 
 void audio_liberer(app_t *app)
 {
+    if (app == NULL)
+        return;
+
     audio_t *a = &app->audio;
 
     for (int i = 0; i < 2; i++) {
@@ -201,6 +214,9 @@ void audio_liberer(app_t *app)
 */
 void audio_changer_theme(app_t *app, choix_theme_t choix)
 {
+    if (app == NULL)
+        return;
+
     audio_t *a = &app->audio;
     theme_son_t t = theme_effectif(choix, app->mode == MODE_YUGIOH);
     int piste = a->pistes[0].piste;
@@ -219,6 +235,9 @@ void audio_changer_theme(app_t *app, choix_theme_t choix)
 /* Nouveaux réglages : la coupure est immédiate, et le fichier est mis à jour. */
 void audio_appliquer_reglages(app_t *app, const reglages_audio_t *r)
 {
+    if (app == NULL || r == NULL)
+        return;
+
     audio_t *a = &app->audio;
 
     if (r->coupe && !a->reglages.coupe)

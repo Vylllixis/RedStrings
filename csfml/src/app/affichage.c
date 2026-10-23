@@ -77,6 +77,9 @@ static sfRenderWindow *creer_fenetre(app_t *app, affichage_t mode)
 */
 int ouvrir_fenetre(app_t *app, affichage_t mode)
 {
+    if (app == NULL)
+        return -1;
+
     sfRenderWindow *f = creer_fenetre(app, mode);
     sfVector2u t;
 
@@ -115,6 +118,9 @@ int ouvrir_fenetre(app_t *app, affichage_t mode)
 */
 void appliquer_taille(app_t *app, unsigned int largeur, unsigned int hauteur)
 {
+    if (app == NULL)
+        return;
+
     float l = 0.f;
     float h = 0.f;
 
@@ -138,12 +144,18 @@ void appliquer_taille(app_t *app, unsigned int largeur, unsigned int hauteur)
 /** Le changement est appliqué après la lecture des événements de l'ancienne fenêtre. */
 void demander_affichage(app_t *app, affichage_t mode)
 {
+    if (app == NULL)
+        return;
+
     if ((unsigned)mode < NB_AFFICHAGES)
         app->affichage_demande = (int)mode;
 }
 
 void appliquer_demande_affichage(app_t *app)
 {
+    if (app == NULL)
+        return;
+
     char msg[96];
     affichage_t mode = (affichage_t)app->affichage_demande;
 
@@ -160,6 +172,9 @@ void appliquer_demande_affichage(app_t *app)
 /** F11 ou Alt+Entrée : fenêtré ↔ plein écran (du type choisi). */
 void basculer_plein_ecran(app_t *app)
 {
+    if (app == NULL)
+        return;
+
     demander_affichage(app, app->affichage == AFFICHAGE_FENETRE ? app->plein_ecran
         : AFFICHAGE_FENETRE);
 }
@@ -168,6 +183,9 @@ void basculer_plein_ecran(app_t *app)
 void changer_type_plein_ecran(app_t *app)
 {
     char msg[96];
+
+    if (app == NULL)
+        return;
 
     app->plein_ecran = app->plein_ecran == AFFICHAGE_SANS_BORDURE
         ? AFFICHAGE_PLEIN_ECRAN : AFFICHAGE_SANS_BORDURE;

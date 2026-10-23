@@ -67,6 +67,9 @@ static void emplacement(app_t *app, int i, sfVector2f c, float e)
 /** Panneau de l'équipe : compte, état, emplacements et sauvegarde. */
 void menu_panneau_equipe(app_t *app, float t)
 {
+    if (app == NULL)
+        return;
+
     sfFloatRect r = EQ_RECT;
     float a = app->alpha;
     float e = sortie_cubique(progression(t, 0.55f, 0.6f));

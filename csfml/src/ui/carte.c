@@ -28,6 +28,9 @@
 void avatar(app_t *app, const personnage_t *p, sfVector2f centre, float r,
     float mort)
 {
+    if (app == NULL || p == NULL)
+        return;
+
     sfColor c = griser(couleur_classe(p->classe), mort);
 
     lueur(app, centre, (sfVector2f){r * 2.4f, r * 2.4f},
@@ -49,6 +52,9 @@ void barre_segments(app_t *app, sfFloatRect r, float segments, sfColor c)
     float x = 0.f;
     int dernier = (int)ceilf(segments) - 1;
 
+    if (app == NULL)
+        return;
+
     for (int i = 0; i < 20; i++) {
         x = r.left + i * (sw + 3.f);
         f = bornerf(segments - i, 0.f, 1.f);
@@ -69,6 +75,9 @@ void barre_segments(app_t *app, sfFloatRect r, float segments, sfColor c)
 void fiche(app_t *app, const personnage_t *p, sfFloatRect r,
     const float segments[NB_STATS])
 {
+    if (app == NULL || p == NULL || segments == NULL)
+        return;
+
     sfColor c = couleur_classe(p->classe);
     float cx = r.left + r.width / 2.f;
     float y = 0.f;
@@ -131,6 +140,9 @@ static void mini_stats(app_t *app, const personnage_t *p, sfFloatRect r)
 void mini_carte(app_t *app, const personnage_t *p, sfFloatRect r,
     float survol, const marque_t *marque)
 {
+    if (app == NULL || p == NULL)
+        return;
+
     float mort = est_ko(p) ? 1.f : 0.f;
     sfColor c = griser(couleur_classe(p->classe), mort * 0.8f);
     sfColor bord = melanger(C_BORD, c, survol);

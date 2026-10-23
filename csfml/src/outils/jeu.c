@@ -22,6 +22,8 @@ int contient_nom(const char *nom, const char *recherche)
 {
     int j = 0;
 
+    if (nom == NULL || recherche == NULL)
+        return nom != NULL && recherche == NULL;
     if (recherche[0] == '\0')
         return 1;
     for (int i = 0; nom[i] != '\0'; i++) {
@@ -42,9 +44,13 @@ int contient_nom(const char *nom, const char *recherche)
  */
 int mode_depuis_arguments(int argc, char **argv, mode_visuel_t *mode)
 {
+    if (mode == NULL)
+        return -1;
     *mode = MODE_NORMAL;
     if (argc <= 1)
         return 0;
+    if (argv == NULL || argv[1] == NULL)
+        return -1;
     if (argc == 2 && my_strcmp(argv[1], ARGUMENT_YUGIOH) == 0) {
         *mode = MODE_YUGIOH;
         return 0;

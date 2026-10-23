@@ -90,6 +90,10 @@ static void dessiner_saisie(app_t *app, champ_t *c, float x0, float cy)
 int champ_texte(app_t *app, champ_t *c, sfFloatRect r, const char *aide,
     int max)
 {
+    if (app == NULL || c == NULL)
+        return 0;
+    aide = aide != NULL ? aide : "";
+
     int s = survole(app, r);
     float dx = 0.f;
     float cy = r.top + r.height / 2.f;

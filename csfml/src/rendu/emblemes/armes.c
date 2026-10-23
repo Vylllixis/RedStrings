@@ -24,12 +24,18 @@ const sfColor emb_TROU = {12, 14, 28, 255};
 
 void emb_d_epees(app_t *app, sfVector2f c, float t, sfColor col)
 {
+    if (app == NULL)
+        return;
+
     emb_epee(app, c, t, -0.72f, col);
     emb_epee(app, c, t, 0.72f, col);
 }
 
 void emb_d_lame(app_t *app, sfVector2f c, float t, sfColor col)
 {
+    if (app == NULL)
+        return;
+
     emb_epee(app, c, t * 1.1f, 0.62f, col);
 }
 
@@ -41,6 +47,9 @@ void emb_d_bouclier(app_t *app, sfVector2f c, float t, sfColor col)
         -0.48f, 0.f};
     static const float BARRES[2][4] = {{0.f, -0.6f, 0.f, 0.6f}, {-0.48f, -0.18f,
         0.48f, -0.18f}};
+
+    if (app == NULL)
+        return;
 
     polygone(app, ECU, 5, c, t, 0.f, col);
     polygone(app, CREUX, 5, c, t, 0.f, melanger(col, emb_TROU, 0.7f));
@@ -55,6 +64,9 @@ void emb_d_hache(app_t *app, sfVector2f c, float t, sfColor col)
         0.05f, 0.05f, -0.15f};
     static const float POINTE[] = {-0.05f, -0.7f, -0.45f, -0.52f, -0.05f, -0.34f};
 
+    if (app == NULL)
+        return;
+
     emb_trait(app, c, t, MANCHE, 0.13f, col);
     polygone(app, FER, 5, c, t, 0.f, col);
     polygone(app, POINTE, 3, c, t, 0.f, col);
@@ -64,6 +76,9 @@ void emb_d_lance(app_t *app, sfVector2f c, float t, sfColor col)
 {
     static const float HAMPE[4] = {-0.62f, 0.86f, 0.4f, -0.46f};
     static const float FER[] = {0.f, -1.f, 0.36f, 0.f, 0.f, 0.42f, -0.36f, 0.f};
+
+    if (app == NULL)
+        return;
 
     emb_trait(app, c, t, HAMPE, 0.11f, col);
     polygone(app, FER, 4, emb_pt(c, t, 0.52f, -0.62f), 0.42f * t, 0.66f, col);
@@ -81,6 +96,9 @@ void emb_d_arc(app_t *app, sfVector2f c, float t, sfColor col)
         emb_pt(c, t, -0.78f, -0.38f)};
     sfVector2f fleche[2] = {emb_pt(c, t, -0.42f, 0.42f), emb_pt(c, t, 0.66f, -0.66f)};
     float u = 0.f;
+
+    if (app == NULL)
+        return;
 
     for (int i = 0; i < 24; i++) {
         u = i / 23.f;
@@ -100,6 +118,9 @@ void emb_d_cible(app_t *app, sfVector2f c, float t, sfColor col)
 {
     static const float CROIX[4][4] = {{0.f, -1.f, 0.f, -0.25f}, {0.f, 0.25f, 0.f, 1.f},
         {-1.f, 0.f, -0.25f, 0.f}, {0.25f, 0.f, 1.f, 0.f}};
+
+    if (app == NULL)
+        return;
 
     arc_cercle(app, c, 0.76f * t, emb_ep(t, 0.1f), (sfVector2f){0.f, 2.f * PI}, col, 0);
     arc_cercle(app, c, 0.44f * t, emb_ep(t, 0.08f), (sfVector2f){0.f, 2.f * PI},

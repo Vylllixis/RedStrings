@@ -35,6 +35,9 @@
 
 void arene_dessiner_popups(app_t *app, arene_t *ar)
 {
+    if (app == NULL || ar == NULL)
+        return;
+
     popup_t *p = NULL;
     float e = 0.f;
     float a = app->alpha;
@@ -111,6 +114,9 @@ void arene_panneau_equipe(app_t *app, arene_t *ar, int e, sfFloatRect r)
     float hl = e == 0 ? LIGNE_J : LIGNE_A;
     char buf[48];
 
+    if (app == NULL || ar == NULL)
+        return;
+
     ombre_biseau(app, r, 14.f, 1.f);
     panneau(app, r, 14.f, (sfColor){24, 29, 52, 225}, (sfColor){12, 14, 28, 235},
         C_BORD);
@@ -130,6 +136,9 @@ void arene_panneau_equipe(app_t *app, arene_t *ar, int e, sfFloatRect r)
 /** Les prochains tours, à partir de l'actif (personnages en lice seulement). */
 void arene_ordre_tours(app_t *app, arene_t *ar)
 {
+    if (app == NULL || ar == NULL)
+        return;
+
     const bataille_t *b = &ar->bataille;
     ref_t r;
     const combattant_t *c = NULL;
@@ -165,6 +174,9 @@ void arene_ordre_tours(app_t *app, arene_t *ar)
 /** Journal : seulement les lignes déjà jouées à l'écran, les plus récentes en clair. */
 void arene_journal(app_t *app, arene_t *ar, sfVector2f pos)
 {
+    if (app == NULL || ar == NULL)
+        return;
+
     const bataille_t *b = &ar->bataille;
     int cache = b->nb_journal - ar->journal_vu;
     const char *ligne = NULL;
@@ -186,6 +198,9 @@ void arene_journal(app_t *app, arene_t *ar, sfVector2f pos)
 /** Bandeau bref au début de chaque tour. */
 void arene_banniere(app_t *app, arene_t *ar)
 {
+    if (app == NULL || ar == NULL)
+        return;
+
     const combattant_t *c = bataille_lire(&ar->bataille, bataille_actif(&ar->bataille));
     float t = ar->t_tour;
     float e = sortie_cubique(progression(t, 0.f, 0.25f));
@@ -213,6 +228,9 @@ void arene_banniere(app_t *app, arene_t *ar)
 
 void arene_ecran_fin(app_t *app, arene_t *ar)
 {
+    if (app == NULL || ar == NULL)
+        return;
+
     int gagne = ar->bataille.gagnant == 0;
     sfColor col = gagne ? C_CYAN : C_ROUGE;
     float e = sortie_rebond(progression(ar->t_etat, 0.1f, 0.6f));

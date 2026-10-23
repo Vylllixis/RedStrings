@@ -34,6 +34,9 @@
 /** Action mise en avant : le combat dès qu'il est possible, sinon l'ajout. */
 int menu_option_principale(app_t *app)
 {
+    if (app == NULL)
+        return 0;
+
     return app->equipe.len >= 2 ? 2 : 0;
 }
 
@@ -130,6 +133,9 @@ static int dessiner_option(app_t *app, int i, sfFloatRect r, const option_t *o,
 
 void menu_commandes(app_t *app, float t)
 {
+    if (app == NULL)
+        return;
+
     option_t o[4];
     float a = app->alpha;
     float e = 0.f;

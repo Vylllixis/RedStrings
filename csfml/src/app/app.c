@@ -26,6 +26,9 @@
 
 int creer_app(app_t *app, mode_visuel_t mode_visuel)
 {
+    if (app == NULL)
+        return -1;
+
     sfVector2u taille;
 
     memset(app, 0, sizeof(app_t));
@@ -66,6 +69,9 @@ int creer_app(app_t *app, mode_visuel_t mode_visuel)
 
 void detruire_app(app_t *app)
 {
+    if (app == NULL)
+        return;
+
     audio_liberer(app);
     yugioh_liberer(app);
     if (app->fenetre)

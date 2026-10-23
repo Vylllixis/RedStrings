@@ -42,6 +42,9 @@ void panneau(app_t *app, sfFloatRect r, float coupe, sfColor haut, sfColor bas,
     sfVertex l[7];
     float f = 0.f;
 
+    if (app == NULL)
+        return;
+
     contour_biseau(r, coupe, pts);
     v[0] = (sfVertex){{r.left + r.width / 2.f, r.top + r.height / 2.f},
         avec_alpha(melanger(haut, bas, 0.5f), app->alpha), {0, 0}};
@@ -63,6 +66,9 @@ void ombre_biseau(app_t *app, sfFloatRect r, float coupe, float force)
     float e = 0.f;
     sfColor c;
 
+    if (app == NULL)
+        return;
+
     for (int i = 5; i >= 1; i--) {
         e = i * 3.5f;
         c = avec_alpha(C_NOIR, force * 0.08f * (1.f - i / 6.f));
@@ -81,6 +87,9 @@ void crochets(app_t *app, sfFloatRect r, float longueur, sfColor c)
     const sfVector2f hd[3] = {{d - longueur, h}, {d, h}, {d, h + longueur}};
     const sfVector2f bg[3] = {{g, b - longueur}, {g, b}, {g + longueur, b}};
 
+    if (app == NULL)
+        return;
+
     ligne_epaisse(app, hd, 3, 2.f, c, 0);
     ligne_epaisse(app, bg, 3, 2.f, c, 0);
 }
@@ -88,6 +97,9 @@ void crochets(app_t *app, sfFloatRect r, float longueur, sfColor c)
 void losange(app_t *app, sfVector2f centre, float r, sfColor c)
 {
     static const float pts[8] = {0.f, -1.f, 1.f, 0.f, 0.f, 1.f, -1.f, 0.f};
+
+    if (app == NULL)
+        return;
 
     polygone(app, pts, 4, centre, r, 0.f, c);
 }
@@ -99,6 +111,9 @@ void hexagone(app_t *app, sfVector2f centre, float r, float rotation,
     float pts[12];
     sfVector2f contour[7];
     float a = 0.f;
+
+    if (app == NULL)
+        return;
 
     for (int k = 0; k < 6; k++) {
         a = rotation - PI / 2.f + k * PI / 3.f;
@@ -122,6 +137,10 @@ void titre_section(app_t *app, const char *num, const char *label,
 {
     float x = pos.x;
     sfVertex filet[2];
+
+    if (app == NULL)
+        return;
+    label = label != NULL ? label : "";
 
     if (num)
         x += etiquette(app, num, pos, accent, ALIGNE_GAUCHE) + 10.f;
@@ -148,6 +167,10 @@ void titre_section(app_t *app, const char *num, const char *label,
  */
 float largeur_touche(app_t *app, const char *s)
 {
+    if (app == NULL)
+        return 0.f;
+    s = s != NULL ? s : "";
+
     police_t p = (unsigned char)s[0] == 0xE2 ? POLICE_SYMBOLES : POLICE_GRAS;
 
     return fmaxf(26.f, largeur_texte(app, p, s, 12) + 16.f);
@@ -156,6 +179,10 @@ float largeur_touche(app_t *app, const char *s)
 float touche_clavier(app_t *app, const char *s, sfVector2f centre, sfColor c,
     float allume)
 {
+    if (app == NULL)
+        return 0.f;
+    s = s != NULL ? s : "";
+
     police_t p = (unsigned char)s[0] == 0xE2 ? POLICE_SYMBOLES : POLICE_GRAS;
     float w = largeur_touche(app, s);
     sfFloatRect r = {centre.x - w / 2.f, centre.y - 13.f, w, 26.f};

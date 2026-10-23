@@ -34,6 +34,9 @@ void menu_fil_rouge(app_t *app, float y, float demi, float p)
     float x = 0.f;
     int perle = 0;
 
+    if (app == NULL)
+        return;
+
     if (p <= 0.f)
         return;
     for (int i = 0; i < 64; i++) {
@@ -79,6 +82,9 @@ static void cadre_logo(app_t *app, float t)
 /** « REDSTRINGS » : chaque lettre tombe avec un léger rebond puis ondule. */
 void menu_titre(app_t *app, float t)
 {
+    if (app == NULL)
+        return;
+
     const char *mot = "REDSTRINGS";
     float avances[10];
     float total = 0.f;
@@ -126,6 +132,9 @@ void menu_titre(app_t *app, float t)
 /** Rappel des touches en bas de l'écran. */
 void menu_aide_menu(app_t *app, float t)
 {
+    if (app == NULL)
+        return;
+
     static const char *touches[5] = {"↑", "↓", "Entrée", "Échap", "F2"};
     static const char *actions[5] = {"", "choisir", "valider", "quitter", "audio"};
     float a = app->alpha;
@@ -152,6 +161,9 @@ void menu_aide_menu(app_t *app, float t)
 /** Crédit animé : la direction visuelle a été réalisée avec Claude. */
 void menu_credit_claude(app_t *app, float t)
 {
+    if (app == NULL)
+        return;
+
     static const char *phrase = "Direction visuelle et animations réalisées avec Claude";
     float a = app->alpha;
     float apparition = progression(t, 1.4f, 0.6f);

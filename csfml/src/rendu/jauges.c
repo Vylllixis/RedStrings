@@ -33,6 +33,9 @@ void arc_cercle(app_t *app, sfVector2f centre, float rayon, float epaisseur,
         MAX_POINTS_ARC);
     float a = 0.f;
 
+    if (app == NULL)
+        return;
+
     for (int i = 0; i < n; i++) {
         a = lerpf(angles.x, angles.y, i / (float)(n - 1));
         pts[i] = (sfVector2f){centre.x + cosf(a) * rayon, centre.y + sinf(a) * rayon};
@@ -47,6 +50,9 @@ void graduations(app_t *app, sfVector2f centre, float rayon, int n,
     sfVertex v[2 * 120];
     float a = 0.f;
     float l = 0.f;
+
+    if (app == NULL)
+        return;
 
     if (n > 120)
         n = 120;
@@ -68,6 +74,9 @@ void ellipse(app_t *app, sfVector2f centre, sfVector2f rayon, float epaisseur,
 {
     sfVector2f pts[65];
     float a = 0.f;
+
+    if (app == NULL)
+        return;
 
     for (int i = 0; i <= 64; i++) {
         a = i * 2.f * PI / 64.f;
@@ -103,6 +112,9 @@ void radar_stats(app_t *app, sfVector2f centre, float rayon,
     sfVector2f pts[NB_STATS + 1];
     sfVertex fond[NB_STATS + 2];
     float k = 0.f;
+
+    if (app == NULL || v == NULL)
+        return;
 
     for (int n = 1; n <= 4; n++) {
         k = rayon * n / 4.f;
