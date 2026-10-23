@@ -8,7 +8,7 @@
 [![CSFML](https://img.shields.io/badge/GUI-CSFML%202.6-34d399?style=for-the-badge&logo=sfml&logoColor=white&labelColor=0e1230)](#csfml)
 [![Classes](https://img.shields.io/badge/classes-28-f43f5e?style=for-the-badge&labelColor=0e1230)](#personnages)
 [![Audio](https://img.shields.io/badge/audio-2%20th%C3%A8mes%20originaux-38bdf8?style=for-the-badge&labelColor=0e1230)](#lidentité-sonore)
-[![Tests](https://img.shields.io/badge/tests-assert%20%2B%20ASan-fbbf24?style=for-the-badge&labelColor=0e1230)](#tests)
+[![Tests](https://img.shields.io/badge/tests-292%20%2B%20ASan-fbbf24?style=for-the-badge&labelColor=0e1230)](#tests)
 [![Licence MIT](https://img.shields.io/badge/licence-MIT-34d399?style=for-the-badge&labelColor=0e1230)](#licence)
 [![ESGI](https://img.shields.io/badge/ESGI-C%20avanc%C3%A9-d946ef?style=for-the-badge&labelColor=0e1230)](#concept)
 
@@ -295,7 +295,7 @@ $$
 
 Le combat s'arrête dès qu'une équipe n'a plus personne debout. Il travaille sur des **copies** des personnages : les PV perdus et les gardes disparaissent à la fin, le roster n'est jamais modifié.
 
-**L'ordinateur** ([`bataille_ia`](src/personnage/bataille.c)) suit trois règles simples et prévisibles : soigner l'allié le plus blessé s'il est sous la moitié de ses PV, se mettre en garde sous le quart de ses PV, sinon attaquer l'ennemi qui a le moins de PV.
+**L'ordinateur** ([`bataille_ia`](src/personnage/bataille_ia.c)) joue de façon raisonnable mais **pas parfaite** : il achève toujours un ennemi qu'une attaque peut tuer ; sinon il soigne l'allié le plus blessé (sous la moitié de ses PV) ou se met en garde (sous le quart), mais avec une envie qui baisse à chaque soin ou garde d'affilée (100 % → 65 % → 30 % → 0 %), si bien qu'il ne se soigne jamais à l'infini. Le reste du temps il attaque, en visant d'habitude l'ennemi le plus faible, avec une chance sur cinq de se tromper de cible.
 
 ### Le même combat, dans le terminal
 
@@ -627,7 +627,7 @@ RedStrings/
 │   ├── assets/fonts/         polices
 │   └── Makefile
 ├── 📁 exemples/              personnages_base.txt : 8 personnages prêts à charger
-├── 📁 tests/                 tests.c et tests_console.c (assert, stdin simulé)
+├── 📁 tests/                 lanceur de tests (rapport détaillé) et suites par domaine (libmy, moteur, console, robustesse, fuzz)
 ├── 📁 .github/readme/        images de ce README et leur générateur
 └── Makefile
 ```
@@ -895,7 +895,7 @@ Sans elles, le mode fonctionne quand même : chaque carte montre l'emblème de s
 | `make csfml` | compile `./redstrings_csfml` |
 | `make doc` | génère la documentation de l'API en HTML dans `docs/` (demande Doxygen : `sudo apt install doxygen`) |
 | `make csfml-debug` | `./redstrings_csfml_debug` avec les sanitizers |
-| `make csfml-tests` | tests de la version graphique, sans fenêtre (UTF-8, animation, classes) |
+| `make csfml-tests` | tests de la version graphique, sans fenêtre (UTF-8, animation, classes, audio, NULL partout) |
 | `make clean` | supprime les `.o` |
 | `make fclean` | supprime aussi les exécutables et `libmy.a` |
 | `make re` | `fclean` puis `make` |
@@ -945,6 +945,10 @@ make tests
 ```
 
 `tests/tests.c` est compilé avec **tout le jeu sauf `main.c`**, plus AddressSanitizer et UBSan : un débordement, un comportement indéfini **ou une fuite mémoire** fait échouer les tests. Aucune fenêtre n'est ouverte : le moteur de combat se teste seul.
+
+**173 tests** pour la console et le moteur, **119** pour la version graphique. Chaque fonction a ses propres tests, et chaque fonction publique est aussi appelée avec des `NULL`, des tailles négatives et des indices hors limites (`tests_null.c`), plus des fichiers de sauvegarde corrompus et des combats aléatoires (`tests_fuzz.c`).
+
+**Le rapport** montre pour chaque test son fichier et sa ligne, le nombre de vérifications et le temps. Un échec affiche la vérification ratée, la valeur **obtenue** et la valeur **attendue**, la ligne de code ; un plantage affiche en plus sa cause probable, la pile d'appels réduite à ton code et la dernière vérification réussie. Chaque test tourne dans son propre processus : un plantage, une fuite ou une boucle infinie (10 s au plus) ne bloque pas les autres.
 
 | Domaine | Ce qui est vérifié |
 |---|---|
