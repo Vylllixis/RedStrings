@@ -70,3 +70,9 @@ personnages.txt
 # Python (générateur d'illustrations du README)
 __pycache__/
 *.pyc
+
+# Audio : fichiers intermédiaires de generer_sons.py, réglages du joueur, fichiers de test
+/csfml/assets/audio/outils/build/
+/csfml/assets/audio/outils/__pycache__/
+reglages_audio.txt
+tests_reglages_audio.tmp
