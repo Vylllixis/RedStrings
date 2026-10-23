@@ -8,8 +8,8 @@
 ** │ But         Écrire et relire la liste des personnages dans un fichier
 ** │             texte, une ligne par personnage : « nom pv atq def classe
 ** │             soin ».
-** │ Contenu     sauvegarder, charger, lire_fichier, lire_ligne_perso,
-** │             personnage_valide, sauvegarde_message
+** │ Contenu     sauvegarder, charger, fusionner, lire_fichier,
+** │             lire_ligne_perso, personnage_valide, sauvegarde_message
 ** │ Utilise     roster.c ; le fichier est lu avec fgets, jamais avec un
 ** │             tampon sans limite
 ** ╰──────────────────────────────────────────────────────────────────────
@@ -132,6 +132,49 @@ static sauvegarde_t lire_fichier(FILE *f, roster_t *lus)
 ** │ cours.
 ** ╰──────────────────────────────────────────────────────────────────────
 */
+/*
+** ╭─ fusionner ──────────────────────────────────────────────────────────
+** │ Ajoute les personnages du fichier à la liste, sans rien écraser.
+** │
+** │ 1. lit tout le fichier dans une liste temporaire (lus), comme charger()
+** │ 2. fichier invalide : libère lus, la liste du joueur n'est pas touchée
+** │ 3. pour chaque personnage de lus : ignoré si son nom existe déjà dans
+** │    la liste (celui du joueur est gardé), ajouté sinon
+** │ 4. si la mémoire manque en cours de route, la liste revient à sa
+** │    longueur de départ : tout ou rien
+** ╰──────────────────────────────────────────────────────────────────────
+*/
+sauvegarde_t fusionner(roster_t *r, const char *chemin, int *ajoutes, int *ignores)
+{
+    FILE *f = fopen(chemin, "r");
+    roster_t lus;
+    sauvegarde_t code = SAUVEGARDE_OK;
+    int len_depart = r->len;
+
+    *ajoutes = 0;
+    *ignores = 0;
+    if (f == NULL)
+        return SAUVEGARDE_ERR_OUVERTURE;
+    roster_init(&lus);
+    code = lire_fichier(f, &lus);
+    fclose(f);
+    for (int i = 0; code == SAUVEGARDE_OK && i < lus.len; i++) {
+        if (trouver_personnage(r->data, r->len, lus.data[i].nom) != -1)
+            ++*ignores;
+        else if (roster_ajouter(r, &lus.data[i]) == 0)
+            ++*ajoutes;
+        else
+            code = SAUVEGARDE_ERR_MEMOIRE;
+    }
+    if (code != SAUVEGARDE_OK) {
+        r->len = len_depart;
+        *ajoutes = 0;
+        *ignores = 0;
+    }
+    roster_liberer(&lus);
+    return code;
+}
+
 sauvegarde_t charger(roster_t *r, const char *chemin)
 {
     FILE *f = fopen(chemin, "r");
