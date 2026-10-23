@@ -24,6 +24,7 @@
 #include "roster.h"
 #include "sauvegarde.h"
 #include "bataille.h"
+#include "tests_console.h"
 
 #define FICHIER_TEST "tests_tmp.txt"
 
@@ -425,6 +426,7 @@ int main(void)
     test_roster();
     test_sauvegarde_aller_retour();
     test_charger_refuse_fichier_invalide();
+    tests_console();
     remove(FICHIER_TEST);
     printf("  Tous les tests passent\n");
     return 0;
