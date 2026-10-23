@@ -26,6 +26,7 @@
     #define FICHIER_REGLAGES_AUDIO "reglages_audio.txt"
     #define MANIFESTE_AUDIO "sons.txt"
 
+/** Une voix de lecture : un sfSound réutilisé d'un bruitage à l'autre. */
 typedef struct {
     sfSound *son;
     int id;             /**< son_t joué, -1 si la voix n'a jamais servi */
@@ -80,6 +81,7 @@ typedef struct {
     int valeurs[3];         /**< copie éditée des volumes */
 } panneau_audio_t;
 
+/** État complet du moteur audio, rangé dans l'application (app->audio). */
 typedef struct {
     int pret;                   /**< 0 : pas d'audio, tous les appels sont sans effet */
     int trace;                  /**< REDSTRINGS_AUDIO_TRACE=1 : chaque décision sur stderr */
@@ -103,31 +105,67 @@ typedef struct {
     panneau_audio_t panneau;
 } audio_t;
 
-/* audio_moteur.c : création, thème et réglages */
+/** @name Création, thème et réglages (audio_moteur.c) */
+/**@{*/
+/**
+ * Prépare l'audio une fois, après la fenêtre : réglages du fichier, voix,
+ * packs du thème choisi, bruitages décodés d'avance. Sans carte son, l'audio
+ * reste désactivé (`pret` = 0) et tous les appels sont sans effet.
+ */
 void audio_init(app_t *app);
+/** Arrête et libère tout ; peut être appelée même si audio_init a échoué. */
 void audio_liberer(app_t *app);
+/** Change d'identité sonore à chaud (et l'enregistre) ; la musique suit en fondu. */
 void audio_changer_theme(app_t *app, choix_theme_t choix);
+/** Applique de nouveaux réglages (la coupure est immédiate) et les enregistre. */
 void audio_appliquer_reglages(app_t *app, const reglages_audio_t *r);
+/**@}*/
 
-/* audio_lecture.c : bruitages */
+/** @name Bruitages (audio_lecture.c) */
+/**@{*/
+/**
+ * Joue l'événement `s` selon le thème actif. Peut ne rien jouer : son coupé,
+ * aucun pack ne le définit, délai minimum non écoulé, ou aucune voix libérable.
+ */
 void son(app_t *app, son_t s);
+/** Comme son(), sauf si un son de priorité >= 2 a déjà sonné pendant l'image. */
 void son_secondaire(app_t *app, son_t s);
+/**
+ * Comme son(), avec une hauteur imposée (`hauteur` multiplie la hauteur, 1 =
+ * normale) et une position (`pan` de -1 à gauche à 1 à droite, 0 au centre).
+ */
 void son_regle(app_t *app, son_t s, float hauteur, float pan);
+/** Arrête tous les bruitages en cours (la musique n'est pas touchée). */
 void audio_couper_voix(app_t *app);
+/**@}*/
 
-/* audio_musique.c : musique et fondus */
+/** @name Musique (audio_musique.c) */
+/**@{*/
+/** Fait jouer `m` en boucle, en fondu enchaîné ; rien si elle joue déjà. */
 void musique(app_t *app, musique_t m);
+/** La musique courante s'éteint en `duree` secondes. */
 void musique_arreter(app_t *app, float duree);
+/** Une fois par image : horloge, atténuation sous les sons importants, fondus, volumes. */
 void audio_maj(app_t *app);
+/**@}*/
 
-/* audio_suivi.c : les changements d'état des écrans deviennent des sons */
+/** @name Sons des écrans (audio_suivi.c) */
+/**@{*/
+/** Nouvel écran : la musique suit, et le premier état observé ne fait pas de bruit. */
 void audio_entrer_scene(app_t *app, scene_t s);
+/** Après le dessin de l'écran : chaque changement d'état devient un événement. */
 void audio_suivre(app_t *app);
+/** Son de l'impact d'un événement du moteur, du côté de la cible. */
 void audio_impact(app_t *app, const evenement_t *ev, int pv_max);
+/**@}*/
 
-/* audio_panneau.c : réglages à l'écran (F2) et coupure rapide (F3) */
+/** @name Réglages à l'écran (audio_panneau.c) */
+/**@{*/
+/** F2 ouvre ou ferme le panneau, F3 coupe ou rétablit le son ; ces touches n'atteignent pas l'écran. */
 void audio_raccourcis(app_t *app);
 int audio_panneau_ouvert(const app_t *app);
+/** Dessine le panneau par-dessus l'écran (vue fixe) et applique les réglages. */
 void audio_panneau(app_t *app);
+/**@}*/
 
 #endif /* GUI_AUDIO_H */
