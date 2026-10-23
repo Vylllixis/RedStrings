@@ -8,6 +8,7 @@
 ** ╰──────────────────────────────────────────────────────────────────────
 */
 
+#include <stddef.h>
 #include "my.h"
 #include "my_string.h"
 
@@ -15,6 +16,8 @@ int my_strlen(const char *str)
 {
     int length = 0;
 
+    if (str == NULL)
+        return 0;
     for (; str[length] != '\0'; length++);
     return length;
 }

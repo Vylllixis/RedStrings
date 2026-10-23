@@ -23,15 +23,28 @@ static int is_alnum(char c)
 
 char **my_str_to_word_array(char const *str)
 {
-    char **array = calloc(my_strlen(str) / 2 + 2, sizeof(char *));
+    char **array = NULL;
     int n = 0;
     int len = 0;
 
+    if (str == NULL)
+        return NULL;
+    array = calloc((size_t)my_strlen(str) / 2 + 2, sizeof(char *));
+    if (array == NULL)
+        return NULL;
     for (; *str; str += len) {
         for (; *str && !is_alnum(*str); str++);
         for (len = 0; is_alnum(str[len]); len++);
-        if (len)
-            array[n++] = my_strncpy(calloc(len + 1, 1), str, len);
+        if (len == 0)
+            continue;
+        array[n] = calloc((size_t)len + 1, 1);
+        if (array[n] == NULL) {
+            for (int i = 0; i < n; i++)
+                free(array[i]);
+            free(array);
+            return NULL;
+        }
+        my_strncpy(array[n++], str, len);
     }
     return array;
 }

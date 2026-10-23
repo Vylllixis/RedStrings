@@ -11,12 +11,16 @@
 ** ╰──────────────────────────────────────────────────────────────────────
 */
 
+#include <stddef.h>
 #include "my.h"
 #include "my_string.h"
 
 char *my_revstr(char *str)
 {
     int length = my_strlen(str);
+
+    if (str == NULL)
+        return NULL;
     for (int i = 0; i < length / 2; i++) {
         char temp = str[i];
         str[i] = str[length - i - 1];

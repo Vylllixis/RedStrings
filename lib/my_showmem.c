@@ -9,10 +9,13 @@
 ** ╰──────────────────────────────────────────────────────────────────────
 */
 
+#include <stddef.h>
 #include "my.h"
 
 int my_showmem(char const *str, int size)
 {
+    if (str == NULL || size <= 0)
+        return 0;
     for (int i = 0; i < size; i++) {
         if (i % 16 == 0 && i != 0) {
             my_putchar('\n');

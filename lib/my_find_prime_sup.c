@@ -10,14 +10,14 @@
 ** ╰──────────────────────────────────────────────────────────────────────
 */
 
+#include <limits.h>
 #include "my.h"
 
 int my_find_prime_sup(int nb)
 {
-    if (nb <= 1)
+    if (nb <= 2)
         return 2;
-    while (!my_is_prime(nb)) {
+    while (nb < INT_MAX && !my_is_prime(nb))
         nb++;
-    }
-    return nb;
+    return my_is_prime(nb) ? nb : 0;
 }
