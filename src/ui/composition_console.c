@@ -72,12 +72,12 @@ static void montrer_equipe(const personnage_t *equipe, int n)
 
 /*
 ** ╭─ choisir_equipe ─────────────────────────────────────────────────────
-** │ Demande jusqu'à TAILLE_EQUIPE_MAX personnages, par nom ou par numéro
-** │ de la liste (une ligne vide termine, q annule tout).
+** │ Demande jusqu'à TAILLE_EQUIPE_MAX personnages, par nom ou par ID (une
+** │ ligne vide termine, q annule tout).
 ** │
 ** │ 1. affiche la liste complète (avec les personnages déjà engagés), puis,
 ** │    après chaque choix, une ligne avec l'équipe en cours
-** │ 2. roster_trouver() comprend un nom ou un numéro
+** │ 2. roster_trouver() comprend un nom ou un ID
 ** │ 3. refuse un personnage introuvable, K.O., ou déjà engagé dans l'une
 ** │    des deux équipes (comparé par le nom retrouvé, pas par le texte tapé)
 ** │ Renvoie la taille de l'équipe, SAISIE_ANNULEE (q) ou SAISIE_FIN
@@ -92,7 +92,7 @@ int choisir_equipe(const roster_t *r, const char *titre,
     int idx = 0;
 
     montrer_liste(r, equipe, n, autre, nb_autre);
-    printf("  " GRAS "%s" RESET GRIS " (1 à %d · nom ou numéro · ligne vide = terminer · "
+    printf("  " GRAS "%s" RESET GRIS " (1 à %d · nom ou ID · ligne vide = terminer · "
         MOT_ANNULER " = annuler)" RESET "\n", titre, TAILLE_EQUIPE_MAX);
     while (n < TAILLE_EQUIPE_MAX && nb_disponibles(r, equipe, n, autre, nb_autre) > 0) {
         printf("  " GRIS "%d." RESET CYAN " › " RESET, n + 1);

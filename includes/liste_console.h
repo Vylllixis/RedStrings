@@ -17,8 +17,9 @@ typedef struct {
 } groupe_liste_t;
 
 /**
- * Affiche tous les personnages, numérotés comme ils sont attendus par
- * roster_trouver() : numéro, nom, classe et PV, puis leur état à droite.
+ * Affiche tous les personnages avec leur ID (leur position dans la liste, à
+ * partir de 1, que roster_trouver() accepte à la place d'un nom), puis leur
+ * nom, leur classe, leurs PV et leur état à droite.
  * Un personnage K.O. est marqué « K.O. » ; celui d'un groupe porte le
  * libellé de ce groupe. `groupes` peut être NULL (nb_groupes = 0).
  */

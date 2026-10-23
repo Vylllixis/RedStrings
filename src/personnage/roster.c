@@ -65,10 +65,11 @@ void roster_liberer(roster_t *r)
 ** ╭─ roster_trouver ─────────────────────────────────────────────────────
 ** │ Retrouve un personnage à partir de ce que le joueur a tapé.
 ** │
-** │ 1. le nom exact (même casse) : il a toujours priorité, même si le nom
-** │    ressemble à un nombre
-** │ 2. sinon un numéro de 1 à len : celui de la liste affichée à l'écran
-** │ Le numéro n'est lu que s'il ne fait que des chiffres et au plus 9 :
+** │ 1. le nom exact (même casse) : il a toujours priorité. La saisie et le
+** │    chargement refusent les noms-nombres, mais la fonction reste sûre si
+** │    un roster en contient quand même
+** │ 2. sinon un ID de 1 à len : sa position dans la liste affichée
+** │ L'ID n'est lu que s'il ne fait que des chiffres et au plus 9 :
 ** │ my_getnbr() ne protège pas contre un dépassement d'int.
 ** ╰──────────────────────────────────────────────────────────────────────
 */
