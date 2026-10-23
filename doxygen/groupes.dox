@@ -10,6 +10,15 @@
 
 @defgroup fenetre Version graphique
 @brief Interface CSFML : application, dessin, composants, scènes.
+
+@defgroup audio Système audio
+@ingroup fenetre
+@brief Événements sonores, packs de sons par thème, musique et réglages du joueur.
+
+Les écrans déclenchent des événements (son(), musique()) sans connaître aucun
+fichier ; le manifeste `sons.txt` de chaque pack dit quoi jouer. Repli : thème
+actif, puis pack standard, puis silence. Guide pratique :
+`csfml/assets/audio/AUDIO.md`.
 */
 
 /** @file personnage.h @ingroup moteur */
@@ -42,3 +51,6 @@
 /** @file gui_scenes.h @ingroup fenetre */
 /** @file gui_utf8.h @ingroup fenetre */
 /** @file gui_yugioh.h @ingroup fenetre */
+
+/** @file gui_sons.h @ingroup audio */
+/** @file gui_audio.h @ingroup audio */
