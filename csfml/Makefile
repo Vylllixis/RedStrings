@@ -21,7 +21,7 @@ OBJS		=	$(SRCS:src/%.c=$(OBJ_DIR)/%.o)
 
 #moteur du jeu partagé avec la version console (aucun affichage dedans)
 MOTEUR_DIR	=	../src/personnage
-MOTEUR		=	personnage.c combat.c bataille.c roster.c sauvegarde.c
+MOTEUR		=	personnage.c combat.c bataille.c bataille_ia.c roster.c sauvegarde.c
 OBJS_MOTEUR	=	$(MOTEUR:%.c=$(OBJ_DIR)/moteur/%.o)
 
 #fonctions de la version graphique qui ne dépendent pas de SFML : testables sans fenêtre

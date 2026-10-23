@@ -10,9 +10,12 @@
 ** ╰──────────────────────────────────────────────────────────────────────
 */
 
+#include <stdlib.h>
+#include <time.h>
 #include "redstrings.h"
 
 int main(void)
 {
+    srand((unsigned)time(NULL));        /* le hasard de l'ordinateur en combat */
     return redstrings();
 }
