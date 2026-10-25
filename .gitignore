@@ -3,6 +3,10 @@
 /redstrings_csfml
 /redstrings_csfml_debug
 /redstrings_csfml_tests
+/redstrings_sdl
+
+# Objets de la version SDL
+/sdl/obj/
 
 # Objets de la version CSFML
 /csfml/obj/
