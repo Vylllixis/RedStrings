@@ -64,3 +64,11 @@ passe par un ADR dans `docs/adr/`.
   développement. TRACE : très verbeux, y compris par image.
 - Le fichier est vidé à chaque message (pas de perte en cas de plantage) : ne pas journaliser
   dans une boucle chaude au niveau INFO ou plus.
+
+## Assertions
+- `ENG_ASSERT(cond)` / `ENG_ASSERT_MSG(cond, fmt, ...)` pour les préconditions et invariants
+  (erreur de programmation). Jamais pour une erreur d'exécution (fichier, GPU, entrée).
+- Retirées en Release **et** RelWithDebInfo : la condition n'est pas évaluée, donc aucun
+  effet de bord dedans (`ENG_ASSERT(i++ < n)` est interdit).
+- Vérifier aussi les arguments reçus par les fonctions publiques du moteur (pointeur non NULL,
+  indice dans les bornes), pas seulement les cas « impossibles ».

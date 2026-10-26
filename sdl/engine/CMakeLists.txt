@@ -9,7 +9,7 @@ if(MSVC)
   target_compile_options(engine_third_party PRIVATE /W0)
 endif()
 
-add_library(engine STATIC src/engine.c src/deps.c src/platform.c src/log.c)
+add_library(engine STATIC src/engine.c src/deps.c src/platform.c src/log.c src/assert.c)
 target_sources(engine PRIVATE $<TARGET_OBJECTS:engine_third_party>)
 target_include_directories(engine PUBLIC include)
 target_link_libraries(engine PUBLIC SDL3::SDL3 cglm_headers cgltf_headers stb_headers)

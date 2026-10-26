@@ -16,7 +16,7 @@ typedef enum EngLogLevel {
 } EngLogLevel;
 
 #if defined(__GNUC__) || defined(__clang__)
-#define ENG_PRINTF_FORMAT(fmt_index, args_index) \
+#define ENG_PRINTF_FORMAT(fmt_index, args_index)                                                   \
     __attribute__((format(printf, fmt_index, args_index)))
 #else
 #define ENG_PRINTF_FORMAT(fmt_index, args_index)

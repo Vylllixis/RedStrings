@@ -1,7 +1,9 @@
+#include <stdbool.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 
+#include "engine/assert.h"
 #include "engine/engine.h"
 #include "engine/log.h"
 #include "engine/platform.h"
@@ -9,14 +11,17 @@
 static void usage(const char *prog)
 {
     fprintf(stderr, "usage : %s [--frames N] [--log-level trace|debug|info|warn|error]\n", prog);
+    fprintf(stderr, "          [--assert-test]\n");
     fprintf(stderr, "  --frames N     quitte après N images (tests automatiques)\n");
     fprintf(stderr,
             "  --log-level L  niveau du journal (sinon variable ENG_LOG_LEVEL, sinon info)\n");
+    fprintf(stderr, "  --assert-test  (développement) déclenche volontairement deux assertions\n");
 }
 
 int main(int argc, char **argv)
 {
     long max_frames = -1; /* -1 : jusqu'à la fermeture de la fenêtre */
+    bool assert_test = false;
     EngLogLevel log_level = eng_log_env_level(ENG_LEVEL_INFO);
 
     for (int i = 1; i < argc; i++) {
@@ -32,6 +37,8 @@ int main(int argc, char **argv)
                 usage(argv[0]);
                 return 2;
             }
+        } else if (strcmp(argv[i], "--assert-test") == 0) {
+            assert_test = true;
         } else {
             usage(argv[0]);
             return 2;
@@ -44,6 +51,17 @@ int main(int argc, char **argv)
 
     ENG_LOG_INFO("engine %s", eng_version());
     eng_print_deps();
+
+    if (assert_test) {
+        int answer = 41;
+        ENG_LOG_INFO("test d'assertion (assertions %s)",
+                     ENG_ASSERTS_ENABLED ? "actives" : "désactivées");
+        ENG_ASSERT(argc > 0); /* vraie : ne doit rien afficher */
+        ENG_ASSERT_MSG(answer == 42, "la réponse vaut %d au lieu de 42", answer);
+        ENG_LOG_INFO("l'exécution a repris après la première assertion");
+        ENG_ASSERT(answer == 42);
+        ENG_LOG_INFO("l'exécution a repris après la seconde assertion");
+    }
 
     EngWindowDesc desc = {
         .title = "Open World",

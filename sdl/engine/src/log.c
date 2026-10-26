@@ -14,8 +14,7 @@
 
 static const char *const level_names[LOG_LEVEL_COUNT] = {"TRACE", "DEBUG", "INFO ", "WARN ",
                                                          "ERROR"};
-static const char *const level_words[LOG_LEVEL_COUNT] = {"trace", "debug", "info", "warn",
-                                                         "error"};
+static const char *const level_words[LOG_LEVEL_COUNT] = {"trace", "debug", "info", "warn", "error"};
 
 static struct {
     SDL_IOStream *file;
@@ -58,9 +57,9 @@ static void emit(EngLogLevel level, const char *file, int line, const char *msg)
 
     char text[LOG_LINE_MAX];
     Uint64 ms = elapsed_ms();
-    int n = snprintf(text, sizeof text, "[%6llu.%03llu] %s %s  %s\n",
-                     (unsigned long long)(ms / 1000u), (unsigned long long)(ms % 1000u),
-                     level_names[level], loc, msg);
+    int n =
+        snprintf(text, sizeof text, "[%6llu.%03llu] %s %s  %s\n", (unsigned long long)(ms / 1000u),
+                 (unsigned long long)(ms % 1000u), level_names[level], loc, msg);
     if (n < 0) {
         return;
     }
