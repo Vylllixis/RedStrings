@@ -7,3 +7,4 @@
 *.log
 /assets/*
 !/assets/.gitkeep
+/third_party/_deps/
