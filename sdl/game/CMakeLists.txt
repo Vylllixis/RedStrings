@@ -5,3 +5,4 @@
 add_library(game SHARED src/game.c)
 target_include_directories(game PRIVATE ${CMAKE_SOURCE_DIR}/engine/include)
 set_target_properties(game PROPERTIES PREFIX "")
+target_link_libraries(game PRIVATE project_options)
