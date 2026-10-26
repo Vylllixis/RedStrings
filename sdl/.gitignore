@@ -1,0 +1,13 @@
+/build/
+/obj/
+*.o
+*.d
+*.so
+*.dll
+*.log
+/assets/*
+!/assets/.gitkeep
+/third_party/_deps/
+
+# Le .gitignore racine ignore *.md ; ici la documentation est versionnée
+!*.md
