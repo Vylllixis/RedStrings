@@ -50,3 +50,8 @@ passe par un ADR dans `docs/adr/`.
 - Formater : `tools/scripts/format.sh` (vérifier sans modifier : `--check`).
 - Analyser : `cmake --preset debug && tools/scripts/lint.sh`.
 - Compiler : `-Wall -Wextra -Wpedantic -Werror` sur notre code, ASan + UBSan en Debug.
+
+## Code tiers
+- Les implémentations de bibliothèques à en-tête unique (cgltf, stb, plus tard miniaudio...)
+  vont dans `engine/src/third_party_impl.c`, compilé sans `-Werror` ni `/WX`.
+  Ne jamais les inclure avec `*_IMPLEMENTATION` dans un fichier soumis à `project_options`.

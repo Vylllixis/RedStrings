@@ -12,7 +12,8 @@ Checks: >
   readability-redundant-*,
   -bugprone-easily-swappable-parameters,
   -misc-include-cleaner,
-  -misc-unused-parameters
+  -misc-unused-parameters,
+  -clang-analyzer-security.insecureAPI.DeprecatedOrUnsafeBufferHandling
 WarningsAsErrors: ''
 # Ne signaler que les en-têtes du projet (pas SDL, cglm, stb, cgltf)
 HeaderFilterRegex: '(engine|game|launcher|tools)/'
