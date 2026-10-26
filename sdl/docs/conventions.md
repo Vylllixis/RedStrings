@@ -55,3 +55,12 @@ passe par un ADR dans `docs/adr/`.
 - Les implémentations de bibliothèques à en-tête unique (cgltf, stb, plus tard miniaudio...)
   vont dans `engine/src/third_party_impl.c`, compilé sans `-Werror` ni `/WX`.
   Ne jamais les inclure avec `*_IMPLEMENTATION` dans un fichier soumis à `project_options`.
+
+## Journal
+- Dans `engine/` et `game/`, jamais `printf`/`fprintf` pour du diagnostic : `ENG_LOG_*`.
+  (Seule exception : l'aide de la ligne de commande du `launcher`, avant l'ouverture du journal.)
+- ERROR : une opération a échoué. WARN : situation anormale mais récupérée. INFO : jalons du
+  cycle de vie, une fois par événement, jamais à chaque image. DEBUG : détail utile au
+  développement. TRACE : très verbeux, y compris par image.
+- Le fichier est vidé à chaque message (pas de perte en cas de plantage) : ne pas journaliser
+  dans une boucle chaude au niveau INFO ou plus.

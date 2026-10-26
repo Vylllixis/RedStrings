@@ -11,3 +11,4 @@
 
 # Le .gitignore racine ignore *.md ; ici la documentation est versionnée
 !*.md
+/logs/

@@ -3,7 +3,8 @@
 #include <stdbool.h>
 #include <stdint.h>
 
-/* Couche plateforme : seul module (avec le futur renderer) qui parle à SDL. */
+/* Couche plateforme : fenêtre et événements. Cet en-tête n'expose pas SDL, pour que game/
+ * puisse l'inclure sans dépendre de SDL. */
 
 typedef struct EngWindowDesc {
     const char *title;

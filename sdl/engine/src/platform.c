@@ -1,14 +1,15 @@
 #include "engine/platform.h"
 
 #include <SDL3/SDL.h>
-#include <stdio.h>
+
+#include "engine/log.h"
 
 bool eng_platform_init(EngPlatform *p, const EngWindowDesc *desc)
 {
     *p = (EngPlatform){0};
 
     if (!SDL_Init(SDL_INIT_VIDEO | SDL_INIT_EVENTS)) {
-        fprintf(stderr, "SDL_Init a échoué : %s\n", SDL_GetError());
+        ENG_LOG_ERROR("SDL_Init a échoué : %s", SDL_GetError());
         return false;
     }
 
@@ -19,7 +20,7 @@ bool eng_platform_init(EngPlatform *p, const EngWindowDesc *desc)
 
     p->window = SDL_CreateWindow(desc->title, desc->width, desc->height, flags);
     if (p->window == NULL) {
-        fprintf(stderr, "SDL_CreateWindow a échoué : %s\n", SDL_GetError());
+        ENG_LOG_ERROR("SDL_CreateWindow a échoué : %s", SDL_GetError());
         SDL_Quit();
         return false;
     }
@@ -29,6 +30,8 @@ bool eng_platform_init(EngPlatform *p, const EngWindowDesc *desc)
         p->fullscreen = true;
     }
     SDL_GetWindowSizeInPixels(p->window, &p->width, &p->height);
+    ENG_LOG_INFO("fenêtre ouverte : %d x %d px, pilote vidéo %s", p->width, p->height,
+                 SDL_GetCurrentVideoDriver());
     return true;
 }
 
@@ -53,13 +56,15 @@ bool eng_platform_pump(EngPlatform *p)
         case SDL_EVENT_WINDOW_PIXEL_SIZE_CHANGED:
             p->width = ev.window.data1;
             p->height = ev.window.data2;
-            printf("fenêtre : %d x %d px\n", p->width, p->height);
+            ENG_LOG_DEBUG("fenêtre redimensionnée : %d x %d px", p->width, p->height);
             break;
         case SDL_EVENT_WINDOW_ENTER_FULLSCREEN:
             p->fullscreen = true;
+            ENG_LOG_DEBUG("plein écran activé");
             break;
         case SDL_EVENT_WINDOW_LEAVE_FULLSCREEN:
             p->fullscreen = false;
+            ENG_LOG_DEBUG("plein écran désactivé");
             break;
         case SDL_EVENT_KEY_DOWN:
             /* Touches provisoires, remplacées par le système d'entrées (M0-18). */
@@ -79,7 +84,7 @@ bool eng_platform_pump(EngPlatform *p)
 void eng_platform_toggle_fullscreen(EngPlatform *p)
 {
     if (!SDL_SetWindowFullscreen(p->window, !p->fullscreen)) {
-        fprintf(stderr, "plein écran impossible : %s\n", SDL_GetError());
+        ENG_LOG_ERROR("plein écran impossible : %s", SDL_GetError());
     }
 }
 
