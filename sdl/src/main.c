@@ -3,16 +3,6 @@
 ** PROJET FIL ROUGE C Avancé
 */
 
-/*
-** ╭─ main.c ─────────────────────────────────────────────────────────────
-** │ But         Premier pas avec SDL2 : ouvre une fenêtre et y affiche un
-** │             carré rouge que l'on déplace avec les flèches.
-** │             Échap ou la croix de la fenêtre pour quitter.
-** │ Contenu     main
-** │ Code retour 0 si tout va bien, 84 en cas d'erreur
-** ╰──────────────────────────────────────────────────────────────────────
-*/
-
 #include <SDL2/SDL.h>
 #include <stdio.h>
 
@@ -21,20 +11,6 @@
 #define TAILLE_CARRE 80
 #define VITESSE 5 // pixels par image
 
-/*
-** ╭─ main ───────────────────────────────────────────────────────────────
-** │ 1. SDL_Init : démarre SDL (partie vidéo)
-** │ 2. SDL_CreateWindow : la fenêtre ; SDL_CreateRenderer : le « pinceau »
-** │    qui dessine dedans
-** │ 3. boucle de jeu, une fois par image :
-** │      a. SDL_PollEvent : lit les événements (fermeture, touche Échap)
-** │      b. SDL_GetKeyboardState : flèches maintenues = on bouge le carré
-** │      c. on efface en gris foncé, on dessine le carré, SDL_RenderPresent
-** │         montre le résultat à l'écran
-** │      d. SDL_Delay(16) : environ 60 images par seconde
-** │ 4. on détruit tout dans l'ordre inverse de la création
-** ╰──────────────────────────────────────────────────────────────────────
-*/
 int main(void)
 {
     if (SDL_Init(SDL_INIT_VIDEO) != 0) {

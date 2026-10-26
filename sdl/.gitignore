@@ -1,0 +1,9 @@
+/build/
+/obj/
+*.o
+*.d
+*.so
+*.dll
+*.log
+/assets/*
+!/assets/.gitkeep
