@@ -1,0 +1,29 @@
+# Analyse statique — voir docs/conventions.md
+# Lancer : tools/scripts/lint.sh
+Checks: >
+  -*,
+  bugprone-*,
+  clang-analyzer-*,
+  misc-*,
+  performance-*,
+  portability-*,
+  readability-braces-around-statements,
+  readability-identifier-naming,
+  readability-redundant-*,
+  -bugprone-easily-swappable-parameters,
+  -misc-include-cleaner,
+  -misc-unused-parameters
+WarningsAsErrors: ''
+# Ne signaler que les en-têtes du projet (pas SDL, cglm, stb, cgltf)
+HeaderFilterRegex: '(engine|game|launcher|tools)/'
+CheckOptions:
+  - { key: readability-identifier-naming.FunctionCase,     value: lower_case }
+  - { key: readability-identifier-naming.VariableCase,     value: lower_case }
+  - { key: readability-identifier-naming.ParameterCase,    value: lower_case }
+  - { key: readability-identifier-naming.MemberCase,       value: lower_case }
+  - { key: readability-identifier-naming.StructCase,       value: CamelCase }
+  - { key: readability-identifier-naming.TypedefCase,      value: CamelCase }
+  - { key: readability-identifier-naming.EnumCase,         value: CamelCase }
+  - { key: readability-identifier-naming.EnumConstantCase, value: UPPER_CASE }
+  - { key: readability-identifier-naming.MacroDefinitionCase, value: UPPER_CASE }
+  - { key: readability-identifier-naming.GlobalConstantCase,  value: UPPER_CASE }

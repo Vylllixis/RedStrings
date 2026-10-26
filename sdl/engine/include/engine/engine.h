@@ -1,7 +1,4 @@
-#ifndef ENGINE_H
-#define ENGINE_H
+#pragma once
 
 const char *eng_version(void);
 void eng_print_deps(void);
-
-#endif

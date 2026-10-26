@@ -134,8 +134,8 @@ csfml-tests:	$(LIB)
 
 #version SDL2 (débutant) : compile puis lance ./redstrings_sdl
 sdl:
-	$(Q)$(MAKE) -C $(SDL_DIR)
-	$(Q)./redstrings_sdl
+	cd sdl && cmake --preset debug && cmake --build --preset debug
+	cd sdl && ./build/debug/bin/launcher
 
 clean:
 	$(LOG_RM) "RM" "$(OBJ_DIR)/"
