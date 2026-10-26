@@ -1,9 +1,5 @@
-/* Seul endroit où les bibliothèques à en-tête unique sont implémentées. */
-#define CGLTF_IMPLEMENTATION
-#include <cgltf.h>
-#define STB_IMAGE_IMPLEMENTATION
-#include <stb_image.h>
-
+/* Affiche les versions des dépendances (les implémentations tierces sont dans
+ * third_party_impl.c). */
 #include <SDL3/SDL_version.h>
 #include <cglm/cglm.h>
 #include <stdio.h>
