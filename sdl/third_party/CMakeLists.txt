@@ -37,6 +37,18 @@ FetchContent_Declare(stb
   GIT_TAG        003501f6d7a8668ce8b6d875e34dd97ad0d5d5b5
   SOURCE_SUBDIR  _none)
 
+# ── utest.h (tag « pre-ai », commit 0744717) : framework de tests, un seul en-tête ──
+# Choix volontaire : le dernier état avant que le dépôt n'accepte du code écrit avec des outils d'IA.
+if(OW_BUILD_TESTS)
+  FetchContent_Declare(utest
+    GIT_REPOSITORY https://github.com/sheredom/utest.h.git
+    GIT_TAG        07447179856c4662d443c6690e3b408b20042e99
+    SOURCE_SUBDIR  _none)
+  FetchContent_MakeAvailable(utest)
+  add_library(utest_headers INTERFACE)
+  target_include_directories(utest_headers SYSTEM INTERFACE "${utest_SOURCE_DIR}")
+endif()
+
 FetchContent_MakeAvailable(SDL3 cglm cgltf stb)
 
 add_library(cgltf_headers INTERFACE)

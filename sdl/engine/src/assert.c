@@ -1,14 +1,25 @@
 #include "engine/assert.h"
 
+#include <SDL3/SDL.h>
 #include <stdarg.h>
 #include <stdio.h>
 
-void eng_assert_fail(const char *expr, const char *file, int line)
+static SDL_AtomicInt g_break_enabled = {1};
+static SDL_AtomicInt g_failure_count = {0};
+
+static bool register_failure(void)
 {
-    eng_log_write(ENG_LEVEL_ERROR, file, line, "ASSERTION ÉCHOUÉE : %s", expr);
+    SDL_AddAtomicInt(&g_failure_count, 1);
+    return SDL_GetAtomicInt(&g_break_enabled) != 0;
 }
 
-void eng_assert_failf(const char *expr, const char *file, int line, const char *fmt, ...)
+bool eng_assert_fail(const char *expr, const char *file, int line)
+{
+    eng_log_write(ENG_LEVEL_ERROR, file, line, "ASSERTION ÉCHOUÉE : %s", expr);
+    return register_failure();
+}
+
+bool eng_assert_failf(const char *expr, const char *file, int line, const char *fmt, ...)
 {
     char detail[512];
     va_list args;
@@ -19,4 +30,15 @@ void eng_assert_failf(const char *expr, const char *file, int line, const char *
         detail[0] = '\0';
     }
     eng_log_write(ENG_LEVEL_ERROR, file, line, "ASSERTION ÉCHOUÉE : %s -- %s", expr, detail);
+    return register_failure();
+}
+
+void eng_assert_set_break(bool enabled)
+{
+    SDL_SetAtomicInt(&g_break_enabled, enabled ? 1 : 0);
+}
+
+int eng_assert_failure_count(void)
+{
+    return SDL_GetAtomicInt(&g_failure_count);
 }

@@ -12,9 +12,9 @@
 #define LOG_PREV_NAME "engine.1.log"
 #define LOG_LEVEL_COUNT 5
 
-static const char *const level_names[LOG_LEVEL_COUNT] = {"TRACE", "DEBUG", "INFO ", "WARN ",
+static const char *const LEVEL_NAMES[LOG_LEVEL_COUNT] = {"TRACE", "DEBUG", "INFO ", "WARN ",
                                                          "ERROR"};
-static const char *const level_words[LOG_LEVEL_COUNT] = {"trace", "debug", "info", "warn", "error"};
+static const char *const LEVEL_WORDS[LOG_LEVEL_COUNT] = {"trace", "debug", "info", "warn", "error"};
 
 static struct {
     SDL_IOStream *file;
@@ -59,7 +59,7 @@ static void emit(EngLogLevel level, const char *file, int line, const char *msg)
     Uint64 ms = elapsed_ms();
     int n =
         snprintf(text, sizeof text, "[%6llu.%03llu] %s %s  %s\n", (unsigned long long)(ms / 1000u),
-                 (unsigned long long)(ms % 1000u), level_names[level], loc, msg);
+                 (unsigned long long)(ms % 1000u), LEVEL_NAMES[level], loc, msg);
     if (n < 0) {
         return;
     }
@@ -82,18 +82,13 @@ static void emit(EngLogLevel level, const char *file, int line, const char *msg)
     }
 }
 
-void eng_log_write(EngLogLevel level, const char *file, int line, const char *fmt, ...)
+static void write_v(EngLogLevel level, const char *file, int line, const char *fmt, va_list args)
 {
-    if ((int)level < SDL_GetAtomicInt(&g_log.level) || (int)level < 0 ||
-        (int)level >= LOG_LEVEL_COUNT) {
-        return;
-    }
-
     char msg[LOG_MSG_MAX];
-    va_list args;
-    va_start(args, fmt);
+    /* Faux positif de clang-tidy 18 (le va_list est bien initialisé par va_start plus haut) :
+     * il n'apparaît qu'avec l'ensemble des vérifications clang-analyzer actives. */
+    // NOLINTNEXTLINE(clang-analyzer-valist.Uninitialized)
     int n = vsnprintf(msg, sizeof msg, fmt, args);
-    va_end(args);
 
     if (n < 0) {
         SDL_strlcpy(msg, "(erreur de formatage)", sizeof msg);
@@ -101,6 +96,19 @@ void eng_log_write(EngLogLevel level, const char *file, int line, const char *fm
         memcpy(msg + sizeof msg - 4, "...", 4);
     }
     emit(level, file, line, msg);
+}
+
+void eng_log_write(EngLogLevel level, const char *file, int line, const char *fmt, ...)
+{
+    if ((int)level < SDL_GetAtomicInt(&g_log.level) || (int)level < 0 ||
+        (int)level >= LOG_LEVEL_COUNT) {
+        return;
+    }
+
+    va_list args;
+    va_start(args, fmt);
+    write_v(level, file, line, fmt, args);
+    va_end(args);
 }
 
 static EngLogLevel from_sdl_priority(SDL_LogPriority priority)
@@ -175,9 +183,9 @@ bool eng_log_init(const char *dir, EngLogLevel level)
     if (SDL_GetCurrentTime(&now) && SDL_TimeToDateTime(now, &date, true)) {
         ENG_LOG_INFO("journal ouvert le %04d-%02d-%02d à %02d:%02d:%02d (heure locale), niveau %s",
                      date.year, date.month, date.day, date.hour, date.minute, date.second,
-                     level_words[level]);
+                     LEVEL_WORDS[level]);
     } else {
-        ENG_LOG_INFO("journal ouvert, niveau %s", level_words[level]);
+        ENG_LOG_INFO("journal ouvert, niveau %s", LEVEL_WORDS[level]);
     }
     return true;
 }
@@ -212,7 +220,7 @@ EngLogLevel eng_log_get_level(void)
 bool eng_log_parse_level(const char *name, EngLogLevel *out)
 {
     for (int i = 0; i < LOG_LEVEL_COUNT; i++) {
-        if (SDL_strcasecmp(name, level_words[i]) == 0) {
+        if (SDL_strcasecmp(name, LEVEL_WORDS[i]) == 0) {
             *out = (EngLogLevel)i;
             return true;
         }

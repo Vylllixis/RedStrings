@@ -27,28 +27,31 @@
 #define ENG_DEBUG_BREAK() raise(SIGTRAP)
 #endif
 
-void eng_assert_fail(const char *expr, const char *file, int line);
-void eng_assert_failf(const char *expr, const char *file, int line, const char *fmt, ...)
+/* Journalisent l'échec. Retournent true s'il faut s'arrêter dans le débogueur. */
+bool eng_assert_fail(const char *expr, const char *file, int line);
+bool eng_assert_failf(const char *expr, const char *file, int line, const char *fmt, ...)
     ENG_PRINTF_FORMAT(4, 5);
+
+/* Pour les tests unitaires : à false, un échec est journalisé et compté mais ne s'arrête pas. */
+void eng_assert_set_break(bool enabled);
+int eng_assert_failure_count(void);
 
 #if !defined(NDEBUG)
 
 #define ENG_ASSERTS_ENABLED 1
 
-#define ENG_ASSERT(cond)                                \
-    do {                                                \
-        if (!(cond)) {                                  \
-            eng_assert_fail(#cond, __FILE__, __LINE__); \
-            ENG_DEBUG_BREAK();                          \
-        }                                               \
+#define ENG_ASSERT(cond)                                                                           \
+    do {                                                                                           \
+        if (!(cond) && eng_assert_fail(#cond, __FILE__, __LINE__)) {                               \
+            ENG_DEBUG_BREAK();                                                                     \
+        }                                                                                          \
     } while (0)
 
-#define ENG_ASSERT_MSG(cond, ...)                                     \
-    do {                                                              \
-        if (!(cond)) {                                                \
-            eng_assert_failf(#cond, __FILE__, __LINE__, __VA_ARGS__); \
-            ENG_DEBUG_BREAK();                                        \
-        }                                                             \
+#define ENG_ASSERT_MSG(cond, ...)                                                                  \
+    do {                                                                                           \
+        if (!(cond) && eng_assert_failf(#cond, __FILE__, __LINE__, __VA_ARGS__)) {                 \
+            ENG_DEBUG_BREAK();                                                                     \
+        }                                                                                          \
     } while (0)
 
 #else
@@ -59,15 +62,15 @@ void eng_assert_failf(const char *expr, const char *file, int line, const char *
  * variables comme « utilisées », sans rien évaluer (sizeof n'évalue pas son opérande). */
 int eng_assert_unused_args(const char *fmt, ...) ENG_PRINTF_FORMAT(1, 2);
 
-#define ENG_ASSERT(cond)   \
-    do {                   \
-        (void)sizeof(cond); \
+#define ENG_ASSERT(cond)                                                                           \
+    do {                                                                                           \
+        (void)sizeof(cond);                                                                        \
     } while (0)
 
-#define ENG_ASSERT_MSG(cond, ...)                          \
-    do {                                                   \
-        (void)sizeof(cond);                                \
-        (void)sizeof(eng_assert_unused_args(__VA_ARGS__)); \
+#define ENG_ASSERT_MSG(cond, ...)                                                                  \
+    do {                                                                                           \
+        (void)sizeof(cond);                                                                        \
+        (void)sizeof(eng_assert_unused_args(__VA_ARGS__));                                         \
     } while (0)
 
 #endif

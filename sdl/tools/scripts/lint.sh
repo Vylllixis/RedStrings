@@ -6,6 +6,7 @@ cd "$(dirname "${BASH_SOURCE[0]}")/../.."
 db="${1:-build/debug}"
 [[ -f "$db/compile_commands.json" ]] || { echo "lint: lance d'abord 'cmake --preset debug'" >&2; exit 1; }
 
-git ls-files -z -- 'engine/*.c' 'game/*.c' 'launcher/*.c' 'tools/*.c' \
+git ls-files -z --cached --others --exclude-standard -- \
+    'engine/*.c' 'game/*.c' 'launcher/*.c' 'tools/*.c' 'tests/*.c' \
   | xargs -0 --no-run-if-empty clang-tidy -p "$db" --quiet --warnings-as-errors='*'
 echo "lint: OK"

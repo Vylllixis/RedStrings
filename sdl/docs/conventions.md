@@ -72,3 +72,10 @@ passe par un ADR dans `docs/adr/`.
   effet de bord dedans (`ENG_ASSERT(i++ < n)` est interdit).
 - Vérifier aussi les arguments reçus par les fonctions publiques du moteur (pointeur non NULL,
   indice dans les bornes), pas seulement les cas « impossibles ».
+
+## Tests
+- Un fichier `tests/test_<module>.c` par module testé, déclaré dans `tests/CMakeLists.txt`
+  avec `ow_add_test(<module> test_<module>.c)`. Lancer : `tools/scripts/test.sh [preset]`.
+- Un test = `UTEST(suite, comportement_attendu)`, un seul comportement, nom en anglais lisible.
+- Les tests ne dépendent ni d'un écran ni d'un GPU. Fichiers temporaires : `tests_tmp/` (build).
+- Un bug corrigé = un test qui le reproduisait d'abord.
