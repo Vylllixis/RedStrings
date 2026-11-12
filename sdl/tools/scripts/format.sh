@@ -8,7 +8,7 @@ mode=(-i)
 
 # --cached --others : les fichiers suivis ET les nouveaux (pas encore ajoutés à git)
 git ls-files -z --cached --others --exclude-standard -- \
-    'engine/*.c' 'engine/*.h' 'game/*.c' 'game/*.h' 'launcher/*.c' 'launcher/*.h' \
+    'engine/*.c' 'engine/*.h' 'engine/*.cpp' 'game/*.c' 'game/*.h' 'launcher/*.c' 'launcher/*.h' \
     'tools/*.c' 'tools/*.h' 'tests/*.c' 'tests/*.h' \
   | xargs -0 --no-run-if-empty clang-format "${mode[@]}"
 echo "format: OK"

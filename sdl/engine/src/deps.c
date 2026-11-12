@@ -1,9 +1,9 @@
 /* Affiche les versions des dépendances (les implémentations tierces sont dans
  * third_party_impl.c). */
 #include <SDL3/SDL_version.h>
-#include <cglm/cglm.h>
 #include "engine/engine.h"
 #include "engine/log.h"
+#include "engine/math.h"
 
 void eng_print_deps(void)
 {

@@ -24,6 +24,7 @@ bool eng_assert_failf(const char *expr, const char *file, int line, const char *
     char detail[512];
     va_list args;
     va_start(args, fmt);
+    // NOLINTNEXTLINE(clang-analyzer-valist.Uninitialized): faux positif, args est initialisé
     int n = vsnprintf(detail, sizeof detail, fmt, args);
     va_end(args);
     if (n < 0) {
