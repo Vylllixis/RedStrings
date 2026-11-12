@@ -1,0 +1,25 @@
+<!doctype html><html><body><canvas id="c" width="256" height="256"></canvas>
+<script type="importmap">{"imports":{"three":"/three/node_modules/three/build/three.module.js","three/addons/":"/three/node_modules/three/examples/jsm/"}}</script>
+<script type="module">
+// Le ciel seul (scene.background équirectangulaire) sous cinq directions, pour comparer l'orientation
+// et l'échelle du ciel du moteur (tools/reference/README.md). Sortie linéaire, sans tonemapping.
+import * as THREE from 'three';
+import { RGBELoader } from 'three/addons/loaders/RGBELoader.js';
+const renderer=new THREE.WebGLRenderer({canvas:document.getElementById('c'),antialias:false,alpha:false,preserveDrawingBuffer:true});
+renderer.setSize(256,256,false);renderer.setPixelRatio(1);
+renderer.outputColorSpace=THREE.LinearSRGBColorSpace;renderer.toneMapping=THREE.NoToneMapping;
+const hdr=await new RGBELoader().loadAsync('/hdr/royal_esplanade_1k.hdr');
+hdr.mapping=THREE.EquirectangularReflectionMapping;
+const dirs=[[1,0,0],[0,0,-1],[0,0,1],[-1,0.3,0],[0.5,0.2,-0.8]];
+const out=[];
+for(const d of dirs){
+  const scene=new THREE.Scene();scene.background=hdr;
+  const cam=new THREE.PerspectiveCamera(60,1,0.1,100);cam.position.set(0,0,0);cam.lookAt(...d);
+  renderer.render(scene,cam);
+  const t=document.createElement('canvas');t.width=256;t.height=256;const x=t.getContext('2d');x.drawImage(renderer.domElement,0,0);
+  const px=x.getImageData(0,0,256,256).data;
+  let s='';for(let i=0;i<px.length;i+=8192)s+=String.fromCharCode.apply(null,px.subarray(i,i+8192));
+  out.push(btoa(s));
+}
+window.__result=out;window.__info='ok';
+</script></body></html>

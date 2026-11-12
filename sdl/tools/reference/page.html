@@ -1,0 +1,40 @@
+<!doctype html><html><body><canvas id="c" width="512" height="512"></canvas>
+<script type="importmap">{"imports":{"three":"/three/node_modules/three/build/three.module.js","three/addons/":"/three/node_modules/three/examples/jsm/"}}</script>
+<script type="module">
+import * as THREE from 'three';
+import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+const MODE=new URLSearchParams(location.search).get('mode')||'A';
+const C=THREE.ShaderChunk;
+if(MODE==='B'||MODE==='C'){
+ const a="reflectedLight.directDiffuse += irradiance * BRDF_Lambert( material.diffuseColor );";
+ if(!C.lights_physical_pars_fragment.includes(a)) throw new Error('chunk A introuvable');
+ C.lights_physical_pars_fragment=C.lights_physical_pars_fragment.replace(a,"{ vec3 hd = normalize( directLight.direction + geometryViewDir ); float vh = saturate( dot( geometryViewDir, hd ) ); vec3 Fs = F_Schlick( material.specularColor, material.specularF90, vh ); reflectedLight.directDiffuse += irradiance * ( vec3( 1.0 ) - Fs ) * BRDF_Lambert( material.diffuseColor ); }");
+}
+if(MODE==='B'||MODE==='D'){
+ const b="material.roughness = max( roughnessFactor, 0.0525 );";
+ const c="material.roughness += geometryRoughness;";
+ if(!C.lights_physical_fragment.includes(b)||!C.lights_physical_fragment.includes(c)) throw new Error('chunk B introuvable');
+ C.lights_physical_fragment=C.lights_physical_fragment.replace(b,"material.roughness = max( roughnessFactor, 0.045 );").replace(c,"");
+}
+const cases=[{eye:[2.2,0.6,3.2],sun:[0.4,0.5,0.75]},{eye:[-2.5,0.3,2.8],sun:[-0.7,0.3,0.65]},{eye:[0,0.2,4],sun:[0,0.9,0.45]},{eye:[3,1,-2],sun:[0.5,0.6,-0.6]}];
+const INT=1.5;
+const renderer=new THREE.WebGLRenderer({canvas:document.getElementById('c'),antialias:false,alpha:false,preserveDrawingBuffer:true});
+renderer.setSize(512,512,false);renderer.setPixelRatio(1);
+renderer.outputColorSpace=THREE.LinearSRGBColorSpace;renderer.toneMapping=THREE.NoToneMapping;
+renderer.setClearColor(0x000000,1);
+const gltf=await new GLTFLoader().loadAsync('/helmet/DamagedHelmet.gltf');
+const maxA=renderer.capabilities.getMaxAnisotropy();
+gltf.scene.traverse(o=>{if(o.isMesh){for(const k of ['map','emissiveMap','normalMap','roughnessMap','metalnessMap','aoMap']){if(o.material[k]){o.material[k].anisotropy=Math.min(16,maxA);o.material[k].needsUpdate=true;}}}});
+const out=[];
+for(const c of cases){
+  const scene=new THREE.Scene();scene.add(gltf.scene);
+  const cam=new THREE.PerspectiveCamera(40,1,0.1,50);cam.position.set(...c.eye);cam.lookAt(0,0,-0.187);
+  const l=new THREE.DirectionalLight(0xffffff,Math.PI*INT);const d=new THREE.Vector3(...c.sun).normalize().multiplyScalar(10);l.position.copy(d);l.target.position.set(0,0,0);scene.add(l);scene.add(l.target);
+  renderer.render(scene,cam);
+  const t=document.createElement('canvas');t.width=512;t.height=512;const x=t.getContext('2d');x.drawImage(renderer.domElement,0,0);
+  const px=x.getImageData(0,0,512,512).data;
+  let s='';for(let i=0;i<px.length;i+=8192)s+=String.fromCharCode.apply(null,px.subarray(i,i+8192));
+  out.push(btoa(s));
+}
+window.__result=out;window.__info=renderer.getContext().getParameter(renderer.getContext().VERSION);
+</script></body></html>

@@ -1,0 +1,50 @@
+<!doctype html><html><body><canvas id="c" width="512" height="512"></canvas>
+<script type="importmap">{"imports":{"three":"/three/node_modules/three/build/three.module.js","three/addons/":"/three/node_modules/three/examples/jsm/"}}</script>
+<script type="module">
+import * as THREE from 'three';
+import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+import { RGBELoader } from 'three/addons/loaders/RGBELoader.js';
+const MODE=new URLSearchParams(location.search).get('mode')||'A';
+const C=THREE.ShaderChunk;
+if(MODE==='B'){
+ const b="material.roughness = max( roughnessFactor, 0.0525 );";
+ const c="material.roughness += geometryRoughness;";
+ if(!C.lights_physical_fragment.includes(b)||!C.lights_physical_fragment.includes(c)) throw new Error('chunk B introuvable');
+ C.lights_physical_fragment=C.lights_physical_fragment.replace(b,"material.roughness = max( roughnessFactor, 0.045 );").replace(c,"");
+ // pas de compensation de diffusion multiple, diffus non atténué : le modèle du moteur (docs/ibl.md)
+ const m="vec3 totalScattering = singleScattering + multiScattering;";
+ const d="vec3 diffuse = material.diffuseColor * ( 1.0 - max( max( totalScattering.r, totalScattering.g ), totalScattering.b ) );";
+ const e="reflectedLight.indirectSpecular += multiScattering * cosineWeightedIrradiance;";
+ const l=C.lights_physical_pars_fragment;
+ if(!l.includes(m)||!l.includes(d)||!l.includes(e)) throw new Error('chunk IBL introuvable');
+ C.lights_physical_pars_fragment=l.replace(d,"vec3 diffuse = material.diffuseColor;").replace(e,"");
+}
+const cases=[{eye:[2.2,0.6,3.2]},{eye:[-2.5,0.3,2.8]},{eye:[0,0.2,4]},{eye:[3,1,-2]}];
+const renderer=new THREE.WebGLRenderer({canvas:document.getElementById('c'),antialias:false,alpha:false,preserveDrawingBuffer:true});
+renderer.setSize(512,512,false);renderer.setPixelRatio(1);
+renderer.outputColorSpace=THREE.LinearSRGBColorSpace;renderer.toneMapping=THREE.NoToneMapping;
+renderer.setClearColor(0x000000,1);
+const UNIFORM=new URLSearchParams(location.search).get('uniform')==='1';
+let hdr=null;
+if(!UNIFORM){ // (ciel uniforme de radiance 1 : valide le BRDF seul, sans filtrage d'image)
+ hdr=await new RGBELoader().loadAsync('/hdr/'+(new URLSearchParams(location.search).get('hdr')||'royal_esplanade_1k.hdr'));
+}
+const pmrem=new THREE.PMREMGenerator(renderer);
+let env;
+if(UNIFORM){const s=new THREE.Scene();s.background=new THREE.Color(1,1,1);env=pmrem.fromScene(s,0,0.1,100).texture;}
+else{hdr.mapping=THREE.EquirectangularReflectionMapping;env=pmrem.fromEquirectangular(hdr).texture;}
+const gltf=await new GLTFLoader().loadAsync('/helmet/DamagedHelmet.gltf');
+const maxA=renderer.capabilities.getMaxAnisotropy();
+gltf.scene.traverse(o=>{if(o.isMesh){for(const k of ['map','emissiveMap','normalMap','roughnessMap','metalnessMap','aoMap']){if(o.material[k]){o.material[k].anisotropy=Math.min(16,maxA);o.material[k].needsUpdate=true;}}}});
+const out=[];
+for(const c of cases){
+  const scene=new THREE.Scene();scene.add(gltf.scene);scene.environment=env;
+  const cam=new THREE.PerspectiveCamera(40,1,0.1,50);cam.position.set(...c.eye);cam.lookAt(0,0,-0.187);
+  renderer.render(scene,cam);
+  const t=document.createElement('canvas');t.width=512;t.height=512;const x=t.getContext('2d');x.drawImage(renderer.domElement,0,0);
+  const px=x.getImageData(0,0,512,512).data;
+  let s='';for(let i=0;i<px.length;i+=8192)s+=String.fromCharCode.apply(null,px.subarray(i,i+8192));
+  out.push(btoa(s));
+}
+window.__result=out;window.__info=renderer.getContext().getParameter(renderer.getContext().VERSION);
+</script></body></html>
