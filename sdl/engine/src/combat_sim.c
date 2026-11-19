@@ -1,5 +1,7 @@
 #include "engine/combat_sim.h"
 
+#include "engine/navgrid.h"
+
 #include <math.h>
 #include <string.h>
 
@@ -193,6 +195,24 @@ static void move_body(EngCombatSim *s, uint32_t i, const EngFighterInput *in)
     f->yaw = b->yaw;
 }
 
+/* M6-03 : pas d'entrée dans une cellule bloquée ; glissement le long du bord. */
+static void keep_walkable(const EngNavGrid *nav, EngSimBody *b)
+{
+    if (eng_nav_walkable(nav, b->pos) || !eng_nav_walkable(nav, b->prev_pos)) {
+        return; /* praticable, ou déjà hors du praticable au début du tick : il peut en sortir */
+    }
+    const float slide_x[2] = {b->pos[0], b->prev_pos[1]};
+    const float slide_z[2] = {b->prev_pos[0], b->pos[1]};
+    if (eng_nav_walkable(nav, slide_x)) {
+        b->pos[1] = b->prev_pos[1];
+    } else if (eng_nav_walkable(nav, slide_z)) {
+        b->pos[0] = b->prev_pos[0];
+    } else {
+        b->pos[0] = b->prev_pos[0];
+        b->pos[1] = b->prev_pos[1];
+    }
+}
+
 static void resolve_bodies(EngCombatSim *s)
 {
     for (uint32_t pass = 0; pass < 2U; pass++) {
@@ -229,6 +249,13 @@ static void resolve_bodies(EngCombatSim *s)
                 continue;
             }
             eng_aiw_push_out(s->world, s->bodies[i].pos, s->radius[i] > 0.0F ? s->radius[i] : 0.3F);
+        }
+    }
+    if (s->nav != NULL) {
+        for (uint32_t i = 0; i < s->count; i++) {
+            if ((s->world_ignore >> i & 1U) == 0U) {
+                keep_walkable(s->nav, &s->bodies[i]);
+            }
         }
     }
 }

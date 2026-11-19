@@ -7,7 +7,7 @@ Légende : **Prouvé** = commande rejouable (Linux, SwiftShader, sans GPU réel)
 | # | Critère | Preuve | État |
 |---|---|---|---|
 | 1 | Attaques définies en données, rechargeables à chaud | `attack_data` + `EngAttackFile` (open/poll), ticks entiers source de vérité ; `test_attack_data`, `test_fighter` | Prouvé (pas vu en jeu) |
-| 2 | Visualisation hitbox/hurtbox + pas à pas | `combat_debug` : pas avant/arrière/saut, frise, dessin par zone ; `test_combat_debug` | Partiel — prouvé sur les données et le nombre de segments, **pas vu à l'écran** |
+| 2 | Visualisation hitbox/hurtbox + pas à pas | `combat_debug` : pas avant/arrière/saut, frise, dessin par zone ; `test_combat_debug`. **Finition** : F5 gèle le jeu, F6 avance d'un tick (vu à l'écran : tick 306 → 312 après 6 pressions, image identique au pixel près tant que rien n'est pressé) ; panneau « Combat » de F1 (état, attaque, phase, PV, posture, endurance par combattant) | Partiel — pas à pas et panneau vus à l'écran ; les capsules (F3) sont cachées dans les modèles opaques (à dessiner par-dessus) |
 | 3 | Replay déterministe | `combat_replay` : même entrées → même hash ; une entrée changée → première divergence ≥ ce tick ; fichier RSRP | Prouvé (même binaire / même machine) |
 | 4 | 2 testeurs jugent le combat lisible | — | **À faire** (ton côté) |
 
@@ -27,7 +27,10 @@ Légende : **Prouvé** = commande rejouable (Linux, SwiftShader, sans GPU réel)
 
 ## Ce que les preuves ne disent pas
 
-Le combat n'est pas branché au personnage jouable : aucun coup n'est visible à l'écran ni audible.
+(Finition, 2026-11-19) Branché au personnage jouable et vu sur le RTX 5070 : coups, chiffres de dégâts,
+traînée de lame, étincelles ; son non écouté par Théo (Q2) ; 2 testeurs à faire (Q5/Q6).
+
+Texte d'origine : le combat n'est pas branché au personnage jouable : aucun coup n'est visible à l'écran ni audible.
 Aucun 60 FPS mesuré, aucune latence audio matérielle, aucun fichier Mixamo réel. Le tag v0.5
 dépend du critère 4.
 

@@ -27,10 +27,12 @@
  * pas de modèle animé avant les tâches d'animation de M4. Pas fixe 60 Hz, appelé depuis la boucle.
  */
 
+#define PLAY_MAX_SLOPE_DEG 45.0F /* personnage Jolt et grille de l'IA (M6-03) */
 #define PLAY_SPAWN_X 4.0F
 #define PLAY_SPAWN_Z 4.0F
 #define PLAY_GROUND_TOP (-0.5F) /* dessus du sol de la démonstration (demo_scene.c) */
 #define PLAY_PIVOT_HEIGHT 1.5F  /* m au-dessus des pieds : le haut du dos */
+#define PLAY_ARENA_PIECES 6U
 
 typedef struct PlayMode {
     EngPhysics *world;
@@ -43,21 +45,24 @@ typedef struct PlayMode {
     float air_control;  /* ]0 ; 1] : part des accélérations disponible en l'air */
     float gravity_fall; /* ]0 ; 5], x la gravité en chute (la montée garde 1) */
     float cut_factor;   /* [0 ; 1[ : vitesse verticale gardée si on relâche Espace en montant */
-    bool sprinting;
-    bool ready;
     uint32_t jumps;     /* sauts effectués (autotest, journal) */
     uint32_t landings;  /* atterrissages */
     PlayCombat *combat; /* NULL sans --combat */
-    bool on_terrain; /* --terrain : sol = champ de hauteurs (collision Jolt) au lieu de l'arène */
     EngArena terrain_arena;
     EngHeightmap map;
     float terrain_half;
     float combat_time; /* secondes de jeu (rechargement des attaques) */
-    bool autoplay;     /* --combat-autoplay : le pilote automatique joue */
     uint32_t ticks;
     AvatarLibrary *avatars; /* M4 : personnages animés ; NULL : capsules en fil de fer */
-    Avatar avatar;          /* le chevalier du joueur */
-    bool show_debug;        /* F3 : capsules, boîtes et flèche en plus des modèles */
+    EngModelGpu arena_models[PLAY_ARENA_PIECES]; /* arène dessinée (marches, mur, rampe...) */
+    mat4 arena_place[PLAY_ARENA_PIECES];
+    uint32_t arena_count;
+    Avatar avatar; /* le chevalier du joueur */
+    bool sprinting;
+    bool ready;
+    bool on_terrain; /* --terrain : sol = champ de hauteurs (collision Jolt) au lieu de l'arène */
+    bool autoplay;   /* --combat-autoplay : le pilote automatique joue */
+    bool show_debug; /* F3 : capsules, boîtes et flèche en plus des modèles */
 } PlayMode;
 
 /* Crée le monde (sol, cubes de la démonstration rendus solides, marches, mur, rampe, plateforme),
@@ -97,6 +102,12 @@ bool play_mode_attach_avatars(PlayMode *play, AvatarLibrary *lib);
 /* Une fois par IMAGE, avant le dessin : anime les personnages (`alpha` : interpolation entre deux
  * pas, `dt` : durée réelle de l'image). */
 void play_mode_update_visuals(PlayMode *play, double alpha, float dt);
+/* Arène en volumes (au lieu du fil de fer) : modèles GPU des marches, du mur, de la plateforme et
+ * de la rampe, éclairés par `env` (peut être NULL). Sans effet sur le terrain. */
+bool play_mode_load_arena_visuals(PlayMode *play, EngRenderer *renderer, EngArena *arena,
+                                  const EngEnvironment *env);
+void play_mode_unload_visuals(PlayMode *play, EngRenderer *renderer);
+
 /* Dessine les personnages (crochet de modèles de la scène, demo_scene_set_model_hook). */
 void play_mode_draw_models(const PlayMode *play, EngRenderQueue *queue, mat4 view_proj,
                            const EngLighting *light, const EngModelShadow *shadow,

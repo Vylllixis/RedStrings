@@ -20,10 +20,16 @@ build/debug/bin/launcher --play-terrain-selftest doux.hmap   # « AUTOTEST TERRA
 
 Le sol devient le champ de hauteurs (collision Jolt alignée sur le rendu, origine −côté/2) ; le
 personnage, le mannequin et le camp sont posés sur le relief (le dessin suit la hauteur sous
-chaque combattant). Les ennemis n'ont pas d'obstacles (pas de cubes sur le terrain). Un relief
-**doux** est conseillé : sur un terrain raide (120 m de relief sur 1 km, comme celui de M3) le départ
-peut tomber sur une pente non praticable et la caméra se colle au versant. Les dessins de l'IA
-(cônes) suivent la hauteur sous le joueur seulement.
+chaque combattant). Navigation sur le relief (M6-03, ADR 0027) : la grille de l'IA bloque les pentes
+au-delà de 45° (la limite du personnage Jolt) et les petits îlots isolés ; les postes du camp tombés
+dans une pente sont déplacés ; un ennemi ne remonte jamais sur une pente (il glisse le long du
+bord). Sur un terrain raide le départ du joueur peut encore tomber sur une pente et la caméra se
+coller au versant. Les dessins de l'IA (cônes) suivent la hauteur sous le joueur seulement.
+
+```
+build/release/bin/assetc heightmap raide.hmap --size 257 --spacing 2 --alt-max 60 --wavelength 100
+build/release/bin/launcher --combat-terrain-selftest raide.hmap   # « AUTOTEST CAMP TERRAIN : OK »
+```
 
 ## Commandes (en plus de celles de `--play`)
 
@@ -38,12 +44,24 @@ peut tomber sur une pente non praticable et la caméra se colle au versant. Les 
 Pendant une attaque, une esquive ou une réaction, le personnage ne marche pas (le combat décide).
 Verrouillé, une attaque se tourne automatiquement vers la cible.
 
-## Ce qui est à l'écran (fil de fer)
+Outils de mise au point (M5-16, M6-10) :
+
+| Touche | Effet |
+|---|---|
+| F5 | gèle le jeu (simulation, IA, personnage et animations arrêtés ; la caméra aussi) ; de nouveau : reprend |
+| F6 | jeu gelé : avance d'UN tick (1/60 s), animations comprises |
+| F1 | panneau de debug ; section « Combat » : tick, état de chaque combattant, attaque en cours et sa phase (anticipation / ACTIF / récupération), PV, posture |
+| clic gauche dans la vue (F1 ouvert) | sélectionne l'ennemi sous le curseur : son état d'IA (perception, chemin, jeton) dans la section « IA », cercle autour de lui |
+
+## Ce qui est à l'écran
 
 - Mannequin en (4, −1), devant le départ : poteau fixe, 1000 PV, se remet à neuf après 3 s sans coup.
 - Camp vers (−14, −11) : grunt (rapide, ronde), brute (lent, lourd), archer (portée longue, fuit blessé).
-- Hurtboxes par zone (tête / torse / membres ; gris = intouchable), arme **orange** pendant
-  l'anticipation d'un ennemi (≥ 300 ms), **rouge** quand elle peut toucher.
+- Arène de M4 en volumes éclairés avec ombres (marches, mur, plateforme, rampe).
+- Télégraphe (sans F3) : la lame d'un ennemi s'entoure d'**orange** pendant l'anticipation
+  (≥ 300 ms), de **rouge** quand elle peut toucher. Traînée blanche derrière la lame pendant une
+  attaque (M5-20).
+- Avec F3 : hurtboxes par zone (tête / torse / membres ; gris = intouchable), capsules physiques.
 - Barres au-dessus des têtes : PV (vert), posture (jaune). Cercle magenta : cible verrouillée.
 - Cônes de vision des ennemis (couleur = état : vert ronde, jaune alerte, magenta poursuite,
   rouge engagé, bleu retour, cyan fuite), ligne vers la cible, anneau jaune = jeton d'attaque.
@@ -72,7 +90,7 @@ jusqu'à une victoire, toujours au plus 2 attaquants.
   esquive, recul et séparation, bornés à 0,6 m par tick. Les ennemis se déplacent dans la
   simulation (plan), sans physique ni marches.
 - Les lignes de l'IA (cônes) sont dessinées à hauteur fixe.
-- Pas de texte à l'écran (nombres de dégâts calculés, non affichés) ; pas de HUD.
+- Le télégraphe et la traînée sont des lignes (debug draw), pas encore des effets de matériau.
 - Son : vérifié avec le pilote « dummy » chez moi, **jamais écouté** ; latence matérielle non mesurée.
 - Ressenti (lisibilité, réactivité) : à juger sur ta machine ; c'est le critère « 2 testeurs » de M5.
 - Captures faites chez moi en rendu logiciel (SwiftShader), pas sur un vrai GPU.

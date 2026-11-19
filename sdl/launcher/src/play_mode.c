@@ -146,7 +146,8 @@ static bool init_common(PlayMode *play, EngTweaks *tweaks, float camera_sensitiv
         return false;
     }
     const float spawn_y = play_mode_ground(play, PLAY_SPAWN_X, PLAY_SPAWN_Z);
-    const EngCharacterDesc desc = {.position = {PLAY_SPAWN_X, spawn_y + 0.05F, PLAY_SPAWN_Z}};
+    const EngCharacterDesc desc = {.position = {PLAY_SPAWN_X, spawn_y + 0.05F, PLAY_SPAWN_Z},
+                                   .max_slope_deg = PLAY_MAX_SLOPE_DEG};
     play->character = eng_character_create(play->world, &desc);
     const float start_yaw = -1.5707963F; /* regarde vers +X, vers les marches */
     const float pivot[3] = {PLAY_SPAWN_X, spawn_y + PLAY_PIVOT_HEIGHT, PLAY_SPAWN_Z};
@@ -234,12 +235,22 @@ void play_mode_shutdown(PlayMode *play)
     play->ready = false;
 }
 
+static float relief_height(void *user, float x, float z)
+{
+    return play_mode_ground((const PlayMode *)user, x, z);
+}
+
 bool play_mode_enable_combat(PlayMode *play, bool audio)
 {
     if (play == NULL || !play->ready || play->combat != NULL) {
         return false;
     }
     play->combat = play_combat_create(audio, !play->on_terrain);
+    if (play->combat != NULL && play->on_terrain) {
+        /* M6-03 : les ennemis vont partout où le personnage peut aller, et pas ailleurs : même
+         * pente limite que le personnage Jolt */
+        (void)play_combat_set_relief(play->combat, relief_height, play, PLAY_MAX_SLOPE_DEG);
+    }
     return play->combat != NULL;
 }
 
@@ -336,7 +347,7 @@ void play_mode_debug_draw(const PlayMode *play, EngDebugLines *lines, double alp
         play->on_terrain ? (ENG_LAYERS_ALL & ~(1U << ENG_LAYER_STATIC)) : ENG_LAYERS_ALL;
     const bool models = play->avatars != NULL && play->avatar.ready;
     if (models && !play->show_debug) {
-        mask &= 1U << ENG_LAYER_STATIC;
+        mask &= play->arena_count > 0U ? 0U : 1U << ENG_LAYER_STATIC;
     }
     const EngPhysicsDebugDraw options = {
         .layer_mask = mask, .focus = {feet[0], feet[1], feet[2]}, .radius = 60.0F};
@@ -355,6 +366,96 @@ void play_mode_debug_draw(const PlayMode *play, EngDebugLines *lines, double alp
     if (play->combat != NULL) {
         play_combat_draw(play->combat, lines, play);
     }
+}
+
+/* ── Arène en volumes ── */
+
+static EngModelMaterial arena_material(float r, float g, float b, float roughness)
+{
+    return (EngModelMaterial){.base_color = {r, g, b, 1.0F},
+                              .image = -1,
+                              .metallic = 0.0F,
+                              .roughness = roughness,
+                              .metallic_roughness_image = -1,
+                              .normal_scale = 1.0F,
+                              .normal_image = -1,
+                              .occlusion_strength = 1.0F,
+                              .occlusion_image = -1,
+                              .emissive_image = -1};
+}
+
+/* Une pièce : boîte [lo ; hi] dans son repère, placée par `place`. */
+static bool add_piece(PlayMode *play, EngRenderer *renderer, EngArena *arena,
+                      const EngEnvironment *env, const float lo[3], const float hi[3],
+                      const EngModelMaterial *mat, mat4 place)
+{
+    if (play->arena_count >= PLAY_ARENA_PIECES) {
+        return false;
+    }
+    const EngArenaMark mark = eng_arena_mark(arena);
+    EngModel box;
+    bool ok = eng_model_make_box(arena, lo, hi, mat, &box);
+    EngModelGpu *gpu = &play->arena_models[play->arena_count];
+    ok = ok && eng_model_gpu_create(gpu, renderer, arena, &box, 0.0F);
+    if (!ok) {
+        eng_arena_reset_to(arena, mark);
+        return false;
+    }
+    if (env != NULL) {
+        (void)eng_model_gpu_set_environment(gpu, renderer, env);
+    }
+    glm_mat4_copy(place, play->arena_place[play->arena_count]);
+    play->arena_count++;
+    return true;
+}
+
+bool play_mode_load_arena_visuals(PlayMode *play, EngRenderer *renderer, EngArena *arena,
+                                  const EngEnvironment *env)
+{
+    if (play == NULL || !play->ready || renderer == NULL || arena == NULL || play->on_terrain) {
+        return false;
+    }
+    const EngModelMaterial stone = arena_material(0.42F, 0.40F, 0.38F, 0.85F);
+    const EngModelMaterial wood = arena_material(0.45F, 0.30F, 0.18F, 0.7F);
+    mat4 id;
+    glm_mat4_identity(id);
+    const float y0 = PLAY_GROUND_TOP;
+    bool ok = true;
+    /* marches : mêmes boîtes que la physique (build_arena) */
+    const float steps[3][3] = {{10.0F, 12.0F, 0.15F}, {13.0F, 15.0F, 0.30F}, {16.0F, 18.0F, 0.45F}};
+    for (int i = 0; i < 3; i++) {
+        const float lo[3] = {steps[i][0], y0, 1.0F};
+        const float hi[3] = {steps[i][1], y0 + steps[i][2], 7.0F};
+        ok = add_piece(play, renderer, arena, env, lo, hi, &stone, id) && ok;
+    }
+    const float wall_lo[3] = {23.75F, y0, 0.5F};
+    const float wall_hi[3] = {24.25F, y0 + 3.0F, 7.5F};
+    ok = add_piece(play, renderer, arena, env, wall_lo, wall_hi, &stone, id) && ok;
+    const float plat_lo[3] = {-8.0F, y0, 2.5F};
+    const float plat_hi[3] = {-5.0F, y0 + 1.2F, 5.5F};
+    ok = add_piece(play, renderer, arena, env, plat_lo, plat_hi, &wood, id) && ok;
+    /* rampe : de x = -12 (au sol) à x = -18 (2 m) ; dalle de 0,2 m dont le DESSUS suit la pente */
+    const float length = sqrtf((6.0F * 6.0F) + (2.0F * 2.0F));
+    const float angle = -atanf(2.0F / 6.0F); /* +X local -> (cos, sin) = vers le bas de la pente */
+    const float ramp_lo[3] = {-0.5F * length, -0.2F, -1.5F};
+    const float ramp_hi[3] = {0.5F * length, 0.0F, 1.5F};
+    mat4 ramp;
+    glm_translate_make(ramp, (vec3){-15.0F, y0 + 1.0F, 4.0F}); /* milieu du dessus */
+    glm_rotate_z(ramp, angle, ramp);
+    ok = add_piece(play, renderer, arena, env, ramp_lo, ramp_hi, &wood, ramp) && ok;
+    ENG_LOG_INFO("arène : %u pièce(s) dessinée(s)", play->arena_count);
+    return ok;
+}
+
+void play_mode_unload_visuals(PlayMode *play, EngRenderer *renderer)
+{
+    if (play == NULL || renderer == NULL) {
+        return;
+    }
+    for (uint32_t i = 0; i < play->arena_count; i++) {
+        eng_model_gpu_destroy(&play->arena_models[i], renderer);
+    }
+    play->arena_count = 0;
 }
 
 /* ── Personnages animés (M4) ── */
@@ -403,6 +504,17 @@ void play_mode_draw_models(const PlayMode *play, EngRenderQueue *queue, mat4 vie
 {
     if (play == NULL || !play->ready || play->avatars == NULL) {
         return;
+    }
+    for (uint32_t i = 0; i < play->arena_count; i++) {
+        mat4 place;
+        glm_mat4_copy((vec4 *)play->arena_place[i], place);
+        if (shadow_pass) {
+            (void)eng_model_gpu_draw_depth(&play->arena_models[i], queue,
+                                           play->avatars->prop_shadow, place, view_proj);
+        } else {
+            (void)eng_model_gpu_draw_shadowed(&play->arena_models[i], queue, play->avatars->prop,
+                                              place, view_proj, light, shadow);
+        }
     }
     if (shadow_pass) {
         avatar_draw_shadow(&play->avatar, play->avatars, queue, view_proj);

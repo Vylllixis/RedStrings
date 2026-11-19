@@ -94,6 +94,8 @@ typedef struct EngUiPanelData {
     uint64_t frame_allocs; /* allocations pendant les images depuis le début (objectif : 0) */
     EngTweaks *tweaks;     /* réglages en direct ; NULL : section absente */
     const char *animation; /* M4-16 : ligne d'état du lecteur d'animation ; NULL : absente */
+    const char *combat;    /* M5-16 : état des combattants (texte multi-lignes) ; NULL : absente */
+    const char *ai;        /* M6-10 : ennemi sélectionné au clic (texte) ; NULL : absente */
 } EngUiPanelData;
 
 /* true si le moteur a été compilé avec l'interface (OW_UI). */

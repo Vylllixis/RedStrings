@@ -488,6 +488,18 @@ if(OW_PHYSICS)
   set_tests_properties(launcher.combat_rig PROPERTIES
     ENVIRONMENT "${LAUNCHER_ENV}"
     PASS_REGULAR_EXPRESSION "AUTOTEST COMBAT : OK \\([0-9]+ mesures, [0-9]+ ticks, rig animé\\)")
+  # M6-03 : le camp sur un relief marqué (60 m, longueur d'onde 100 m : la moitié des cellules
+  # dépasse 45°, les 3 postes du camp tombent sur une pente) : postes déplacés, îlots retirés, les
+  # ennemis atteignent le joueur sans jamais remonter sur une pente.
+  if(UNIX)
+    add_test(NAME launcher.camp_terrain
+             COMMAND sh -c "\"$1\" heightmap \"$3\" --size 257 --spacing 2 --alt-max 60 --wavelength 100 && \"$2\" --combat-terrain-selftest \"$3\""
+                     sh $<TARGET_FILE:assetc> $<TARGET_FILE:launcher> ${CMAKE_CURRENT_BINARY_DIR}/camp_terrain.hmap
+             WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR})
+    set_tests_properties(launcher.camp_terrain PROPERTIES
+      ENVIRONMENT "${LAUNCHER_ENV}"
+      PASS_REGULAR_EXPRESSION "AUTOTEST CAMP TERRAIN : OK")
+  endif()
   # Galerie des états d'animation (M4) : personnages cuits chargés sur le GPU et dessinés.
   add_test(NAME launcher.avatar_gallery COMMAND launcher --avatar-gallery --frames 10
            --env-samples 16 WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR})
@@ -497,6 +509,18 @@ if(OW_PHYSICS)
     PASS_REGULAR_EXPRESSION "5/5 corps, 9/9 armes")
   if(OW_SOFTWARE_VULKAN_ICD) # comme les autres tests GPU (voir plus haut)
     set_property(TEST launcher.avatar_gallery APPEND PROPERTY ENVIRONMENT_MODIFICATION
+      "VK_DRIVER_FILES=set:${OW_SOFTWARE_VULKAN_ICD}" "VK_ICD_FILENAMES=set:${OW_SOFTWARE_VULKAN_ICD}")
+  endif()
+  # Combat rendu sur le GPU (M4/M5) : arène en volumes, 5 personnages skinnés avec leurs ombres ;
+  # aucun dessin ne doit être perdu (B11 : la file d'ombre en perdait 16 par image).
+  add_test(NAME launcher.combat_render COMMAND launcher --combat-autoplay --no-audio --frames 60
+           --env-samples 16 WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR})
+  set_tests_properties(launcher.combat_render PROPERTIES
+    ENVIRONMENT "SDL_VIDEODRIVER=offscreen"
+    FAIL_REGULAR_EXPRESSION "ERROR|non détruite|perdu"
+    PASS_REGULAR_EXPRESSION "renderer : 60 image\\(s\\), 60 passe\\(s\\) d'ombre")
+  if(OW_SOFTWARE_VULKAN_ICD)
+    set_property(TEST launcher.combat_render APPEND PROPERTY ENVIRONMENT_MODIFICATION
       "VK_DRIVER_FILES=set:${OW_SOFTWARE_VULKAN_ICD}" "VK_ICD_FILENAMES=set:${OW_SOFTWARE_VULKAN_ICD}")
   endif()
 endif()

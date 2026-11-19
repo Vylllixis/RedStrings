@@ -59,6 +59,79 @@ static void cell_center(const EngNavGrid *nav, uint32_t idx, float out[2])
     out[1] = nav->origin[1] + ((float)z + 0.5F) * nav->cell;
 }
 
+uint32_t eng_nav_block_steep(EngNavGrid *nav, EngNavHeightFn height, void *user,
+                             float max_slope_deg)
+{
+    if (nav == NULL || height == NULL || !isfinite(max_slope_deg) || max_slope_deg <= 0.0F ||
+        max_slope_deg >= 90.0F || nav->w == 0U || nav->h == 0U) {
+        return 0;
+    }
+    const float max_grad = tanf(max_slope_deg * 0.01745329252F);
+    const float h = 0.5F * nav->cell;
+    uint32_t n = 0;
+    for (uint32_t z = 0; z < nav->h; z++) {
+        for (uint32_t x = 0; x < nav->w; x++) {
+            const uint32_t i = (z * nav->w) + x;
+            if (nav->blocked[i] != 0U) {
+                continue;
+            }
+            const float cx = nav->origin[0] + (((float)x + 0.5F) * nav->cell);
+            const float cz = nav->origin[1] + (((float)z + 0.5F) * nav->cell);
+            const float gx = (height(user, cx + h, cz) - height(user, cx - h, cz)) / nav->cell;
+            const float gz = (height(user, cx, cz + h) - height(user, cx, cz - h)) / nav->cell;
+            const float grad = sqrtf((gx * gx) + (gz * gz));
+            if (!isfinite(grad) || grad > max_grad) {
+                nav->blocked[i] = 1U;
+                n++;
+            }
+        }
+    }
+    return n;
+}
+
+uint32_t eng_nav_remove_islands(EngNavGrid *nav, uint32_t min_cells)
+{
+    if (nav == NULL || nav->w == 0U || min_cells < 2U) {
+        return 0;
+    }
+    const uint32_t total = nav->w * nav->h;
+    memset(nav->state, 0, total); /* 1 : déjà rangé dans une région */
+    uint32_t blocked = 0;
+    for (uint32_t seed = 0; seed < total; seed++) {
+        if (nav->blocked[seed] != 0U || nav->state[seed] != 0U) {
+            continue;
+        }
+        /* parcours en largeur : `scratch` reçoit toutes les cellules de la région, dans l'ordre */
+        uint32_t head = 0;
+        uint32_t tail = 0;
+        nav->scratch[tail++] = seed;
+        nav->state[seed] = 1U;
+        while (head < tail) {
+            const uint32_t cur = nav->scratch[head++];
+            const uint32_t x = cur % nav->w;
+            const uint32_t z = cur / nav->w;
+            const uint32_t next[4] = {
+                x > 0U ? cur - 1U : UINT32_MAX, x + 1U < nav->w ? cur + 1U : UINT32_MAX,
+                z > 0U ? cur - nav->w : UINT32_MAX, z + 1U < nav->h ? cur + nav->w : UINT32_MAX};
+            for (int k = 0; k < 4; k++) {
+                const uint32_t n = next[k];
+                if (n != UINT32_MAX && nav->blocked[n] == 0U && nav->state[n] == 0U) {
+                    nav->state[n] = 1U;
+                    nav->scratch[tail++] = n;
+                }
+            }
+        }
+        if (tail < min_cells) {
+            for (uint32_t i = 0; i < tail; i++) {
+                nav->blocked[nav->scratch[i]] = 1U;
+            }
+            blocked += tail;
+        }
+    }
+    memset(nav->state, 0, total);
+    return blocked;
+}
+
 bool eng_nav_walkable(const EngNavGrid *nav, const float p[2])
 {
     int32_t cx = 0;
@@ -177,6 +250,26 @@ static float octile(int32_t ax, int32_t az, int32_t bx, int32_t bz)
     const float lo = dx < dz ? dx : dz;
     const float hi = dx < dz ? dz : dx;
     return hi + (1.41421356F - 1.0F) * lo;
+}
+
+bool eng_nav_nearest_walkable(const EngNavGrid *nav, const float p[2], float out[2])
+{
+    int32_t cx = 0;
+    int32_t cz = 0;
+    if (nav == NULL || p == NULL || out == NULL || !to_cell(nav, p, &cx, &cz)) {
+        return false;
+    }
+    if (nav->blocked[((size_t)cz * nav->w) + (size_t)cx] == 0U) {
+        out[0] = p[0];
+        out[1] = p[1];
+        return true;
+    }
+    const int32_t idx = nearest_free(nav, cx, cz);
+    if (idx < 0) {
+        return false;
+    }
+    cell_center(nav, (uint32_t)idx, out);
+    return true;
 }
 
 uint32_t eng_nav_path(EngNavGrid *nav, const float from[2], const float to[2], float out[][2],

@@ -185,6 +185,7 @@ int main(int argc, char **argv)
     bool combat_audio = true;
     bool combat_selftest = false;
     bool combat_selftest_rig = false;
+    const char *combat_terrain_selftest_path = NULL;
     bool combat_autoplay = false;
     double world_bench_km = 0.0;
     const char *terrain_selftest_path = NULL;
@@ -269,6 +270,8 @@ int main(int argc, char **argv)
             combat_audio = false;
         } else if (strcmp(argv[i], "--combat-selftest") == 0) {
             combat_selftest = true;
+        } else if (strcmp(argv[i], "--combat-terrain-selftest") == 0 && i + 1 < argc) {
+            combat_terrain_selftest_path = argv[++i];
         } else if (strcmp(argv[i], "--combat-rig-selftest") == 0) {
             combat_selftest = true;
             combat_selftest_rig = true;
@@ -444,6 +447,11 @@ int main(int argc, char **argv)
         eng_log_shutdown();
         return bench_ok ? 0 : 1;
     }
+    if (combat_terrain_selftest_path != NULL) { /* M6-03 : le camp sur un relief */
+        const bool camp_ok = play_combat_terrain_selftest(combat_terrain_selftest_path);
+        eng_log_shutdown();
+        return camp_ok ? 0 : 1;
+    }
     if (combat_selftest) { /* sans fenêtre ni GPU : personnage, combat et IA scriptés */
         const bool combat_ok = play_combat_selftest(combat_selftest_rig);
         eng_log_shutdown();
@@ -590,7 +598,11 @@ int main(int argc, char **argv)
     bool use_renderer = false;
     if (use_gpu) {
         EngRendererDesc renderer_desc = {
-            .depth_buffer = true, .hdr = true, .max_shadow_commands = 256};
+            .depth_buffer = true,
+            .hdr = true,
+            .max_shadow_commands = 1024,
+            /* personnages skinnés : 41 matrices d'os (~2,8 Kio) par pièce, aussi dans l'ombre */
+            .max_shadow_uniform_bytes = 256U * 1024U};
 #ifdef OW_SHADER_SOURCE_DIR
         renderer_desc.source_dir = OW_SHADER_SOURCE_DIR;
 #endif
@@ -686,7 +698,10 @@ int main(int argc, char **argv)
 
     /* Mode jouable (M4) : monde physique, personnage, caméra 3e personne. */
     PlayMode play = {0};
-    static AvatarLibrary avatars; /* personnages animés (grand : hors pile) */
+    static AvatarLibrary avatars;  /* personnages animés (grand : hors pile) */
+    static char combat_text[1024]; /* M5-16 : panneau « Combat » de F1 */
+    static char ai_text[512];      /* M6-10 : ennemi sélectionné au clic */
+    uint32_t pick_serial = 0; /* M6-10 : dernier appui vu (un clic bref tient dans une image) */
     bool use_play = false;
     static GameFlow flow;
     bool use_flow = false;
@@ -730,6 +745,9 @@ int main(int argc, char **argv)
                 play_mode_attach_avatars(&play, &avatars)) {
                 demo_scene_set_model_hook(&scene, launcher_model_hook, &play_hook);
                 platform.debug_draw = false; /* capsules et grille : F3 */
+                (void)play_mode_load_arena_visuals(&play, &renderer, &memory.permanent,
+                                                   scene.has_environment ? &scene.environment
+                                                                         : NULL);
             }
         }
     }
@@ -906,6 +924,7 @@ int main(int argc, char **argv)
         uint32_t steps = eng_loop_advance(&loop, clock.dt_counter);
         ENG_PROF_PLOT("pas de simulation", steps);
         ENG_PROF_ZONE(z_sim, "simulation");
+        uint32_t frozen_steps = 0; /* F6 : ticks avancés pendant le gel (animations) */
         for (uint32_t i = 0; i < steps; i++) {
             ENG_PROF_ZONE(z_tick, "tick");
             EngInputState input;
@@ -914,7 +933,15 @@ int main(int argc, char **argv)
             eng_input_begin_tick(&platform.input, &input); /* UNE fois par pas */
             camera_prev = camera;
             if (use_play) {
-                if (!use_flow || game_flow_tick(&flow, &play, &input, (float)loop.tick_seconds)) {
+                /* F5 : jeu gelé ; F6 : un tick par pression (débogage du combat, M5-16) */
+                bool run_tick = !platform.debug_freeze;
+                if (platform.debug_freeze && platform.debug_steps > 0U) {
+                    platform.debug_steps--;
+                    run_tick = true;
+                    frozen_steps++;
+                }
+                if (run_tick &&
+                    (!use_flow || game_flow_tick(&flow, &play, &input, (float)loop.tick_seconds))) {
                     play_mode_tick(&play, &input, (float)loop.tick_seconds);
                 }
                 play_mode_view(&play, &camera);
@@ -935,6 +962,8 @@ int main(int argc, char **argv)
             ENG_PROF_ZONE_END(z_tick);
         }
         ENG_PROF_ZONE_END(z_sim);
+        /* F5 : jeu gelé : on montre le dernier tick (pas d'interpolation qui tremble) */
+        const double frame_alpha = platform.debug_freeze ? 1.0 : loop.alpha;
         eng_memory_end_frame(&memory);
         EngClockStats stats;
         if (eng_clock_take_stats(&clock, &stats)) {
@@ -990,11 +1019,49 @@ int main(int argc, char **argv)
                     if (gallery.ready) {
                         avatar_gallery_update(&gallery, &avatars, (float)clock.dt);
                     }
+                    combat_text[0] = '\0';
+                    ai_text[0] = '\0';
+                    if (use_play && play.combat != NULL) {
+                        /* M5-16 / M6-10 : panneau F1 ; clic dans la vue = sélection d'un ennemi */
+                        (void)play_combat_debug_text(play.combat, combat_text, sizeof combat_text);
+                        float mx = 0.0F;
+                        float my = 0.0F;
+                        (void)SDL_GetMouseState(&mx, &my);
+                        /* l'appui est un ÉVÉNEMENT : lire l'état du bouton raterait un clic dont
+                         * l'appui et la relâche arrivent dans la même image */
+                        const bool click = platform.input.last_serial != pick_serial &&
+                                           platform.input.last_kind == ENG_BIND_MOUSE_BUTTON &&
+                                           platform.input.last_code == SDL_BUTTON_LEFT;
+                        pick_serial = platform.input.last_serial;
+                        if (platform.debug_ui && !platform.mouse_captured && click &&
+                            (!use_ui || !eng_ui_wants_mouse(&ui))) {
+                            int ww = 0;
+                            int wh = 0;
+                            (void)SDL_GetWindowSize(platform.window, &ww, &wh);
+                            EngCamera pick_camera;
+                            eng_camera_lerp(&camera_prev, &camera, (float)loop.alpha, &pick_camera);
+                            EngRay ray;
+                            const float aspect_pick = wh > 0 ? (float)ww / (float)wh : 1.0F;
+                            if (eng_ray_from_screen(&pick_camera, aspect_pick, mx, my, (float)ww,
+                                                    (float)wh, &ray)) {
+                                float feet[3];
+                                (void)eng_character_position(play.character, feet);
+                                (void)play_combat_pick(play.combat, ray.origin, ray.dir,
+                                                       play_mode_ground(&play, feet[0], feet[2]));
+                            }
+                        }
+                        (void)play_combat_ai_text(play.combat, ai_text, sizeof ai_text);
+                    }
                     if (use_play) { /* animation des personnages : une fois par image */
                         play.show_debug = platform.debug_draw;
                         const bool paused = use_flow && eng_menu_is_open(&flow.menu);
-                        play_mode_update_visuals(&play, loop.alpha,
-                                                 paused ? 0.0F : (float)clock.dt);
+                        /* F5 : les animations sont gelées avec le combat ; F6 les avance d'un
+                         * tick, comme la simulation */
+                        const float visual_dt =
+                            platform.debug_freeze
+                                ? (float)((double)frozen_steps * loop.tick_seconds)
+                                : (float)clock.dt;
+                        play_mode_update_visuals(&play, frame_alpha, paused ? 0.0F : visual_dt);
                     }
                     EngRenderQueue *queue = eng_renderer_begin_frame(&renderer);
                     (void)eng_lighting_set_sun_angles(&lighting, sun_azimuth, sun_elevation);
@@ -1040,7 +1107,7 @@ int main(int argc, char **argv)
                                 &editor_mode.editor); /* souris capturée : pas de clic */
                         }
                     }
-                    play_hook.alpha = loop.alpha;
+                    play_hook.alpha = frame_alpha;
                     if (platform.debug_draw || use_editor || use_play ||
                         play_hook.skeleton != NULL) {
                         /* F3 ; en dernier : les lignes recouvrent la scène */
@@ -1084,6 +1151,8 @@ int main(int argc, char **argv)
                                 .frame_allocs = eng_memory_frame_allocs(&memory),
                                 .tweaks = &tweaks,
                                 .animation = skeleton_view.animated ? skeleton_view.status : NULL,
+                                .combat = combat_text[0] != '\0' ? combat_text : NULL,
+                                .ai = ai_text[0] != '\0' ? ai_text : NULL,
                             };
                             panel.arenas[0] =
                                 (EngUiArena){"permanent", memory.permanent.used,
@@ -1150,6 +1219,10 @@ int main(int argc, char **argv)
         ENG_LOG_INFO("renderer : %llu image(s), %llu passe(s) d'ombre",
                      (unsigned long long)renderer.stats.frames,
                      (unsigned long long)renderer.stats.shadow_passes);
+        if (renderer.stats.dropped_commands != 0U) { /* file ou uniforms trop petits */
+            ENG_LOG_WARN("renderer : %llu dessin(s) perdu(s) (file ou uniforms pleins)",
+                         (unsigned long long)renderer.stats.dropped_commands);
+        }
         if (use_editor) {
             demo_scene_set_world(&scene, NULL);
             editor_mode_shutdown(&editor_mode);
@@ -1160,6 +1233,7 @@ int main(int argc, char **argv)
         }
         skeleton_view_shutdown(&skeleton_view);
         demo_scene_set_model_hook(&scene, NULL, NULL);
+        play_mode_unload_visuals(&play, &renderer);
         avatar_library_shutdown(&avatars, &renderer);
         demo_scene_shutdown(&scene, &renderer);
         const uint32_t leaked = eng_renderer_shutdown(&renderer);

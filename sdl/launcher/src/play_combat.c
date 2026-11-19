@@ -115,7 +115,9 @@ struct PlayCombat {
     mat4 rig_world[FIGHTERS][AVATAR_MAX_JOINTS];
     AvatarProp rig_prop[FIGHTERS];
     float rig_scale[FIGHTERS];
-    EngPose reach_pose; /* mesure des portées (play_combat_attach_avatars) */
+    EngPose reach_pose;             /* mesure des portées (play_combat_attach_avatars) */
+    EngWeaponTrail trail[FIGHTERS]; /* M5-20 : traînée de la lame pendant une attaque */
+    int32_t ai_selected;            /* M6-10 : agent choisi au clic, -1 */
 };
 
 /* applique les statistiques du niveau au joueur ; `heal` : PV et endurance au maximum */
@@ -134,6 +136,9 @@ static void apply_progress(PlayCombat *c, bool heal)
         pf->stamina = pf->stamina > st.stamina_max ? st.stamina_max : pf->stamina;
     }
 }
+
+/* M6-03 : une région praticable plus petite (cellules de la grille, 0,5 m : 16 m²) est bloquée. */
+#define PLAY_NAV_MIN_REGION 64U
 
 static PlayCombat g_combat; /* ~1 Mo : instance unique, hors pile */
 
@@ -208,6 +213,7 @@ PlayCombat *play_combat_create(bool audio, bool arena_obstacles)
     memset(c, 0, sizeof *c);
     eng_prog_init(&c->progress);
     c->lock = -1;
+    c->ai_selected = -1;
     if (!eng_arena_init(&c->scratch, "combat", (size_t)1 << 20)) {
         return NULL;
     }
@@ -552,7 +558,8 @@ void play_combat_draw(const PlayCombat *c, EngDebugLines *lines, const PlayMode 
                 }
             }
             const bool modeled = i == PLAYER ? play->avatars != NULL : c->has_avatar[i];
-            if (f->fsm.state == ENG_CS_ATTACK && (!modeled || play->show_debug)) {
+            if (f->fsm.state == ENG_CS_ATTACK &&
+                (!modeled || play->show_debug || i >= FIRST_ENEMY)) {
                 /* arme : orange pendant l'anticipation d'un ennemi, rouge quand elle peut toucher
                  */
                 const bool active = eng_fighter_hitboxes_active(f, c->sim.attacks);
@@ -571,6 +578,7 @@ void play_combat_draw(const PlayCombat *c, EngDebugLines *lines, const PlayMode 
                     }
                 }
             }
+            (void)eng_trail_draw_debug(&c->trail[i], lines); /* M5-20 */
             bar(lines, b->pos, 2.15F, f->vitals.hp / f->vitals.max_hp, 0.9F, ENG_DEBUG_GREEN);
             bar(lines, b->pos, 2.05F, f->posture / f->params.max_posture, 0.9F, ENG_DEBUG_YELLOW);
             if ((int32_t)i == c->lock) {
@@ -585,8 +593,9 @@ void play_combat_draw(const PlayCombat *c, EngDebugLines *lines, const PlayMode 
     /* cônes de l'IA et particules : posés à la hauteur du sol sous le joueur (approximation) */
     const uint32_t d0 = lines->depth_count;
     const uint32_t o0 = lines->overlay_count;
-    if (c->avatars == NULL || play->show_debug) {
-        (void)eng_aidbg_draw(&c->group, &c->sim, -1, lines); /* cônes de vision : debug (F3) */
+    if (c->avatars == NULL || play->show_debug || c->ai_selected >= 0) {
+        /* cônes de vision : debug (F3) ; l'ennemi sélectionné au clic en blanc, avec son chemin */
+        (void)eng_aidbg_draw(&c->group, &c->sim, c->ai_selected, lines);
     }
     (void)eng_particles_draw_debug(&c->particles, lines);
     shift(lines, d0, o0,
@@ -746,6 +755,9 @@ bool play_combat_attach_avatars(PlayCombat *c, AvatarLibrary *lib, const PlayMod
                          c, lib, light != ENG_ATTACK_NONE ? &c->attacks.attacks[light] : NULL,
                          AVATAR_SWORD, 1.0F));
     }
+    for (uint32_t i = 0; i < FIGHTERS; i++) {
+        (void)eng_trail_init(&c->trail[i], 10U); /* 10 ticks de rémanence */
+    }
     c->rig_prop[PLAYER] = AVATAR_SWORD; /* le chevalier (PlayMode) */
     c->rig_scale[PLAYER] = 1.0F;
     for (uint32_t i = 0; hurt_ok && i < c->sim.count && i < FIGHTERS; i++) {
@@ -798,9 +810,14 @@ static void rig_tick(PlayCombat *c)
         if (avatar_blade_world(lib, c->rig_prop[i], c->rig_world[i], model, c->rig_scale[i],
                                &blade)) {
             (void)eng_sim_set_weapon(&c->sim, i, &blade, 1);
+            /* traînée : la lame laisse sa trace pendant toute l'attaque, puis s'efface */
+            if (d.state == ENG_CS_ATTACK) {
+                (void)eng_trail_push(&c->trail[i], blade.a, blade.b);
+            }
         } else {
             (void)eng_sim_set_weapon(&c->sim, i, NULL, 0);
         }
+        eng_trail_update(&c->trail[i]);
     }
 }
 
@@ -852,6 +869,109 @@ void play_combat_draw_models(const PlayCombat *c, const AvatarLibrary *lib, EngR
             avatar_draw(&c->avatar[i], lib, queue, view_proj, light, shadow);
         }
     }
+}
+
+uint32_t play_combat_set_relief(PlayCombat *c, float (*height)(void *user, float x, float z),
+                                void *user, float max_slope_deg)
+{
+    if (c == NULL || !c->ready) {
+        return 0;
+    }
+    const uint32_t n = eng_nav_block_steep(&c->nav, height, user, max_slope_deg);
+    const uint32_t islands = eng_nav_remove_islands(&c->nav, PLAY_NAV_MIN_REGION);
+    c->sim.nav = &c->nav; /* les ennemis ne montent jamais sur une pente bloquée */
+    /* postes et rondes posés sur une pente : déplacés sur le praticable le plus proche */
+    uint32_t moved = 0;
+    for (uint32_t i = 0; i < c->group.count && i < c->camp.count; i++) {
+        EngAiAgent *a = &c->group.agents[i];
+        EngCampMember *m = &c->camp.m[i];
+        moved += eng_nav_walkable(&c->nav, m->pos) ? 0U : 1U;
+        (void)eng_nav_nearest_walkable(&c->nav, m->pos, m->pos);
+        a->home[0] = m->pos[0];
+        a->home[1] = m->pos[1];
+        for (uint32_t k = 0; k < m->patrol_n && k < ENG_AI_PATROL_MAX; k++) {
+            (void)eng_nav_nearest_walkable(&c->nav, m->patrol[k], m->patrol[k]);
+        }
+        for (uint32_t k = 0; k < a->patrol_n && k < ENG_AI_PATROL_MAX; k++) {
+            (void)eng_nav_nearest_walkable(&c->nav, a->patrol[k], a->patrol[k]);
+        }
+    }
+    spawn_all(c);
+    ENG_LOG_INFO("combat : navigation sur le relief, %u cellule(s) trop raide(s) (> %.0f°), %u en "
+                 "îlots isolés, %u poste(s) d'ennemi déplacé(s) hors pente",
+                 n, (double)max_slope_deg, islands, moved);
+    return n;
+}
+
+size_t play_combat_debug_text(const PlayCombat *c, char *buf, size_t cap)
+{
+    if (c == NULL || !c->ready || buf == NULL || cap == 0U) {
+        return 0;
+    }
+    static const char *const names[FIGHTERS] = {"joueur", "mannequin", "ennemi 1", "ennemi 2",
+                                                "ennemi 3"};
+    static const char *const phases[4] = {"anticipation", "ACTIF", "récupération", "fini"};
+    size_t n = 0;
+    buf[0] = '\0';
+    n += (size_t)snprintf(buf + n, cap - n, "tick %u%s\n", (unsigned)c->sim.tick,
+                          c->sim.hitstop > 0U ? "  (gel d'impact)" : "");
+    for (uint32_t i = 0; i < c->sim.count && i < FIGHTERS && n < cap; i++) {
+        const EngFighter *f = &c->sim.fighters[i];
+        char what[96] = "";
+        if (f->fsm.state == ENG_CS_ATTACK) {
+            const EngAttack *a = eng_fighter_attack(f, c->sim.attacks);
+            const EngAttackPhase ph =
+                a != NULL ? eng_attack_phase(a, f->attack_tick) : ENG_ATTACK_DONE;
+            (void)snprintf(what, sizeof what, " %s t%u %s", a != NULL ? a->name : "?",
+                           (unsigned)f->attack_tick, phases[(uint32_t)ph < 4U ? ph : 3U]);
+        } else {
+            (void)snprintf(what, sizeof what, " t%u", (unsigned)f->fsm.ticks);
+        }
+        const int k = snprintf(
+            buf + n, cap - n, "%s : %s%s\n    PV %.0f/%.0f  posture %.0f  endurance %.0f\n",
+            names[i], eng_combat_state_name(f->vitals.dead ? ENG_CS_DEAD : f->fsm.state), what,
+            (double)f->vitals.hp, (double)f->vitals.max_hp, (double)f->posture, (double)f->stamina);
+        if (k < 0) {
+            break;
+        }
+        n += (size_t)k;
+    }
+    return n < cap ? n : cap - 1U;
+}
+
+int32_t play_combat_pick(PlayCombat *c, const float origin[3], const float dir[3], float ground)
+{
+    if (c == NULL || !c->ready || origin == NULL || dir == NULL) {
+        return -1;
+    }
+    const float o[3] = {origin[0], origin[1] - ground,
+                        origin[2]}; /* monde -> plan de la simulation */
+    const int32_t picked = eng_aidbg_pick(&c->group, &c->sim, o, dir, 200.0F);
+    if (picked != c->ai_selected) {
+        if (picked >= 0) {
+            const EngAiAgent *a = &c->group.agents[picked];
+            ENG_LOG_INFO("IA : ennemi %u sélectionné (%s)",
+                         (unsigned)(a->fighter - FIRST_ENEMY + 1U),
+                         a->arch < c->arch.count ? c->arch.a[a->arch].name : "?");
+        } else {
+            ENG_LOG_INFO("IA : sélection effacée");
+        }
+    }
+    c->ai_selected = picked;
+    return c->ai_selected;
+}
+
+size_t play_combat_ai_text(const PlayCombat *c, char *buf, size_t cap)
+{
+    if (c == NULL || !c->ready || buf == NULL || cap == 0U || c->ai_selected < 0) {
+        return 0;
+    }
+    EngAiDebugInfo info;
+    if (!eng_aidbg_info(&c->group, &c->sim, (uint32_t)c->ai_selected, &info)) {
+        buf[0] = '\0';
+        return 0;
+    }
+    return eng_aidbg_format(&info, buf, cap);
 }
 
 void play_combat_reset(PlayCombat *c)
@@ -1123,6 +1243,91 @@ static void put(CombatTest *t, float x, float z, float yaw)
     for (int i = 0; i < 30; i++) {
         step(t, 0, 0, 0.0F, 0.0F);
     }
+}
+
+bool play_combat_terrain_selftest(const char *heightmap_path)
+{
+    static CombatTest t;
+    memset(&t, 0, sizeof t);
+    t.ok = true;
+    if (heightmap_path == NULL ||
+        !play_mode_init_terrain(&t.play, NULL, 1.0F, false, heightmap_path) ||
+        !play_mode_enable_combat(&t.play, false)) {
+        ENG_LOG_ERROR("AUTOTEST CAMP TERRAIN : ÉCHEC (initialisation ; Jolt et le terrain requis)");
+        play_mode_shutdown(&t.play);
+        return false;
+    }
+    PlayCombat *c = t.play.combat;
+    c->sim.fighters[PLAYER].vitals.max_hp = 5000.0F;
+    c->sim.fighters[PLAYER].vitals.hp = 5000.0F;
+    uint32_t steep_cells = 0;
+    for (uint32_t i = 0; i < c->nav.w * c->nav.h; i++) {
+        steep_cells += c->nav.blocked[i] != 0U ? 1U : 0U;
+    }
+    /* joueur posé sur le relief à environ 6 m du camp, en garde */
+    float spot[2] = {-9.0F, -5.0F}; /* sur le praticable le plus proche : jamais dans une pente */
+    (void)eng_nav_nearest_walkable(&c->nav, spot, spot);
+    float feet[3] = {spot[0], 0.0F, spot[1]};
+    feet[1] = play_mode_ground(&t.play, feet[0], feet[2]) + 0.05F;
+    play_mode_teleport(&t.play, feet, 2.3561945F - 3.14159265F);
+    const uint32_t block = 1U << ENG_ACTION_INTERACT;
+    uint32_t in_steep = 0;
+    bool was_walkable[FIGHTERS] = {false};
+    uint32_t start_steep = 0;
+    for (uint32_t k = FIRST_ENEMY; k < FIGHTERS; k++) {
+        start_steep += eng_nav_walkable(&c->nav, c->sim.bodies[k].pos) ? 0U : 1U;
+    }
+    uint32_t closest_tick = 0;
+    float closest = 1e9F;
+    for (int i = 0; i < 1800; i++) {
+        step(&t, i == 0 ? block : 0U, block, 0.0F, 0.0F);
+        for (uint32_t k = FIRST_ENEMY; k < FIGHTERS; k++) {
+            if (c->sim.fighters[k].vitals.dead) {
+                continue;
+            }
+            const float *p = c->sim.bodies[k].pos;
+            if (eng_nav_walkable(&c->nav, p)) {
+                was_walkable[k] = true;
+            } else if (was_walkable[k]) { /* revenu sur une pente après l'avoir quittée */
+                in_steep++;
+            }
+            const float d =
+                hypotf(p[0] - c->sim.bodies[PLAYER].pos[0], p[1] - c->sim.bodies[PLAYER].pos[1]);
+            if (d < closest) {
+                closest = d;
+                closest_tick = (uint32_t)i;
+            }
+        }
+    }
+    PlayCombatStats s;
+    play_combat_stats(c, &s);
+    float route[64][2];
+    const float *pp = c->sim.bodies[PLAYER].pos;
+    const uint32_t route_n = eng_nav_path(&c->nav, c->camp.m[0].pos, pp, route, 64);
+    const bool reachable = route_n > 0U && hypotf(route[route_n - 1U][0] - pp[0],
+                                                  route[route_n - 1U][1] - pp[1]) < 0.75F;
+    ENG_LOG_INFO("autotest : joueur en (%.1f, %.1f) sur une cellule %s ; chemin depuis le camp : "
+                 "%u point(s), %s",
+                 (double)pp[0], (double)pp[1],
+                 eng_nav_walkable(&c->nav, pp) ? "praticable" : "BLOQUÉE", route_n,
+                 reachable ? "jusqu'au joueur" : "s'arrête avant le joueur");
+    ENG_LOG_INFO("autotest : %u cellule(s) raide(s) dans la grille, %u ennemi(s) placé(s) sur une "
+                 "pente au départ, ennemi le plus proche à %.2f m (tick %u)",
+                 steep_cells, start_steep, (double)closest, closest_tick);
+    check(&t, s.enemies_engaged >= 1U, "camp sur relief : ennemis engagés",
+          (float)s.enemies_engaged);
+    check(&t, closest < 2.5F, "camp sur relief : un ennemi atteint le joueur (m)", closest);
+    check(&t, in_steep == 0U, "camp sur relief : ticks revenus sur une pente quittée",
+          (float)in_steep);
+    check(&t, start_steep == 0U, "camp sur relief : ennemis placés sur une pente au départ",
+          (float)start_steep);
+    check(&t, s.max_attackers <= 2U, "camp sur relief : attaquants simultanés (<= 2)",
+          (float)s.max_attackers);
+    check(&t, s.player_hits_taken >= 1U, "camp sur relief : coups reçus par le joueur",
+          (float)s.player_hits_taken);
+    ENG_LOG_INFO("AUTOTEST CAMP TERRAIN : %s (%d mesures)", t.ok ? "OK" : "ÉCHEC", t.checks);
+    play_mode_shutdown(&t.play);
+    return t.ok;
 }
 
 bool play_combat_selftest(bool rig)

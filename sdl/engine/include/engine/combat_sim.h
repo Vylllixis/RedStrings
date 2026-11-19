@@ -82,6 +82,11 @@ typedef struct EngCombatSim {
     float radius[ENG_SIM_MAX];      /* rayon de collision corps-corps (0 : aucune séparation) */
     const EngAiWorld *world;        /* obstacles statiques (NULL : aucun) */
     uint32_t world_ignore;          /* bit i : le combattant i n'est pas repoussé par `world` */
+    /* M6-03 : cellules non praticables (pentes trop raides, engine/navgrid.h). Un combattant qui
+     * était sur une cellule praticable au début du tick n'entre jamais dans une cellule bloquée :
+     * il glisse le long du bord (axe X ou Z conservé) ou reste en place. Un combattant déjà sur
+     * une cellule bloquée peut en sortir. Respecte aussi `world_ignore`. NULL : aucune. */
+    const struct EngNavGrid *nav;
     uint32_t total_hits; /* touches réelles (dégâts, garde, parade) depuis le début */
 } EngCombatSim;
 

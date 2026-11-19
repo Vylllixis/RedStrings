@@ -40,8 +40,28 @@ typedef struct EngNavGrid {
 bool eng_nav_build(EngNavGrid *nav, const EngAiWorld *world, const float min[2], const float max[2],
                    float cell, float agent_radius);
 
+/* Relief (M6-03, terrain) : hauteur du sol en (x, z). */
+typedef float (*EngNavHeightFn)(void *user, float x, float z);
+
+/* Bloque les cellules trop raides : pente estimée par différences centrées sur ±1/2 cellule en x
+ * et en z (une marche plus haute que la demi-cellule compte comme une pente raide). Les cellules
+ * déjà bloquées le restent. Retourne le nombre de cellules nouvellement bloquées ; 0 si un argument
+ * est invalide (`max_slope_deg` dans ]0 ; 90[). À appeler après eng_nav_build. */
+uint32_t eng_nav_block_steep(EngNavGrid *nav, EngNavHeightFn height, void *user,
+                             float max_slope_deg);
+
+/* Bloque les îlots praticables de moins de `min_cells` cellules (4-connexité) : poches isolées
+ * entre deux pentes, où un ennemi déplacé ou poussé resterait coincé. Comme la surface minimale de
+ * région de Recast. Retourne le nombre de cellules bloquées ; utilise le travail de A*. */
+uint32_t eng_nav_remove_islands(EngNavGrid *nav, uint32_t min_cells);
+
 /* Point praticable (dans la grille et hors cellule bloquée) ? */
 bool eng_nav_walkable(const EngNavGrid *nav, const float p[2]);
+
+/* Point praticable le plus proche de `p` (M6-03 : postes d'un camp posés sur une pente) : `p`
+ * lui-même s'il est praticable, sinon le centre de la cellule libre la plus proche (au plus 12
+ * cellules). false (out inchangé) si `p` est hors de la grille ou s'il n'y en a aucune. */
+bool eng_nav_nearest_walkable(const EngNavGrid *nav, const float p[2], float out[2]);
 
 /* Chemin lissé de `from` vers `to` : points d'étape (sans `from`), dernier = `to` (ou le point
  * praticable le plus proche si `to` est bloqué). Retourne le nombre de points, 0 si aucun chemin.

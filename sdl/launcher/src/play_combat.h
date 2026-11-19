@@ -59,6 +59,11 @@ void play_combat_draw(const PlayCombat *c, EngDebugLines *lines, const struct Pl
 void play_combat_autopilot(PlayCombat *c, const float feet[3], float camera_yaw, uint32_t tick,
                            EngInputState *in);
 
+/* Terrain (M6-03) : la grille de navigation des ennemis bloque les cellules plus raides que
+ * `max_slope_deg` (relief donné par `height`). Retourne le nombre de cellules bloquées. */
+uint32_t play_combat_set_relief(PlayCombat *c, float (*height)(void *user, float x, float z),
+                                void *user, float max_slope_deg);
+
 /* Nouvelle partie : joueur à neuf, camp et mannequin remis à zéro. */
 void play_combat_reset(PlayCombat *c);
 /* Sauvegarde (M8-05) : PV, endurance, posture du joueur et état des ennemis du camp. */
@@ -86,6 +91,15 @@ void play_combat_draw_models(const PlayCombat *c, const AvatarLibrary *lib, EngR
                              mat4 view_proj, const EngLighting *light, const EngModelShadow *shadow,
                              bool shadow_pass);
 
+/* Débogage (F1) : état de chaque combattant (état, attaque, phase et tick, PV, posture,
+ * endurance) dans `buf` ; retourne la longueur écrite. */
+size_t play_combat_debug_text(const PlayCombat *c, char *buf, size_t cap);
+/* M6-10 : sélectionne l'ennemi touché par le rayon (origine et direction dans le MONDE ; `ground`
+ * : hauteur du sol sous le joueur, la simulation étant plane à y = 0). Retourne l'agent ou -1. */
+int32_t play_combat_pick(PlayCombat *c, const float origin[3], const float dir[3], float ground);
+/* Fiche de l'ennemi sélectionné (état, cible, jeton, chemin, perception) ; 0 sans sélection. */
+size_t play_combat_ai_text(const PlayCombat *c, char *buf, size_t cap);
+
 /* Mesures pour l'autotest et le journal. */
 typedef struct PlayCombatStats {
     uint32_t tick;
@@ -108,3 +122,9 @@ void play_combat_stats(const PlayCombat *c, PlayCombatStats *out);
  * « AUTOTEST COMBAT : OK » ou la première erreur. `rig` (--combat-rig-selftest) : avec les
  * personnages KayKit (partie CPU) : hurtboxes sur les os et lame animée (M5-05, M5-06). */
 bool play_combat_selftest(bool rig);
+
+/* Autotest M6-03 (option --combat-terrain-selftest FICHIER.hmap) : le camp sur un terrain en
+ * relief ; le joueur garde près du camp. Vérifie que les ennemis l'atteignent, ne se tiennent
+ * jamais sur une cellule trop raide (grille + relief) et qu'il n'y a jamais plus de 2 attaquants.
+ * Journalise « AUTOTEST CAMP TERRAIN : OK ». */
+bool play_combat_terrain_selftest(const char *heightmap_path);

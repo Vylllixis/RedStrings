@@ -33,10 +33,18 @@ livraisons ; les tags sont posés par Théo après ses tests.
 ## v0.6 (M6) — ennemis et IA
 - Perception, navigation (grille + A*), comportements, jetons d'attaque (2 au plus), archétypes en
   données, boss à phases, camps, débogueur d'IA.
+- M6 (finition) : navigation sur le relief (ADR 0027) : pentes au-delà de 45° (même limite que le
+  personnage Jolt) et îlots isolés bloqués, postes du camp déplacés hors pente, aucun ennemi ne
+  remonte sur une pente (glissement le long du bord dans la simulation) ; autotest du camp sur un
+  relief marqué (`launcher.camp_terrain`). Télégraphe des ennemis (lame orange puis rouge) visible
+  sans F3. Clic dans la vue avec F1 : sélection d'un ennemi et son état dans le panneau.
 
 ## v0.5 (M5) — combat
 - Machine à états, frame data en données rechargeables, hitbox/hurtbox, esquive, garde, parade,
   combos, game feel, verrouillage, replay déterministe, audio et effets de combat, mannequin.
+- M5 (finition) : F5 gèle le combat, F6 avance d'un tick ; panneau « Combat » de F1 (état, tick,
+  frame data des combattants) ; traînée de la lame pendant les attaques ; arène de M4 dessinée en
+  volumes éclairés avec ombres (au lieu du fil de fer).
 
 ## v0.0 à v0.4 (M0 à M4)
 - Fondations, rendu (SDL_GPU, PBR, ombres), assets et scènes, monde (terrain, ciel, végétation),

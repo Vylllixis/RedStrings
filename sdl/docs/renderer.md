@@ -89,7 +89,10 @@ eng_render_draw_uniforms2(q, &cmd, NULL, 0, &light_block, sizeof light_block); /
 - File d'ombre du renderer : `EngRendererDesc.max_shadow_commands` (0 : aucune ; `max_shadow_uniform_bytes`,
   64 Kio par défaut), `eng_renderer_begin_shadow_queue` la vide et la rend, `eng_renderer_set_shadow_map`
   désigne la carte que `eng_renderer_end_frame` rend avant la passe de l'image. Carte nulle : pas de
-  passe d'ombre (coût nul).
+  passe d'ombre (coût nul). Le lanceur prend 1 024 dessins et 256 Kio : une pièce skinnée pousse ses
+  41 matrices d'os (~2,8 Kio) aussi dans l'ombre, et 64 Kio ne tenaient qu'une vingtaine de pièces
+  (B11 : 16 pièces d'ombre perdues par image en combat). Tout dessin perdu est journalisé à l'arrêt
+  (« dessin(s) perdu(s) ») et fait échouer `launcher.combat_render`.
 - Lecture : `EngDrawCmd.shadow_map` + `shadow_sampler` sont liés à l'emplacement
   `ENG_SHADOW_SLOT` (8) du fragment shader, hors des huit emplacements de `texture` /
   `extra_textures`. Les deux ou aucun, et les emplacements 0 à 7 doivent être tous occupés, sinon le

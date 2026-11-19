@@ -5,6 +5,7 @@
 #include <string.h>
 
 #include "engine/combat_sim.h"
+#include "engine/navgrid.h"
 #include "utest.h"
 
 static const char SET[] =
@@ -378,4 +379,51 @@ UTEST(combat_sim, weapon_offsets_follow_the_lateral_axis_and_unused_slots_stay_u
     EXPECT_NEAR(w[0].b[0], 0.4F, 1e-5F);
     EXPECT_NEAR(w[0].b[2], 1.7F, 1e-5F);
     EXPECT_NEAR(w[1].radius, -5.0F, 1e-9F);
+}
+
+/* M6-03 : une pente raide le long de x > 2 (bloquée dans la grille). Un combattant qui marche en
+ * diagonale vers +X+Z s'arrête au bord et glisse le long (z continue d'augmenter) ; un combattant
+ * posé DANS la pente peut en sortir. */
+static float wall_height(void *user, float x, float z)
+{
+    (void)user;
+    (void)z;
+    return x > 2.0F ? (x - 2.0F) * 3.0F : 0.0F; /* 72° au-delà de x = 2 */
+}
+
+static EngNavGrid g_slope_nav; /* ~300 Ko : hors pile */
+
+UTEST(combat_sim, a_fighter_never_walks_into_a_steep_cell_and_slides_along_its_edge)
+{
+    EngAiWorld w;
+    eng_aiw_init(&w);
+    const float mn[2] = {-8.0F, -8.0F};
+    const float mx[2] = {8.0F, 8.0F};
+    ASSERT_TRUE(eng_nav_build(&g_slope_nav, &w, mn, mx, 0.5F, 0.3F));
+    ASSERT_GT(eng_nav_block_steep(&g_slope_nav, wall_height, NULL, 35.0F), 10U);
+    EngCombatSim s;
+    duel(&s, 10.0F);
+    s.nav = &g_slope_nav;
+    EngFighterInput in[2] = {none(), none()};
+    in[0].moving = true;
+    in[0].move_dir[0] = 0.7071F; /* vers +X+Z */
+    in[0].move_dir[1] = 0.7071F;
+    float max_x = -1e9F;
+    for (int i = 0; i < 90; i++) {
+        eng_sim_step(&s, in);
+        EXPECT_TRUE(eng_nav_walkable(&g_slope_nav, s.bodies[0].pos));
+        max_x = fmaxf(max_x, s.bodies[0].pos[0]);
+    }
+    EXPECT_LT(max_x, 2.5F);              /* arrêté au bord de la pente */
+    EXPECT_GT(s.bodies[0].pos[1], 3.0F); /* mais il a glissé le long : z a continué */
+    /* posé dans la pente : il en ressort */
+    ASSERT_TRUE(eng_sim_place(&s, 0, 3.0F, 0.0F, 0.0F));
+    EXPECT_FALSE(eng_nav_walkable(&g_slope_nav, s.bodies[0].pos));
+    in[0].move_dir[0] = -1.0F;
+    in[0].move_dir[1] = 0.0F;
+    for (int i = 0; i < 30; i++) {
+        eng_sim_step(&s, in);
+    }
+    EXPECT_TRUE(eng_nav_walkable(&g_slope_nav, s.bodies[0].pos));
+    EXPECT_LT(s.bodies[0].pos[0], 1.5F);
 }

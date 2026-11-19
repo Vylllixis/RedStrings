@@ -433,3 +433,91 @@ UTEST(ai_tokens, release_and_has_ignore_unknown_ids_and_invalid_inputs)
     eng_tokens_release(&t, 7);
     EXPECT_EQ(eng_tokens_in_use(&t), 0U);
 }
+
+/* Relief (M6-03) : une falaise de 4 m le long de x = 0 (pente 76°), percée d'une rampe douce
+ * (15°) entre z = 4 et z = 8 ; partout ailleurs, une pente régulière de 20° (praticable). Le chemin
+ * de x = -10 à x = +10 doit passer par la rampe et ne jamais traverser une cellule raide. */
+static float cliff_height(void *user, float x, float z)
+{
+    (void)user;
+    const float base = 0.364F * z; /* tan 20° le long de z */
+    float wall;
+    if (z > 4.0F && z < 8.0F) {
+        wall = fminf(4.0F, fmaxf(0.0F, (x + 7.5F) * 0.268F)); /* rampe de 15° de x = -7,5 à +7,5 */
+    } else {
+        wall = fminf(4.0F, fmaxf(0.0F, (x + 0.5F) * 4.0F)); /* falaise : 4 m sur 1 m */
+    }
+    return base + wall;
+}
+
+UTEST(navgrid, steep_terrain_is_blocked_and_the_path_takes_the_gentle_ramp)
+{
+    EngAiWorld w;
+    eng_aiw_init(&w);
+    const float mn[2] = {-16.0F, -16.0F};
+    const float mx[2] = {16.0F, 16.0F};
+    ASSERT_TRUE(eng_nav_build(&g_nav, &w, mn, mx, 0.5F, 0.4F));
+    const uint32_t blocked = eng_nav_block_steep(&g_nav, cliff_height, NULL, 35.0F);
+    EXPECT_GT(blocked, 20U); /* la falaise */
+    const float on_slope[2] = {-8.0F, -10.0F};
+    EXPECT_TRUE(eng_nav_walkable(&g_nav, on_slope)); /* 20° : praticable */
+    const float on_cliff[2] = {0.0F, -5.0F};
+    EXPECT_FALSE(eng_nav_walkable(&g_nav, on_cliff));
+    const float from[2] = {-10.0F, -6.0F};
+    const float to[2] = {10.0F, -6.0F};
+    float path[64][2];
+    const uint32_t n = eng_nav_path(&g_nav, from, to, path, 64);
+    ASSERT_GE(n, 2U);
+    bool via_ramp = false;
+    float cur[2] = {from[0], from[1]};
+    for (uint32_t i = 0; i < n; i++) {
+        EXPECT_TRUE(eng_nav_line_free(&g_nav, cur, path[i]));
+        via_ramp = via_ramp || (path[i][1] > 4.0F && path[i][1] < 8.0F);
+        cur[0] = path[i][0];
+        cur[1] = path[i][1];
+    }
+    EXPECT_TRUE(via_ramp);
+    EXPECT_EQ(eng_nav_block_steep(&g_nav, NULL, NULL, 35.0F), 0U);
+    EXPECT_EQ(eng_nav_block_steep(&g_nav, cliff_height, NULL, 90.0F), 0U);
+    /* poste posé sur la falaise : déplacé sur la cellule libre la plus proche (moins d'1 m) */
+    float moved[2] = {0.0F, 0.0F};
+    ASSERT_TRUE(eng_nav_nearest_walkable(&g_nav, on_cliff, moved));
+    EXPECT_TRUE(eng_nav_walkable(&g_nav, moved));
+    EXPECT_LT(hypotf(moved[0] - on_cliff[0], moved[1] - on_cliff[1]), 1.0F);
+    float same[2] = {0.0F, 0.0F};
+    ASSERT_TRUE(eng_nav_nearest_walkable(&g_nav, on_slope, same));
+    EXPECT_EQ(same[0], on_slope[0]); /* déjà praticable : inchangé */
+    EXPECT_EQ(same[1], on_slope[1]);
+    const float outside[2] = {100.0F, 0.0F};
+    EXPECT_FALSE(eng_nav_nearest_walkable(&g_nav, outside, same));
+    EXPECT_FALSE(eng_nav_nearest_walkable(NULL, on_cliff, same));
+}
+
+/* M6-03 : une poche de 3 x 3 cellules entourée de cellules bloquées est retirée (un ennemi y
+ * resterait coincé) ; le reste de la grille, une seule grande région, est gardé. */
+UTEST(navgrid, small_isolated_pockets_are_blocked_and_the_large_region_is_kept)
+{
+    EngAiWorld w;
+    eng_aiw_init(&w);
+    const float mn[2] = {-8.0F, -8.0F};
+    const float mx[2] = {8.0F, 8.0F};
+    ASSERT_TRUE(eng_nav_build(&g_nav, &w, mn, mx, 0.5F, 0.4F));
+    /* anneau bloqué de 5 x 5 autour de la cellule (10, 10) : poche intérieure de 3 x 3 */
+    for (uint32_t z = 8; z <= 12; z++) {
+        for (uint32_t x = 8; x <= 12; x++) {
+            if (x == 8 || x == 12 || z == 8 || z == 12) {
+                g_nav.blocked[(z * g_nav.w) + x] = 1U;
+            }
+        }
+    }
+    const float in_pocket[2] = {g_nav.origin[0] + (10.5F * g_nav.cell),
+                                g_nav.origin[1] + (10.5F * g_nav.cell)};
+    const float outside[2] = {4.0F, 4.0F};
+    ASSERT_TRUE(eng_nav_walkable(&g_nav, in_pocket));
+    EXPECT_EQ(eng_nav_remove_islands(&g_nav, 16U), 9U); /* les 9 cellules de la poche */
+    EXPECT_FALSE(eng_nav_walkable(&g_nav, in_pocket));
+    EXPECT_TRUE(eng_nav_walkable(&g_nav, outside));
+    EXPECT_EQ(eng_nav_remove_islands(&g_nav, 16U), 0U); /* plus rien à retirer */
+    EXPECT_EQ(eng_nav_remove_islands(NULL, 16U), 0U);
+    EXPECT_EQ(eng_nav_remove_islands(&g_nav, 1U), 0U);
+}

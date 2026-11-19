@@ -132,6 +132,11 @@ bool eng_platform_pump(EngPlatform *p)
                 p->debug_draw = !p->debug_draw;
             } else if (ev.key.down && ev.key.key == SDLK_F1) {
                 p->debug_ui = !p->debug_ui;
+            } else if (ev.key.down && ev.key.key == SDLK_F5) {
+                p->debug_freeze = !p->debug_freeze;
+                p->debug_steps = 0;
+            } else if (ev.key.down && ev.key.key == SDLK_F6 && p->debug_freeze) {
+                p->debug_steps++;
             }
             break;
         case SDL_EVENT_MOUSE_BUTTON_DOWN:

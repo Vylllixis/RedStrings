@@ -178,6 +178,16 @@ void eng_ui_draw_panel(EngUi *ui, const EngUiPanelData *data)
         if (data->animation != NULL && data->animation[0] != '\0') {
             igText("%s", data->animation);
         }
+        if (data->combat != NULL && data->combat[0] != '\0' &&
+            igCollapsingHeader_TreeNodeFlags("Combat (F5 : geler, F6 : un tick)",
+                                             ImGuiTreeNodeFlags_DefaultOpen)) {
+            igTextUnformatted(data->combat, NULL);
+        }
+        if (data->ai != NULL && data->ai[0] != '\0' &&
+            igCollapsingHeader_TreeNodeFlags("IA (clic sur un ennemi)",
+                                             ImGuiTreeNodeFlags_DefaultOpen)) {
+            igTextUnformatted(data->ai, NULL);
+        }
         if (data->tweaks != NULL &&
             igCollapsingHeader_TreeNodeFlags("Réglages", ImGuiTreeNodeFlags_DefaultOpen)) {
             draw_tweaks_section(ui, data->tweaks);

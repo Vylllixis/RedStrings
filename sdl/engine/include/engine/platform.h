@@ -39,6 +39,8 @@ typedef struct EngPlatform {
     bool mouse_captured; /* souris capturée (mode relatif : curseur caché, déplacements infinis) */
     bool debug_draw; /* affichage de debug (lignes, grille...) : F3 le bascule ; actif au départ */
     bool debug_ui; /* interface de debug (panneau Dear ImGui) : F1 la bascule ; masquée au départ */
+    bool debug_freeze;       /* F5 : simulation gelée (débogage pas à pas du combat, M5-16) */
+    uint32_t debug_steps;    /* F6 : pas à jouer pendant le gel (chaque pression en ajoute un) */
     EngEventHook event_hook; /* filtre d'événements, NULL si aucun */
     void *event_hook_user;
     bool quit_requested;

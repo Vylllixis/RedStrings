@@ -33,7 +33,9 @@ recharge` (boss : jusqu'à 3, PV décroissants). Une erreur donne un message ave
 
 ## Limites
 
-Rien n'est branché au jeu ni visible à l'écran ; navigation en plan (pas de terrain) ; les ennemis
+Branché au jeu dans `--combat` (`docs/combat-play.md`). Navigation en plan (x, z) ; sur le terrain,
+la grille bloque les pentes au-delà de 45° et les îlots de moins de 16 m² (ADR 0027 : un seul étage,
+pas de Recast) ; les ennemis
 tournent instantanément vers leur cible ; pas de projectile (l'archer attaque à longue portée) ;
 éviter « l'empilement » = séparation simple des corps (pas d'évitement local prédictif) ;
 perception : un seul joueur ; l'IA de groupe est testée jusqu'à 7 ennemis (limite du simulateur à 8).
