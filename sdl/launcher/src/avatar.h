@@ -86,6 +86,7 @@ typedef struct Avatar {
     mat4 *joint_world; /* pose monde (repère du personnage), joint_count matrices */
     mat4 *palette;     /* matrices de skinning envoyées au GPU */
     mat4 model;        /* personnage -> monde */
+    float glow[3];     /* émissif ajouté aux armes (télégraphe, M6) ; 0 : aucun */
 } Avatar;
 
 /* Partie CPU : lit assets/cooked/characters/knight.skel et les clips. false (journalisé) si un

@@ -539,6 +539,9 @@ void play_combat_draw(const PlayCombat *c, EngDebugLines *lines, const PlayMode 
             const vec3 e = {b->pos[0] + 0.5F, 0.05F, b->pos[1]};
             (void)eng_debug_line(lines, a, e, ENG_DEBUG_GRAY);
         } else {
+            const bool modeled = i == PLAYER ? play->avatars != NULL : c->has_avatar[i];
+            /* F3 avec les modèles : capsules PAR-DESSUS (sinon cachées dans les corps opaques) */
+            eng_debug_lines_set_overlay(lines, modeled);
             if (i != PLAYER && (!c->has_avatar[i] || play->show_debug)) {
                 /* le joueur a déjà sa capsule physique ; avec les modèles animés : F3 seulement */
                 EngCapsule box[ENG_HURTBOX_MAX];
@@ -557,9 +560,7 @@ void play_combat_draw(const PlayCombat *c, EngDebugLines *lines, const PlayMode 
                         lines, &box[k], touchable ? eng_zone_color(zones[k]) : ENG_DEBUG_GRAY);
                 }
             }
-            const bool modeled = i == PLAYER ? play->avatars != NULL : c->has_avatar[i];
-            if (f->fsm.state == ENG_CS_ATTACK &&
-                (!modeled || play->show_debug || i >= FIRST_ENEMY)) {
+            if (f->fsm.state == ENG_CS_ATTACK && (!modeled || play->show_debug)) {
                 /* arme : orange pendant l'anticipation d'un ennemi, rouge quand elle peut toucher
                  */
                 const bool active = eng_fighter_hitboxes_active(f, c->sim.attacks);
@@ -578,6 +579,7 @@ void play_combat_draw(const PlayCombat *c, EngDebugLines *lines, const PlayMode 
                     }
                 }
             }
+            eng_debug_lines_set_overlay(lines, false);
             (void)eng_trail_draw_debug(&c->trail[i], lines); /* M5-20 */
             bar(lines, b->pos, 2.15F, f->vitals.hp / f->vitals.max_hp, 0.9F, ENG_DEBUG_GREEN);
             bar(lines, b->pos, 2.05F, f->posture / f->params.max_posture, 0.9F, ENG_DEBUG_YELLOW);
@@ -830,6 +832,36 @@ static float lerp_angle(float a, float b, float t)
     return a + ((d - 3.14159265F) * t);
 }
 
+/* Télégraphe (M6) : l'arme d'un ennemi s'allume en ORANGE pendant l'anticipation, de plus en plus
+ * fort jusqu'au coup, puis ROUGE tant qu'elle peut toucher. Valeurs HDR : le bloom les fait
+ * rayonner. Le joueur et le mannequin ne s'allument pas. */
+static void telegraph_glow(const PlayCombat *c, uint32_t i, float glow[3])
+{
+    glow[0] = 0.0F;
+    glow[1] = 0.0F;
+    glow[2] = 0.0F;
+    const EngFighter *f = &c->sim.fighters[i];
+    if (i < FIRST_ENEMY || f->vitals.dead || f->fsm.state != ENG_CS_ATTACK) {
+        return;
+    }
+    const EngAttack *a = eng_fighter_attack(f, c->sim.attacks);
+    if (a == NULL) {
+        return;
+    }
+    const EngAttackPhase ph = eng_attack_phase(a, f->attack_tick);
+    if (ph == ENG_ATTACK_STARTUP) {
+        const float u = a->startup > 0U ? (float)f->attack_tick / (float)a->startup : 1.0F;
+        const float k = 0.5F + (1.5F * (u > 1.0F ? 1.0F : u)); /* monte jusqu'au coup */
+        glow[0] = 1.0F * k; /* orange : assez peu intense pour que le tonemapping garde la teinte */
+        glow[1] = 0.28F * k;
+        glow[2] = 0.02F * k;
+    } else if (ph == ENG_ATTACK_ACTIVE) {
+        glow[0] = 3.0F; /* rouge franc */
+        glow[1] = 0.08F;
+        glow[2] = 0.04F;
+    }
+}
+
 void play_combat_update_visuals(PlayCombat *c, const PlayMode *play, double alpha, float dt)
 {
     if (c == NULL || !c->ready || c->avatars == NULL) {
@@ -849,6 +881,7 @@ void play_combat_update_visuals(PlayCombat *c, const PlayMode *play, double alph
         EngActorDrive d = {.ground_speed = sqrtf((dx * dx) + (dz * dz)) * 60.0F, .grounded = true};
         fighter_drive(c, i, c->avatars, alpha, &d);
         avatar_update(&c->avatar[i], c->avatars, &d, dt, feet, lerp_angle(b->prev_yaw, b->yaw, t));
+        telegraph_glow(c, i, c->avatar[i].glow);
     }
 }
 

@@ -131,6 +131,10 @@ uint32_t eng_model_gpu_draw_shadowed(const EngModelGpu *gpu, EngRenderQueue *que
 
 /* Réglages d'un dessin particulier (terrain, M3-03) : tous facultatifs. */
 typedef struct EngModelDrawOptions {
+    /* Ajouté au facteur émissif de TOUTES les parties (linéaire, HDR ; M6 : arme d'un ennemi qui
+     * s'allume pendant l'anticipation). Tout à 0 (défaut) : aucun effet. Multiplié par la texture
+     * émissive du matériau s'il en a une (blanche sinon). */
+    float emissive_add[3];
     /* Cinq handles qui REMPLACENT, pour toutes les parties, les cinq textures du matériau
      * (emplacements 0 à 4 du fragment shader) ; NULL : celles des matériaux. */
     const EngTextureHandle *textures;

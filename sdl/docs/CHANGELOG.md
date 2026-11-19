@@ -36,8 +36,9 @@ livraisons ; les tags sont posés par Théo après ses tests.
 - M6 (finition) : navigation sur le relief (ADR 0027) : pentes au-delà de 45° (même limite que le
   personnage Jolt) et îlots isolés bloqués, postes du camp déplacés hors pente, aucun ennemi ne
   remonte sur une pente (glissement le long du bord dans la simulation) ; autotest du camp sur un
-  relief marqué (`launcher.camp_terrain`). Télégraphe des ennemis (lame orange puis rouge) visible
-  sans F3. Clic dans la vue avec F1 : sélection d'un ennemi et son état dans le panneau.
+  relief marqué (`launcher.camp_terrain`). Télégraphe : l'arme d'un ennemi s'allume en orange pendant
+  l'anticipation puis en rouge pendant le coup (émissif par dessin). Clic dans la vue avec F1 :
+  sélection d'un ennemi et son état dans le panneau. F3 : hitbox et hurtbox par-dessus les modèles.
 
 ## v0.5 (M5) — combat
 - Machine à états, frame data en données rechargeables, hitbox/hurtbox, esquive, garde, parade,

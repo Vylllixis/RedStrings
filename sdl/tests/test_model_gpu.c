@@ -115,6 +115,9 @@ static const EngEnvironment *g_env;
 /* Charge le modèle décrit par `spec`, le dessine avec `model_matrix` (identité si NULL) et lit
  * les pixels dans g_pixels. Renvoie false si une étape échoue ; détruit le modèle GPU avant de
  * rendre la main (les fuites sont comptées à la fermeture). */
+/* Options de dessin du prochain draw_spec_lit (NULL : eng_model_gpu_draw). */
+static const EngModelDrawOptions *g_draw_options;
+
 static bool draw_spec_lit(TestModel *t, const Spec *spec, mat4 model_matrix,
                           const EngLighting *lighting)
 {
@@ -135,8 +138,14 @@ static bool draw_spec_lit(TestModel *t, const Spec *spec, mat4 model_matrix,
     mat4 identity;
     glm_mat4_identity(identity);
     EngRenderQueue *q = eng_renderer_begin_frame(&t->r);
-    const uint32_t accepted = eng_model_gpu_draw(
-        &gpu, q, t->pipeline, model_matrix != NULL ? model_matrix : identity, identity, lighting);
+    const uint32_t accepted =
+        g_draw_options != NULL
+            ? eng_model_gpu_draw_ex(&gpu, q, t->pipeline,
+                                    model_matrix != NULL ? model_matrix : identity, identity,
+                                    lighting, NULL, g_draw_options)
+            : eng_model_gpu_draw(&gpu, q, t->pipeline,
+                                 model_matrix != NULL ? model_matrix : identity, identity,
+                                 lighting);
     DrawContext c = {&t->r};
     const bool ok = accepted == gpu.part_count &&
                     render_to_pixels_depth(&t->f, eng_renderer_depth_format(&t->r), execute_queue,
@@ -988,6 +997,34 @@ UTEST(eng_model_gpu, emissive_is_added_after_the_lighting_and_its_texture_is_srg
     glowing.emissive[0] = 0.1F;
     const float up_z[3] = {0.0F, 0.0F, 1.0F};
     EXPECT_PIXEL_IS_PBR(&light, &glowing, up_z, IN_TRIANGLE_X, IN_TRIANGLE_Y, TOL_LIT);
+    eng_renderer_end_frame(&t.r);
+    CLOSE_MODEL(t);
+}
+
+/* M6 (télégraphe) : l'émissif des options de dessin s'ajoute à celui du matériau, pour ce dessin
+ * seulement. Base noire, ni soleil ni ambiante : (1 ; 0,5 ; 0) + (0 ; 0,25 ; 0,5) = (1 ; 0,75 ;
+ * 0,5) -> (255, 191, 128) ; sans l'option, (255, 128, 0). */
+UTEST(eng_model_gpu, the_draw_options_add_an_emissive_glow_to_one_draw_only)
+{
+    TestModel t;
+    if (!open_model(&t)) {
+        EXPECT_FALSE(render_gpu_required());
+        return;
+    }
+    EngLighting dark = test_light();
+    dark.sun_intensity = 0.0F;
+    dark.ambient_intensity = 0.0F;
+    Spec s = {.material = "{\"pbrMetallicRoughness\":{\"baseColorFactor\":[0,0,0,1],"
+                          "\"metallicFactor\":0,\"roughnessFactor\":1},"
+                          "\"emissiveFactor\":[1,0.5,0]}"};
+    const EngModelDrawOptions glow = {.emissive_add = {0.0F, 0.25F, 0.5F}};
+    g_draw_options = &glow;
+    const bool drawn = draw_spec_lit(&t, &s, NULL, &dark);
+    g_draw_options = NULL;
+    ASSERT_TRUE(drawn);
+    EXPECT_PIXEL_LEVELS(IN_TRIANGLE_X, IN_TRIANGLE_Y, 255, 191, 128, 2);
+    ASSERT_TRUE(draw_spec_lit(&t, &s, NULL, &dark));
+    EXPECT_PIXEL_LEVELS(IN_TRIANGLE_X, IN_TRIANGLE_Y, 255, 128, 0, 2);
     eng_renderer_end_frame(&t.r);
     CLOSE_MODEL(t);
 }

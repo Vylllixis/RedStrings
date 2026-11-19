@@ -587,7 +587,7 @@ uint32_t eng_model_gpu_draw_ex(const EngModelGpu *gpu, EngRenderQueue *queue,
         fragment.material[2] = material->normal_scale;
         fragment.material[3] = material->occlusion_strength;
         for (int c = 0; c < 3; c++) {
-            fragment.emissive[c] = material->emissive[c];
+            fragment.emissive[c] = material->emissive[c] + opt->emissive_add[c];
         }
         fragment.emissive[3] = material->has_normal_map ? 1.0F : 0.0F;
         fragment.environment[0] = gpu->environment.prefiltered_levels > 1U

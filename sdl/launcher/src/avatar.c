@@ -432,8 +432,10 @@ static void draw_props(const Avatar *av, const AvatarLibrary *lib, EngRenderQueu
             (void)eng_model_gpu_draw_depth(&lib->props[p], queue, lib->prop_shadow, world,
                                            view_proj);
         } else {
-            (void)eng_model_gpu_draw_shadowed(&lib->props[p], queue, lib->prop, world, view_proj,
-                                              light, shadow);
+            const EngModelDrawOptions glow = {
+                .emissive_add = {av->glow[0], av->glow[1], av->glow[2]}};
+            (void)eng_model_gpu_draw_ex(&lib->props[p], queue, lib->prop, world, view_proj, light,
+                                        shadow, &glow);
         }
     }
 }

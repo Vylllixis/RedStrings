@@ -9,7 +9,7 @@ Tests : `test_ai_core` (16), `test_ai_camp` (11). Décisions : ADR 0025 ; module
 |---|---|---|---|
 | 1 | Navigation sur navmesh sans blocage sur le camp de test | camp de 6 ennemis (3 archétypes, rochers + muret) : blocage maximal en poursuite = quelques ticks (< 120 exigés), aucun ennemi dans un obstacle ; contournement d'un mur vers un joueur seulement entendu. **Finition** : camp sur un relief marqué (`launcher.camp_terrain` : la moitié des cellules au-delà de 45°, les 3 postes dans une pente) : postes déplacés, îlots retirés, un ennemi atteint le joueur, 0 tick revenu sur une pente | Prouvé — **avec une grille + A\*, pas Recast** (ADR 0025, décision confirmée par l'ADR 0027) |
 | 2 | Au plus 2 attaquants simultanés | `eng_aig_attackers` ≤ 2 à chaque tick d'un combat complet (11 000 ticks) | Prouvé |
-| 3 | Télégraphie lisible de chaque attaque ennemie | validation des archétypes (anticipation ≥ 18 ticks = 300 ms sur toute la chaîne) + mesure départ → premier tick actif ≥ 18 sur le combat complet | Prouvé (la lisibilité *visuelle* n'est pas jugée : animation absente) |
+| 3 | Télégraphie lisible de chaque attaque ennemie | validation des archétypes (anticipation ≥ 18 ticks = 300 ms sur toute la chaîne) + mesure départ → premier tick actif ≥ 18 sur le combat complet. **Finition** : animation calée sur la frame data (M4) et arme qui s'allume (orange en anticipation, rouge au coup), vues tick par tick à l'écran ; test GPU de l'émissif par dessin (mutation détectée) | Prouvé pour la durée et l'affichage ; « lisible » à juger par 2 testeurs (Q6) |
 
 ## Tâches
 
@@ -30,8 +30,7 @@ Tests : `test_ai_core` (16), `test_ai_camp` (11). Décisions : ADR 0025 ; module
 ## Ce que les preuves ne disent pas
 
 (Finition, 2026-11-19) Branché au jeu dans `--combat` avec les personnages animés de M4 ; vu sur le
-RTX 5070. Reste : le télégraphe n'est qu'un trait autour de la lame (peu lisible de loin, à
-renforcer), les patterns de boss (M6-09), le ressenti (2 testeurs).
+RTX 5070. Reste : les patterns de boss (M6-09), le ressenti (2 testeurs, Q6).
 
 Texte d'origine : rien de M6 n'est branché au jeu ni visible à l'écran. Les ennemis tournent instantanément ; le déplacement
 est en plan (x, z) ; la sim de combat est limitée à 8 combattants (joueur + 7). Le tag v0.6 et le test

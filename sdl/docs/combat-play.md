@@ -58,10 +58,12 @@ Outils de mise au point (M5-16, M6-10) :
 - Mannequin en (4, −1), devant le départ : poteau fixe, 1000 PV, se remet à neuf après 3 s sans coup.
 - Camp vers (−14, −11) : grunt (rapide, ronde), brute (lent, lourd), archer (portée longue, fuit blessé).
 - Arène de M4 en volumes éclairés avec ombres (marches, mur, plateforme, rampe).
-- Télégraphe (sans F3) : la lame d'un ennemi s'entoure d'**orange** pendant l'anticipation
-  (≥ 300 ms), de **rouge** quand elle peut toucher. Traînée blanche derrière la lame pendant une
-  attaque (M5-20).
-- Avec F3 : hurtboxes par zone (tête / torse / membres ; gris = intouchable), capsules physiques.
+- Télégraphe (sans F3) : l'arme d'un ennemi **s'allume en orange** pendant l'anticipation
+  (≥ 300 ms), de plus en plus fort jusqu'au coup, puis **en rouge** tant qu'elle peut toucher
+  (émissif ajouté au dessin de l'arme, `EngModelDrawOptions.emissive_add` ; le bloom la fait
+  rayonner). Traînée blanche derrière la lame pendant une attaque (M5-20).
+- Avec F3 : hurtboxes par zone (tête / torse / membres ; gris = intouchable), armes orange puis
+  rouges, capsules physiques ; dessinées **par-dessus** les modèles (sinon cachées dans les corps).
 - Barres au-dessus des têtes : PV (vert), posture (jaune). Cercle magenta : cible verrouillée.
 - Cônes de vision des ennemis (couleur = état : vert ronde, jaune alerte, magenta poursuite,
   rouge engagé, bleu retour, cyan fuite), ligne vers la cible, anneau jaune = jeton d'attaque.
@@ -90,7 +92,8 @@ jusqu'à une victoire, toujours au plus 2 attaquants.
   esquive, recul et séparation, bornés à 0,6 m par tick. Les ennemis se déplacent dans la
   simulation (plan), sans physique ni marches.
 - Les lignes de l'IA (cônes) sont dessinées à hauteur fixe.
-- Le télégraphe et la traînée sont des lignes (debug draw), pas encore des effets de matériau.
+- La traînée est faite de lignes (debug draw), pas encore un ruban texturé. La lueur du télégraphe
+  est la même pour toutes les armes (réglée dans `telegraph_glow`, `play_combat.c`).
 - Son : vérifié avec le pilote « dummy » chez moi, **jamais écouté** ; latence matérielle non mesurée.
 - Ressenti (lisibilité, réactivité) : à juger sur ta machine ; c'est le critère « 2 testeurs » de M5.
 - Captures faites chez moi en rendu logiciel (SwiftShader), pas sur un vrai GPU.
