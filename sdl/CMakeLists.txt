@@ -28,10 +28,15 @@ option(OW_BUILD_TESTS "Compiler les tests unitaires (CTest)" ON)
 # des fonctions sans effet).
 option(OW_UI "Interface de debug Dear ImGui (cimgui) : panneau de statistiques et réglages" ON)
 
+# Physique (M4-01) : Jolt Physics via son habillage C « joltc », téléchargés et compilés en C++ à la
+# configuration (voir docs/physics.md et ADR 0024). Désactivée : le moteur se compile sans Jolt et
+# eng_physics_* échoue proprement (eng_physics_available() renvoie false).
+option(OW_PHYSICS "Moteur physique Jolt (via joltc)" ON)
+
 # Tracy, SPIRV-Cross (outil de compilation des shaders) et Dear ImGui sont en C++ : le compilateur
 # C++ n'est requis que si l'une de ces options est active. (enable_language ici, à la racine : un appel
 # dans un sous-dossier ne serait pas visible ailleurs.)
-if(OW_PROFILE OR OW_BUILD_SHADERS OR OW_UI)
+if(OW_PROFILE OR OW_BUILD_SHADERS OR OW_UI OR OW_PHYSICS)
   enable_language(CXX)
 endif()
 

@@ -63,6 +63,24 @@ sortie = encodage_sRGB(rgb)                     sauf cible déjà _SRGB (le GPU 
   (0,80 ; 0 ; 0) en ACES avant encodage). Un overlay de debug à couleurs exactes demanderait une
   seconde passe après la résolution.
 
+## Post-process : FXAA et bloom (M8-06)
+
+Les deux effets vivent **dans la même passe** que le tonemapping (`tonemap.frag.hlsl`), pour ne pas
+ajouter de texture intermédiaire :
+
+- **Bloom** : pour chaque pixel, 16 lectures de la texture HDR sur deux anneaux (3 et 8 pixels) ;
+  seule la part **au-dessus de 1** (`max(c - 1, 0)`) contribue, pondérée par `EngTonemap.bloom`
+  (0 à 2, borné par `eng_tonemap_sanitize`). Elle est ajoutée **avant** l'exposition et la courbe.
+- **FXAA** : variante simple de celle de Lottes, sur la luminance **après** tonemapping : détection
+  du contraste local (4 voisins), direction du bord, deux lectures bilinéaires (calculées à la main,
+  le sampler étant au plus proche) le long du bord, repli sur la moyenne proche si la lecture large
+  sort de la plage de luminance locale. `EngTonemap.fxaa` l'active.
+- Par défaut dans `EngTonemap` : désactivés (les tests de valeurs exactes restent exacts). Le
+  lanceur les active (FXAA oui, bloom 0,5) ; le menu **Options** du jeu (« Anticrénelage (FXAA) »,
+  « Halo lumineux (bloom) ») et le panneau de debug F1 les règlent ; les valeurs sont enregistrées
+  dans `options.txt` (`graphics.fxaa`, `graphics.bloom`).
+- Coût : 16 lectures (bloom) + 9 à 13 lectures (FXAA) par pixel en plus. Non mesuré sur un vrai GPU.
+
 ## Vérification
 
 - `tests/test_tonemap.c` (CPU) : valeurs ACES, NONE et sRGB **calculées à la main** ; AgX comparé à
@@ -73,6 +91,9 @@ sortie = encodage_sRGB(rgb)                     sauf cible déjà _SRGB (le GPU 
   au millième, sans arrondi 8 bits, y compris sur le segment linéaire de l'sRGB). La passe principale
   du moteur est vérifiée en relisant la texture HDR (valeurs 4,0 et 0,5 exactes, donc ni écrêtées
   ni arrondies). Chaîne complète : modèle éclairé en PBR (rouge ≈ 3,4, bien au-dessus de 1) → HDR → pixels.
+- `tests/test_tonemap_gpu.c`, `fxaa_softens_a_staircase_edge_and_bloom_spreads_a_bright_point` :
+  un bord en escalier noir/blanc est adouci par le FXAA (pixels intermédiaires apparus, rien sans
+  FXAA) ; un point à 8,0 sur fond noir éclaire ses voisins à 3 et 8 pixels avec bloom et pas sans.
 - `tests/test_gpu.c` : ordre résolution → overlay, une seule résolution par image, redimensionnement,
   désactivation.
 
@@ -80,7 +101,11 @@ sortie = encodage_sRGB(rgb)                     sauf cible déjà _SRGB (le GPU 
 
 - Rendu sur la vraie fenêtre non vérifié par lecture de pixels (la swapchain ne se relit pas) : la
   résolution est vérifiée vers des textures, et l'enchaînement sur la swapchain par compteurs.
-- Pas d'auto-exposition, pas de bloom, pas d'anti-crénelage : l'exposition est un réglage manuel.
+- Pas d'auto-exposition : l'exposition est un réglage manuel.
+- Bloom approché en une passe (16 lectures, rayon fixe en pixels) : pas de chaîne de flous
+  sous-échantillonnés, donc halo court et pas de flou large sur les très grandes sources.
+- FXAA simplifié (pas la version 3.11 complète avec recherche des extrémités du bord) : adoucit les
+  escaliers mais moins bien qu'un FXAA complet ou un TAA ; pas de SSAO.
 - Pas de dithering : une dégradé très lent peut montrer des bandes en 8 bits.
 - AgX sans « look » ; ACES par canal (pas la chaîne complète AP1/RRT/ODT).
 - Un `EngRenderer` HDR consomme une texture RGBA16F supplémentaire (8 octets par pixel, soit 16 Mio

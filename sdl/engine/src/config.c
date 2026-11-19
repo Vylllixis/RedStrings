@@ -22,6 +22,8 @@ void eng_config_defaults(EngConfig *config)
         .vsync = true,
         .mouse_sensitivity = 0.002F,
         .stick_deadzone = 0.2F,
+        .camera_sensitivity = 1.0F,
+        .camera_invert_y = false,
     };
 }
 
@@ -318,6 +320,18 @@ static void parse_setting(Parser *parser, const char *key, char *value)
             return;
         }
         config->stick_deadzone = number;
+    } else if (SDL_strcasecmp(key, "camera_sensitivity") == 0) {
+        if (!parse_float(value, &number) || !(number > 0.0F) || number > 10.0F) {
+            issue(parser, "camera_sensitivity attend un nombre dans ]0 ; 10]");
+            return;
+        }
+        config->camera_sensitivity = number;
+    } else if (SDL_strcasecmp(key, "camera_invert_y") == 0) {
+        if (!parse_bool(value, &flag)) {
+            issue(parser, "camera_invert_y attend true/false");
+            return;
+        }
+        config->camera_invert_y = flag;
     } else if (SDL_strcasecmp(key, "bind.move.keys") == 0) {
         parse_move_keys(parser, value);
     } else if (SDL_strncasecmp(key, "bind.", 5) == 0) {

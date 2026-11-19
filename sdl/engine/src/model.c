@@ -9,6 +9,7 @@
 #include "engine/files.h"
 #include "engine/log.h"
 #include "engine/math.h"
+#include "engine/skin.h"
 
 /* cgltf alloue par SDL_malloc / SDL_free, comme le reste du moteur (compteur d'allocations). */
 static void *gltf_alloc(void *user, cgltf_size size)
@@ -63,6 +64,21 @@ typedef enum PrimResult {
     PRIM_SKIP, /* pas un triangle : ignorée */
     PRIM_ERROR,
 } PrimResult;
+
+/* Chargement d'un personnage (eng_model_parse_skinned) : NULL pour un modèle ordinaire. */
+typedef struct SkinSel {
+    const cgltf_skin *skin;
+    const uint32_t *remap;
+    uint32_t remap_count;
+    EngSkinVertex *out; /* un élément par sommet du modèle */
+} SkinSel;
+
+/* Le nœud entre-t-il dans le modèle ? Ordinaire : tout nœud qui porte un maillage ; personnage :
+ * seulement ceux qui utilisent le skin choisi. */
+static bool node_selected(const cgltf_node *node, const SkinSel *sel)
+{
+    return node->mesh != NULL && (sel == NULL || node->skin == sel->skin);
+}
 
 static PrimResult inspect_primitive(const cgltf_primitive *prim, PrimInfo *info)
 {
@@ -269,12 +285,12 @@ typedef struct Totals {
     uint32_t parts;
 } Totals;
 
-static bool count_totals(const cgltf_data *data, Totals *totals)
+static bool count_totals(const cgltf_data *data, const SkinSel *sel, Totals *totals)
 {
     *totals = (Totals){0};
     for (cgltf_size n = 0; n < data->nodes_count; n++) {
         const cgltf_mesh *mesh = data->nodes[n].mesh;
-        if (mesh == NULL) {
+        if (!node_selected(&data->nodes[n], sel)) {
             continue;
         }
         for (cgltf_size p = 0; p < mesh->primitives_count; p++) {
@@ -310,15 +326,101 @@ typedef struct Cursor {
     uint32_t part;
 } Cursor;
 
+/* JOINTS_0 / WEIGHTS_0 de la primitive -> `out[0..vcount[` (indices du squelette, poids u8 de somme
+ * 255). false (journalisé) si l'un manque, est mal typé ou contient une valeur inutilisable. */
+static bool read_skin(const cgltf_primitive *prim, const SkinSel *sel, uint32_t vcount,
+                      EngSkinVertex *out)
+{
+    const cgltf_accessor *joints = NULL;
+    const cgltf_accessor *weights = NULL;
+    bool extra = false;
+    for (cgltf_size a = 0; a < prim->attributes_count; a++) {
+        const cgltf_attribute *at = &prim->attributes[a];
+        if (at->type == cgltf_attribute_type_joints && at->index == 0) {
+            joints = at->data;
+        } else if (at->type == cgltf_attribute_type_weights && at->index == 0) {
+            weights = at->data;
+        } else if ((at->type == cgltf_attribute_type_joints ||
+                    at->type == cgltf_attribute_type_weights) &&
+                   at->index > 0) {
+            extra = true;
+        }
+    }
+    if (joints == NULL || weights == NULL || joints->type != cgltf_type_vec4 ||
+        weights->type != cgltf_type_vec4 || joints->count != vcount || weights->count != vcount) {
+        ENG_LOG_ERROR("glTF : une primitive skinnée doit avoir JOINTS_0 et WEIGHTS_0 (vec4, un par "
+                      "sommet)");
+        return false;
+    }
+    if (extra) {
+        ENG_LOG_WARN("glTF : JOINTS_1 / WEIGHTS_1 ignorés (4 influences par sommet au plus)");
+    }
+    for (uint32_t v = 0; v < vcount; v++) {
+        cgltf_uint j[4];
+        float w[4];
+        if (!cgltf_accessor_read_uint(joints, v, j, 4) ||
+            !cgltf_accessor_read_float(weights, v, w, 4)) {
+            ENG_LOG_ERROR("glTF : JOINTS_0 / WEIGHTS_0 illisibles (sommet %u)", v);
+            return false;
+        }
+        float sum = 0.0F;
+        for (int i = 0; i < 4; i++) {
+            if (!isfinite(w[i]) || w[i] < 0.0F) {
+                ENG_LOG_ERROR("glTF : poids de skinning invalide au sommet %u", v);
+                return false;
+            }
+            sum += w[i];
+        }
+        if (!(sum > 0.0F) || !isfinite(sum)) {
+            ENG_LOG_ERROR("glTF : sommet %u sans aucun poids de skinning", v);
+            return false;
+        }
+        int total = 0;
+        int largest = 0;
+        for (int i = 0; i < 4; i++) {
+            const int q = (int)lroundf(w[i] / sum * 255.0F);
+            out[v].weights[i] = (uint8_t)q;
+            total += q;
+            if (w[i] > w[largest]) {
+                largest = i;
+            }
+            if (q == 0) {
+                out[v].joints[i] = 0;
+            } else if (j[i] >= sel->remap_count) {
+                ENG_LOG_ERROR("glTF : sommet %u : articulation %u hors du skin (%u)", v, j[i],
+                              sel->remap_count);
+                return false;
+            } else {
+                out[v].joints[i] = (uint8_t)sel->remap[j[i]];
+            }
+        }
+        /* l'arrondi peut laisser la somme à 254 ou 256 : la plus forte influence absorbe l'écart */
+        const int fixed = (int)out[v].weights[largest] + (255 - total);
+        if (fixed < 1 || fixed > 255) {
+            ENG_LOG_ERROR("glTF : poids de skinning inutilisables au sommet %u", v);
+            return false;
+        }
+        out[v].weights[largest] = (uint8_t)fixed;
+    }
+    return true;
+}
+
 static bool fill_primitive(EngModel *model, EngArena *scratch, const cgltf_data *data,
                            const cgltf_node *node, const cgltf_primitive *prim,
-                           const PrimInfo *info, Cursor *cursor)
+                           const PrimInfo *info, const SkinSel *sel, Cursor *cursor)
 {
     mat4 world;
     mat3 normal_matrix;
     bool flip = false;
-    if (!node_matrices(node, world, normal_matrix, &flip)) {
+    if (sel != NULL) {
+        /* maillage skinné : la matrice du nœud est ignorée (spécification glTF) */
+        glm_mat4_identity(world);
+        glm_mat3_identity(normal_matrix);
+    } else if (!node_matrices(node, world, normal_matrix, &flip)) {
         ENG_LOG_ERROR("glTF : matrice de nœud singulière");
+        return false;
+    }
+    if (sel != NULL && !read_skin(prim, sel, info->vertex_count, &sel->out[cursor->vertex])) {
         return false;
     }
     const uint32_t vcount = info->vertex_count;
@@ -560,10 +662,10 @@ static bool material_image(EngModel *model, EngArena *scratch, const cgltf_data 
 /* ── API ── */
 
 static bool build(EngModel *model, EngArena *arena, EngArena *scratch, cgltf_data *data,
-                  const char *base_path)
+                  const char *base_path, SkinSel *sel)
 {
     Totals totals;
-    if (!count_totals(data, &totals)) {
+    if (!count_totals(data, sel, &totals)) {
         return false;
     }
     model->vertex_count = (uint32_t)totals.vertices;
@@ -638,7 +740,7 @@ static bool build(EngModel *model, EngArena *arena, EngArena *scratch, cgltf_dat
     Cursor cursor = {0};
     for (cgltf_size n = 0; n < data->nodes_count; n++) {
         const cgltf_node *node = &data->nodes[n];
-        if (node->mesh == NULL) {
+        if (!node_selected(node, sel)) {
             continue;
         }
         for (cgltf_size p = 0; p < node->mesh->primitives_count; p++) {
@@ -646,7 +748,7 @@ static bool build(EngModel *model, EngArena *arena, EngArena *scratch, cgltf_dat
             if (inspect_primitive(&node->mesh->primitives[p], &info) != PRIM_OK) {
                 continue; /* déjà signalée par count_totals */
             }
-            if (!fill_primitive(model, scratch, data, node, &node->mesh->primitives[p], &info,
+            if (!fill_primitive(model, scratch, data, node, &node->mesh->primitives[p], &info, sel,
                                 &cursor)) {
                 return false;
             }
@@ -664,7 +766,7 @@ static bool build(EngModel *model, EngArena *arena, EngArena *scratch, cgltf_dat
             model->bounds_max[a] = fmaxf(model->bounds_max[a], p);
         }
     }
-    if (data->animations_count != 0 || data->skins_count != 0) {
+    if (sel == NULL && (data->animations_count != 0 || data->skins_count != 0)) {
         ENG_LOG_INFO("glTF : %zu animation(s) et %zu skin(s) ignorée(s)",
                      (size_t)data->animations_count, (size_t)data->skins_count);
     }
@@ -686,8 +788,17 @@ static bool unsupported_extension(const cgltf_data *data)
     return false;
 }
 
-bool eng_model_parse(EngArena *arena, EngArena *scratch, const void *data, size_t size,
-                     const char *base_path, EngModel *model)
+/* `select_skin` : NULL pour un modèle ordinaire ; sinon (eng_model_parse_skinned) `*select_skin`
+ * désigne le skin à charger (indice -> pointeur résolu ici) et son `out` est alloué ici. */
+typedef struct SkinRequest {
+    uint32_t skin_index;
+    const uint32_t *remap;
+    uint32_t remap_count;
+    EngSkinVertex *out; /* sortie : allouée dans l'arène */
+} SkinRequest;
+
+static bool parse_impl(EngArena *arena, EngArena *scratch, const void *data, size_t size,
+                       const char *base_path, SkinRequest *request, EngModel *model)
 {
     *model = (EngModel){0};
     if (data == NULL || size == 0) {
@@ -721,7 +832,36 @@ bool eng_model_parse(EngArena *arena, EngArena *scratch, const void *data, size_
     if (ok) {
         const EngArenaMark arena_mark = eng_arena_mark(arena);
         const EngArenaMark scratch_mark = eng_arena_mark(scratch);
-        ok = build(model, arena, scratch, gltf, base_path);
+        SkinSel sel = {0};
+        if (request != NULL) {
+            if (request->skin_index >= gltf->skins_count || request->remap == NULL ||
+                request->remap_count != gltf->skins[request->skin_index].joints_count) {
+                ENG_LOG_ERROR("glTF : skin %u inexistant, ou `remap` (%u) incohérent avec lui",
+                              request->skin_index, request->remap_count);
+                ok = false;
+            } else {
+                sel = (SkinSel){.skin = &gltf->skins[request->skin_index],
+                                .remap = request->remap,
+                                .remap_count = request->remap_count};
+            }
+        }
+        if (ok) {
+            Totals totals;
+            if (request != NULL) {
+                ok = count_totals(gltf, &sel, &totals);
+                sel.out = ok ? ENG_ARENA_NEW_ARRAY(arena, EngSkinVertex, totals.vertices) : NULL;
+                if (ok && sel.out == NULL) {
+                    ENG_LOG_ERROR("glTF : arène trop petite pour les poids de skinning");
+                    ok = false;
+                }
+                if (ok) {
+                    request->out = sel.out;
+                }
+            }
+            if (ok) {
+                ok = build(model, arena, scratch, gltf, base_path, request != NULL ? &sel : NULL);
+            }
+        }
         eng_arena_reset_to(scratch, scratch_mark);
         if (!ok) {
             eng_model_free(model);
@@ -733,6 +873,113 @@ bool eng_model_parse(EngArena *arena, EngArena *scratch, const void *data, size_
         *model = (EngModel){0};
     }
     return ok;
+}
+
+bool eng_model_parse(EngArena *arena, EngArena *scratch, const void *data, size_t size,
+                     const char *base_path, EngModel *model)
+{
+    return parse_impl(arena, scratch, data, size, base_path, NULL, model);
+}
+
+bool eng_model_parse_skinned(EngArena *arena, EngArena *scratch, const void *data, size_t size,
+                             const char *base_path, uint32_t skin_index, const uint32_t *remap,
+                             uint32_t remap_count, EngModel *model, EngSkinVertex **skin)
+{
+    if (skin == NULL) {
+        *model = (EngModel){0};
+        return false;
+    }
+    *skin = NULL;
+    SkinRequest request = {
+        .skin_index = skin_index, .remap = remap, .remap_count = remap_count, .out = NULL};
+    if (!parse_impl(arena, scratch, data, size, base_path, &request, model)) {
+        return false;
+    }
+    *skin = request.out;
+    return true;
+}
+
+/* Ajoute dossier + URI décodée à `paths` s'il n'y est pas déjà. false : échec (journalisé). */
+static bool add_dependency(EngArena *arena, const char **paths, uint32_t *count,
+                           const char *directory, const char *uri)
+{
+    if (uri == NULL || strncmp(uri, "data:", 5) == 0) {
+        return true; /* données incluses : pas un fichier */
+    }
+    char decoded[512];
+    if (strlen(uri) >= sizeof decoded) {
+        ENG_LOG_ERROR("glTF : URI trop longue");
+        return false;
+    }
+    SDL_strlcpy(decoded, uri, sizeof decoded);
+    cgltf_decode_uri(decoded);
+    char path[1024];
+    if (SDL_snprintf(path, sizeof path, "%s%s", directory, decoded) >= (int)sizeof path) {
+        ENG_LOG_ERROR("glTF : chemin de dépendance trop long");
+        return false;
+    }
+    for (uint32_t i = 0; i < *count; i++) {
+        if (strcmp(paths[i], path) == 0) {
+            return true;
+        }
+    }
+    const size_t length = strlen(path) + 1U;
+    char *copy = eng_arena_alloc(arena, length, 1);
+    if (copy == NULL) {
+        return false;
+    }
+    memcpy(copy, path, length);
+    paths[(*count)++] = copy;
+    return true;
+}
+
+bool eng_model_dependencies(EngArena *arena, const void *data, size_t size, const char *base_path,
+                            const char ***out_paths, uint32_t *out_count)
+{
+    *out_paths = NULL;
+    *out_count = 0;
+    if (data == NULL || size == 0 || base_path == NULL) {
+        ENG_LOG_ERROR("glTF : dépendances : données ou chemin d'origine manquants");
+        return false;
+    }
+    cgltf_options options = {0};
+    options.memory.alloc_func = gltf_alloc;
+    options.memory.free_func = gltf_release;
+    cgltf_data *gltf = NULL;
+    const cgltf_result result = cgltf_parse(&options, data, size, &gltf);
+    if (result != cgltf_result_success) {
+        ENG_LOG_ERROR("glTF : analyse impossible : %s", gltf_error(result));
+        return false;
+    }
+    char directory[1024];
+    directory_of(base_path, directory, sizeof directory);
+
+    const EngArenaMark mark = eng_arena_mark(arena);
+    /* une case de plus que nécessaire : jamais de tableau vide (rendu à l'arène plus bas si rien)
+     */
+    const size_t capacity = (size_t)gltf->buffers_count + gltf->images_count + 1U;
+    const char **paths =
+        (const char **)eng_arena_alloc(arena, capacity * sizeof *paths, alignof(const char *));
+    bool ok = paths != NULL;
+    uint32_t count = 0;
+    for (cgltf_size i = 0; ok && i < gltf->buffers_count; i++) {
+        ok = add_dependency(arena, paths, &count, directory, gltf->buffers[i].uri);
+    }
+    for (cgltf_size i = 0; ok && i < gltf->images_count; i++) {
+        ok = add_dependency(arena, paths, &count, directory, gltf->images[i].uri);
+    }
+    cgltf_free(gltf);
+    if (!ok) {
+        eng_arena_reset_to(arena, mark);
+        return false;
+    }
+    if (count == 0) {
+        eng_arena_reset_to(arena, mark); /* rien à rendre : l'arène n'a pas bougé */
+        return true;
+    }
+    *out_paths = paths;
+    *out_count = count;
+    return true;
 }
 
 bool eng_model_load(EngArena *arena, EngArena *scratch, const char *path, EngModel *model)

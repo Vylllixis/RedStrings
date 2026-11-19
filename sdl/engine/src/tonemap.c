@@ -8,6 +8,8 @@ void eng_tonemap_default(EngTonemap *t)
 {
     t->op = ENG_TONEMAP_ACES;
     t->exposure_ev = 0.0F;
+    t->fxaa = false;
+    t->bloom = 0.0F;
 }
 
 bool eng_tonemap_sanitize(EngTonemap *t)
@@ -25,6 +27,13 @@ bool eng_tonemap_sanitize(EngTonemap *t)
         clean = false;
     } else if (t->exposure_ev < ENG_EXPOSURE_EV_MIN) {
         t->exposure_ev = ENG_EXPOSURE_EV_MIN;
+        clean = false;
+    }
+    if (!isfinite(t->bloom) || t->bloom < 0.0F) {
+        t->bloom = 0.0F;
+        clean = false;
+    } else if (t->bloom > 2.0F) {
+        t->bloom = 2.0F;
         clean = false;
     }
     return clean;

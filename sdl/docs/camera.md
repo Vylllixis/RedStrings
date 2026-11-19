@@ -65,3 +65,51 @@ retard, ≈ 17 ms).
 - Si SDL refuse le mode relatif (pilote `offscreen`, certains environnements distants), la souris
   reste libre et ne tourne pas la caméra ; un avertissement est journalisé.
 - Le sens de la molette suit le réglage du système (défilement « naturel » inclus).
+
+
+## Caméra 3e personne (M4-10)
+
+`engine/orbit_camera.h` : orbite autour d'un pivot (le haut du dos du personnage). Module pur : il ne
+lit que `EngInputState` (axe LOOK, molette) et produit un `EngCamera` (`eng_orbit_camera_apply`), donc
+le rendu et les tests ne changent pas.
+
+- **Conventions** : yaw 0 = regarde vers -Z ; yaw positif à gauche ; pitch positif = regarde vers le
+  haut (caméra sous le pivot). Souris vers le haut : pitch positif ; `camera_invert_y` l'inverse.
+- **Limites verticales** : pitch dans [-75°, +40°] ; une butée n'accumule pas de « dette » (revenir est
+  immédiat). Distance dans [1 m ; 12 m], molette = x1,15 par cran.
+- **Lissages** : filtres exponentiels exacts en temps `1 - exp(-dt/tau)` (suivi du pivot : 0,10 s,
+  regard : 0,03 s ; 0 = désactivé). Le suivi lissé masque les petites montées de marche du
+  contrôleur. Avec un pivot qui avance à la vitesse v, le retard vaut v·dt·e^(-dt/tau)/(1-e^(-dt/tau)),
+  soit environ v·tau - v·dt/2.
+- **Fluidité** : la caméra avance par pas FIXES comme la simulation ; on affiche l'interpolation
+  (`eng_camera_lerp`) des deux derniers pas avec l'alpha de la boucle. Le test
+  `orbit_camera.same_picture_at_30_60_and_144_fps_and_no_jerk` filme un scénario à ces trois
+  cadences : mêmes images aux instants communs, et jamais plus vite que le pas de simulation le plus
+  rapide.
+- **Sensibilité** : multiplicateur `camera_sensitivity` (]0 ; 10], config.ini) de
+  `ENG_CAMERA_LOOK_UNIT`, appliqué en plus de `mouse_sensitivity`.
+- `effective` (distance utilisée) est remise à `distance` à chaque pas : la collision (M4-11) la réduit
+  ensuite. `eng_orbit_camera_flat_forward/right` donnent les directions horizontales pour le
+  déplacement relatif à la caméra (M4-07).
+
+## Collision de la caméra orbitale (M4-11)
+
+`eng_orbit_camera_collide(camera, world, layer_mask, radius, dt)`, à appeler **après**
+`eng_orbit_camera_update`, dans le même pas fixe.
+
+- Une **sphère** de rayon `ENG_ORBIT_COLLISION_RADIUS` (0,25 m, supérieur au plan proche) est
+  balayée du pivot vers l'œil (`eng_physics_spherecast`, Jolt `CastShape`). Un simple rayon
+  laisserait le plan proche couper la paroi : la sphère arrête le centre de l'œil à un rayon du mur.
+- Obstacle : `effective` passe **immédiatement** à la distance libre (jamais de traversée).
+- Plus d'obstacle : retour vers `distance` par un filtre exponentiel exact (`ENG_ORBIT_RECOVER_TAU`
+  = 0,3 s), sans saut. Mémoire dans `clear` ; `eng_orbit_camera_snap` la réinitialise.
+- Plancher `ENG_ORBIT_COLLISION_MIN` (0,10 m) : pivot collé à un mur, l'œil ne se confond pas avec
+  le pivot.
+- Passer des couches **statiques** (`1U << ENG_LAYER_STATIC`) : le corps du personnage, les
+  hitboxes et les capteurs ne doivent pas rapprocher la caméra.
+- Sans Jolt (`OW_PHYSICS=OFF`) : aucun obstacle, la caméra garde `distance`.
+
+Limites connues (non traitées) : si le pivot lui-même est dans la géométrie (personnage coincé),
+la caméra se colle au plancher de 0,10 m ; pas de fondu du personnage quand la caméra est très
+proche ; la qualité visuelle (tremblements dans un coin, retour trop lent ou trop vif) reste à
+juger à l'écran : seule la géométrie est vérifiée par les tests.

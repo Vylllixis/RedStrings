@@ -43,7 +43,7 @@ eng_render_draw_uniforms(q, &cmd, mvp, sizeof mvp);   // copie 64 octets dans la
 
 - Les octets sont **copiés** dans une zone de la file (`EngRendererDesc.max_uniform_bytes`, défaut
   raisonnable) : la source peut être une variable locale. Chaque dessin a son emplacement, aligné
-  sur 16 octets, 4096 octets au plus (`ENG_MAX_UNIFORM_BYTES`).
+  sur 16 octets, 16384 octets au plus (`ENG_MAX_UNIFORM_BYTES`, de quoi porter la palette de 256 os d'un personnage skinné : M4-15).
 - Refus (`dropped` augmente) : file ou zone pleine, pointeur NULL, taille 0 ou trop grande.
 - À l'exécution, `offset + size` hors de la zone utilisée → commande rejetée comme un handle périmé.
 - Vertex uniforms : slot 0 (`register(b0, space1)`).

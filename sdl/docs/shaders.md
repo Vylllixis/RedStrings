@@ -204,3 +204,30 @@ ailleurs la chaîne est désactivée avec un avertissement.
   la main (M1-04).
 - Windows : la copie des DLL de DXC à côté de `shadercross.exe` est prévue mais n'a pas été
   exécutée.
+
+## `terrain.frag.hlsl` (M3-03)
+
+Même vertex shader que les modèles (`model.vert`). Le fragment shader reprend l'éclairage de `model.frag` (à
+garder aligné : test `engine.terrain_gpu`) ; la couleur de base vient d'une splatmap (slot 0, RGBA8 linéaire) et de
+quatre albédos (slots 1 à 4, sRGB) lus en triplanaire. `environment.y` : longueur d'une répétition (m),
+`environment.z` : netteté du triplanaire ; renseignés par `EngModelDrawOptions.user`. Voir `docs/terrain.md`.
+
+## `atmosphere.frag.hlsl` (M3-05)
+
+Même vertex shader que la skybox (`sky.vert`). Aucune texture : le ciel est calculé par pixel à partir de la direction
+du soleil, des épaisseurs optiques et de quelques limites passées en uniforms. Les formules sont **recopiées** de
+`engine/src/atmosphere.c` (à garder alignées : test `engine.atmosphere_gpu`). Voir `docs/atmosphere.md`.
+
+## Brouillard dans `terrain.frag.hlsl` (M3-06)
+
+Le cbuffer `Lighting` du terrain se prolonge de quatre `float4` après `shadow_c` (`fog_a` à `fog_sky`), fournis par
+`EngModelDrawOptions.fragment_tail` (`eng_fog_pack`). `apply_fog` et `fog_horizon` recopient `engine/src/fog.c` et la
+partie « horizon » d'`atmosphere.c` (à garder alignées : tests `engine.fog` et `engine.terrain_gpu`). `fog_a.w = 0` ou
+`fog_a.x = 0` : pas de brouillard. Voir `docs/fog.md`.
+
+## `instanced.vert.hlsl` (M3-07)
+
+Vertex shader des maillages instanciés : même entrée de sommet que `model.vert` (emplacements 0 à 3) plus l'instance
+(emplacements 4 à 6, flux 1, voir `docs/instancing.md`). Uniforms (`register(b0, space1)`) : `view_proj` et la couleur
+du matériau. Les sorties sont celles de `model.vert` : le fragment shader est `model.frag`. Test d'équivalence :
+`engine.instancing_gpu`.

@@ -9,6 +9,7 @@
 #include "engine/model.h"
 #include "engine/renderer.h"
 #include "engine/shadow.h"
+#include "engine/skin.h"
 
 /* Un EngModel (engine/model.h) envoyé au GPU et dessiné par le renderer : un buffer de sommets, un
  * buffer d'index (u32), une texture par image utilisée, un sampler, et une commande de dessin par
@@ -42,23 +43,24 @@ typedef struct EngModelGpuMaterial {
 } EngModelGpuMaterial;
 
 typedef struct EngModelGpu {
+    EngTextureHandle *textures;        /* par image : version sRGB (nulle si non utilisée ainsi) */
+    EngTextureHandle *linear_textures; /* par image : version linéaire (nulle si non utilisée) */
+    EngModelPart *parts;
+    EngModelGpuMaterial *materials;
+    uint32_t texture_count;
+    uint32_t part_count;
+    uint32_t material_count;
     EngBufferHandle vertices;
     EngBufferHandle indices;
     EngSamplerHandle sampler;
     EngTextureHandle white;
     EngSamplerHandle shadow_sampler; /* plus proche voisin, bords prolongés (carte d'ombre) */
+    float bounds_min[3];
+    float bounds_max[3];
     EngEnvironment
         environment;       /* éclairage par image ; par défaut : environnement uniforme blanc */
     bool owns_environment; /* true : le modèle détruit `environment` (c'est le défaut) */
-    EngTextureHandle *textures;        /* par image : version sRGB (nulle si non utilisée ainsi) */
-    EngTextureHandle *linear_textures; /* par image : version linéaire (nulle si non utilisée) */
-    uint32_t texture_count;
-    EngModelPart *parts;
-    uint32_t part_count;
-    EngModelGpuMaterial *materials;
-    uint32_t material_count;
-    float bounds_min[3];
-    float bounds_max[3];
+    bool skinned;          /* sommets de 56 octets : EngModelVertex + EngSkinVertex (M4-15) */
 } EngModelGpu;
 
 /* Décrit le pipeline qui dessine un EngModelGpu : sommets EngModelVertex (position, normale, UV,
@@ -72,6 +74,22 @@ void eng_model_pipeline_desc(EngPipelineDesc *desc);
  * jusqu'à 16). Échec (false, journalisé) : tout ce qui avait été créé est détruit. */
 bool eng_model_gpu_create(EngModelGpu *gpu, EngRenderer *renderer, EngArena *arena,
                           const EngModel *model, float anisotropy);
+
+/* Comme eng_model_gpu_create, pour un personnage (M4-15) : `skin` (model->vertex_count éléments,
+ * eng_model_parse_skinned) est entrelacé aux sommets (56 octets chacun : EngModelVertex puis
+ * EngSkinVertex). Le modèle ne se dessine qu'avec les pipelines eng_model_skinned_pipeline_desc /
+ * eng_model_skinned_shadow_pipeline_desc ET une palette de matrices (EngModelDrawOptions.
+ * skin_matrices), sinon le dessin est refusé. `skin` NULL : échec. */
+bool eng_model_gpu_create_skinned(EngModelGpu *gpu, EngRenderer *renderer, EngArena *arena,
+                                  const EngModel *model, const EngSkinVertex *skin,
+                                  float anisotropy);
+
+/* Pipelines d'un modèle skinné : les mêmes que eng_model_pipeline_desc /
+ * eng_model_shadow_pipeline_desc mais avec les shaders model_skinned.vert / shadow_skinned.vert
+ * (docs/skinning.md) et le flux entrelacé de 56 octets. Le fragment shader est celui des modèles
+ * ordinaires. */
+void eng_model_skinned_pipeline_desc(EngPipelineDesc *desc);
+void eng_model_skinned_shadow_pipeline_desc(EngPipelineDesc *desc);
 
 /* Détruit les ressources. Sans effet sur un modèle GPU nul ou déjà détruit. */
 void eng_model_gpu_destroy(EngModelGpu *gpu, EngRenderer *renderer);
@@ -111,12 +129,67 @@ uint32_t eng_model_gpu_draw_shadowed(const EngModelGpu *gpu, EngRenderQueue *que
                                      EngPipelineHandle pipeline, mat4 model_matrix, mat4 view_proj,
                                      const EngLighting *lighting, const EngModelShadow *shadow);
 
+/* Réglages d'un dessin particulier (terrain, M3-03) : tous facultatifs. */
+typedef struct EngModelDrawOptions {
+    /* Cinq handles qui REMPLACENT, pour toutes les parties, les cinq textures du matériau
+     * (emplacements 0 à 4 du fragment shader) ; NULL : celles des matériaux. */
+    const EngTextureHandle *textures;
+    EngSamplerHandle sampler; /* sampler des emplacements 0 à 7 ; nul : celui du modèle */
+    /* Trois valeurs libres pour le fragment shader (environment.yzw du cbuffer : le terrain y met
+     * la taille d'une répétition de texture et la netteté du triplanaire). */
+    float user[3];
+    /* Parties à dessiner, dans cet ordre (indices < part_count du modèle ; hors limites : ignorés)
+     * ; NULL : toutes. Sert au culling (M3-04) : seules les parties visibles sont mises en file. */
+    const uint32_t *parts;
+    uint32_t part_count; /* nombre d'éléments de `parts` (ignoré si NULL) */
+    /* Flottants ajoutés APRÈS les uniforms d'éclairage de model.frag dans le bloc de fragment
+     * (M3-06 : le brouillard du terrain) ; le fragment shader doit déclarer le cbuffer en
+     * conséquence. NULL ou 0 : rien. Au plus ENG_MODEL_MAX_TAIL_FLOATS, arrondi vers le bas à un
+     * multiple de 4 (des float4 entiers : le bloc de fragment est aligné sur 16 octets). */
+    const float *fragment_tail;
+    uint32_t fragment_tail_floats;
+    /* Dessin INSTANCIÉ (M3-07, engine/instancing.h) : `instance_count` copies du maillage, placées
+     * par le buffer `instance_buffer` (EngInstance), en un dessin par partie. Exige le pipeline de
+     * eng_instanced_pipeline_desc. `model_matrix` est alors ignorée (chaque instance a la sienne).
+     */
+    EngBufferHandle instance_buffer;
+    uint32_t instance_count;
+    /* Flottants ajoutés APRÈS les uniforms de eng_instanced (view_proj, couleur) dans le bloc de
+     * vertex d'un dessin INSTANCIÉ (M3-09 : vent et fondu de l'herbe, grass.vert) ; ignorés pour un
+     * dessin non instancié. NULL ou 0 : rien. Au plus ENG_MODEL_MAX_VERTEX_TAIL_FLOATS, arrondi
+     * vers le bas à un multiple de 4 (des float4 entiers). */
+    const float *vertex_tail;
+    uint32_t vertex_tail_floats;
+    /* Palette d'un modèle SKINNÉ (M4-15) : `skin_joint_count` matrices 4x4 (16 flottants, colonnes
+     * d'abord, contiguës) = eng_pose_skin_matrices, dans l'espace du personnage. Obligatoire pour
+     * un modèle créé par eng_model_gpu_create_skinned (1 à ENG_SKELETON_MAX_JOINTS matrices, finies
+     * ; sinon aucun dessin n'est mis en file) ; INTERDITE pour un modèle ordinaire. Seules
+     * 3 lignes par articulation sont envoyées (la dernière est toujours 0 0 0 1). */
+    const float *skin_matrices;
+    uint32_t skin_joint_count;
+} EngModelDrawOptions;
+#define ENG_MODEL_MAX_TAIL_FLOATS 64U
+#define ENG_MODEL_MAX_VERTEX_TAIL_FLOATS 16U
+
+/* Comme eng_model_gpu_draw_shadowed, avec ces réglages (`options` NULL : aucun). */
+uint32_t eng_model_gpu_draw_ex(const EngModelGpu *gpu, EngRenderQueue *queue,
+                               EngPipelineHandle pipeline, mat4 model_matrix, mat4 view_proj,
+                               const EngLighting *lighting, const EngModelShadow *shadow,
+                               const EngModelDrawOptions *options);
+
 /* Met en file un dessin par partie dans la PASSE D'OMBRE : `pipeline` est un pipeline depth_only
  * (eng_model_shadow_pipeline_desc), `light_view_proj` la matrice monde -> découpage du soleil
  * (EngShadowMap.view_proj). Renvoie le nombre de dessins acceptés. */
 uint32_t eng_model_gpu_draw_depth(const EngModelGpu *gpu, EngRenderQueue *queue,
                                   EngPipelineHandle pipeline, mat4 model_matrix,
                                   mat4 light_view_proj);
+
+/* Passe d'ombre d'un modèle skinné : comme eng_model_gpu_draw_depth, avec la palette (mêmes règles
+ * que EngModelDrawOptions.skin_matrices). `pipeline` : eng_model_skinned_shadow_pipeline_desc. */
+uint32_t eng_model_gpu_draw_depth_skinned(const EngModelGpu *gpu, EngRenderQueue *queue,
+                                          EngPipelineHandle pipeline, mat4 model_matrix,
+                                          mat4 light_view_proj, const float *skin_matrices,
+                                          uint32_t skin_joint_count);
 
 /* Pipeline de la passe d'ombre pour les sommets EngModelVertex (shadow.*, sans élimination de
  * faces : les modèles ouverts projettent leur ombre depuis les deux côtés). */

@@ -92,6 +92,13 @@ typedef enum EngTextureFormat {
      * eng_renderer_create_texture_data (pas de mipmaps calculés ici). */
     ENG_TEXTURE_RGBA16F, /* 8 octets par texel */
     ENG_TEXTURE_RG16F,   /* 4 octets par texel */
+    /* BC7 (M2-03) : blocs de 4 x 4 texels sur 16 octets, mêmes valeurs que RGBA8 / RGBA8_SRGB une
+     * fois décodées. Seulement avec eng_renderer_create_texture_data : les niveaux sont fournis
+     * déjà compressés (le moteur ne compresse ni ne génère de mips ici). Un niveau compte
+     * ceil(w / 4) * ceil(h / 4) blocs, donc 16 octets même à 1 x 1. Refusé (journalisé) si le GPU
+     * ne sait pas lire BC7. */
+    ENG_TEXTURE_BC7,
+    ENG_TEXTURE_BC7_SRGB,
     /* Profondeur 32 bits flottante : seulement la carte d'ombre (eng_renderer_create_shadow_map),
      * rendue par une passe d'ombre puis lue par les shaders. Refusée par les autres créations. */
     ENG_TEXTURE_DEPTH32F,
@@ -109,11 +116,11 @@ typedef struct EngTextureDesc {
 } EngTextureDesc;
 
 /* Texture dont TOUS les niveaux sont fournis (données déjà calculées : cartes d'environnement,
- * LUT). `layers` : 1 (texture 2D) ou 6 (cubemap, `width == height`, faces dans l'ordre +X -X +Y -Y
- * +Z -Z, vues depuis l'intérieur, convention OpenGL / Vulkan / Direct3D : une direction (x, y, z)
- * lit la face de son axe dominant). `data` : pour chaque couche, les niveaux 0 à mip_levels-1 à la
- * suite, lignes serrées, première ligne = haut (v = 0). Un cube se lit dans le shader par une
- * direction : TextureCube.SampleLevel(sampler, direction, niveau). */
+ * LUT, textures compressées BC7). `layers` : 1 (texture 2D) ou 6 (cubemap, `width == height`, faces
+ * dans l'ordre +X -X +Y -Y +Z -Z, vues depuis l'intérieur, convention OpenGL / Vulkan / Direct3D :
+ * une direction (x, y, z) lit la face de son axe dominant). `data` : pour chaque couche, les
+ * niveaux 0 à mip_levels-1 à la suite, lignes serrées, première ligne = haut (v = 0). Un cube se
+ * lit dans le shader par une direction : TextureCube.SampleLevel(sampler, direction, niveau). */
 typedef struct EngTextureDataDesc {
     const char *name;
     uint32_t width;
@@ -202,9 +209,17 @@ typedef struct EngPipelineDesc {
     const char *name;            /* pour le journal */
     const char *vertex_shader;   /* « triangle.vert » : voir docs/shaders.md */
     const char *fragment_shader; /* « triangle.frag » */
-    uint32_t vertex_stride;      /* octets entre deux sommets (un seul flux de sommets) */
+    uint32_t vertex_stride;      /* octets entre deux sommets (flux 0) */
     EngVertexAttribute attributes[ENG_MAX_VERTEX_ATTRIBUTES];
     uint32_t attribute_count;
+    /* Flux d'INSTANCES (M3-07) : un second flux de sommets, lu une fois par INSTANCE (et non par
+     * sommet), pour dessiner des milliers de copies d'un même maillage en un seul dessin. Les
+     * attributs ont leur propre `location` (différente de celles du flux 0) et leurs offsets
+     * comptent depuis le début d'UNE instance. `instance_stride` 0 : pas de flux d'instances ;
+     * sinon le dessin DOIT fournir EngDrawCmd.instance_buffer. */
+    uint32_t instance_stride;
+    EngVertexAttribute instance_attributes[ENG_MAX_VERTEX_ATTRIBUTES];
+    uint32_t instance_attribute_count;
     EngTopology topology;
     EngCullMode cull_mode;
     EngFrontFace front_face;
@@ -247,6 +262,11 @@ typedef struct EngDrawCmd {
     uint32_t first;          /* premier sommet (ou index) */
     int32_t vertex_offset;   /* ajouté à chaque index (dessin indexé) */
     uint32_t instance_count; /* 0 : une instance */
+    /* Buffer ENG_BUFFER_VERTEX des instances (flux 1) : exigé, avec instance_count >= 1, si le
+     * pipeline a un flux d'instances (instance_stride), interdit sinon ; il doit contenir au moins
+     * instance_count x instance_stride octets, sinon le dessin est rejeté (le GPU lirait hors du
+     * buffer). */
+    EngBufferHandle instance_buffer;
     /* Uniforms du vertex shader (emplacement 0) : rempli par eng_render_draw_uniforms, ne pas
      * l'écrire à la main. uniform_size == 0 : aucun uniform. */
     uint32_t uniform_offset;
@@ -276,7 +296,7 @@ typedef struct EngDrawCmd {
 
 /* Taille maximale des uniforms d'un dessin (une matrice 4x4 = 64 octets) et alignement dans la
  * file. */
-#define ENG_MAX_UNIFORM_BYTES 4096U
+#define ENG_MAX_UNIFORM_BYTES 16384U
 #define ENG_UNIFORM_ALIGNMENT 16U
 
 typedef struct EngRenderQueue {
@@ -408,6 +428,7 @@ typedef struct EngRendererStats {
     uint64_t overlay_passes;    /* images où l'overlay (interface de debug) a été dessiné */
     uint64_t resolve_draws;     /* résolutions HDR -> écran dessinées (M1-14) */
     uint64_t shadow_passes;     /* passes d'ombre ouvertes (M1-17) */
+    uint64_t instances; /* instances émises (somme des instance_count des dessins, M3-07) */
 } EngRendererStats;
 
 /* Overlay (M1-12) : dessin par-dessus la scène, dans une seconde passe sans profondeur (voir

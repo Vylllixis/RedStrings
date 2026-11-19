@@ -1,0 +1,92 @@
+#pragma once
+
+#include <stdbool.h>
+#include <stdint.h>
+
+#include "engine/debug_lines.h"
+#include "engine/game_menu.h"
+#include "engine/input_state.h"
+#include "engine/math.h"
+#include "engine/save_game.h"
+#include "engine/ui_game.h"
+
+/* Combat dans le mode jouable (raccord M4 + M5 + M6, option --play --combat).
+ *
+ * Branche sur le personnage du mode jouable : la simulation de combat (M5), un mannequin
+ * d'entraînement, un petit camp de 3 ennemis pilotés par l'IA (M6), le verrouillage de cible, les
+ * particules et (en option) le son. Le personnage physique (Jolt) reste l'autorité de position du
+ * joueur ; la simulation lui renvoie seulement les déplacements de combat (esquive, recul,
+ * séparation) et dit quand il ne peut pas marcher (attaque, esquive, réaction).
+ *
+ * Données : assets/combat/attacks.txt (rechargé à chaud) et assets/combat/enemies.txt. Si les
+ * fichiers manquent, des valeurs intégrées identiques sont utilisées.
+ *
+ * Dessin (fil de fer) : hurtboxes par zone (gris : intouchable), armes actives en rouge, barres de
+ * PV (vert) et de posture (jaune), cible verrouillée (cercle magenta), cônes de vision et jetons
+ * d'attaque des ennemis, particules d'impact. */
+
+typedef struct PlayCombat PlayCombat;
+
+typedef struct PlayCombatStep {
+    bool locked;   /* le joueur ne peut pas marcher ce tick */
+    float push[2]; /* déplacement (x, z) imposé par le combat ce tick, en mètres */
+    bool face;     /* `facing` doit être appliqué (attaque vers la cible verrouillée) */
+    float facing;  /* lacet voulu */
+} PlayCombatStep;
+
+/* `audio` : ouvre le périphérique audio (sinon silencieux). `arena_obstacles` : les ennemis
+ * contournent les cubes et murs de l'arène de M4 (false sur le terrain : pas d'obstacle).
+ * Instance unique (stockage statique). */
+PlayCombat *play_combat_create(bool audio, bool arena_obstacles);
+void play_combat_destroy(PlayCombat *c);
+
+/* Un pas fixe. `feet` : pieds du personnage ; `facing` : son lacet ; `move_dir` : direction de
+ * marche voulue (x, z), nulle si immobile ; `camera_yaw` : pour le verrouillage. */
+void play_combat_tick(PlayCombat *c, const EngInputState *input, const float feet[3], float facing,
+                      const float move_dir[2], float camera_yaw, double now_seconds,
+                      PlayCombatStep *out);
+
+struct PlayMode;
+
+/* Dessin de debug, posé sur le sol du mode jouable (relief en mode terrain ; la simulation est
+ * plane, à y = 0). */
+void play_combat_draw(const PlayCombat *c, EngDebugLines *lines, const struct PlayMode *play);
+
+/* Pilote automatique (--combat-autoplay, démonstration sans manette) : écrit dans `in` les
+ * entrées d'un joueur qui verrouille l'ennemi vivant le plus proche, s'en approche et frappe
+ * (relatives à la caméra `camera_yaw`). */
+void play_combat_autopilot(PlayCombat *c, const float feet[3], float camera_yaw, uint32_t tick,
+                           EngInputState *in);
+
+/* Nouvelle partie : joueur à neuf, camp et mannequin remis à zéro. */
+void play_combat_reset(PlayCombat *c);
+/* Sauvegarde (M8-05) : PV, endurance, posture du joueur et état des ennemis du camp. */
+void play_combat_snapshot(const PlayCombat *c, EngSaveGame *s);
+void play_combat_restore(PlayCombat *c, const EngSaveGame *s);
+/* Volumes (général et par bus). */
+void play_combat_apply_options(PlayCombat *c, const EngGameOptions *o);
+/* Interface (M8-03) : barres, cible verrouillée, nombres de dégâts projetés à l'écran. */
+void play_combat_fill_hud(const PlayCombat *c, const struct PlayMode *play, mat4 view_proj,
+                          int width, int height, EngHud *hud);
+
+/* Mesures pour l'autotest et le journal. */
+typedef struct PlayCombatStats {
+    uint32_t tick;
+    float dummy_damage; /* dégâts reçus par le mannequin */
+    uint32_t enemy_kills;
+    uint32_t player_hits_taken;
+    uint32_t max_attackers; /* maximum observé d'ennemis attaquant en même temps */
+    uint32_t enemies_engaged;
+    float player_hp;
+    int32_t lock_target; /* -1 si aucune */
+    uint32_t attacks_version;
+    uint32_t audio_callbacks;
+    uint32_t level; /* progression (M8-08) */
+    uint32_t total_xp;
+} PlayCombatStats;
+
+void play_combat_stats(const PlayCombat *c, PlayCombatStats *out);
+
+/* Autotest sans fenêtre (option --combat-selftest) : nécessite Jolt. Journalise
+ * « AUTOTEST COMBAT : OK » ou la première erreur. */
+bool play_combat_selftest(void);

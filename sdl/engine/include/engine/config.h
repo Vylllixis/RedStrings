@@ -14,6 +14,8 @@
  *   vsync = true
  *   mouse_sensitivity = 0.002
  *   stick_deadzone = 0.2
+ *   camera_sensitivity = 1.0      (caméra 3e personne : multiplicateur, ]0 ; 10])
+ *   camera_invert_y = false
  *   bind.attack = mouse:left, pad:west
  *   bind.move.keys = A, D, S, W
  *
@@ -40,6 +42,8 @@ typedef struct EngConfig {
     bool vsync;
     float mouse_sensitivity;
     float stick_deadzone;
+    float camera_sensitivity; /* multiplicateur du regard de la caméra 3e personne */
+    bool camera_invert_y;
 
     bool action_overridden[ENG_ACTION_COUNT];
     EngButtonBinding action_bindings[ENG_ACTION_COUNT][ENG_MAX_BUTTON_BINDINGS];

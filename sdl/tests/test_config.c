@@ -420,3 +420,29 @@ UTEST(eng_config, shipped_example_file_matches_the_defaults)
     SDL_free(uncommented);
     eng_arena_shutdown(&arena);
 }
+
+UTEST(eng_config, camera_settings_default_parse_and_reject_bad_values)
+{
+    EngConfig d;
+    eng_config_defaults(&d);
+    EXPECT_NEAR(d.camera_sensitivity, 1.0, 1e-6);
+    EXPECT_FALSE(d.camera_invert_y);
+
+    EngConfig c = parsed("camera_sensitivity = 2.5\ncamera_invert_y = true\n", NULL);
+    EXPECT_NEAR(c.camera_sensitivity, 2.5, 1e-6);
+    EXPECT_TRUE(c.camera_invert_y);
+
+    int issues = -1;
+    c = parsed("camera_sensitivity = 0\n"           /* 1 : nulle */
+               "camera_sensitivity = 11\n"          /* 2 : trop grande */
+               "camera_sensitivity = -1\n"          /* 3 : négative */
+               "camera_sensitivity = beaucoup\n"    /* 4 : illisible */
+               "camera_invert_y = oui peut-etre\n", /* 5 */
+               &issues);
+    EXPECT_EQ(issues, 5);
+    EXPECT_NEAR(c.camera_sensitivity, 1.0, 1e-6);
+    EXPECT_FALSE(c.camera_invert_y);
+
+    c = parsed("camera_sensitivity = 10\n", NULL); /* borne incluse */
+    EXPECT_NEAR(c.camera_sensitivity, 10.0, 1e-6);
+}

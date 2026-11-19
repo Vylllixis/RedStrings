@@ -1,4 +1,8 @@
+#include <SDL3/SDL_mouse.h>
+#include <SDL3/SDL_video.h>
+#include <math.h>
 #include <stdbool.h>
+#include <signal.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -25,6 +29,15 @@
 #include "engine/ui.h"
 
 #include "demo_scene.h"
+#include "editor_mode.h"
+#if defined(ENG_HAVE_CRASH)
+#include "engine/crash.h"
+#endif
+#include "game_flow.h"
+#include "engine/daynight.h"
+#include "play_mode.h"
+#include "world_bench.h"
+#include "skeleton_view.h"
 
 ENG_LSAN_DEFAULT_SUPPRESSIONS();
 
@@ -35,7 +48,11 @@ static void usage(const char *prog)
     fprintf(
         stderr,
         "          [--software] [--assert-test] [--no-mipmaps] [--anisotropy N] [--ui]\n"
-        "          [--env image.hdr] [--env-samples N] [--frames-in-flight N] [--stress-resize]\n");
+        "          [--env image.hdr] [--env-samples N] [--frames-in-flight N] [--stress-resize]\n"
+        "          [--watch-assets] [--sun-elevation DEG] [--sun-azimuth DEG]\n          "
+        "[--day-night HEURE] [--day-length S]\n          "
+        "[--fog-density 1/M] [--rocks N] [--placement] [--placement-seed N] [--grass]\n          "
+        "[--water] [--water-level M]\n");
     fprintf(stderr, "  --frames N     quitte après N images (tests automatiques)\n");
     fprintf(stderr,
             "  --log-level L  niveau du journal (sinon variable ENG_LOG_LEVEL, sinon info)\n");
@@ -44,6 +61,44 @@ static void usage(const char *prog)
     fprintf(
         stderr,
         "  --config PATH  fichier de configuration (défaut : config.ini à côté de l'exécutable)\n");
+    fprintf(stderr,
+            "  --watch-assets démo : recuit et recharge le modèle quand ses sources changent\n");
+    fprintf(
+        stderr,
+        "  --terrain PATH démo : dessine le champ de hauteurs .hmap (assetc heightmap) à la place "
+        "de la démonstration ; point de vue au-dessus du centre\n");
+    fprintf(stderr,
+            "  --editor       éditeur : charge la scène, clic = sélection, flèches = déplacement, "
+            "fenêtre Éditeur (Enregistrer)\n");
+    fprintf(stderr, "  --scene PATH   scène de l'éditeur (défaut " EDITOR_DEFAULT_SCENE
+                    ", relatif à l'exécutable ; chemin absolu accepté)\n");
+    fprintf(stderr,
+            "  --editor-selftest (développement) clique, déplace, enregistre et relit, puis "
+            "journalise AUTOTEST ÉDITEUR\n");
+    fprintf(
+        stderr,
+        "  --play         mode jouable : personnage, caméra 3e personne, saut, sprint, arène en "
+        "boîtes grises (ZQSD, souris, Espace, Maj)\n");
+    fprintf(stderr, "  --skeleton F   affiche le squelette F (.skel, voir `assetc skel`) en os "
+                    "superposés au modèle central\n");
+    fprintf(stderr, "  --play-selftest (développement) autotest du mode jouable sans fenêtre, "
+                    "journalise AUTOTEST JEU\n");
+    fprintf(stderr, "  --combat       mode jouable + combat : mannequin, camp de 3 ennemis (clic "
+                    "gauche/droit, Ctrl, E, Q) ; --no-audio : sans son\n");
+    fprintf(stderr,
+            "  --crash-test   (développement) plantage volontaire : écrit logs/crash-*.txt\n");
+    fprintf(stderr, "  --new-game     avec --combat : saute le menu principal (nouvelle partie)\n");
+    fprintf(stderr,
+            "  --game-selftest (développement) partie, sauvegarde, relance, reprise sans fenêtre ; "
+            "journalise AUTOTEST PARTIE\n");
+    fprintf(stderr, "  --combat-autoplay  comme --combat, joué par un pilote automatique "
+                    "(démonstration)\n");
+    fprintf(stderr, "  --screenshot F N (développement) écrit l'image n° N en PPM dans F\n");
+    fprintf(stderr,
+            "  --world-bench [KM] benchmark de traversée du monde ouvert (défaut 10 km à 30 "
+            "m/s), sans fenêtre ; --world-bench-report F : rapport écrit dans F\n");
+    fprintf(stderr, "  --combat-selftest (développement) autotest du combat sans fenêtre, "
+                    "journalise AUTOTEST COMBAT\n");
     fprintf(stderr, "  --no-mipmaps   démo : texture du cube sans mipmaps (montre l'aliasing)\n");
     fprintf(stderr, "  --anisotropy N démo : filtrage anisotrope de 0 (aucun) à 16 (défaut 16)\n");
     fprintf(stderr, "  --env FICHIER  démo : ciel = image équirectangulaire Radiance .hdr (sinon "
@@ -63,6 +118,25 @@ static void usage(const char *prog)
     fprintf(stderr, "  --assert-test  (développement) déclenche volontairement deux assertions\n");
 }
 
+/* Dessins de debug du lanceur (mode jouable, squelette), appelés par la scène
+ * (demo_scene_set_debug_hook). */
+typedef struct PlayHook {
+    const PlayMode *play;   /* NULL : pas de mode jouable */
+    SkeletonView *skeleton; /* NULL : pas de squelette */
+    double alpha;
+} PlayHook;
+
+static void launcher_debug_hook(void *user, EngDebugLines *lines, mat4 model, bool has_model)
+{
+    const PlayHook *hook = user;
+    if (hook->play != NULL) {
+        play_mode_debug_draw(hook->play, lines, hook->alpha);
+    }
+    if (hook->skeleton != NULL && has_model) {
+        (void)skeleton_view_draw(hook->skeleton, lines, model);
+    }
+}
+
 int main(int argc, char **argv)
 {
     eng_mem_track_install(); /* avant toute allocation de SDL */
@@ -72,8 +146,36 @@ int main(int argc, char **argv)
     bool force_software = false;
     bool start_with_ui = false;
     bool stress_resize = false;
+    bool editor_enabled = false;
+    bool editor_selftest = false;
+    bool play_enabled = false;
+    bool play_selftest = false;
+    bool combat_enabled = false;
+    bool combat_audio = true;
+    bool combat_selftest = false;
+    bool combat_autoplay = false;
+    double world_bench_km = 0.0;
+    const char *terrain_selftest_path = NULL;
+    bool game_selftest = false;
+    bool start_new_game = false;
+    bool crash_test = false;
+    const char *world_bench_report = NULL;
+    const char *screenshot_path = NULL;
+    long screenshot_frame = 0;
+    const char *skeleton_path = NULL;
+    const char *anim_path = NULL;
+    const char *sockets_path = NULL;
+    const char *scene_arg = NULL;
     uint32_t frames_in_flight = 0; /* 0 : valeur par défaut du moteur */
-    DemoOptions demo_options = {.mipmaps = true, .anisotropy = 16.0F};
+    DemoOptions demo_options = {.mipmaps = true,
+                                .placement_seed = 1,
+                                .anisotropy = 16.0F,
+                                .sun_elevation = 45.0F,
+                                .sun_azimuth = 30.0F,
+                                .fog_density = -1.0F};
+    bool use_day_night = false; /* --day-night / --day-length (M8-07) ; la partie l'active aussi */
+    double day_night_hour = -1.0;
+    double day_length = 0.0;
     const char *game_path = NULL;
     const char *config_path = NULL;
     EngLogLevel log_level = eng_log_env_level(ENG_LEVEL_INFO);
@@ -95,6 +197,128 @@ int main(int argc, char **argv)
             config_path = argv[++i];
         } else if (strcmp(argv[i], "--game") == 0 && i + 1 < argc) {
             game_path = argv[++i];
+        } else if (strcmp(argv[i], "--editor") == 0) {
+            editor_enabled = true;
+        } else if (strcmp(argv[i], "--editor-selftest") == 0) {
+            editor_enabled = true;
+            editor_selftest = true;
+        } else if (strcmp(argv[i], "--play") == 0) {
+            play_enabled = true;
+        } else if (strcmp(argv[i], "--play-selftest") == 0) {
+            play_selftest = true;
+        } else if (strcmp(argv[i], "--combat") == 0) {
+            play_enabled = true;
+            combat_enabled = true;
+        } else if (strcmp(argv[i], "--crash-test") == 0) {
+            crash_test = true;
+        } else if (strcmp(argv[i], "--new-game") == 0) {
+            start_new_game = true;
+        } else if (strcmp(argv[i], "--game-selftest") == 0) {
+            game_selftest = true;
+        } else if (strcmp(argv[i], "--play-terrain-selftest") == 0 && i + 1 < argc) {
+            terrain_selftest_path = argv[++i];
+        } else if (strcmp(argv[i], "--world-bench") == 0) {
+            world_bench_km = 10.0;
+            if (i + 1 < argc && argv[i + 1][0] != '-') {
+                world_bench_km = strtod(argv[++i], NULL);
+            }
+        } else if (strcmp(argv[i], "--world-bench-report") == 0 && i + 1 < argc) {
+            world_bench_report = argv[++i];
+        } else if (strcmp(argv[i], "--combat-autoplay") == 0) {
+            play_enabled = true;
+            combat_enabled = true;
+            combat_autoplay = true;
+        } else if (strcmp(argv[i], "--screenshot") == 0 && i + 2 < argc) {
+            screenshot_path = argv[++i];
+            screenshot_frame = strtol(argv[++i], NULL, 10);
+        } else if (strcmp(argv[i], "--no-audio") == 0) {
+            combat_audio = false;
+        } else if (strcmp(argv[i], "--combat-selftest") == 0) {
+            combat_selftest = true;
+        } else if (strcmp(argv[i], "--skeleton") == 0 && i + 1 < argc) {
+            skeleton_path = argv[++i];
+        } else if (strcmp(argv[i], "--anim") == 0 && i + 1 < argc) {
+            anim_path = argv[++i];
+        } else if (strcmp(argv[i], "--sockets") == 0 && i + 1 < argc) {
+            sockets_path = argv[++i];
+        } else if (strcmp(argv[i], "--scene") == 0 && i + 1 < argc) {
+            scene_arg = argv[++i];
+        } else if ((strcmp(argv[i], "--sun-elevation") == 0 ||
+                    strcmp(argv[i], "--sun-azimuth") == 0) &&
+                   i + 1 < argc) {
+            char *end = NULL;
+            const bool is_elevation = strcmp(argv[i], "--sun-elevation") == 0;
+            const float value = strtof(argv[++i], &end);
+            if (*end != '\0' || !isfinite(value) || value < -180.0F || value > 180.0F ||
+                (is_elevation && (value < -90.0F || value > 90.0F))) {
+                usage(argv[0]);
+                return 2;
+            }
+            if (is_elevation) {
+                demo_options.sun_elevation = value;
+            } else {
+                demo_options.sun_azimuth = value;
+            }
+        } else if ((strcmp(argv[i], "--day-night") == 0 || strcmp(argv[i], "--day-length") == 0) &&
+                   i + 1 < argc) {
+            const bool is_hour = strcmp(argv[i], "--day-night") == 0;
+            char *end = NULL;
+            const double value = strtod(argv[++i], &end);
+            if (*end != '\0' || !isfinite(value) || value < 0.0 ||
+                (is_hour ? value >= 24.0 : (value < 1.0 || value > 1e6))) {
+                usage(argv[0]);
+                return 2;
+            }
+            use_day_night = true;
+            if (is_hour) {
+                day_night_hour = value;
+            } else {
+                day_length = value;
+            }
+        } else if (strcmp(argv[i], "--fog-density") == 0 && i + 1 < argc) {
+            char *end = NULL;
+            const float value = strtof(argv[++i], &end);
+            if (*end != '\0' || !isfinite(value) || value < 0.0F || value > 1.0F) {
+                usage(argv[0]);
+                return 2;
+            }
+            demo_options.fog_density = value;
+        } else if (strcmp(argv[i], "--rocks") == 0 && i + 1 < argc) {
+            char *end = NULL;
+            const unsigned long value = strtoul(argv[++i], &end, 10);
+            if (*end != '\0' || end == argv[i] || value > 1000000UL) {
+                usage(argv[0]);
+                return 2;
+            }
+            demo_options.rock_count = (uint32_t)value;
+        } else if (strcmp(argv[i], "--grass") == 0) {
+            demo_options.grass = true;
+        } else if (strcmp(argv[i], "--water") == 0) {
+            demo_options.water = true;
+        } else if (strcmp(argv[i], "--water-level") == 0 && i + 1 < argc) {
+            char *end = NULL;
+            const float value = strtof(argv[++i], &end);
+            if (*end != '\0' || end == argv[i] || !isfinite(value) || fabsf(value) > 100000.0F) {
+                usage(argv[0]);
+                return 2;
+            }
+            demo_options.water = true;
+            demo_options.water_level_set = true;
+            demo_options.water_level = value;
+        } else if (strcmp(argv[i], "--placement") == 0) {
+            demo_options.placement = true;
+        } else if (strcmp(argv[i], "--placement-seed") == 0 && i + 1 < argc) {
+            char *end = NULL;
+            const unsigned long value = strtoul(argv[++i], &end, 10);
+            if (*end != '\0' || end == argv[i] || value > 0xFFFFFFF0UL) {
+                usage(argv[0]);
+                return 2;
+            }
+            demo_options.placement_seed = (uint32_t)value;
+        } else if (strcmp(argv[i], "--terrain") == 0 && i + 1 < argc) {
+            demo_options.terrain_path = argv[++i];
+        } else if (strcmp(argv[i], "--watch-assets") == 0) {
+            demo_options.watch_assets = true;
         } else if (strcmp(argv[i], "--no-mipmaps") == 0) {
             demo_options.mipmaps = false;
         } else if (strcmp(argv[i], "--anisotropy") == 0 && i + 1 < argc) {
@@ -145,8 +369,54 @@ int main(int argc, char **argv)
     (void)eng_log_init(log_dir, log_level);
 
     ENG_LOG_INFO("engine %s", eng_version());
+    /* M9-03 : rapport de crash à côté du journal */
+#if defined(ENG_HAVE_CRASH)
+    if (eng_crash_install(log_dir, eng_version())) {
+        eng_crash_note("journal", log_dir);
+    }
+#else
+    ENG_LOG_WARN("rapport de crash désactivé (engine/src/crash.c absent de cette build)");
+#endif
+    if (crash_test) { /* (développement) plantage volontaire : le rapport doit être écrit */
+#if defined(__SANITIZE_ADDRESS__)
+        /* sous ASan/UBSan, une écriture nulle est interceptée avant le signal : on l'envoie
+         * directement (même gestionnaire, même rapport) */
+        ENG_LOG_WARN("test de crash : signal SIGSEGV (build instrumenté)");
+        (void)raise(SIGSEGV);
+#else
+        ENG_LOG_WARN("test de crash : écriture à l'adresse nulle");
+        volatile int *volatile null_ptr = NULL;
+        *null_ptr = 42; /* NOLINT(clang-analyzer-core.NullDereference) : plantage voulu */
+#endif
+    }
     ENG_LOG_INFO("journal dans %s", log_dir);
     eng_print_deps();
+
+    if (game_selftest) { /* sans fenêtre : nouvelle partie, sauvegarde, relance, reprise */
+        const bool game_ok = game_flow_selftest();
+        eng_log_shutdown();
+        return game_ok ? 0 : 1;
+    }
+    if (terrain_selftest_path != NULL) { /* sans fenêtre : personnage sur un terrain .hmap */
+        const bool terrain_ok = play_mode_terrain_selftest(terrain_selftest_path);
+        eng_log_shutdown();
+        return terrain_ok ? 0 : 1;
+    }
+    if (world_bench_km > 0.0) { /* sans fenêtre : traversée du monde ouvert mesurée */
+        const bool bench_ok = world_bench_run(world_bench_km, 30.0, world_bench_report);
+        eng_log_shutdown();
+        return bench_ok ? 0 : 1;
+    }
+    if (combat_selftest) { /* sans fenêtre ni GPU : personnage, combat et IA scriptés */
+        const bool combat_ok = play_combat_selftest();
+        eng_log_shutdown();
+        return combat_ok ? 0 : 1;
+    }
+    if (play_selftest) { /* sans fenêtre ni GPU : physique et entrées scriptées seulement */
+        const bool play_ok = play_mode_selftest();
+        eng_log_shutdown();
+        return play_ok ? 0 : 1;
+    }
 
     if (assert_test) {
         int answer = 41;
@@ -211,6 +481,10 @@ int main(int argc, char **argv)
             .frames_in_flight = frames_in_flight,
         };
         use_gpu = eng_gpu_init(&gpu, platform.window, &gpu_desc);
+        if (use_gpu && screenshot_path != NULL) {
+            gpu.capture_path = screenshot_path;
+            gpu.capture_frame = screenshot_frame > 0 ? (uint64_t)screenshot_frame : 1U;
+        }
         if (use_gpu) {
             platform.vsync = gpu.present_mode == ENG_PRESENT_VSYNC;
         } else {
@@ -222,7 +496,9 @@ int main(int argc, char **argv)
     EngMemory memory;
     const EngMemoryConfig memory_config = {
         .permanent_bytes = (size_t)64 * 1024 * 1024,
-        .level_bytes = (size_t)64 * 1024 * 1024,
+        /* un terrain de 1025 x 1025 échantillons demande 75 Mio de maillage CPU (engine/terrain.h)
+         */
+        .level_bytes = (size_t)(demo_options.terrain_path != NULL ? 256 : 64) * 1024 * 1024,
         .frame_bytes = (size_t)8 * 1024 * 1024,
     };
     if (!eng_memory_init(&memory, &memory_config)) {
@@ -308,8 +584,38 @@ int main(int argc, char **argv)
             ENG_LOG_WARN("interface de debug indisponible");
         }
     }
+    /* Terrain (--terrain) : point de vue au-dessus du centre, plan lointain et vitesse adaptés à un
+     * terrain de l'ordre du kilomètre (la diagonale de 1025 m en fait 1450). */
+    float terrain_position[3];
+    if (use_renderer && demo_scene_terrain_view(&scene, terrain_position)) {
+        eng_camera_init(&camera, terrain_position, 0.0F, -0.35F);
+        camera.far_z = 3000.0F;
+        eng_camera_set_speed(&camera, 40.0F);
+        camera_prev = camera;
+    }
     bool ui_was_shown = false;
     bool mouse_was_captured_before_ui = false;
+
+    /* Éditeur (M2-10b) : un monde chargé depuis la scène, dessiné à la place du modèle central. */
+    EditorMode editor_mode = {0};
+    bool use_editor = false;
+    bool selftest_done = false;
+    bool selftest_failed = false;
+    if (editor_enabled) {
+        if (!use_renderer) {
+            ENG_LOG_WARN("éditeur indisponible sans rendu GPU%s",
+                         editor_selftest ? " : AUTOTEST ÉDITEUR : IGNORÉ (pas de rendu GPU)" : "");
+            selftest_done = true;
+        } else if (editor_mode_init(&editor_mode, scene_arg)) {
+            use_editor = true;
+            demo_scene_set_world(&scene, &editor_mode.world);
+            if (use_ui) {
+                platform.debug_ui = true; /* la fenêtre d'éditeur est affichée dès le départ */
+            }
+            ENG_LOG_INFO("éditeur : clic gauche = sélection, flèches de couleur = déplacement sur "
+                         "l'axe, F2 = capturer/libérer la souris pour voler, F1 = interface");
+        }
+    }
 
     /* Variables réglables en direct par l'interface (adresses de nos propres variables). */
     EngTweaks tweaks;
@@ -327,24 +633,128 @@ int main(int argc, char **argv)
     if (use_renderer) {
         tonemap = eng_renderer_tonemap(&renderer);
     }
+    tonemap.fxaa = true; /* post-process (M8-06) ; le menu Options le règle ensuite */
+    tonemap.bloom = 0.5F;
     int32_t tonemap_operator = (int32_t)tonemap.op;
     (void)eng_tweaks_add_int(&tweaks, "tonemap : 0 aucun, 1 ACES, 2 AgX", &tonemap_operator, 0,
                              (int32_t)ENG_TONEMAP_COUNT - 1);
     (void)eng_tweaks_add_float(&tweaks, "exposition (EV)", &tonemap.exposure_ev,
                                ENG_EXPOSURE_EV_MIN, ENG_EXPOSURE_EV_MAX);
+    (void)eng_tweaks_add_bool(&tweaks, "anticrénelage FXAA", &tonemap.fxaa);
+    (void)eng_tweaks_add_float(&tweaks, "bloom", &tonemap.bloom, 0.0F, 2.0F);
     (void)eng_tweaks_add_float(&tweaks, "fond rouge", &clear_color[0], 0.0F, 1.0F);
     (void)eng_tweaks_add_float(&tweaks, "fond vert", &clear_color[1], 0.0F, 1.0F);
     (void)eng_tweaks_add_float(&tweaks, "fond bleu", &clear_color[2], 0.0F, 1.0F);
     (void)eng_tweaks_add_bool(&tweaks, "debug draw (F3)", &platform.debug_draw);
+
+    /* Mode jouable (M4) : monde physique, personnage, caméra 3e personne. */
+    PlayMode play = {0};
+    bool use_play = false;
+    static GameFlow flow;
+    bool use_flow = false;
+    bool flow_menu_was_open = false;
+    SkeletonView skeleton_view = {0};
+    PlayHook play_hook = {0};
+    bool use_debug_hook = false;
+    if (play_enabled) {
+        if (!use_renderer || use_editor) {
+            ENG_LOG_WARN("mode jouable indisponible %s",
+                         use_editor ? "avec l'éditeur" : "sans rendu GPU");
+        } else if (demo_options.terrain_path != NULL
+                       ? play_mode_init_terrain(&play, &tweaks, config.camera_sensitivity,
+                                                config.camera_invert_y, demo_options.terrain_path)
+                       : play_mode_init(&play, &tweaks, config.camera_sensitivity,
+                                        config.camera_invert_y)) {
+            use_play = true;
+            if (combat_enabled && !play_mode_enable_combat(&play, combat_audio)) {
+                ENG_LOG_WARN("combat indisponible : mode jouable sans combat");
+            }
+            play.autoplay = combat_autoplay;
+            /* M8 : menus, sauvegarde, options ; la démonstration automatique saute le menu */
+            use_flow = play.combat != NULL && game_flow_init(&flow, &play, &platform.input, NULL);
+            if (use_flow && (start_new_game || combat_autoplay)) {
+                game_flow_start_new(&flow, &play);
+            }
+            if (use_flow && day_night_hour >= 0.0) {
+                (void)eng_daynight_set_hour(&flow.daynight, day_night_hour);
+            }
+            if (use_flow && day_length > 0.0) {
+                flow.daynight.day_seconds = (float)day_length;
+            }
+            play_hook.play = &play;
+            use_debug_hook = true;
+            play_mode_view(&play, &camera);
+            camera_prev = camera;
+        }
+    }
+    /* Squelette de debug (M4-12) : os superposés au modèle central. */
+    if (skeleton_path != NULL || anim_path != NULL) {
+        if (!use_renderer) {
+            ENG_LOG_WARN("--skeleton / --anim indisponibles sans rendu GPU");
+        } else if (skeleton_path == NULL || skeleton_view_load(&skeleton_view, skeleton_path)) {
+            /* M4-16 : --anim anime le squelette ; sans --skeleton, celui que désigne le clip */
+            if (anim_path != NULL &&
+                !skeleton_view_load_anim(&skeleton_view, skeleton_path, anim_path)) {
+                skeleton_view_shutdown(&skeleton_view);
+            }
+            if (skeleton_view.ready && sockets_path != NULL &&
+                !skeleton_view_load_sockets(&skeleton_view, sockets_path)) {
+                skeleton_view_shutdown(&skeleton_view);
+            }
+            if (skeleton_view.ready) {
+                play_hook.skeleton = &skeleton_view;
+                use_debug_hook = true;
+                if (skeleton_view.animated) {
+                    EngAnimDebug *a = &skeleton_view.anim;
+                    (void)eng_tweaks_add_bool(&tweaks, "animation : pause (P)", &a->paused);
+                    (void)eng_tweaks_add_float(&tweaks, "animation : instant (s)", &a->time, 0.0F,
+                                               skeleton_view.clip.duration);
+                    (void)eng_tweaks_add_float(&tweaks, "animation : vitesse", &a->speed,
+                                               -ENG_ANIM_DEBUG_MAX_SPEED, ENG_ANIM_DEBUG_MAX_SPEED);
+                    (void)eng_tweaks_add_bool(&tweaks, "animation : boucle", &a->loop);
+                    (void)eng_tweaks_add_bool(&tweaks, "animation : pose de repos", &a->show_rest);
+                    (void)eng_tweaks_add_bool(&tweaks, "animation : trajectoire (T)",
+                                              &a->show_trail);
+                    (void)eng_tweaks_add_int(&tweaks, "animation : articulation suivie (J K)",
+                                             &a->selected, -1,
+                                             (int32_t)skeleton_view.skeleton.joint_count - 1);
+                }
+            }
+        }
+    }
+    if (use_debug_hook) {
+        demo_scene_set_debug_hook(&scene, launcher_debug_hook, &play_hook);
+    }
     /* Éclairage du modèle (PBR, M1-15) : le soleil se règle par azimut et hauteur. */
     EngLighting lighting;
     eng_lighting_default(&lighting);
     lighting.ambient_intensity =
         1.0F; /* intensité de l'environnement (M1-16) : 1 = le ciel tel quel */
-    float sun_azimuth = 30.0F;
-    float sun_elevation = 45.0F;
+    float sun_azimuth = demo_options.sun_azimuth;
+    float sun_elevation = demo_options.sun_elevation;
+    /* Cycle jour / nuit (M8-07) : celui de la partie, sinon une horloge locale (--day-night). */
+    static EngDayNight local_daynight;
+    eng_daynight_init(&local_daynight, day_night_hour >= 0.0 ? day_night_hour : 9.0);
+    if (day_length > 0.0) {
+        local_daynight.day_seconds = (float)day_length;
+    }
+    EngDayNight *daynight = use_flow ? &flow.daynight : (use_day_night ? &local_daynight : NULL);
+    float daynight_hour_ui = daynight != NULL ? (float)daynight->hour : 0.0F;
+    float daynight_hour_shown = daynight_hour_ui;
+    if (daynight != NULL) {
+        (void)eng_tweaks_add_float(&tweaks, "jour/nuit : heure", &daynight_hour_ui, 0.0F, 23.99F);
+        (void)eng_tweaks_add_float(&tweaks, "jour/nuit : vitesse", &daynight->speed, 0.0F, 60.0F);
+    }
     (void)eng_tweaks_add_float(&tweaks, "soleil : azimut (deg)", &sun_azimuth, -180.0F, 180.0F);
     (void)eng_tweaks_add_float(&tweaks, "soleil : hauteur (deg)", &sun_elevation, -90.0F, 90.0F);
+    if (use_renderer) {
+        (void)eng_tweaks_add_float(&tweaks, "brouillard : densité (1/m)", &scene.fog.density, 0.0F,
+                                   0.02F);
+        (void)eng_tweaks_add_float(&tweaks, "brouillard : décroissance (1/m)",
+                                   &scene.fog.height_falloff, 0.0F, 0.02F);
+        (void)eng_tweaks_add_float(&tweaks, "brouillard : opacité max", &scene.fog.max_opacity,
+                                   0.0F, 1.0F);
+    }
     (void)eng_tweaks_add_float(&tweaks, "soleil : intensité", &lighting.sun_intensity, 0.0F, 4.0F);
     (void)eng_tweaks_add_float(&tweaks, "environnement : intensité", &lighting.ambient_intensity,
                                0.0F, 4.0F);
@@ -414,6 +824,7 @@ int main(int argc, char **argv)
         if (use_renderer) {
             /* Rechargement des shaders : outil de développement, hors compteur d'allocations. */
             (void)eng_renderer_update(&renderer, clock.time);
+            demo_scene_update(&scene, clock.time); /* recuisson et rechargement des assets */
         }
         ENG_PROF_ZONE_END(z_poll);
         eng_memory_begin_frame(&memory);
@@ -437,7 +848,22 @@ int main(int argc, char **argv)
                 platform.mouse_captured ? mouse_look_sensitivity : 0.0F;
             eng_input_begin_tick(&platform.input, &input); /* UNE fois par pas */
             camera_prev = camera;
-            eng_camera_update(&camera, &input, (float)loop.tick_seconds);
+            if (use_play) {
+                if (!use_flow || game_flow_tick(&flow, &play, &input, (float)loop.tick_seconds)) {
+                    play_mode_tick(&play, &input, (float)loop.tick_seconds);
+                }
+                play_mode_view(&play, &camera);
+                if (use_flow && flow.quit) {
+                    alive = false;
+                }
+                if (use_flow && flow.graphics_dirty) { /* M8-06 */
+                    tonemap.fxaa = flow.options.fxaa;  /* appliqué au renderer plus bas */
+                    tonemap.bloom = flow.options.bloom;
+                    flow.graphics_dirty = false;
+                }
+            } else {
+                eng_camera_update(&camera, &input, (float)loop.tick_seconds);
+            }
             ENG_PROF_ZONE(z_update, "game.update");
             game.api->update(game.state, &input, loop.tick_seconds);
             ENG_PROF_ZONE_END(z_update);
@@ -473,20 +899,80 @@ int main(int argc, char **argv)
                     eng_renderer_set_clear_color(&renderer, clear_color[0], clear_color[1],
                                                  clear_color[2], 1.0F);
                     tonemap.op = (EngTonemapOperator)tonemap_operator;
-                    eng_renderer_set_tonemap(&renderer, &tonemap);
+                    EngTonemap frame_tonemap = tonemap;
+                    scene.night = 0.0F;
+                    if (daynight != NULL) {
+                        if (daynight_hour_ui != daynight_hour_shown) { /* curseur F1 déplacé */
+                            (void)eng_daynight_set_hour(daynight, (double)daynight_hour_ui);
+                        }
+                        if (daynight == &local_daynight) {
+                            eng_daynight_tick(daynight, clock.dt < 0.25 ? clock.dt : 0.25);
+                        }
+                        eng_daynight_sun(daynight, &sun_azimuth, &sun_elevation);
+                        scene.night = eng_daynight_night_weight(sun_elevation);
+                        frame_tonemap.exposure_ev +=
+                            eng_daynight_exposure_bias(daynight, sun_elevation);
+                        daynight_hour_ui = (float)daynight->hour;
+                        daynight_hour_shown = daynight_hour_ui;
+                    }
+                    eng_renderer_set_tonemap(&renderer, &frame_tonemap);
                     const float aspect =
                         platform.height > 0 ? (float)platform.width / (float)platform.height : 1.0F;
                     EngCamera view_camera;
                     eng_camera_lerp(&camera_prev, &camera, (float)loop.alpha, &view_camera);
+                    skeleton_view_update(&skeleton_view, (float)clock.dt,
+                                         !use_ui || !eng_ui_wants_keyboard(&ui));
                     EngRenderQueue *queue = eng_renderer_begin_frame(&renderer);
                     (void)eng_lighting_set_sun_angles(&lighting, sun_azimuth, sun_elevation);
                     shadow_params.pcf_radius = (uint32_t)shadow_radius;
                     demo_scene_draw(&scene, &renderer, queue, sim_time, &view_camera, aspect,
                                     &lighting, shadow_enabled ? &shadow_params : NULL);
-                    if (platform
-                            .debug_draw) { /* F3 ; en dernier : les lignes recouvrent la scène */
+                    if (use_editor) {
+                        if (editor_selftest) {
+                            /* le modèle est chargé par demo_scene_update : on attend quelques
+                             * images, puis le test se déroule en une seule image */
+                            if (!selftest_done && frame >= 8) {
+                                char out[512];
+                                if (eng_path_resolve(out, sizeof out,
+                                                     "logs/editor_selftest.scene") &&
+                                    editor_mode_selftest(&editor_mode, &scene, &view_camera, aspect,
+                                                         (float)platform.width,
+                                                         (float)platform.height, out)) {
+                                    selftest_failed = false;
+                                } else {
+                                    selftest_failed = true;
+                                }
+                                selftest_done = true;
+                            }
+                        } else if (!platform.mouse_captured) {
+                            float mouse_x = 0.0F;
+                            float mouse_y = 0.0F;
+                            const SDL_MouseButtonFlags buttons =
+                                SDL_GetMouseState(&mouse_x, &mouse_y);
+                            int window_w = 0;
+                            int window_h = 0;
+                            (void)SDL_GetWindowSize(platform.window, &window_w, &window_h);
+                            EngRay ray;
+                            if (eng_ray_from_screen(&view_camera, aspect, mouse_x, mouse_y,
+                                                    (float)window_w, (float)window_h, &ray)) {
+                                (void)eng_editor_pointer(&editor_mode.editor, &editor_mode.world,
+                                                         demo_scene_entity_bounds, &scene, &ray,
+                                                         view_camera.position,
+                                                         (buttons & SDL_BUTTON_LMASK) != 0,
+                                                         use_ui && eng_ui_wants_mouse(&ui));
+                            }
+                        } else {
+                            eng_editor_drag_end(
+                                &editor_mode.editor); /* souris capturée : pas de clic */
+                        }
+                    }
+                    play_hook.alpha = loop.alpha;
+                    if (platform.debug_draw || use_editor || use_play ||
+                        play_hook.skeleton != NULL) {
+                        /* F3 ; en dernier : les lignes recouvrent la scène */
                         demo_scene_draw_debug(&scene, &renderer, queue, sim_time, &view_camera,
-                                              aspect);
+                                              aspect, platform.debug_draw,
+                                              use_editor ? &editor_mode.editor : NULL);
                     }
                     if (use_ui) {
                         /* F1 : à l'ouverture la souris est libérée (sinon on ne pourrait pas
@@ -500,7 +986,15 @@ int main(int argc, char **argv)
                             }
                             ui_was_shown = platform.debug_ui;
                         }
-                        eng_ui_set_visible(&ui, platform.debug_ui);
+                        if (use_flow) { /* menu ouvert : souris libre ; fermé : regard à la souris
+                                         */
+                            const bool menu_open = eng_menu_is_open(&flow.menu);
+                            if (menu_open != flow_menu_was_open && !platform.debug_ui) {
+                                (void)eng_platform_set_mouse_capture(&platform, !menu_open);
+                            }
+                            flow_menu_was_open = menu_open;
+                        }
+                        eng_ui_set_visible(&ui, platform.debug_ui || use_flow);
                         if (eng_ui_begin_frame(&ui, platform.width, platform.height,
                                                (float)clock.dt)) {
                             EngUiPanelData panel = {
@@ -510,9 +1004,12 @@ int main(int argc, char **argv)
                                 .uniform_pushes = (uint32_t)uniforms_last_frame,
                                 .rejected_commands = renderer.stats.rejected_commands,
                                 .dropped_commands = renderer.stats.dropped_commands,
+                                .terrain_chunks_drawn = scene.terrain_chunks_drawn,
+                                .terrain_chunks_total = scene.terrain_chunk_total,
                                 .arena_count = 3,
                                 .frame_allocs = eng_memory_frame_allocs(&memory),
                                 .tweaks = &tweaks,
+                                .animation = skeleton_view.animated ? skeleton_view.status : NULL,
                             };
                             panel.arenas[0] =
                                 (EngUiArena){"permanent", memory.permanent.used,
@@ -523,7 +1020,21 @@ int main(int argc, char **argv)
                             panel.arenas[2] =
                                 (EngUiArena){"frame", memory.frame.used, memory.frame.peak,
                                              memory.frame.capacity};
-                            eng_ui_draw_panel(&ui, &panel);
+                            if (platform.debug_ui) {
+                                eng_ui_draw_panel(&ui, &panel);
+                            }
+                            if (use_flow) {
+                                game_flow_draw(&flow, &ui, &play, &view_camera, aspect,
+                                               platform.width, platform.height);
+                            }
+                            if (use_editor) {
+                                EngUiEditorResult editor_result = {0};
+                                eng_ui_draw_editor(&ui, &editor_mode.world, &editor_mode.editor,
+                                                   &editor_result);
+                                if (editor_result.save_requested) {
+                                    (void)editor_mode_save(&editor_mode);
+                                }
+                            }
                             eng_ui_end_frame(&ui);
                         }
                     }
@@ -565,6 +1076,15 @@ int main(int argc, char **argv)
         ENG_LOG_INFO("renderer : %llu image(s), %llu passe(s) d'ombre",
                      (unsigned long long)renderer.stats.frames,
                      (unsigned long long)renderer.stats.shadow_passes);
+        if (use_editor) {
+            demo_scene_set_world(&scene, NULL);
+            editor_mode_shutdown(&editor_mode);
+        }
+        demo_scene_set_debug_hook(&scene, NULL, NULL);
+        if (use_play) {
+            play_mode_shutdown(&play);
+        }
+        skeleton_view_shutdown(&skeleton_view);
         demo_scene_shutdown(&scene, &renderer);
         const uint32_t leaked = eng_renderer_shutdown(&renderer);
         if (leaked != 0) {
@@ -573,7 +1093,7 @@ int main(int argc, char **argv)
     }
     eng_game_host_shutdown(&game);
     eng_memory_shutdown(&memory);
-    int exit_code = 0;
+    int exit_code = selftest_failed ? 1 : 0;
     if (use_gpu) {
         eng_gpu_wait_idle(&gpu);
         const bool balanced = eng_gpu_resources_balanced(&gpu);

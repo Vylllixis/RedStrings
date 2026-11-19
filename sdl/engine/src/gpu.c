@@ -1,5 +1,7 @@
 #include "engine/gpu.h"
 
+#include <stdio.h>
+
 #include <SDL3/SDL.h>
 
 #include "engine/gpu_debug.h"
@@ -582,6 +584,58 @@ uint32_t eng_gpu_swapchain_format(const EngGpu *gpu)
     return (uint32_t)SDL_GetGPUSwapchainTextureFormat(gpu->device, gpu->window);
 }
 
+/* Relit la swapchain (copie vers un tampon de transfert) et l'écrit en PPM. Attend le GPU. */
+static void capture(EngGpu *gpu)
+{
+    const Uint32 w = gpu->swapchain_width;
+    const Uint32 h = gpu->swapchain_height;
+    const SDL_GPUTransferBufferCreateInfo info = {.usage = SDL_GPU_TRANSFERBUFFERUSAGE_DOWNLOAD,
+                                                  .size = w * h * 4U};
+    SDL_GPUTransferBuffer *buffer = SDL_CreateGPUTransferBuffer(gpu->device, &info);
+    if (buffer == NULL) {
+        ENG_LOG_ERROR("capture : tampon impossible : %s", SDL_GetError());
+        return;
+    }
+    SDL_GPUCopyPass *copy = SDL_BeginGPUCopyPass(gpu->command_buffer);
+    const SDL_GPUTextureRegion region = {.texture = gpu->swapchain_texture, .w = w, .h = h, .d = 1};
+    const SDL_GPUTextureTransferInfo dst = {
+        .transfer_buffer = buffer, .pixels_per_row = w, .rows_per_layer = h};
+    SDL_DownloadFromGPUTexture(copy, &region, &dst);
+    SDL_EndGPUCopyPass(copy);
+    SDL_GPUFence *fence = SDL_SubmitGPUCommandBufferAndAcquireFence(gpu->command_buffer);
+    gpu->command_buffer = NULL;
+    if (fence == NULL) {
+        ENG_LOG_ERROR("capture : soumission refusée : %s", SDL_GetError());
+        SDL_ReleaseGPUTransferBuffer(gpu->device, buffer);
+        return;
+    }
+    gpu->frames_submitted++;
+    (void)SDL_WaitForGPUFences(gpu->device, true, &fence, 1);
+    SDL_ReleaseGPUFence(gpu->device, fence);
+    const uint8_t *px = SDL_MapGPUTransferBuffer(gpu->device, buffer, false);
+    const SDL_GPUTextureFormat fmt = SDL_GetGPUSwapchainTextureFormat(gpu->device, gpu->window);
+    const bool bgra = fmt == SDL_GPU_TEXTUREFORMAT_B8G8R8A8_UNORM ||
+                      fmt == SDL_GPU_TEXTUREFORMAT_B8G8R8A8_UNORM_SRGB;
+    FILE *f = px != NULL ? fopen(gpu->capture_path, "wb") : NULL;
+    if (f != NULL) {
+        (void)fprintf(f, "P6\n%u %u\n255\n", (unsigned)w, (unsigned)h);
+        for (size_t i = 0; i < (size_t)w * h; i++) {
+            const uint8_t rgb[3] = {px[(i * 4U) + (bgra ? 2U : 0U)], px[(i * 4U) + 1U],
+                                    px[(i * 4U) + (bgra ? 0U : 2U)]};
+            (void)fwrite(rgb, 1, 3, f);
+        }
+        (void)fclose(f);
+        gpu->captured = true;
+        ENG_LOG_INFO("capture : %s (%ux%u)", gpu->capture_path, (unsigned)w, (unsigned)h);
+    } else {
+        ENG_LOG_ERROR("capture : écriture de %s impossible", gpu->capture_path);
+    }
+    if (px != NULL) {
+        SDL_UnmapGPUTransferBuffer(gpu->device, buffer);
+    }
+    SDL_ReleaseGPUTransferBuffer(gpu->device, buffer);
+}
+
 void eng_gpu_end_frame(EngGpu *gpu)
 {
     if (gpu->command_buffer == NULL || gpu->swapchain_texture == NULL) {
@@ -603,6 +657,12 @@ void eng_gpu_end_frame(EngGpu *gpu)
     gpu->overlay_open = false;
     gpu->main_pass_ended = false;
     eng_gpu_debug_pop(gpu->command_buffer); /* « Frame N » : fermé avant la soumission */
+    if (gpu->capture_path != NULL && !gpu->captured &&
+        gpu->frames_submitted + 1U >= gpu->capture_frame) {
+        capture(gpu);
+        gpu->swapchain_texture = NULL;
+        return;
+    }
     SDL_GPUFence *fence = SDL_SubmitGPUCommandBufferAndAcquireFence(gpu->command_buffer);
     if (fence != NULL) {
         gpu->frames_submitted++;

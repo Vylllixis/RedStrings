@@ -4,6 +4,7 @@
 #include <stddef.h>
 #include <stdint.h>
 
+#include "engine/editor.h"
 #include "engine/frame_stats.h"
 #include "engine/tweak.h"
 
@@ -28,6 +29,15 @@ struct SDL_GPUCommandBuffer;
 struct SDL_GPURenderPass;
 struct EngGpu;
 
+#define ENG_UI_EDITOR_MAX_ROWS 64U
+#define ENG_UI_EDITOR_MAX_FIELDS 32U
+
+typedef struct EngUiFieldRect {
+    float rect[4];
+    uint32_t component; /* identifiant du composant */
+    uint32_t field;     /* indice du champ dans sa description */
+} EngUiFieldRect;
+
 typedef struct EngUi {
     bool ready;        /* contexte créé */
     bool visible;      /* affichée (F1) : masquée, begin_frame ne fait rien */
@@ -41,7 +51,17 @@ typedef struct EngUi {
     float tweak_rects[ENG_TWEAK_MAX][4];
     uint32_t tweak_rect_count;
     float reset_rect[4];
+    /* Idem pour l'éditeur (eng_ui_draw_editor) : une ligne de hiérarchie par entité affichée. */
+    float editor_rows[ENG_UI_EDITOR_MAX_ROWS][4];
+    EngEntity editor_row_entities[ENG_UI_EDITOR_MAX_ROWS];
+    float editor_save_rect[4];
+    float editor_add_rect[4];
+    float editor_delete_rect[4];
+    EngUiFieldRect editor_fields[ENG_UI_EDITOR_MAX_FIELDS];
+    uint32_t editor_row_count;
+    uint32_t editor_field_count;
     bool has_reset_rect;
+    bool has_editor_rects;
 } EngUi;
 
 /* Un arène à afficher dans le panneau. */
@@ -64,11 +84,16 @@ typedef struct EngUiPanelData {
     uint32_t uniform_pushes;
     uint64_t rejected_commands; /* cumulés : doivent rester à 0 */
     uint64_t dropped_commands;
+    /* Terrain (M3-04) : chunks dessinés / chunks du terrain à la dernière image ; total 0 : ligne
+     * absente */
+    uint32_t terrain_chunks_drawn;
+    uint32_t terrain_chunks_total;
     /* Mémoire */
     EngUiArena arenas[ENG_UI_MAX_ARENAS];
     uint32_t arena_count;
     uint64_t frame_allocs; /* allocations pendant les images depuis le début (objectif : 0) */
     EngTweaks *tweaks;     /* réglages en direct ; NULL : section absente */
+    const char *animation; /* M4-16 : ligne d'état du lecteur d'animation ; NULL : absente */
 } EngUiPanelData;
 
 /* true si le moteur a été compilé avec l'interface (OW_UI). */
@@ -88,6 +113,24 @@ void eng_ui_set_visible(EngUi *ui, bool visible);
 bool eng_ui_begin_frame(EngUi *ui, int width, int height, float dt);
 /* Panneau de debug (statistiques, mémoire, réglages) ; entre begin_frame et end_frame. */
 void eng_ui_draw_panel(EngUi *ui, const EngUiPanelData *data);
+/* Ce que la fenêtre d'éditeur a demandé pendant cette image. */
+typedef struct EngUiEditorResult {
+    bool save_requested; /* « Enregistrer » cliqué : c'est l'appelant qui écrit le fichier */
+} EngUiEditorResult;
+
+/* Fenêtre d'éditeur : barre d'outils (Enregistrer, nouvelle entité, nouvelle entité enfant,
+ * supprimer), hiérarchie (ENG_UI_EDITOR_MAX_ROWS lignes affichées, ordre parent-puis-enfants) et
+ * inspecteur de l'entité sélectionnée : un widget par champ de chaque composant présent, d'après la
+ * description du composant (cases, entiers, flottants, vec3, quaternions en degrés d'Euler,
+ * chaînes). Les valeurs sont modifiées en place. Entre begin_frame et end_frame. */
+void eng_ui_draw_editor(EngUi *ui, EngWorld *world, EngEditor *editor, EngUiEditorResult *result);
+/* Rectangle du widget du champ `field` (indice dans la description) du composant `component`
+ * (identifiant) de la dernière image ; false s'il n'est pas affiché (au plus
+ * ENG_UI_EDITOR_MAX_FIELDS champs sont suivis). */
+bool eng_ui_editor_field_rect(const EngUi *ui, uint32_t component, uint32_t field, float out[4]);
+/* Rectangle de la ligne de hiérarchie de `entity` ; false si elle n'est pas affichée. */
+bool eng_ui_editor_row_rect(const EngUi *ui, EngEntity entity, float out[4]);
+
 /* Termine l'image : les données de dessin sont prêtes pour l'overlay. */
 void eng_ui_end_frame(EngUi *ui);
 

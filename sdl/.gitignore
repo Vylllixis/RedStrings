@@ -5,10 +5,15 @@
 *.so
 *.dll
 *.log
-/assets/*
-!/assets/.gitkeep
+# assets/ contient les SOURCES (glTF, PNG, données de combat) : versionnées. Les sorties cuites vont
+# dans build/<preset>/bin/assets/cooked/.
+/assets/cooked/
 /third_party/_deps/
 
 # Le .gitignore racine ignore *.md ; ici la documentation est versionnée
 !*.md
 /logs/
+# Sorties locales des outils lancés depuis sdl/ (rapports, terrains générés, fichiers de test)
+/tests_tmp/
+/perf*.txt
+/*.hmap

@@ -37,6 +37,21 @@ FetchContent_Declare(stb
   GIT_TAG        003501f6d7a8668ce8b6d875e34dd97ad0d5d5b5
   SOURCE_SUBDIR  _none)
 
+# ── bc7enc (commit f66c2e4) : encodeur BC7 en C (MIT ou domaine public), pour le cuiseur (M2-03) ──
+# Pas de CMake utilisé : seul bc7enc.c est compilé (engine/src/third_party_bc7.c).
+FetchContent_Declare(bc7enc
+  GIT_REPOSITORY https://github.com/richgel999/bc7enc.git
+  GIT_TAG        f66c2e489b07138f2673a2fb3d27c1aa1d565c48
+  SOURCE_SUBDIR  _none)
+
+# ── FastNoiseLite (commit 785f37a, version C : C/FastNoiseLite.h) : bruit procédural, M3-01 ──
+# Un seul en-tête (MIT), sans tags dans le dépôt : commit figé. Compilé dans un seul fichier
+# (engine/src/third_party_fnl.c), derrière engine/noise.h.
+FetchContent_Declare(fastnoiselite
+  GIT_REPOSITORY https://github.com/Auburn/FastNoiseLite.git
+  GIT_TAG        785f37a9ad76e283586a379675085f2063ae03f7
+  SOURCE_SUBDIR  _none)
+
 # ── utest.h (tag « pre-ai », commit 0744717) : framework de tests, un seul en-tête ──
 # Choix volontaire : le dernier état avant que le dépôt n'accepte du code écrit avec des outils d'IA.
 if(OW_BUILD_TESTS)
@@ -49,7 +64,7 @@ if(OW_BUILD_TESTS)
   target_include_directories(utest_headers SYSTEM INTERFACE "${utest_SOURCE_DIR}")
 endif()
 
-FetchContent_MakeAvailable(SDL3 cglm cgltf stb)
+FetchContent_MakeAvailable(SDL3 cglm cgltf stb bc7enc fastnoiselite)
 
 # ── Tracy (v0.15.0, commit f2a4f25) : profileur, SEULEMENT si OW_PROFILE=ON ──
 # Le client est en C++ (API C : TracyC.h). Le visualiseur doit avoir la MÊME version.
@@ -124,10 +139,58 @@ if(OW_UI)
   target_compile_definitions(ow_imgui INTERFACE OW_UI=1)
 endif()
 
+# ── Jolt Physics (v5.7.0, commit cf16769) + joltc (commit b670cef) : OW_PHYSICS seulement ──
+# joltc est un habillage C de Jolt (C++17). Il déclare lui-même Jolt (FetchContent « JoltPhysics »,
+# tag v5.7.0) : on déclare Jolt AVANT lui, la première déclaration l'emporte, ce qui fige la
+# version ici. Seul engine/src/physics.c voit joltc.h ; le jeu n'en voit rien (test physics.isolation).
+# Réglages : SSE4.1/4.2 seulement (pas d'AVX/FMA : binaire portable, résultats identiques d'une
+# machine à l'autre à instructions égales), pas de plateforme Windows spécifique, pas d'exemples.
+add_library(ow_physics INTERFACE)
+if(OW_PHYSICS)
+  set(USE_SSE4_1 ON CACHE BOOL "" FORCE)
+  set(USE_SSE4_2 ON CACHE BOOL "" FORCE)
+  set(USE_AVX OFF CACHE BOOL "" FORCE)
+  set(USE_AVX2 OFF CACHE BOOL "" FORCE)
+  set(USE_AVX512 OFF CACHE BOOL "" FORCE)
+  set(USE_LZCNT OFF CACHE BOOL "" FORCE)
+  set(USE_TZCNT OFF CACHE BOOL "" FORCE)
+  set(USE_F16C OFF CACHE BOOL "" FORCE)
+  set(USE_FMADD OFF CACHE BOOL "" FORCE)
+  set(JPH_USE_DX12 OFF CACHE BOOL "" FORCE)         # pas de compute shaders GPU pour les corps mous
+  set(JPH_USE_VK OFF CACHE BOOL "" FORCE)
+  set(JPH_USE_MTL OFF CACHE BOOL "" FORCE)
+  set(JPH_USE_CPU_COMPUTE OFF CACHE BOOL "" FORCE)
+  set(JPH_SAMPLES OFF CACHE BOOL "" FORCE)
+  set(JPH_INSTALL OFF CACHE BOOL "" FORCE)
+  set(JPH_BUILD_SHARED OFF CACHE BOOL "" FORCE)
+  set(TARGET_UNIT_TESTS OFF CACHE BOOL "" FORCE)
+  set(TARGET_HELLO_WORLD OFF CACHE BOOL "" FORCE)
+  set(TARGET_PERFORMANCE_TEST OFF CACHE BOOL "" FORCE)
+  set(TARGET_SAMPLES OFF CACHE BOOL "" FORCE)
+  set(TARGET_VIEWER OFF CACHE BOOL "" FORCE)
+  set(INTERPROCEDURAL_OPTIMIZATION OFF CACHE BOOL "" FORCE)
+  FetchContent_Declare(JoltPhysics
+    GIT_REPOSITORY https://github.com/jrouwe/JoltPhysics.git
+    GIT_TAG        v5.7.0
+    GIT_SHALLOW    ON
+    SOURCE_SUBDIR  Build)
+  FetchContent_Declare(joltc
+    GIT_REPOSITORY https://github.com/amerkoleci/joltc.git
+    GIT_TAG        b670cefc5c836a98410e275981fad921ff57a69f)
+  FetchContent_MakeAvailable(joltc)
+  target_link_libraries(ow_physics INTERFACE joltc)
+  # joltc.h (code tiers) utilise des constantes binaires (extension C23) : en-tête « système », donc
+  # sans avertissements pour notre -Wpedantic -Werror.
+  target_include_directories(ow_physics SYSTEM INTERFACE "${joltc_SOURCE_DIR}/include")
+  target_compile_definitions(ow_physics INTERFACE OW_PHYSICS=1)
+endif()
+
 add_library(cgltf_headers INTERFACE)
 target_include_directories(cgltf_headers INTERFACE "${cgltf_SOURCE_DIR}")
 add_library(stb_headers INTERFACE)
 target_include_directories(stb_headers INTERFACE "${stb_SOURCE_DIR}")
+add_library(bc7enc_headers INTERFACE)
+target_include_directories(bc7enc_headers INTERFACE "${bc7enc_SOURCE_DIR}")
 
 # ── Chaîne de compilation des shaders : SDL_shadercross + SPIRV-Cross + DXC ──
 # HLSL -> SPIR-V / DXIL / MSL, hors ligne, par l'exécutable `shadercross` (voir cmake/Shaders.cmake).
@@ -218,3 +281,5 @@ endfunction()
 
 # Visible par le CMake racine (ce fichier est un sous-dossier) : décide de la cible « shaders » et des tests.
 set(OW_SHADERS_OK ${OW_SHADERS_OK} PARENT_SCOPE)
+add_library(fnl_headers INTERFACE)
+target_include_directories(fnl_headers INTERFACE "${fastnoiselite_SOURCE_DIR}/C")

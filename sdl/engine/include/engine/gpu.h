@@ -67,6 +67,11 @@ typedef struct EngGpu {
     uint64_t resolve_passes;     /* passes de résolution HDR -> swapchain exécutées (M1-14) */
     EngPresentMode present_mode; /* mode réellement actif */
     float clear_color[4];
+    /* Capture d'écran (développement, --screenshot) : à la soumission de l'image n° capture_frame
+     * (1 = la première), la swapchain est relue et écrite en PPM dans capture_path. */
+    const char *capture_path;
+    uint64_t capture_frame;
+    bool captured;
     uint64_t frames_submitted; /* images soumises et présentées */
     uint64_t frames_skipped;   /* images sans cible (fenêtre réduite) ou en erreur */
     uint64_t overlay_passes;   /* passes overlay ouvertes (M1-12) */

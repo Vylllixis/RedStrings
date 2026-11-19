@@ -1,0 +1,123 @@
+# Jeu d'attaques du mode combat (--play --combat). Rechargé à chaud : enregistre, l'effet est
+# immédiat (une version invalide est refusée et journalisée, l'ancienne reste).
+# Durées en ticks à 60 Hz ; hitbox : os  ax ay az  bx by bz  rayon  (repère du corps, +Z = avant).
+
+# ── joueur ──
+attack light1
+ startup 8
+ active 4
+ recovery 14
+ damage 10
+ posture 8
+ stamina 10
+ hitstop 3
+ cancel_from 6
+ next light2
+ hitbox hand_r 0 0 0.3 0 0 1.4 0.15
+end
+attack light2
+ startup 7
+ active 4
+ recovery 14
+ damage 10
+ posture 8
+ stamina 10
+ hitstop 3
+ cancel_from 6
+ next light3
+ hitbox hand_r 0 0 0.3 0 0 1.4 0.15
+end
+attack light3
+ startup 10
+ active 5
+ recovery 20
+ damage 14
+ posture 14
+ stamina 14
+ hitstop 4
+ hitbox hand_r 0 0 0.3 0 0 1.5 0.18
+end
+attack heavy
+ startup 20
+ active 5
+ recovery 24
+ damage 25
+ posture 30
+ stamina 25
+ hitstop 6
+ hitbox hand_r 0 0 0.3 0 0 1.6 0.2
+end
+
+# ── ennemis (anticipation >= 18 ticks = 300 ms, vérifiée au chargement) ──
+attack g_slash
+ startup 18
+ active 4
+ recovery 18
+ damage 6
+ posture 8
+ stamina 5
+ hitstop 3
+ cancel_from 6
+ next g_slash2
+ hitbox hand_r 0 0 0.3 0 0 1.5 0.15
+end
+attack g_slash2
+ startup 18
+ active 4
+ recovery 20
+ damage 6
+ posture 8
+ stamina 5
+ hitstop 3
+ hitbox hand_r 0 0 0.3 0 0 1.5 0.15
+end
+attack g_lunge
+ startup 24
+ active 6
+ recovery 30
+ damage 10
+ posture 14
+ stamina 5
+ hitstop 4
+ hitbox hand_r 0 0 0.3 0 0 2.0 0.15
+end
+attack b_swing
+ startup 28
+ active 5
+ recovery 30
+ damage 14
+ posture 20
+ stamina 5
+ hitstop 5
+ hitbox hand_r 0 0 0.3 0 0 1.8 0.2
+end
+attack b_slam
+ startup 40
+ active 6
+ recovery 40
+ damage 22
+ posture 30
+ stamina 5
+ hitstop 6
+ hitbox hand_r 0 0 0.3 0 0 2.2 0.25
+end
+attack a_stab
+ startup 24
+ active 4
+ recovery 40
+ damage 8
+ posture 8
+ stamina 5
+ hitstop 3
+ hitbox hand_r 0 0 0.5 0 0 5.5 0.12
+end
+attack a_pierce
+ startup 36
+ active 5
+ recovery 50
+ damage 12
+ posture 12
+ stamina 5
+ hitstop 4
+ hitbox hand_r 0 0 0.5 0 0 6.5 0.12
+end

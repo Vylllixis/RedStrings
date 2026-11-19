@@ -1,0 +1,39 @@
+# Archétypes du mode combat (format : engine/include/engine/ai_archetype.h). Lu au lancement.
+archetype grunt
+ hp 50
+ speed 1.15
+ sight 16
+ fov 120
+ hearing 12
+ standoff 4
+ light g_slash
+ heavy g_lunge
+ plan light 0 1.9 50 3 2
+ plan heavy 0.8 2.4 140 1 1
+end
+archetype brute
+ hp 120
+ speed 0.7
+ radius 0.5
+ sight 14
+ fov 100
+ hearing 10
+ standoff 4.5
+ light b_swing
+ heavy b_slam
+ plan light 0 2.2 80 2 1
+ plan heavy 0 2.6 180 1 1
+end
+archetype archer
+ hp 40
+ speed 0.9
+ sight 20
+ fov 110
+ hearing 12
+ standoff 7
+ flee_below 0.3
+ light a_stab
+ heavy a_pierce
+ plan light 3 6 90 3 1
+ plan heavy 4 7 200 1 1
+end

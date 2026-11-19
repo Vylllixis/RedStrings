@@ -55,6 +55,9 @@ bool eng_ui_begin_frame(EngUi *ui, int width, int height, float dt)
     ui->draw_pending = false;
     ui->tweak_rect_count = 0;
     ui->has_reset_rect = false;
+    ui->editor_row_count = 0;
+    ui->editor_field_count = 0;
+    ui->has_editor_rects = false;
     ow_ui_new_frame(width, height, dt);
     ui->frame_open = true;
     return true;
@@ -84,6 +87,10 @@ static void draw_render_section(const EngUiPanelData *d)
            (unsigned)d->pipeline_binds, (unsigned)d->uniform_pushes);
     igText("rejetés : %llu    perdus : %llu", (unsigned long long)d->rejected_commands,
            (unsigned long long)d->dropped_commands);
+    if (d->terrain_chunks_total > 0) {
+        igText("chunks dessinés : %u / %u", (unsigned)d->terrain_chunks_drawn,
+               (unsigned)d->terrain_chunks_total);
+    }
 }
 
 static void draw_memory_section(const EngUiPanelData *d)
@@ -168,12 +175,199 @@ void eng_ui_draw_panel(EngUi *ui, const EngUiPanelData *data)
         if (igCollapsingHeader_TreeNodeFlags("Mémoire", ImGuiTreeNodeFlags_DefaultOpen)) {
             draw_memory_section(data);
         }
+        if (data->animation != NULL && data->animation[0] != '\0') {
+            igText("%s", data->animation);
+        }
         if (data->tweaks != NULL &&
             igCollapsingHeader_TreeNodeFlags("Réglages", ImGuiTreeNodeFlags_DefaultOpen)) {
             draw_tweaks_section(ui, data->tweaks);
         }
     }
     igEnd();
+}
+
+/* ── Éditeur ── */
+
+static void *field_pointer(void *component, const EngFieldDesc *field)
+{
+    return (uint8_t *)component + field->offset;
+}
+
+static void draw_field(EngUi *ui, void *component, uint32_t id, uint32_t index,
+                       const EngFieldDesc *field)
+{
+    void *p = field_pointer(component, field);
+    igPushID_Str(field->name);
+    switch (field->type) {
+    case ENG_FIELD_BOOL:
+        (void)igCheckbox(field->name, (bool *)p);
+        break;
+    case ENG_FIELD_I32: {
+        int v = (int)*(const int32_t *)p;
+        if (igDragInt(field->name, &v, 1.0F, 0, 0, "%d", ImGuiSliderFlags_None)) {
+            *(int32_t *)p = (int32_t)v;
+        }
+        break;
+    }
+    case ENG_FIELD_U32: {
+        int v = (int)*(const uint32_t *)p;
+        if (igDragInt(field->name, &v, 1.0F, 0, INT32_MAX, "%d", ImGuiSliderFlags_AlwaysClamp)) {
+            *(uint32_t *)p = (uint32_t)v;
+        }
+        break;
+    }
+    case ENG_FIELD_FLOAT:
+        (void)igDragFloat(field->name, (float *)p, 0.05F, 0.0F, 0.0F, "%.3f",
+                          ImGuiSliderFlags_None);
+        break;
+    case ENG_FIELD_VEC3:
+        (void)igDragFloat3(field->name, (float *)p, 0.05F, 0.0F, 0.0F, "%.3f",
+                           ImGuiSliderFlags_None);
+        break;
+    case ENG_FIELD_QUAT: {
+        float degrees[3];
+        eng_editor_quat_to_euler((const float *)p, degrees);
+        if (igDragFloat3(field->name, degrees, 0.5F, 0.0F, 0.0F, "%.1f°", ImGuiSliderFlags_None)) {
+            eng_editor_euler_to_quat(degrees, (float *)p);
+        }
+        break;
+    }
+    case ENG_FIELD_STRING:
+        (void)igInputText(field->name, (char *)p, field->length, ImGuiInputTextFlags_None, NULL,
+                          NULL);
+        break;
+    }
+    if (ui->editor_field_count < ENG_UI_EDITOR_MAX_FIELDS) {
+        EngUiFieldRect *slot = &ui->editor_fields[ui->editor_field_count++];
+        store_rect(slot->rect);
+        slot->component = id;
+        slot->field = index;
+    }
+    igPopID();
+}
+
+static void draw_inspector(EngUi *ui, EngWorld *world, EngEntity entity)
+{
+    for (uint32_t id = 1; id <= world->component_count; id++) {
+        void *component = eng_world_get(world, entity, id);
+        if (component == NULL) {
+            continue;
+        }
+        const EngComponentDesc *desc = &world->tables[id - 1U].desc;
+        igPushID_Int((int)id);
+        if (igCollapsingHeader_TreeNodeFlags(desc->name, ImGuiTreeNodeFlags_DefaultOpen)) {
+            for (uint32_t f = 0; f < desc->field_count; f++) {
+                draw_field(ui, component, id, f, &desc->fields[f]);
+            }
+        }
+        igPopID();
+    }
+}
+
+static void draw_hierarchy_row(EngUi *ui, EngWorld *world, EngEditor *editor, EngEntity entity,
+                               uint32_t row)
+{
+    const EngName *name = eng_world_get(world, entity, ENG_COMPONENT_NAME);
+    char label[ENG_NAME_MAX + 16];
+    (void)snprintf(label, sizeof label, "%s##%u", name != NULL ? name->text : "(sans nom)",
+                   (unsigned)row);
+    const float indent = 14.0F * (float)eng_world_depth(world, entity);
+    if (indent > 0.0F) {
+        igIndent(indent);
+    }
+    const bool selected = eng_world_alive(world, editor->selected) &&
+                          editor->selected.index == entity.index &&
+                          editor->selected.generation == entity.generation;
+    if (igSelectable_Bool(label, selected, ImGuiSelectableFlags_None, ZERO2)) {
+        (void)eng_editor_select(editor, world, entity);
+    }
+    if (indent > 0.0F) {
+        igUnindent(indent);
+    }
+    store_rect(ui->editor_rows[row]);
+    ui->editor_row_entities[row] = entity;
+    ui->editor_row_count = row + 1U;
+}
+
+static void draw_hierarchy(EngUi *ui, EngWorld *world, EngEditor *editor)
+{
+    uint32_t cursor = 0;
+    uint32_t shown = 0;
+    uint32_t total = 0;
+    EngEntity root;
+    while (eng_world_next_entity(world, &cursor, &root)) {
+        if (eng_world_parent(world, root).generation != 0) {
+            continue;
+        }
+        for (EngEntity e = root; e.generation != 0; e = eng_world_next_in_subtree(world, root, e)) {
+            total++;
+            if (shown < ENG_UI_EDITOR_MAX_ROWS) {
+                draw_hierarchy_row(ui, world, editor, e, shown);
+                shown++;
+            }
+        }
+    }
+    if (total > shown) {
+        igText("… et %u autre(s)", (unsigned)(total - shown));
+    }
+}
+
+void eng_ui_draw_editor(EngUi *ui, EngWorld *world, EngEditor *editor, EngUiEditorResult *result)
+{
+    if (!ui->frame_open) {
+        return;
+    }
+    igSetNextWindowPos((ImVec2_c){12.0F, 300.0F}, ImGuiCond_FirstUseEver, ZERO2);
+    igSetNextWindowSize((ImVec2_c){380.0F, 420.0F}, ImGuiCond_FirstUseEver);
+    if (igBegin("Éditeur", NULL, ImGuiWindowFlags_None)) {
+        if (igButton("Enregistrer", ZERO2) && result != NULL) {
+            result->save_requested = true;
+        }
+        store_rect(ui->editor_save_rect);
+        igSameLine(0.0F, -1.0F);
+        if (igButton("Nouvelle", ZERO2)) {
+            (void)eng_editor_new_entity(editor, world, false);
+        }
+        store_rect(ui->editor_add_rect);
+        igSameLine(0.0F, -1.0F);
+        if (igButton("Supprimer", ZERO2)) {
+            (void)eng_editor_delete_selected(editor, world);
+        }
+        store_rect(ui->editor_delete_rect);
+        ui->has_editor_rects = true;
+        if (igCollapsingHeader_TreeNodeFlags("Hiérarchie", ImGuiTreeNodeFlags_DefaultOpen)) {
+            draw_hierarchy(ui, world, editor);
+        }
+        const EngEntity selected = eng_editor_selected(editor, world);
+        if (selected.generation != 0 &&
+            igCollapsingHeader_TreeNodeFlags("Inspecteur", ImGuiTreeNodeFlags_DefaultOpen)) {
+            draw_inspector(ui, world, selected);
+        }
+    }
+    igEnd();
+}
+
+bool eng_ui_editor_field_rect(const EngUi *ui, uint32_t component, uint32_t field, float out[4])
+{
+    for (uint32_t i = 0; i < ui->editor_field_count; i++) {
+        if (ui->editor_fields[i].component == component && ui->editor_fields[i].field == field) {
+            memcpy(out, ui->editor_fields[i].rect, sizeof ui->editor_fields[i].rect);
+            return true;
+        }
+    }
+    return false;
+}
+
+bool eng_ui_editor_row_rect(const EngUi *ui, EngEntity entity, float out[4])
+{
+    for (uint32_t i = 0; i < ui->editor_row_count; i++) {
+        if (ui->editor_row_entities[i].index == entity.index &&
+            ui->editor_row_entities[i].generation == entity.generation) {
+            memcpy(out, ui->editor_rows[i], sizeof ui->editor_rows[i]);
+            return true;
+        }
+    }
+    return false;
 }
 
 void eng_ui_end_frame(EngUi *ui)
@@ -299,6 +493,31 @@ void eng_ui_draw_panel(EngUi *ui, const EngUiPanelData *data)
 {
     (void)ui;
     (void)data;
+}
+
+void eng_ui_draw_editor(EngUi *ui, EngWorld *world, EngEditor *editor, EngUiEditorResult *result)
+{
+    (void)ui;
+    (void)world;
+    (void)editor;
+    (void)result;
+}
+
+bool eng_ui_editor_field_rect(const EngUi *ui, uint32_t component, uint32_t field, float out[4])
+{
+    (void)ui;
+    (void)component;
+    (void)field;
+    (void)out;
+    return false;
+}
+
+bool eng_ui_editor_row_rect(const EngUi *ui, EngEntity entity, float out[4])
+{
+    (void)ui;
+    (void)entity;
+    (void)out;
+    return false;
 }
 
 void eng_ui_end_frame(EngUi *ui)

@@ -1072,6 +1072,71 @@ UTEST(eng_tonemap_gpu, a_lit_model_keeps_values_above_one_until_the_tonemapping)
     CLOSE_TONEMAP(t);
 }
 
+static float g_post_texels[SIZE * SIZE * 4];
+
+/* M8-06 : post-process dans la passe de tonemapping. FXAA : une arête en escalier (diagonale
+ * 1 texel = 1 pixel) n'a que deux niveaux sans FXAA, des niveaux intermédiaires avec. Bloom : un
+ * texel très brillant éclaire ses voisins à 3 pixels avec, pas sans. */
+UTEST(eng_tonemap_gpu, fxaa_softens_a_staircase_edge_and_bloom_spreads_a_bright_point)
+{
+    TonemapTest t;
+    if (!open_tonemap(&t, FORMAT_UNORM)) {
+        EXPECT_FALSE(render_gpu_required());
+        return;
+    }
+    for (uint32_t y = 0; y < SIZE; y++) {
+        for (uint32_t x = 0; x < SIZE; x++) {
+            const float v = (x * 2U > y) ? 1.0F : 0.0F; /* pente 1/2 : vrais escaliers */
+            float *px = &g_post_texels[((size_t)y * SIZE + x) * 4U];
+            px[0] = px[1] = px[2] = v;
+            px[3] = 1.0F;
+        }
+    }
+    SDL_GPUTexture *hdr = upload_hdr(t.f.gpu.device, SIZE, SIZE, g_post_texels);
+    ASSERT_TRUE(hdr != NULL);
+    EngTonemap tm = {.op = ENG_TONEMAP_NONE, .exposure_ev = 0.0F};
+    eng_renderer_set_tonemap(&t.r, &tm);
+    ASSERT_TRUE(resolve_to_pixels(&t, hdr, FORMAT_UNORM, NULL, NULL, g_pixels));
+    uint32_t mid_off = 0;
+    for (size_t i = 0; i < (size_t)SIZE * SIZE; i++) {
+        mid_off += (g_pixels[i * 4U] > 20U && g_pixels[i * 4U] < 235U) ? 1U : 0U;
+    }
+    EXPECT_EQ(mid_off, 0U);
+    tm.fxaa = true;
+    eng_renderer_set_tonemap(&t.r, &tm);
+    ASSERT_TRUE(resolve_to_pixels(&t, hdr, FORMAT_UNORM, NULL, NULL, g_pixels));
+    uint32_t mid_on = 0;
+    for (size_t i = 0; i < (size_t)SIZE * SIZE; i++) {
+        mid_on += (g_pixels[i * 4U] > 20U && g_pixels[i * 4U] < 235U) ? 1U : 0U;
+    }
+    EXPECT_GT(mid_on, SIZE / 2U); /* au moins un pixel adouci par marche d'escalier */
+    EXPECT_TRUE(pixel_is(g_pixels, SIZE, 60, 2, 255, 255, 255, 1)); /* loin de l'arête : intact */
+    EXPECT_TRUE(pixel_is(g_pixels, SIZE, 2, 60, 0, 0, 0, 1));
+    SDL_ReleaseGPUTexture(t.f.gpu.device, hdr);
+    /* bloom */
+    memset(g_post_texels, 0, sizeof g_post_texels);
+    for (size_t i = 0; i < (size_t)SIZE * SIZE; i++) {
+        g_post_texels[i * 4U + 3U] = 1.0F;
+    }
+    float *bright = &g_post_texels[((size_t)32 * SIZE + 32) * 4U];
+    bright[0] = bright[1] = bright[2] = 40.0F;
+    hdr = upload_hdr(t.f.gpu.device, SIZE, SIZE, g_post_texels);
+    ASSERT_TRUE(hdr != NULL);
+    tm.fxaa = false;
+    tm.bloom = 0.0F;
+    eng_renderer_set_tonemap(&t.r, &tm);
+    ASSERT_TRUE(resolve_to_pixels(&t, hdr, FORMAT_UNORM, NULL, NULL, g_pixels));
+    EXPECT_TRUE(pixel_is(g_pixels, SIZE, 35, 32, 0, 0, 0, 0));
+    tm.bloom = 1.0F;
+    eng_renderer_set_tonemap(&t.r, &tm);
+    ASSERT_TRUE(resolve_to_pixels(&t, hdr, FORMAT_UNORM, NULL, NULL, g_pixels));
+    EXPECT_GT(g_pixels[((size_t)32 * SIZE + 35) * 4U], 100U); /* halo à 3 pixels */
+    EXPECT_GT(g_pixels[((size_t)32 * SIZE + 40) * 4U], 20U);  /* et à 8 pixels, plus faible */
+    EXPECT_TRUE(pixel_is(g_pixels, SIZE, 5, 5, 0, 0, 0, 0));  /* loin : noir */
+    SDL_ReleaseGPUTexture(t.f.gpu.device, hdr);
+    CLOSE_TONEMAP(t);
+}
+
 #else /* sans shaders compilés */
 
 UTEST(eng_tonemap_gpu, needs_compiled_shaders)

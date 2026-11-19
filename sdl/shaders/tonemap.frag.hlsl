@@ -8,6 +8,7 @@ cbuffer Tonemap : register(b0, space3)
 {
     float4 params; // x : multiplicateur d'exposition (2^EV) ; y : opérateur (0 aucun, 1 ACES,
                    // 2 AgX) ; z : 1 = encoder en sRGB, 0 = la cible le fait (format _SRGB)
+    float4 post;   // x : 1 = FXAA (M8-06) ; y : force du bloom (0 : coupé) ; zw : inutilisés
 };
 
 float3 aces(float3 x)
@@ -57,10 +58,10 @@ float3 srgb_encode(float3 x)
     return lerp(1.055f * pow(x, 1.0f / 2.4f) - 0.055f, 12.92f * x, step(x, 0.0031308f));
 }
 
-float4 main(float2 uv : TEXCOORD0) : SV_Target0
+float3 tonemap_ldr(float3 c)
 {
     // 65504 : plus grand RGBA16F fini ; +inf (débordement) donnerait inf/inf = NaN, un pixel noir
-    float3 color = clamp(hdr.Sample(hdr_sampler, uv).rgb, 0.0f, 65504.0f) * params.x;
+    float3 color = clamp(c, 0.0f, 65504.0f) * params.x;
     int op = (int)(params.y + 0.5f);
     if (op == 1) {
         color = aces(color);
@@ -68,6 +69,93 @@ float4 main(float2 uv : TEXCOORD0) : SV_Target0
         color = agx(color);
     } else {
         color = saturate(color);
+    }
+    return color;
+}
+
+// texel lu sans filtrage (l'échantillonneur HDR est au plus proche), coordonnées bornées. Par
+// SampleLevel au centre du texel et non Load : la texture reste une texture échantillonnée (avec
+// Load seul, la réflexion des shaders la déclare en « storage » et SDL_GPU refuse le binding).
+float3 texel(int2 p, int2 size)
+{
+    p = clamp(p, int2(0, 0), size - int2(1, 1));
+    float2 uv = (float2(p) + 0.5f) / float2(size);
+    return hdr.SampleLevel(hdr_sampler, uv, 0.0f).rgb;
+}
+
+// bloom (M8-06) : la part au-dessus de 1 (avant exposition) de 16 texels sur deux anneaux,
+// pondérée, ajoutée au pixel. Approximation en une passe (pas de chaîne de flou).
+float3 bloom_at(int2 p, int2 size)
+{
+    float3 sum = float3(0.0f, 0.0f, 0.0f);
+    [unroll] for (int k = 0; k < 8; k++) {
+        float a = 0.785398f * (float)k;
+        float2 d = float2(cos(a), sin(a));
+        sum += max(texel(p + int2(round(d * 3.0f)), size) - 1.0f, 0.0f) * 0.09f;
+        sum += max(texel(p + int2(round(d * 8.0f)), size) - 1.0f, 0.0f) * 0.035f;
+    }
+    return sum;
+}
+
+float3 ldr_at(int2 p, int2 size)
+{
+    float3 c = texel(p, size);
+    if (post.y > 0.0f) {
+        c += post.y * bloom_at(p, size);
+    }
+    return tonemap_ldr(c);
+}
+
+// interpolation bilinéaire faite à la main, sur les valeurs DÉJÀ tonemappées (FXAA travaille en LDR)
+float3 ldr_bilinear(float2 px, int2 size)
+{
+    float2 q = px - 0.5f;
+    int2 i = (int2)floor(q);
+    float2 f = q - floor(q);
+    float3 a = tonemap_ldr(texel(i, size));
+    float3 b = tonemap_ldr(texel(i + int2(1, 0), size));
+    float3 c = tonemap_ldr(texel(i + int2(0, 1), size));
+    float3 d = tonemap_ldr(texel(i + int2(1, 1), size));
+    return lerp(lerp(a, b, f.x), lerp(c, d, f.x), f.y);
+}
+
+float luma(float3 c)
+{
+    return dot(c, float3(0.299f, 0.587f, 0.114f));
+}
+
+float4 main(float2 uv : TEXCOORD0) : SV_Target0
+{
+    uint w;
+    uint h;
+    hdr.GetDimensions(w, h);
+    int2 size = int2((int)w, (int)h);
+    float2 px = uv * float2((float)w, (float)h);
+    int2 p = (int2)floor(px);
+    float3 color = ldr_at(p, size);
+    if (post.x > 0.5f) {
+        // FXAA « simple » (Lottes) : direction de l'arête par les quatre diagonales, deux et quatre
+        // prises le long de l'arête, la plus sûre gardée
+        float lm = luma(color);
+        float nw = luma(ldr_at(p + int2(-1, -1), size));
+        float ne = luma(ldr_at(p + int2(1, -1), size));
+        float sw = luma(ldr_at(p + int2(-1, 1), size));
+        float se = luma(ldr_at(p + int2(1, 1), size));
+        float lmin = min(lm, min(min(nw, ne), min(sw, se)));
+        float lmax = max(lm, max(max(nw, ne), max(sw, se)));
+        if (lmax - lmin > max(0.0312f, lmax * 0.125f)) {
+            float2 dir = float2(-((nw + ne) - (sw + se)), (nw + sw) - (ne + se));
+            float reduce = max((nw + ne + sw + se) * 0.25f * 0.125f, 1.0f / 128.0f);
+            float rcp_min = 1.0f / (min(abs(dir.x), abs(dir.y)) + reduce);
+            dir = clamp(dir * rcp_min, -8.0f, 8.0f);
+            float2 c = float2(p) + 0.5f;
+            float3 a = 0.5f * (ldr_bilinear(c + dir * (1.0f / 3.0f - 0.5f), size) +
+                               ldr_bilinear(c + dir * (2.0f / 3.0f - 0.5f), size));
+            float3 b = a * 0.5f + 0.25f * (ldr_bilinear(c - dir * 0.5f, size) +
+                                           ldr_bilinear(c + dir * 0.5f, size));
+            float lb = luma(b);
+            color = (lb < lmin || lb > lmax) ? a : b;
+        }
     }
     if (params.z > 0.5f) {
         color = srgb_encode(color);

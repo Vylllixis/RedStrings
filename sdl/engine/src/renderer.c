@@ -53,6 +53,9 @@ typedef struct Pipeline {
     uint32_t vertex_stride;
     EngVertexAttribute attributes[ENG_MAX_VERTEX_ATTRIBUTES];
     uint32_t attribute_count;
+    uint32_t instance_stride;
+    EngVertexAttribute instance_attributes[ENG_MAX_VERTEX_ATTRIBUTES];
+    uint32_t instance_attribute_count;
     EngTopology topology;
     EngCullMode cull_mode;
     EngFrontFace front_face;
@@ -482,6 +485,10 @@ static SDL_GPUTextureFormat to_sdl_texture_format(EngTextureFormat format)
         return SDL_GPU_TEXTUREFORMAT_R16G16B16A16_FLOAT;
     case ENG_TEXTURE_RG16F:
         return SDL_GPU_TEXTUREFORMAT_R16G16_FLOAT;
+    case ENG_TEXTURE_BC7:
+        return SDL_GPU_TEXTUREFORMAT_BC7_RGBA_UNORM;
+    case ENG_TEXTURE_BC7_SRGB:
+        return SDL_GPU_TEXTUREFORMAT_BC7_RGBA_UNORM_SRGB;
     case ENG_TEXTURE_NONE:
     case ENG_TEXTURE_RGBA8:
     default:
@@ -492,6 +499,20 @@ static SDL_GPUTextureFormat to_sdl_texture_format(EngTextureFormat format)
 static uint32_t texel_bytes(EngTextureFormat format)
 {
     return format == ENG_TEXTURE_RGBA16F ? 8U : 4U;
+}
+
+static bool is_block_compressed(EngTextureFormat format)
+{
+    return format == ENG_TEXTURE_BC7 || format == ENG_TEXTURE_BC7_SRGB;
+}
+
+/* Octets d'un niveau de `w` x `h` texels : BC7 par blocs de 4 x 4 (16 octets), sinon par texel. */
+static size_t level_bytes(EngTextureFormat format, uint32_t w, uint32_t h)
+{
+    if (is_block_compressed(format)) {
+        return (((size_t)w + 3U) / 4U) * (((size_t)h + 3U) / 4U) * 16U;
+    }
+    return (size_t)w * h * texel_bytes(format);
 }
 
 /* Envoie les niveaux 0 à levels-1 de `transfer` (niveaux consécutifs) vers `texture`. */
@@ -605,8 +626,10 @@ EngTextureHandle eng_renderer_create_texture(EngRenderer *r, const EngTextureDes
 /* Envoie `layers` x `levels` régions (couche par couche, niveaux consécutifs) de `transfer`. */
 static bool upload_texture_data(SDL_GPUDevice *device, SDL_GPUTexture *texture,
                                 SDL_GPUTransferBuffer *transfer, uint32_t width, uint32_t height,
-                                uint32_t layers, uint32_t levels, uint32_t texel, const char *name)
+                                uint32_t layers, uint32_t levels, EngTextureFormat format,
+                                const char *name)
 {
+    const bool blocks = is_block_compressed(format);
     SDL_GPUCommandBuffer *commands = SDL_AcquireGPUCommandBuffer(device);
     if (commands == NULL) {
         return false;
@@ -619,14 +642,16 @@ static bool upload_texture_data(SDL_GPUDevice *device, SDL_GPUTexture *texture,
             uint32_t w;
             uint32_t h;
             eng_image_mip_size(width, height, level, &w, &h);
-            const SDL_GPUTextureTransferInfo source = {.transfer_buffer = transfer,
-                                                       .offset = offset,
-                                                       .pixels_per_row = w,
-                                                       .rows_per_layer = h};
+            /* BC : lignes et couches comptées en texels mais arrondies au bloc de 4 */
+            const SDL_GPUTextureTransferInfo source = {
+                .transfer_buffer = transfer,
+                .offset = offset,
+                .pixels_per_row = blocks ? (w + 3U) & ~3U : w,
+                .rows_per_layer = blocks ? (h + 3U) & ~3U : h};
             const SDL_GPUTextureRegion destination = {
                 .texture = texture, .mip_level = level, .layer = layer, .w = w, .h = h, .d = 1};
             SDL_UploadToGPUTexture(copy, &source, &destination, false);
-            offset += w * h * texel;
+            offset += (uint32_t)level_bytes(format, w, h);
         }
     }
     SDL_EndGPUCopyPass(copy);
@@ -641,7 +666,8 @@ EngTextureHandle eng_renderer_create_texture_data(EngRenderer *r, const EngTextu
     const bool format_ok =
         desc != NULL &&
         (desc->format == ENG_TEXTURE_RGBA8 || desc->format == ENG_TEXTURE_RGBA8_SRGB ||
-         desc->format == ENG_TEXTURE_RGBA16F || desc->format == ENG_TEXTURE_RG16F);
+         desc->format == ENG_TEXTURE_RGBA16F || desc->format == ENG_TEXTURE_RG16F ||
+         is_block_compressed(desc->format));
     if (!r->ready || desc == NULL || desc->data == NULL || desc->width == 0 || desc->height == 0 ||
         desc->width > ENG_IMAGE_MAX_SIZE || desc->height > ENG_IMAGE_MAX_SIZE || !format_ok ||
         (desc->layers != 1 && desc->layers != 6) ||
@@ -650,9 +676,21 @@ EngTextureHandle eng_renderer_create_texture_data(EngRenderer *r, const EngTextu
         ENG_LOG_ERROR("renderer : description de texture invalide (« %s »)", name);
         return ENG_TEXTURE_NULL;
     }
-    const uint32_t texel = texel_bytes(desc->format);
-    const size_t per_layer =
-        eng_image_mip_chain_size(desc->width, desc->height, desc->mip_levels) / 4U * texel;
+    if (is_block_compressed(desc->format) &&
+        !SDL_GPUTextureSupportsFormat(r->gpu->device, to_sdl_texture_format(desc->format),
+                                      desc->layers == 6 ? SDL_GPU_TEXTURETYPE_CUBE
+                                                        : SDL_GPU_TEXTURETYPE_2D,
+                                      SDL_GPU_TEXTUREUSAGE_SAMPLER)) {
+        ENG_LOG_ERROR("renderer : le GPU ne lit pas BC7 (texture « %s »)", name);
+        return ENG_TEXTURE_NULL;
+    }
+    size_t per_layer = 0;
+    for (uint32_t level = 0; level < desc->mip_levels; level++) {
+        uint32_t w = 0;
+        uint32_t h = 0;
+        eng_image_mip_size(desc->width, desc->height, level, &w, &h);
+        per_layer += level_bytes(desc->format, w, h);
+    }
     const size_t total = per_layer * desc->layers;
     if (total > UINT32_MAX) {
         ENG_LOG_ERROR("renderer : texture « %s » trop grande", name);
@@ -691,7 +729,7 @@ EngTextureHandle eng_renderer_create_texture_data(EngRenderer *r, const EngTextu
         memcpy(mapped, desc->data, total);
         SDL_UnmapGPUTransferBuffer(device, transfer);
         ok = upload_texture_data(device, gpu_texture, transfer, desc->width, desc->height,
-                                 desc->layers, desc->mip_levels, texel, name);
+                                 desc->layers, desc->mip_levels, desc->format, name);
     }
     if (transfer != NULL) {
         SDL_ReleaseGPUTransferBuffer(device, transfer);
@@ -891,32 +929,39 @@ static uint32_t pipeline_depth_format(const EngRenderer *r, const Pipeline *p)
 static SDL_GPUGraphicsPipeline *build_pipeline(EngRenderer *r, const Pipeline *p,
                                                SDL_GPUShader *vertex, SDL_GPUShader *fragment)
 {
-    SDL_GPUVertexAttribute attributes[ENG_MAX_VERTEX_ATTRIBUTES];
-    for (uint32_t i = 0; i < p->attribute_count; i++) {
-        SDL_GPUVertexElementFormat format;
-        if (!to_sdl_vertex_format(p->attributes[i].format, &format)) {
-            ENG_LOG_ERROR("renderer : pipeline « %s » : format de sommet %d inconnu", p->name,
-                          (int)p->attributes[i].format);
-            return NULL;
+    SDL_GPUVertexAttribute attributes[2 * ENG_MAX_VERTEX_ATTRIBUTES];
+    uint32_t attribute_total = 0;
+    for (uint32_t stream = 0; stream < 2; stream++) {
+        const EngVertexAttribute *source = stream == 0 ? p->attributes : p->instance_attributes;
+        const uint32_t source_count =
+            stream == 0 ? p->attribute_count : p->instance_attribute_count;
+        for (uint32_t i = 0; i < source_count; i++) {
+            SDL_GPUVertexElementFormat format;
+            if (!to_sdl_vertex_format(source[i].format, &format)) {
+                ENG_LOG_ERROR("renderer : pipeline « %s » : format de sommet %d inconnu", p->name,
+                              (int)source[i].format);
+                return NULL;
+            }
+            attributes[attribute_total++] = (SDL_GPUVertexAttribute){.location = source[i].location,
+                                                                     .buffer_slot = stream,
+                                                                     .format = format,
+                                                                     .offset = source[i].offset};
         }
-        attributes[i] = (SDL_GPUVertexAttribute){.location = p->attributes[i].location,
-                                                 .buffer_slot = 0,
-                                                 .format = format,
-                                                 .offset = p->attributes[i].offset};
     }
-    const SDL_GPUVertexBufferDescription buffer_description = {
-        .slot = 0, .pitch = p->vertex_stride, .input_rate = SDL_GPU_VERTEXINPUTRATE_VERTEX};
+    const SDL_GPUVertexBufferDescription buffer_descriptions[2] = {
+        {.slot = 0, .pitch = p->vertex_stride, .input_rate = SDL_GPU_VERTEXINPUTRATE_VERTEX},
+        {.slot = 1, .pitch = p->instance_stride, .input_rate = SDL_GPU_VERTEXINPUTRATE_INSTANCE}};
     const SDL_GPUColorTargetDescription target = {.format = (SDL_GPUTextureFormat)p->color_format};
 
     SDL_GPUGraphicsPipelineCreateInfo info;
     SDL_zero(info);
     info.vertex_shader = vertex;
     info.fragment_shader = fragment;
-    if (p->attribute_count != 0) {
-        info.vertex_input_state.vertex_buffer_descriptions = &buffer_description;
-        info.vertex_input_state.num_vertex_buffers = 1;
+    if (attribute_total != 0) {
+        info.vertex_input_state.vertex_buffer_descriptions = buffer_descriptions;
+        info.vertex_input_state.num_vertex_buffers = p->instance_stride != 0 ? 2U : 1U;
         info.vertex_input_state.vertex_attributes = attributes;
-        info.vertex_input_state.num_vertex_attributes = p->attribute_count;
+        info.vertex_input_state.num_vertex_attributes = attribute_total;
     }
     info.primitive_type = p->topology == ENG_TOPOLOGY_LINES ? SDL_GPU_PRIMITIVETYPE_LINELIST
                                                             : SDL_GPU_PRIMITIVETYPE_TRIANGLELIST;
@@ -972,17 +1017,48 @@ static bool init_shader(EngRenderer *r, EngShaderHot *hot, const char *shader, E
                                r->has_offline_dir ? r->offline_dir : NULL, shader, stage);
 }
 
+/* Flux d'instances cohérent : stride et attributs ensemble, des emplacements distincts de ceux du
+ * flux 0 et entre eux, des offsets qui tiennent dans une instance. */
+static bool instance_stream_valid(const EngPipelineDesc *desc)
+{
+    if (desc->instance_stride == 0) {
+        return desc->instance_attribute_count == 0;
+    }
+    if (desc->instance_attribute_count == 0 ||
+        desc->instance_attribute_count > ENG_MAX_VERTEX_ATTRIBUTES || desc->attribute_count == 0) {
+        return false;
+    }
+    for (uint32_t i = 0; i < desc->instance_attribute_count; i++) {
+        const EngVertexAttribute *a = &desc->instance_attributes[i];
+        if (a->format == ENG_VERTEX_NONE || a->offset >= desc->instance_stride) {
+            return false;
+        }
+        for (uint32_t j = 0; j < desc->attribute_count; j++) {
+            if (desc->attributes[j].location == a->location) {
+                return false;
+            }
+        }
+        for (uint32_t j = 0; j < i; j++) {
+            if (desc->instance_attributes[j].location == a->location) {
+                return false;
+            }
+        }
+    }
+    return true;
+}
+
 EngPipelineHandle eng_renderer_create_pipeline(EngRenderer *r, const EngPipelineDesc *desc)
 {
     if (!r->ready || desc == NULL || desc->vertex_shader == NULL || desc->fragment_shader == NULL ||
         desc->attribute_count > ENG_MAX_VERTEX_ATTRIBUTES ||
-        (desc->attribute_count != 0 && desc->vertex_stride == 0) ||
+        (desc->attribute_count != 0 && desc->vertex_stride == 0) || !instance_stream_valid(desc) ||
         (desc->depth_write && !desc->depth_test) ||
         (desc->depth_only && (!desc->depth_test || !desc->depth_write || desc->no_depth_target)) ||
         ((desc->depth_test || desc->depth_write) && !desc->depth_only &&
          (r->depth_format == 0 || desc->no_depth_target))) {
         ENG_LOG_ERROR("renderer : description de pipeline invalide (profondeur demandée sans depth "
-                      "buffer ou avec no_depth_target, ou écriture sans test ?)");
+                      "buffer ou avec no_depth_target, écriture sans test, ou flux d'instances "
+                      "incohérent ?)");
         return ENG_PIPELINE_NULL;
     }
     EngHandle handle;
@@ -995,6 +1071,9 @@ EngPipelineHandle eng_renderer_create_pipeline(EngRenderer *r, const EngPipeline
     p->vertex_stride = desc->vertex_stride;
     memcpy(p->attributes, desc->attributes, sizeof p->attributes);
     p->attribute_count = desc->attribute_count;
+    p->instance_stride = desc->instance_stride;
+    memcpy(p->instance_attributes, desc->instance_attributes, sizeof p->instance_attributes);
+    p->instance_attribute_count = desc->instance_attribute_count;
     p->topology = desc->topology;
     p->cull_mode = desc->cull_mode;
     p->front_face = desc->front_face;
@@ -1148,8 +1227,14 @@ bool eng_renderer_resolve_hdr(EngRenderer *r, SDL_GPUCommandBuffer *commands,
     SDL_BindGPUGraphicsPipeline(pass, pipeline->gpu);
     const SDL_GPUTextureSamplerBinding binding = {.texture = hdr, .sampler = r->hdr_sampler};
     SDL_BindGPUFragmentSamplers(pass, 0, &binding, 1);
-    const float params[4] = {eng_tonemap_exposure_scale(&r->tonemap), (float)r->tonemap.op,
-                             format_is_srgb(r->resolve_format) ? 0.0F : 1.0F, 0.0F};
+    const float params[8] = {eng_tonemap_exposure_scale(&r->tonemap),
+                             (float)r->tonemap.op,
+                             format_is_srgb(r->resolve_format) ? 0.0F : 1.0F,
+                             0.0F,
+                             r->tonemap.fxaa ? 1.0F : 0.0F,
+                             r->tonemap.bloom,
+                             0.0F,
+                             0.0F};
     SDL_PushGPUFragmentUniformData(commands, 0, params, sizeof params);
     SDL_DrawGPUPrimitives(pass, 3, 1, 0, 0); /* un triangle plein écran, sans buffer */
     r->stats.resolve_draws++;
@@ -1183,6 +1268,7 @@ uint32_t eng_renderer_execute(EngRenderer *r, const EngRenderQueue *queue,
     uint32_t drawn = 0;
     const Pipeline *bound_pipeline = NULL;
     const Buffer *bound_vertex = NULL;
+    const Buffer *bound_instance = NULL;
     const Buffer *bound_index = NULL;
     EngIndexType bound_index_type = ENG_INDEX_U16;
     const Texture *bound_textures[ENG_MAX_DRAW_TEXTURES] = {NULL};
@@ -1199,6 +1285,18 @@ uint32_t eng_renderer_execute(EngRenderer *r, const EngRenderQueue *queue,
         const bool indexed = cmd->index_buffer.handle.generation != 0;
         const Buffer *index =
             indexed ? (const Buffer *)eng_pool_get(&r->buffers, cmd->index_buffer.handle) : NULL;
+        /* flux d'instances : exigé (et assez grand) si le pipeline en a un, interdit sinon */
+        const bool has_instance_buffer = cmd->instance_buffer.handle.generation != 0;
+        const Buffer *instance_buffer =
+            has_instance_buffer
+                ? (const Buffer *)eng_pool_get(&r->buffers, cmd->instance_buffer.handle)
+                : NULL;
+        const bool instances_ok =
+            pipeline == NULL || (pipeline->instance_stride == 0
+                                     ? !has_instance_buffer
+                                     : (instance_buffer != NULL && cmd->instance_count >= 1 &&
+                                        (uint64_t)cmd->instance_count * pipeline->instance_stride <=
+                                            instance_buffer->size));
         const bool has_uniforms = cmd->uniform_size != 0;
         const bool uniforms_ok =
             !has_uniforms || (commands != NULL && cmd->uniform_size <= ENG_MAX_UNIFORM_BYTES &&
@@ -1247,7 +1345,7 @@ uint32_t eng_renderer_execute(EngRenderer *r, const EngRenderQueue *queue,
                                (!has_shadow || (shadow != NULL && shadow_sampler != NULL &&
                                                 texture_count == ENG_SHADOW_SLOT));
         if (pipeline == NULL || vertex == NULL || (indexed && index == NULL) || cmd->count == 0 ||
-            !uniforms_ok || !fragment_uniforms_ok || !textures_ok || !shadow_ok) {
+            !instances_ok || !uniforms_ok || !fragment_uniforms_ok || !textures_ok || !shadow_ok) {
             r->stats.rejected_commands++;
             if (!r->warned_rejected) {
                 r->warned_rejected = true;
@@ -1262,6 +1360,7 @@ uint32_t eng_renderer_execute(EngRenderer *r, const EngRenderQueue *queue,
             SDL_BindGPUGraphicsPipeline(pass, pipeline->gpu);
             bound_pipeline = pipeline;
             bound_vertex = NULL; /* par prudence, on relie les buffers après un changement */
+            bound_instance = NULL;
             bound_index = NULL;
             bound_texture_count = 0;
             bound_sampler = NULL;
@@ -1273,6 +1372,11 @@ uint32_t eng_renderer_execute(EngRenderer *r, const EngRenderQueue *queue,
             const SDL_GPUBufferBinding binding = {.buffer = vertex->gpu, .offset = 0};
             SDL_BindGPUVertexBuffers(pass, 0, &binding, 1);
             bound_vertex = vertex;
+        }
+        if (pipeline->instance_stride != 0 && instance_buffer != bound_instance) {
+            const SDL_GPUBufferBinding binding = {.buffer = instance_buffer->gpu, .offset = 0};
+            SDL_BindGPUVertexBuffers(pass, 1, &binding, 1);
+            bound_instance = instance_buffer;
         }
         if (texture_count != 0) {
             bool same = sampler == bound_sampler && texture_count == bound_texture_count;
@@ -1327,6 +1431,7 @@ uint32_t eng_renderer_execute(EngRenderer *r, const EngRenderQueue *queue,
         } else {
             SDL_DrawGPUPrimitives(pass, cmd->count, instances, cmd->first, 0);
         }
+        r->stats.instances += instances;
         drawn++;
     }
     r->stats.draws += drawn;

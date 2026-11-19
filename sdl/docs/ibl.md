@@ -121,8 +121,10 @@ le HDR réel.
 ## Limites
 
 - Le disque de soleil du ciel et le soleil directionnel de `EngLighting` sont indépendants : un ciel avec
-  soleil + un soleil directionnel éclairent deux fois (le ciel procédural du lanceur place son disque
-  dans la direction du soleil par défaut, mais ne suit pas les curseurs).
+  soleil + un soleil directionnel éclairent deux fois. Depuis M3-05 le lanceur dessine par défaut un **ciel
+  analytique** dont le disque suit les curseurs du soleil (docs/atmosphere.md) ; cette skybox cubemap ne sert
+  plus que pour une image HDR (`--env`) ou si le shader `atmosphere.frag` manque, et son disque ne suit
+  toujours pas les curseurs.
 - Échantillonnage d'un cube **dans la face** (le GPU filtre au-dessus des arêtes, pas le CPU) ; le
   sur-échantillonnage et les mips ne lissent pas non plus les arêtes.
 - Pas de compensation de diffusion multiple (les métaux rugueux perdent de l'énergie, comme avant).

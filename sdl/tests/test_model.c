@@ -1530,3 +1530,207 @@ UTEST(eng_model_box, refuses_empty_inverted_or_non_finite_boxes_and_restores_the
     eng_arena_shutdown(&tiny);
     fixture_close(&f);
 }
+
+/* ── Dépendances d'un glTF (M2-04) ── */
+
+/* Construit le glTF de `s` dans f->file et en demande les dépendances. */
+static bool dependencies_of(Fixture *f, const Spec *s, const char *base_path, const char ***paths,
+                            uint32_t *count)
+{
+    uint8_t blob[1024];
+    size_t blob_size = 0;
+    f->file_size = build(s, f->file, sizeof f->file, blob, &blob_size);
+    return eng_model_dependencies(&f->arena, f->file, f->file_size, base_path, paths, count);
+}
+
+UTEST(eng_model_deps, external_buffer_and_image_are_listed_with_the_decoded_names)
+{
+    Fixture f;
+    ASSERT_TRUE(fixture_open(&f));
+    const Spec s = {.material = TEXTURED,
+                    .texture = true,
+                    .buffer_uri = "tampon.bin",
+                    .image_uri = "ma%20texture.png"};
+    const char **paths = NULL;
+    uint32_t count = 99;
+    ASSERT_TRUE(dependencies_of(&f, &s, "un dossier/m.gltf", &paths, &count));
+    ASSERT_EQ(count, 2U);
+    EXPECT_STREQ(paths[0], "un dossier/tampon.bin");
+    EXPECT_STREQ(paths[1], "un dossier/ma texture.png");
+    fixture_close(&f);
+}
+
+UTEST(eng_model_deps, paths_are_not_normalised_and_the_directory_may_be_empty)
+{
+    Fixture f;
+    ASSERT_TRUE(fixture_open(&f));
+    const Spec s = {.material = TEXTURED,
+                    .texture = true,
+                    .buffer_uri = "m.bin",
+                    .image_uri = "../textures/a.png"};
+    const char **paths = NULL;
+    uint32_t count = 0;
+    ASSERT_TRUE(dependencies_of(&f, &s, "a/models/m.gltf", &paths, &count));
+    ASSERT_EQ(count, 2U);
+    EXPECT_STREQ(paths[1], "a/models/../textures/a.png");
+    ASSERT_TRUE(dependencies_of(&f, &s, "m.gltf", &paths, &count)); /* pas de dossier */
+    ASSERT_EQ(count, 2U);
+    EXPECT_STREQ(paths[0], "m.bin");
+    ASSERT_TRUE(dependencies_of(&f, &s, "C:\\jeu\\m.gltf", &paths, &count)); /* séparateur « \ » */
+    EXPECT_STREQ(paths[0], "C:\\jeu\\m.bin");
+    fixture_close(&f);
+}
+
+UTEST(eng_model_deps, embedded_data_is_not_a_file)
+{
+    Fixture f;
+    ASSERT_TRUE(fixture_open(&f));
+    const Spec s = {.material = TEXTURED, .texture = true}; /* tampon et image en data: URI */
+    const char **paths = (const char **)&f;                 /* doit être remis à NULL */
+    uint32_t count = 99;
+    ASSERT_TRUE(dependencies_of(&f, &s, "d/m.gltf", &paths, &count));
+    EXPECT_EQ(count, 0U);
+    EXPECT_TRUE(paths == NULL);
+    const size_t used = f.arena.used;
+    const Spec glb = {.glb = true};
+    ASSERT_TRUE(dependencies_of(&f, &glb, "d/m.glb", &paths, &count));
+    EXPECT_EQ(count, 0U);
+    EXPECT_EQ(f.arena.used, used); /* rien à allouer : l'arène n'a pas bougé */
+    fixture_close(&f);
+}
+
+UTEST(eng_model_deps, a_file_named_twice_is_listed_once)
+{
+    Fixture f;
+    ASSERT_TRUE(fixture_open(&f));
+    const Spec s = {
+        .material = TEXTURED, .texture = true, .buffer_uri = "x.bin", .image_uri = "x.bin"};
+    const char **paths = NULL;
+    uint32_t count = 0;
+    ASSERT_TRUE(dependencies_of(&f, &s, "d/m.gltf", &paths, &count));
+    ASSERT_EQ(count, 1U);
+    EXPECT_STREQ(paths[0], "d/x.bin");
+    fixture_close(&f);
+}
+
+UTEST(eng_model_deps, bad_input_is_refused_and_leaves_the_arena_and_outputs_clean)
+{
+    Fixture f;
+    ASSERT_TRUE(fixture_open(&f));
+    const Spec s = {.material = TEXTURED,
+                    .texture = true,
+                    .buffer_uri = "tampon.bin",
+                    .image_uri = "ma%20texture.png"};
+    uint8_t blob[1024];
+    size_t blob_size = 0;
+    f.file_size = build(&s, f.file, sizeof f.file, blob, &blob_size);
+    const char **paths = (const char **)&f;
+    uint32_t count = 99;
+    const size_t used = f.arena.used;
+
+    EXPECT_FALSE(eng_model_dependencies(&f.arena, f.file, f.file_size, NULL, &paths, &count));
+    EXPECT_FALSE(eng_model_dependencies(&f.arena, NULL, f.file_size, "d/m.gltf", &paths, &count));
+    EXPECT_FALSE(eng_model_dependencies(&f.arena, f.file, 0, "d/m.gltf", &paths, &count));
+    EXPECT_TRUE(paths == NULL);
+    EXPECT_EQ(count, 0U);
+
+    const char junk[] = "{ pas du glTF";
+    paths = (const char **)&f;
+    EXPECT_FALSE(
+        eng_model_dependencies(&f.arena, junk, sizeof junk - 1U, "d/m.gltf", &paths, &count));
+    EXPECT_TRUE(paths == NULL);
+
+    /* arène trop petite pour le tableau, puis pour les chaînes : restituée dans les deux cas */
+    for (size_t room = 0; room < 40; room += 8) {
+        EngArena tiny;
+        ASSERT_TRUE(eng_arena_init(&tiny, "tiny", 64));
+        ASSERT_TRUE(eng_arena_alloc(&tiny, 64 - room, 1) != NULL);
+        const size_t before = tiny.used;
+        paths = (const char **)&f;
+        EXPECT_FALSE(
+            eng_model_dependencies(&tiny, f.file, f.file_size, "d/m.gltf", &paths, &count));
+        EXPECT_TRUE(paths == NULL);
+        EXPECT_EQ(tiny.used, before);
+        eng_arena_shutdown(&tiny);
+    }
+
+    /* URI de 600 octets : refusée (limite 512) */
+    char big[700];
+    memset(big, 'a', sizeof big);
+    big[600] = '\0';
+    const Spec long_name = {
+        .material = TEXTURED, .texture = true, .buffer_uri = big, .image_uri = "i.png"};
+    f.file_size = build(&long_name, f.file, sizeof f.file, blob, &blob_size);
+    EXPECT_FALSE(eng_model_dependencies(&f.arena, f.file, f.file_size, "d/m.gltf", &paths, &count));
+    EXPECT_EQ(f.arena.used, used);
+    fixture_close(&f);
+}
+
+/* Limites exactes : URI décodée de 512 octets au plus (511 + nul), chemin complet de 1024 au plus.
+ */
+UTEST(eng_model_deps, length_limits_are_exact)
+{
+    Fixture f;
+    ASSERT_TRUE(fixture_open(&f));
+    char uri[600];
+    char base[700];
+    const char **paths = NULL;
+    uint32_t count = 0;
+
+    /* URI : 511 caractères acceptés, 512 refusés (aucune troncature silencieuse) */
+    memset(uri, 'a', sizeof uri);
+    uri[511] = '\0';
+    Spec s = {.material = TEXTURED, .texture = true, .buffer_uri = uri, .image_uri = "i.png"};
+    ASSERT_TRUE(dependencies_of(&f, &s, "m.gltf", &paths, &count));
+    ASSERT_EQ(count, 2U);
+    EXPECT_EQ(strlen(paths[0]), (size_t)511);
+    uri[511] = 'a';
+    uri[512] = '\0';
+    EXPECT_FALSE(dependencies_of(&f, &s, "m.gltf", &paths, &count));
+
+    /* chemin complet : dossier (601 octets, « / » compris) + URI */
+    memset(base, 'd', 600);
+    SDL_strlcpy(base + 600, "/m.gltf", sizeof base - 600U);
+    memset(uri, 'a', sizeof uri);
+    uri[422] = '\0'; /* 601 + 422 = 1023 : accepté */
+    ASSERT_TRUE(dependencies_of(&f, &s, base, &paths, &count));
+    EXPECT_EQ(strlen(paths[0]), (size_t)1023);
+    uri[422] = 'a';
+    uri[423] = '\0'; /* 601 + 423 = 1024 : refusé */
+    EXPECT_FALSE(dependencies_of(&f, &s, base, &paths, &count));
+    fixture_close(&f);
+}
+
+/* ── Export Blender (M2-11, docs/blender-export.md) ──
+ * Fichiers FABRIQUÉS À LA MAIN dans la forme que l'exporteur glTF de Blender 4.x produit (noms de
+ * nœuds, extras, extensions de matériau optionnelles, double face). Aucun n'a été écrit par un vrai
+ * Blender : ce test vérifie que le chargeur ignore ce que l'exporteur ajoute d'optionnel, pas que
+ * la procédure du document marche de bout en bout. */
+
+UTEST(eng_model, blender_style_metadata_and_optional_extensions_are_accepted)
+{
+    Fixture f;
+    ASSERT_TRUE(fixture_open(&f));
+    EngModel m;
+    const Spec s = {
+        .extra_top = "\"extensionsUsed\":[\"KHR_materials_ior\",\"KHR_materials_specular\","
+                     "\"KHR_texture_transform\"],\"extras\":{\"author\":\"x\"}",
+        .node_json = "\"name\":\"Crate\",\"translation\":[0,1,0],\"rotation\":[0,0,0,1],"
+                     "\"scale\":[1,1,1],\"extras\":{\"k\":1}",
+        .material = "{\"name\":\"Material\",\"doubleSided\":true,"
+                    "\"pbrMetallicRoughness\":{\"baseColorFactor\":[0.8,0.8,0.8,1],"
+                    "\"metallicFactor\":0,\"roughnessFactor\":0.5},"
+                    "\"extensions\":{\"KHR_materials_ior\":{\"ior\":1.45},"
+                    "\"KHR_materials_specular\":{\"specularFactor\":0.5,"
+                    "\"specularColorFactor\":[1,1,1]}}}"};
+    ASSERT_TRUE(load_spec(&f, &s, &m));
+    EXPECT_EQ(m.part_count, 1U);
+    EXPECT_NEAR(m.materials[1].base_color[0], 0.8F, EPS);
+    EXPECT_NEAR(m.materials[1].metallic, 0.0F, EPS);
+    EXPECT_NEAR(m.materials[1].roughness, 0.5F, EPS);
+    /* le triangle (0,0,0) (1,0,0) (0,1,0) est décalé de +1 en y par le nœud */
+    EXPECT_VEC3(m.bounds_min, 0.0F, 1.0F, 0.0F);
+    EXPECT_VEC3(m.bounds_max, 1.0F, 2.0F, 0.0F);
+    eng_model_free(&m);
+    fixture_close(&f);
+}

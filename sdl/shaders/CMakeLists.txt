@@ -13,11 +13,18 @@ ow_add_shaders(shaders
     multitex.frag.hlsl
     model.vert.hlsl
     model.frag.hlsl
+    instanced.vert.hlsl
+    grass.vert.hlsl
+    terrain.frag.hlsl
+    water.frag.hlsl
     lines.vert.hlsl
     lines.frag.hlsl
     tonemap.vert.hlsl
     tonemap.frag.hlsl
     sky.vert.hlsl
     sky.frag.hlsl
+    atmosphere.frag.hlsl
     shadow.vert.hlsl
-    shadow.frag.hlsl)
+    shadow.frag.hlsl
+    model_skinned.vert.hlsl
+    shadow_skinned.vert.hlsl)

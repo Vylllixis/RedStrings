@@ -105,6 +105,18 @@ typedef struct EngModel {
 bool eng_model_parse(EngArena *arena, EngArena *scratch, const void *data, size_t size,
                      const char *base_path, EngModel *model);
 
+/* Fichiers externes qu'un .gltf lit (tampons .bin, images), pour le fichier de dépendances du
+ * cuiseur (M2-04). `base_path` : chemin du .gltf, dont le dossier précède chaque URI décodée
+ * (« %20 » -> espace) ; les chemins sont rendus tels quels, sans normalisation (« ../textures/a.png
+ * » reste ainsi). Les données incluses (data: URI, tampon d'un GLB) ne sont pas des fichiers et
+ * sont ignorées ; les doublons sont éliminés. Le tableau et les chaînes sont alloués dans `arena`.
+ * Sans fichier externe : `*out_paths` = NULL, `*out_count` = 0, `arena` inchangée. Ne lit aucun
+ * fichier. Échec (false, journalisé : données invalides, URI trop longue, arène
+ * pleine) :
+ * `*out_paths` = NULL, `*out_count` = 0, `arena` restituée. */
+bool eng_model_dependencies(EngArena *arena, const void *data, size_t size, const char *base_path,
+                            const char ***out_paths, uint32_t *out_count);
+
 /* Lit puis analyse un fichier (chemin relatif à l'exécutable, voir engine/files.h). */
 bool eng_model_load(EngArena *arena, EngArena *scratch, const char *path, EngModel *model);
 

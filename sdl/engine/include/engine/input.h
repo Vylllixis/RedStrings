@@ -91,6 +91,14 @@ typedef struct EngInput {
     uint32_t held;
     uint32_t pressed_latch;
     uint32_t released_latch;
+
+    /* Dernière entrée PRESSÉE (touche, bouton de souris, de manette ou gâchette), quelle que soit
+     * sa liaison : sert au remappage (« appuie sur une touche »). `last_serial` augmente à chaque
+     * nouvelle pression ; on le compare à une valeur mémorisée pour savoir si une pression est
+     * arrivée depuis. Un relâchement ne le change pas. */
+    uint32_t last_serial;
+    EngBindKind last_kind;
+    int last_code;
 } EngInput;
 
 void eng_input_init(EngInput *input); /* aucune liaison */

@@ -34,6 +34,10 @@ typedef enum EngTonemapOperator {
 typedef struct EngTonemap {
     EngTonemapOperator op;
     float exposure_ev; /* en EV (stops), [ENG_EXPOSURE_EV_MIN, ENG_EXPOSURE_EV_MAX] */
+    /* Post-process (M8-06), dans la même passe que le tonemapping. Coupés par défaut : la
+     * référence CPU (eng_tonemap_apply) ne les reproduit pas. */
+    bool fxaa;   /* anticrénelage FXAA « simple » sur l'image tonemappée */
+    float bloom; /* force du halo autour des valeurs > 1 (0 : coupé, au plus 2) */
 } EngTonemap;
 
 /* ACES, 0 EV. */

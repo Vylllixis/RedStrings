@@ -1,0 +1,939 @@
+#include "play_combat.h"
+
+#include <SDL3/SDL.h>
+#include <math.h>
+#include <stdio.h>
+#include <string.h>
+
+#include "engine/ai_camp.h"
+#include "engine/ai_debug.h"
+#include "engine/arena.h"
+#include "engine/attack_data.h"
+#include "engine/audio_device.h"
+#include "engine/combat_audio.h"
+#include "engine/damage_numbers.h"
+#include "engine/files.h"
+#include "engine/lockon.h"
+#include "engine/log.h"
+#include "engine/mixer.h"
+#include "engine/progression.h"
+#include "engine/training_dummy.h"
+#include "engine/vfx.h"
+#include "play_mode.h"
+
+#define PLAYER 0U
+#define DUMMY 1U
+#define FIRST_ENEMY 2U
+#define FIGHTERS 5U
+#define RESPAWN_TICKS 180U
+#define CAMP_RESPAWN_TICKS 600U
+#define MAX_PUSH 0.6F
+#define DUMMY_X 4.0F
+#define DUMMY_Z (-1.0F)
+
+/* Valeurs intégrées : copie de assets/combat/ (utilisées si les fichiers manquent). */
+static const char DEFAULT_ATTACKS[] =
+    "attack light1\n startup 8\n active 4\n recovery 14\n damage 10\n posture 8\n stamina 10\n"
+    " hitstop 3\n cancel_from 6\n next light2\n hitbox hand_r 0 0 0.3 0 0 1.4 0.15\nend\n"
+    "attack light2\n startup 7\n active 4\n recovery 14\n damage 10\n posture 8\n stamina 10\n"
+    " hitstop 3\n cancel_from 6\n next light3\n hitbox hand_r 0 0 0.3 0 0 1.4 0.15\nend\n"
+    "attack light3\n startup 10\n active 5\n recovery 20\n damage 14\n posture 14\n stamina 14\n"
+    " hitstop 4\n hitbox hand_r 0 0 0.3 0 0 1.5 0.18\nend\n"
+    "attack heavy\n startup 20\n active 5\n recovery 24\n damage 25\n posture 30\n stamina 25\n"
+    " hitstop 6\n hitbox hand_r 0 0 0.3 0 0 1.6 0.2\nend\n"
+    "attack g_slash\n startup 18\n active 4\n recovery 18\n damage 6\n posture 8\n stamina 5\n"
+    " hitstop 3\n cancel_from 6\n next g_slash2\n hitbox hand_r 0 0 0.3 0 0 1.5 0.15\nend\n"
+    "attack g_slash2\n startup 18\n active 4\n recovery 20\n damage 6\n posture 8\n stamina 5\n"
+    " hitstop 3\n hitbox hand_r 0 0 0.3 0 0 1.5 0.15\nend\n"
+    "attack g_lunge\n startup 24\n active 6\n recovery 30\n damage 10\n posture 14\n stamina 5\n"
+    " hitstop 4\n hitbox hand_r 0 0 0.3 0 0 2.0 0.15\nend\n"
+    "attack b_swing\n startup 28\n active 5\n recovery 30\n damage 14\n posture 20\n stamina 5\n"
+    " hitstop 5\n hitbox hand_r 0 0 0.3 0 0 1.8 0.2\nend\n"
+    "attack b_slam\n startup 40\n active 6\n recovery 40\n damage 22\n posture 30\n stamina 5\n"
+    " hitstop 6\n hitbox hand_r 0 0 0.3 0 0 2.2 0.25\nend\n"
+    "attack a_stab\n startup 24\n active 4\n recovery 40\n damage 8\n posture 8\n stamina 5\n"
+    " hitstop 3\n hitbox hand_r 0 0 0.5 0 0 5.5 0.12\nend\n"
+    "attack a_pierce\n startup 36\n active 5\n recovery 50\n damage 12\n posture 12\n stamina 5\n"
+    " hitstop 4\n hitbox hand_r 0 0 0.5 0 0 6.5 0.12\nend\n";
+
+static const char DEFAULT_ENEMIES[] =
+    "archetype grunt\n hp 50\n speed 1.15\n sight 16\n fov 120\n hearing 12\n standoff 4\n"
+    " light g_slash\n heavy g_lunge\n plan light 0 1.9 50 3 2\n plan heavy 0.8 2.4 140 1 1\nend\n"
+    "archetype brute\n hp 120\n speed 0.7\n radius 0.5\n sight 14\n fov 100\n hearing 10\n"
+    " standoff 4.5\n light b_swing\n heavy b_slam\n plan light 0 2.2 80 2 1\n"
+    " plan heavy 0 2.6 180 1 1\nend\n"
+    "archetype archer\n hp 40\n speed 0.9\n sight 20\n fov 110\n hearing 12\n standoff 7\n"
+    " flee_below 0.3\n light a_stab\n heavy a_pierce\n plan light 3 6 90 3 1\n"
+    " plan heavy 4 7 200 1 1\nend\n";
+
+struct PlayCombat {
+    bool ready;
+    EngArena scratch;
+    EngAttackFile file;
+    bool file_ok;
+    EngAttackSet attacks; /* copie utilisée par la simulation */
+    uint32_t attacks_version;
+    EngArchSet arch;
+    EngAiWorld world;
+    EngNavGrid nav;
+    EngCombatSim sim;
+    EngAiGroup group;
+    EngCamp camp;
+    EngTrainingDummy dummy;
+    EngParticles particles;
+    EngDamageNumbers numbers;
+    EngMixer mixer;
+    EngCombatAudio audio;
+    EngAudioDevice *device;
+    int32_t lock; /* indice de combattant verrouillé, -1 */
+    uint32_t dead_ticks;
+    uint32_t cleared_ticks;
+    bool was_dead[FIGHTERS];
+    EngProgress progress;   /* M8-08 */
+    uint32_t levelup_ticks; /* message « Niveau N » encore affiché */
+    PlayCombatStats stats;
+};
+
+/* applique les statistiques du niveau au joueur ; `heal` : PV et endurance au maximum */
+static void apply_progress(PlayCombat *c, bool heal)
+{
+    EngFighter *pf = &c->sim.fighters[PLAYER];
+    const EngProgressStats st = eng_prog_stats(&c->progress);
+    pf->params.max_stamina = st.stamina_max;
+    pf->params.damage_scale = st.damage_scale;
+    pf->vitals.max_hp = st.hp_max;
+    if (heal) {
+        pf->vitals.hp = st.hp_max;
+        pf->stamina = st.stamina_max;
+    } else {
+        pf->vitals.hp = pf->vitals.hp > st.hp_max ? st.hp_max : pf->vitals.hp;
+        pf->stamina = pf->stamina > st.stamina_max ? st.stamina_max : pf->stamina;
+    }
+}
+
+static PlayCombat g_combat; /* ~1 Mo : instance unique, hors pile */
+
+/* Fichier de données : d'abord les sources du dépôt (rechargement à chaud pendant le
+ * développement), sinon à côté de l'exécutable (version distribuée). */
+static bool data_path(const char *relative, char *out, size_t cap)
+{
+#ifdef OW_ASSET_SOURCE_DIR
+    (void)snprintf(out, cap, "%s/%s", OW_ASSET_SOURCE_DIR, relative);
+    SDL_PathInfo info;
+    if (SDL_GetPathInfo(out, &info)) {
+        return true;
+    }
+#endif
+    char rel[256];
+    (void)snprintf(rel, sizeof rel, "assets/%s", relative);
+    return eng_path_resolve(out, cap, rel);
+}
+
+static bool read_text(EngArena *arena, const char *relative, const char **out)
+{
+    char path[1024];
+    if (!data_path(relative, path, sizeof path)) {
+        return false;
+    }
+    EngFileData data;
+    if (!eng_file_read_all(arena, path, &data)) {
+        return false;
+    }
+    *out = (const char *)data.data;
+    return true;
+}
+
+static void attack_path(char *out, size_t cap)
+{
+    if (!data_path("combat/attacks.txt", out, cap)) {
+        out[0] = '\0';
+    }
+}
+
+static void build_world(EngAiWorld *w)
+{
+    eng_aiw_init(w);
+    /* les cubes de la démonstration (1 m) sauf le central, comme play_mode.c */
+    for (int gz = -3; gz <= 3; gz++) {
+        for (int gx = -3; gx <= 3; gx++) {
+            if (gx != 0 || gz != 0) {
+                (void)eng_aiw_add_box(w, (float)gx * 8.0F, (float)gz * 8.0F, 0.5F, 0.5F);
+            }
+        }
+    }
+    (void)eng_aiw_add_box(w, 24.0F, 4.0F, 0.25F, 3.5F); /* mur */
+    (void)eng_aiw_add_box(w, -6.5F, 4.0F, 1.5F, 1.5F);  /* plateforme */
+    (void)eng_aiw_add_box(w, 14.0F, 4.0F, 4.0F, 3.0F);  /* marches : les ennemis les évitent */
+}
+
+static void spawn_all(PlayCombat *c)
+{
+    for (uint32_t i = 0; i < c->group.count; i++) {
+        (void)eng_aig_reset_agent(&c->group, &c->sim, i);
+        (void)eng_sim_place(&c->sim, c->group.agents[i].fighter, c->camp.m[i].pos[0],
+                            c->camp.m[i].pos[1], c->camp.m[i].yaw);
+    }
+}
+
+PlayCombat *play_combat_create(bool audio, bool arena_obstacles)
+{
+    PlayCombat *c = &g_combat;
+    if (c->ready) {
+        return NULL;
+    }
+    memset(c, 0, sizeof *c);
+    eng_prog_init(&c->progress);
+    c->lock = -1;
+    if (!eng_arena_init(&c->scratch, "combat", (size_t)1 << 20)) {
+        return NULL;
+    }
+    char err[256];
+    char path[1024];
+    attack_path(path, sizeof path);
+    c->file_ok =
+        path[0] != '\0' && eng_attackfile_open(&c->file, &c->scratch, path) && c->file.valid;
+    if (c->file_ok) {
+        c->attacks = c->file.set;
+        c->attacks_version = c->file.version;
+        ENG_LOG_INFO("combat : attaques lues dans %s (rechargées à chaud)", path);
+    } else if (!eng_attackset_parse(DEFAULT_ATTACKS, &c->attacks, err, sizeof err)) {
+        ENG_LOG_ERROR("combat : attaques intégrées invalides : %s", err);
+        play_combat_destroy(c);
+        return NULL;
+    } else {
+        ENG_LOG_WARN("combat : %s introuvable ou invalide, attaques intégrées", path);
+    }
+    eng_arena_reset(&c->scratch);
+    const char *enemies = NULL;
+    if (!read_text(&c->scratch, "combat/enemies.txt", &enemies) ||
+        !eng_arch_parse(enemies, &c->arch, err, sizeof err)) {
+        if (enemies != NULL) {
+            ENG_LOG_WARN("combat : enemies.txt invalide (%s), archétypes intégrés", err);
+        }
+        if (!eng_arch_parse(DEFAULT_ENEMIES, &c->arch, err, sizeof err)) {
+            ENG_LOG_ERROR("combat : archétypes intégrés invalides : %s", err);
+            play_combat_destroy(c);
+            return NULL;
+        }
+    }
+    if (!eng_arch_validate(&c->arch, &c->attacks, err, sizeof err)) {
+        ENG_LOG_ERROR("combat : %s", err);
+        play_combat_destroy(c);
+        return NULL;
+    }
+    if (arena_obstacles) {
+        build_world(&c->world);
+    } else {
+        eng_aiw_init(&c->world);
+    }
+    const float mn[2] = {-30.0F, -30.0F};
+    const float mx[2] = {30.0F, 30.0F};
+    if (!eng_nav_build(&c->nav, &c->world, mn, mx, 0.5F, 0.55F) ||
+        !eng_sim_init(&c->sim, &c->attacks, FIGHTERS)) {
+        play_combat_destroy(c);
+        return NULL;
+    }
+    c->sim.world = &c->world;
+    c->sim.world_ignore = 1U << PLAYER; /* le joueur a sa propre physique (Jolt) */
+    c->sim.radius[PLAYER] = 0.4F;
+    c->sim.radius[DUMMY] = 0.4F;
+    (void)eng_sim_place(&c->sim, PLAYER, PLAY_SPAWN_X, PLAY_SPAWN_Z, -1.5707963F);
+    (void)eng_sim_place(&c->sim, DUMMY, DUMMY_X, DUMMY_Z,
+                        0.0F); /* entre les cubes, devant le départ */
+    eng_dummy_init(&c->dummy, DUMMY, ENG_DUMMY_STATIC, 90);
+    c->sim.fighters[DUMMY].vitals.max_hp = 1000.0F; /* se remet à neuf après 3 s sans coup */
+    c->sim.fighters[DUMMY].vitals.hp = 1000.0F;
+    eng_aig_init(&c->group, &c->arch, &c->world, &c->nav, PLAYER);
+    eng_camp_init(&c->camp);
+    const float face = 2.3561945F; /* tourné vers le départ (+X, +Z) */
+    const float patrol[2][2] = {{-12.0F, -12.0F}, {-12.0F, -4.0F}};
+    bool ok =
+        eng_camp_add(&c->camp, eng_arch_find(&c->arch, "grunt"), -12.0F, -12.0F, face, patrol, 2) &&
+        eng_camp_add(&c->camp, eng_arch_find(&c->arch, "brute"), -14.0F, -10.0F, face, NULL, 0) &&
+        eng_camp_add(&c->camp, eng_arch_find(&c->arch, "archer"), -18.0F, -12.0F, face, NULL, 0) &&
+        eng_camp_spawn(&c->camp, &c->group, &c->sim, FIRST_ENEMY);
+    if (!ok) {
+        ENG_LOG_ERROR(
+            "combat : création du camp impossible (archétypes grunt/brute/archer requis)");
+        play_combat_destroy(c);
+        return NULL;
+    }
+    eng_particles_init(&c->particles, 12345U);
+    eng_dmgnum_init(&c->numbers);
+    if (audio && eng_mixer_init(&c->mixer, 48000U) && eng_combat_audio_init(&c->audio, &c->mixer)) {
+        c->device = eng_audio_device_open(&c->mixer);
+        if (c->device == NULL) {
+            ENG_LOG_WARN("combat : périphérique audio indisponible, combat silencieux");
+        }
+    }
+    c->ready = true;
+    ENG_LOG_INFO("combat : clic gauche = légère, clic droit = lourde, Ctrl = esquive, E maintenu = "
+                 "garde (pression au bon moment = parade), A (AZERTY) / Q (QWERTY) = verrouillage "
+                 "; mannequin en (4, -1), "
+                 "camp de 3 ennemis vers (-14, -11)");
+    return c;
+}
+
+void play_combat_destroy(PlayCombat *c)
+{
+    if (c == NULL) {
+        return;
+    }
+    eng_audio_device_close(c->device);
+    c->device = NULL;
+    eng_arena_shutdown(&c->scratch);
+    c->ready = false;
+}
+
+static void poll_attacks(PlayCombat *c, double now)
+{
+    if (!c->file_ok) {
+        return;
+    }
+    eng_arena_reset(&c->scratch);
+    if (!eng_attackfile_poll(&c->file, &c->scratch, now)) {
+        return;
+    }
+    char err[256];
+    if (!eng_arch_validate(&c->arch, &c->file.set, err, sizeof err)) {
+        ENG_LOG_WARN("combat : nouvelle version refusée (%s), l'ancienne reste", err);
+        return;
+    }
+    for (uint32_t i = 0; i < c->sim.count; i++) { /* une attaque en cours garde un indice valide */
+        if (c->sim.fighters[i].fsm.state == ENG_CS_ATTACK) {
+            ENG_LOG_INFO("combat : rechargement différé (attaque en cours)");
+            return;
+        }
+    }
+    c->attacks = c->file.set;
+    c->attacks_version = c->file.version;
+    ENG_LOG_INFO("combat : attaques rechargées (version %u)", c->attacks_version);
+}
+
+void play_combat_tick(PlayCombat *c, const EngInputState *input, const float feet[3], float facing,
+                      const float move_dir[2], float camera_yaw, double now_seconds,
+                      PlayCombatStep *out)
+{
+    if (out != NULL) {
+        memset(out, 0, sizeof *out);
+    }
+    if (c == NULL || !c->ready || input == NULL || feet == NULL || move_dir == NULL ||
+        out == NULL) {
+        return;
+    }
+    if (c->sim.tick % 30U == 0U) {
+        poll_attacks(c, now_seconds);
+    }
+    EngFighter *pf = &c->sim.fighters[PLAYER];
+    /* le joueur : position du personnage physique */
+    (void)eng_sim_place(&c->sim, PLAYER, feet[0], feet[2], facing);
+    const float player_xz[2] = {feet[0], feet[2]};
+
+    /* verrouillage */
+    EngLockCandidate cand[FIGHTERS];
+    for (uint32_t i = 0; i < FIGHTERS; i++) {
+        cand[i].pos[0] = c->sim.bodies[i].pos[0];
+        cand[i].pos[1] = c->sim.bodies[i].pos[1];
+        cand[i].alive = !c->sim.fighters[i].vitals.dead;
+    }
+    if (eng_action_pressed(input, ENG_ACTION_LOCK_ON)) {
+        c->lock = c->lock >= 0
+                      ? -1
+                      : eng_lockon_acquire(player_xz, camera_yaw, cand, FIGHTERS, (int32_t)PLAYER);
+    }
+    if (c->lock >= 0 && !eng_lockon_valid(player_xz, cand, FIGHTERS, c->lock)) {
+        c->lock = -1;
+    }
+
+    EngFighterInput in[FIGHTERS];
+    memset(in, 0, sizeof in);
+    if (!pf->vitals.dead) {
+        in[PLAYER].light = eng_action_pressed(input, ENG_ACTION_ATTACK);
+        in[PLAYER].heavy = eng_action_pressed(input, ENG_ACTION_HEAVY_ATTACK);
+        in[PLAYER].dodge = eng_action_pressed(input, ENG_ACTION_DODGE);
+        in[PLAYER].block_pressed = eng_action_pressed(input, ENG_ACTION_INTERACT);
+        in[PLAYER].block_held = eng_action_held(input, ENG_ACTION_INTERACT);
+        const float len = sqrtf(move_dir[0] * move_dir[0] + move_dir[1] * move_dir[1]);
+        if (len > 0.1F) {
+            in[PLAYER].move_dir[0] = move_dir[0] / len;
+            in[PLAYER].move_dir[1] = move_dir[1] / len;
+        }
+        /* la simulation ne déplace pas le joueur (moving = false) : c'est le personnage physique */
+        if ((in[PLAYER].light || in[PLAYER].heavy) && c->lock >= 0) {
+            const float dx = c->sim.bodies[c->lock].pos[0] - player_xz[0];
+            const float dz = c->sim.bodies[c->lock].pos[1] - player_xz[1];
+            if (dx * dx + dz * dz > 1e-6F) {
+                out->face = true;
+                out->facing = atan2f(-dx, -dz);
+                c->sim.bodies[PLAYER].yaw = out->facing;
+                c->sim.bodies[PLAYER].prev_yaw = out->facing;
+                pf->yaw = out->facing;
+            }
+        }
+    }
+    eng_dummy_tick(&c->dummy, &c->sim, &in[DUMMY]);
+    const bool moving = (move_dir[0] * move_dir[0] + move_dir[1] * move_dir[1]) > 0.01F;
+    const bool attacking = pf->fsm.state == ENG_CS_ATTACK;
+    eng_aig_tick(&c->group, &c->sim, attacking ? 12.0F : (moving ? 8.0F : 0.0F), in);
+
+    const float before[2] = {c->sim.bodies[PLAYER].pos[0], c->sim.bodies[PLAYER].pos[1]};
+    eng_sim_step(&c->sim, in);
+    /* le mannequin est un poteau : ni recul ni poussée */
+    (void)eng_sim_place(&c->sim, DUMMY, DUMMY_X, DUMMY_Z, c->sim.bodies[DUMMY].yaw);
+    out->push[0] = c->sim.bodies[PLAYER].pos[0] - before[0];
+    out->push[1] = c->sim.bodies[PLAYER].pos[1] - before[1];
+    const float push_len = hypotf(out->push[0], out->push[1]);
+    if (push_len > MAX_PUSH) { /* recul d'un coup lourd au plus ; jamais un saut de téléportation */
+        out->push[0] *= MAX_PUSH / push_len;
+        out->push[1] *= MAX_PUSH / push_len;
+    }
+    const EngCombatState st = pf->fsm.state;
+    out->locked = st == ENG_CS_ATTACK || st == ENG_CS_DODGE || st == ENG_CS_HITSTUN ||
+                  st == ENG_CS_STAGGER || st == ENG_CS_DEAD || st == ENG_CS_PARRY;
+
+    /* retours : particules, son, mesures */
+    for (uint32_t k = 0; k < c->sim.event_count; k++) {
+        const EngSimEvent *e = &c->sim.events[k];
+        (void)eng_vfx_on_event(&c->particles, e);
+        (void)eng_dmgnum_spawn(&c->numbers, e);
+        if (c->device != NULL) {
+            eng_audio_device_lock(c->device);
+            (void)eng_combat_audio_on_event(&c->audio, e, player_xz, facing);
+            eng_audio_device_unlock(c->device);
+        }
+        if (e->defender == PLAYER && e->kind != ENG_HITKIND_IGNORED) {
+            c->stats.player_hits_taken++;
+        }
+    }
+    eng_particles_update(&c->particles);
+    eng_dmgnum_update(&c->numbers);
+    for (uint32_t i = FIRST_ENEMY; i < FIGHTERS; i++) {
+        const bool dead = c->sim.fighters[i].vitals.dead;
+        if (dead && !c->was_dead[i]) {
+            c->stats.enemy_kills++;
+            const uint32_t xp = eng_prog_kill_xp(c->sim.fighters[i].vitals.max_hp);
+            if (eng_prog_add_xp(&c->progress, xp) > 0U) {
+                apply_progress(c, true); /* montée de niveau : soins complets */
+                c->levelup_ticks = 180U;
+                ENG_LOG_INFO("progression : niveau %u (%u XP au total)", c->progress.level,
+                             c->progress.total_xp);
+            }
+        }
+        c->was_dead[i] = dead;
+    }
+    uint32_t engaged = 0;
+    for (uint32_t i = 0; i < c->group.count; i++) {
+        engaged += c->group.agents[i].state == ENG_AI_ENGAGE ? 1U : 0U;
+    }
+    const uint32_t att = eng_aig_attackers(&c->group, &c->sim);
+    if (att > c->stats.max_attackers) {
+        c->stats.max_attackers = att;
+    }
+    if (engaged > c->stats.enemies_engaged) {
+        c->stats.enemies_engaged = engaged;
+    }
+
+    /* mort du joueur : renaissance et camp remis à neuf ; camp vaincu : réapparition */
+    if (pf->vitals.dead) {
+        if (++c->dead_ticks >= RESPAWN_TICKS) {
+            const EngFighterParams p = pf->params;
+            eng_fighter_init(pf, &p);
+            apply_progress(c, true); /* la renaissance garde le niveau */
+            c->dead_ticks = 0;
+            spawn_all(c);
+            ENG_LOG_INFO("combat : le joueur renaît, le camp est remis à neuf");
+        }
+    }
+    if (eng_camp_cleared(&c->group, &c->sim)) {
+        if (++c->cleared_ticks >= CAMP_RESPAWN_TICKS) {
+            c->cleared_ticks = 0;
+            spawn_all(c);
+            ENG_LOG_INFO("combat : camp vaincu, il réapparaît");
+        }
+    } else {
+        c->cleared_ticks = 0;
+    }
+    if (c->levelup_ticks > 0U) {
+        c->levelup_ticks--;
+    }
+    c->stats.level = c->progress.level;
+    c->stats.total_xp = c->progress.total_xp;
+    c->stats.tick = c->sim.tick;
+    c->stats.dummy_damage = c->dummy.total_damage;
+    c->stats.player_hp = pf->vitals.hp;
+    c->stats.lock_target = c->lock;
+    c->stats.attacks_version = c->attacks_version;
+    c->stats.audio_callbacks = c->device != NULL ? eng_audio_device_callbacks(c->device) : 0U;
+}
+
+static void bar(EngDebugLines *lines, const float p[2], float y, float frac, float width,
+                EngDebugColor col)
+{
+    frac = frac < 0.0F ? 0.0F : (frac > 1.0F ? 1.0F : frac);
+    const vec3 a = {p[0] - width * 0.5F, y, p[1]};
+    const vec3 b = {p[0] + width * 0.5F, y, p[1]};
+    const vec3 m = {a[0] + width * frac, y, p[1]};
+    (void)eng_debug_line(lines, a, b, ENG_DEBUG_GRAY);
+    if (frac > 0.0F) {
+        const vec3 a2 = {a[0], y + 0.03F, p[1]};
+        const vec3 m2 = {m[0], y + 0.03F, p[1]};
+        (void)eng_debug_line(lines, a2, m2, col);
+    }
+}
+
+static void shift(EngDebugLines *lines, uint32_t depth_from, uint32_t overlay_from, float dy)
+{
+    for (uint32_t i = depth_from; i < lines->depth_count; i++) {
+        lines->depth[i].position[1] += dy;
+    }
+    for (uint32_t i = overlay_from; i < lines->overlay_count; i++) {
+        lines->overlay[i].position[1] += dy;
+    }
+}
+
+void play_combat_draw(const PlayCombat *c, EngDebugLines *lines, const PlayMode *play)
+{
+    if (c == NULL || !c->ready || lines == NULL) {
+        return;
+    }
+    for (uint32_t i = 0; i < c->sim.count; i++) {
+        const EngFighter *f = &c->sim.fighters[i];
+        const EngSimBody *b = &c->sim.bodies[i];
+        const uint32_t d0 = lines->depth_count;
+        const uint32_t o0 = lines->overlay_count;
+        if (f->vitals.dead) {
+            const vec3 a = {b->pos[0] - 0.5F, 0.05F, b->pos[1]};
+            const vec3 e = {b->pos[0] + 0.5F, 0.05F, b->pos[1]};
+            (void)eng_debug_line(lines, a, e, ENG_DEBUG_GRAY);
+        } else {
+            if (i != PLAYER) { /* le joueur a déjà sa capsule physique */
+                EngCapsule box[ENG_SIM_HURTBOXES];
+                EngHitZone zones[ENG_SIM_HURTBOXES];
+                eng_sim_hurtboxes(b, false, box, zones);
+                const bool touchable = eng_fighter_hittable(f);
+                for (uint32_t k = 0; k < ENG_SIM_HURTBOXES; k++) {
+                    (void)eng_capsule_debug_draw(
+                        lines, &box[k], touchable ? eng_zone_color(zones[k]) : ENG_DEBUG_GRAY);
+                }
+            }
+            if (f->fsm.state == ENG_CS_ATTACK) {
+                /* arme : orange pendant l'anticipation d'un ennemi, rouge quand elle peut toucher
+                 */
+                const bool active = eng_fighter_hitboxes_active(f, c->sim.attacks);
+                if (active || i >= FIRST_ENEMY) {
+                    EngCapsule w[ENG_ATTACK_MAX_HITBOXES];
+                    const uint32_t nw =
+                        eng_sim_weapons(b, false, eng_fighter_attack(f, c->sim.attacks), w);
+                    for (uint32_t k = 0; k < nw; k++) {
+                        (void)eng_capsule_debug_draw(
+                            lines, &w[k], active ? ENG_DEBUG_RED : ENG_DEBUG_RGB(255, 150, 30));
+                    }
+                }
+            }
+            bar(lines, b->pos, 2.15F, f->vitals.hp / f->vitals.max_hp, 0.9F, ENG_DEBUG_GREEN);
+            bar(lines, b->pos, 2.05F, f->posture / f->params.max_posture, 0.9F, ENG_DEBUG_YELLOW);
+            if ((int32_t)i == c->lock) {
+                const vec3 ctr = {b->pos[0], 0.05F, b->pos[1]};
+                const vec3 u = {0.7F, 0, 0};
+                const vec3 v = {0, 0, 0.7F};
+                (void)eng_debug_circle(lines, ctr, u, v, ENG_DEBUG_MAGENTA, 24);
+            }
+        }
+        shift(lines, d0, o0, play_mode_ground(play, b->pos[0], b->pos[1]));
+    }
+    /* cônes de l'IA et particules : posés à la hauteur du sol sous le joueur (approximation) */
+    const uint32_t d0 = lines->depth_count;
+    const uint32_t o0 = lines->overlay_count;
+    (void)eng_aidbg_draw(&c->group, &c->sim, -1, lines);
+    (void)eng_particles_draw_debug(&c->particles, lines);
+    shift(lines, d0, o0,
+          play_mode_ground(play, c->sim.bodies[PLAYER].pos[0], c->sim.bodies[PLAYER].pos[1]));
+}
+
+void play_combat_reset(PlayCombat *c)
+{
+    if (c == NULL || !c->ready) {
+        return;
+    }
+    EngFighter *pf = &c->sim.fighters[PLAYER];
+    const EngFighterParams p = pf->params;
+    const float max_hp = pf->vitals.max_hp;
+    eng_fighter_init(pf, &p);
+    pf->vitals.max_hp = max_hp;
+    pf->vitals.hp = max_hp;
+    EngFighter *df = &c->sim.fighters[DUMMY];
+    const EngFighterParams dp = df->params;
+    eng_fighter_init(df, &dp);
+    df->vitals.max_hp = 1000.0F;
+    df->vitals.hp = 1000.0F;
+    spawn_all(c);
+    c->lock = -1;
+    c->dead_ticks = 0;
+    c->cleared_ticks = 0;
+    eng_dmgnum_init(&c->numbers);
+    eng_particles_init(&c->particles, 12345U);
+    memset(c->was_dead, 0, sizeof c->was_dead);
+    eng_prog_init(&c->progress); /* nouvelle partie : niveau 1 */
+    c->levelup_ticks = 0;
+    apply_progress(c, true);
+}
+
+void play_combat_snapshot(const PlayCombat *c, EngSaveGame *s)
+{
+    if (c == NULL || s == NULL || !c->ready) {
+        return;
+    }
+    const EngFighter *pf = &c->sim.fighters[PLAYER];
+    s->hp = pf->vitals.hp;
+    s->hp_max = pf->vitals.max_hp;
+    s->stamina = pf->stamina;
+    s->posture = pf->posture;
+    s->has_progress = true;
+    s->progress = c->progress;
+    s->has_enemies = true;
+    s->enemy_count = c->group.count < ENG_SAVE_MAX_ENEMIES ? c->group.count : ENG_SAVE_MAX_ENEMIES;
+    for (uint32_t i = 0; i < s->enemy_count; i++) {
+        const uint32_t f = c->group.agents[i].fighter;
+        s->enemies[i].alive = !c->sim.fighters[f].vitals.dead;
+        s->enemies[i].hp = c->sim.fighters[f].vitals.hp;
+        s->enemies[i].pos[0] = c->sim.bodies[f].pos[0];
+        s->enemies[i].pos[1] = c->sim.bodies[f].pos[1];
+        s->enemies[i].yaw = c->sim.bodies[f].yaw;
+    }
+}
+
+void play_combat_restore(PlayCombat *c, const EngSaveGame *s)
+{
+    if (c == NULL || s == NULL || !c->ready) {
+        return;
+    }
+    play_combat_reset(c);
+    EngFighter *pf = &c->sim.fighters[PLAYER];
+    if (s->has_progress && eng_prog_valid(&s->progress)) {
+        c->progress = s->progress;
+        apply_progress(c, false);
+    }
+    pf->vitals.max_hp = s->hp_max;
+    pf->vitals.hp = s->hp > s->hp_max ? s->hp_max : s->hp;
+    pf->stamina = s->stamina;
+    pf->posture = s->posture;
+    if (!s->has_enemies) {
+        return; /* sauvegarde v1 : le camp repart de son état initial */
+    }
+    for (uint32_t i = 0; i < s->enemy_count && i < c->group.count; i++) {
+        const uint32_t f = c->group.agents[i].fighter;
+        EngFighter *ef = &c->sim.fighters[f];
+        (void)eng_sim_place(&c->sim, f, s->enemies[i].pos[0], s->enemies[i].pos[1],
+                            s->enemies[i].yaw);
+        if (s->enemies[i].alive) {
+            ef->vitals.hp = s->enemies[i].hp > 0.0F ? s->enemies[i].hp : 1.0F;
+        } else {
+            ef->vitals.hp = 0.0F;
+            ef->vitals.dead = true;
+            ef->fsm.state = ENG_CS_DEAD;
+            c->was_dead[f] = true;
+        }
+    }
+}
+
+void play_combat_apply_options(PlayCombat *c, const EngGameOptions *o)
+{
+    if (c == NULL || o == NULL || !c->ready) {
+        return;
+    }
+    if (c->device != NULL) {
+        eng_audio_device_lock(c->device);
+    }
+    c->mixer.master = o->master;
+    for (uint32_t b = 0; b < ENG_BUS_COUNT; b++) {
+        (void)eng_mixer_set_bus(&c->mixer, (EngAudioBus)b, o->volume[b]);
+    }
+    if (c->device != NULL) {
+        eng_audio_device_unlock(c->device);
+    }
+}
+
+static bool project(mat4 view_proj, const float p[3], int w, int h, float *sx, float *sy)
+{
+    vec4 v = {p[0], p[1], p[2], 1.0F};
+    vec4 clip;
+    glm_mat4_mulv(view_proj, v, clip);
+    if (clip[3] <= 0.05F) {
+        return false;
+    }
+    const float nx = clip[0] / clip[3];
+    const float ny = clip[1] / clip[3];
+    if (nx < -1.2F || nx > 1.2F || ny < -1.2F || ny > 1.2F) {
+        return false;
+    }
+    *sx = (nx * 0.5F + 0.5F) * (float)w;
+    *sy = (0.5F - ny * 0.5F) * (float)h;
+    return true;
+}
+
+void play_combat_fill_hud(const PlayCombat *c, const PlayMode *play, mat4 view_proj, int w, int h,
+                          EngHud *hud)
+{
+    if (c == NULL || hud == NULL || !c->ready) {
+        return;
+    }
+    const EngFighter *pf = &c->sim.fighters[PLAYER];
+    hud->hp = pf->vitals.hp;
+    hud->hp_max = pf->vitals.max_hp;
+    hud->stamina = pf->stamina;
+    hud->stamina_max = pf->params.max_stamina;
+    hud->posture = pf->posture;
+    hud->posture_max = pf->params.max_posture;
+    hud->level = c->progress.level;
+    {
+        const uint32_t need = eng_prog_need(c->progress.level);
+        hud->xp_frac = need > 0U ? (float)c->progress.xp / (float)need : 1.0F;
+    }
+    hud->has_target = c->lock >= 0;
+    if (hud->has_target) {
+        const EngFighter *tf = &c->sim.fighters[c->lock];
+        const char *name = "Mannequin";
+        for (uint32_t i = 0; i < c->group.count; i++) {
+            if (c->group.agents[i].fighter == (uint32_t)c->lock) {
+                name = c->arch.a[c->group.agents[i].arch].name;
+            }
+        }
+        (void)snprintf(hud->target_name, sizeof hud->target_name, "%s", name);
+        hud->target_hp = tf->vitals.hp;
+        hud->target_hp_max = tf->vitals.max_hp;
+        hud->target_posture = tf->posture;
+        hud->target_posture_max = tf->params.max_posture;
+    }
+    hud->number_count = 0;
+    for (uint32_t i = 0; i < ENG_DMGNUM_MAX && hud->number_count < ENG_HUD_NUMBERS; i++) {
+        const EngDamageNumber *d = &c->numbers.items[i];
+        if (!d->active) {
+            continue;
+        }
+        const float ground = play_mode_ground(play, d->pos[0], d->pos[2]);
+        const float p[3] = {d->pos[0], d->pos[1] + ground + 0.4F, d->pos[2]};
+        EngHudNumber *n = &hud->numbers[hud->number_count];
+        if (!project(view_proj, p, w, h, &n->x, &n->y) ||
+            !eng_dmgnum_text(d, n->text, sizeof n->text)) {
+            continue;
+        }
+        n->alpha = eng_dmgnum_alpha(d);
+        n->to_player = false;
+        hud->number_count++;
+    }
+    if (pf->vitals.dead) {
+        (void)snprintf(hud->message, sizeof hud->message, "%s",
+                       "Tu es tombé... renaissance dans un instant");
+    } else if (c->levelup_ticks > 0U) {
+        (void)snprintf(hud->message, sizeof hud->message, "Niveau %u !", c->progress.level);
+    } else if (eng_camp_cleared(&c->group, &c->sim)) {
+        (void)snprintf(hud->message, sizeof hud->message, "%s", "Camp vaincu !");
+    } else {
+        hud->message[0] = '\0';
+    }
+}
+
+void play_combat_stats(const PlayCombat *c, PlayCombatStats *out)
+{
+    if (c != NULL && out != NULL) {
+        *out = c->stats;
+    }
+}
+
+void play_combat_autopilot(PlayCombat *c, const float feet[3], float camera_yaw, uint32_t tick,
+                           EngInputState *in)
+{
+    if (c == NULL || !c->ready || feet == NULL || in == NULL) {
+        return;
+    }
+    memset(in, 0, sizeof *in);
+    if (c->lock < 0 || c->sim.fighters[c->lock].vitals.dead || c->lock == (int32_t)DUMMY) {
+        float best = 1e9F;
+        c->lock = -1;
+        for (uint32_t k = FIRST_ENEMY; k < FIGHTERS; k++) {
+            const float d =
+                hypotf(c->sim.bodies[k].pos[0] - feet[0], c->sim.bodies[k].pos[1] - feet[2]);
+            if (!c->sim.fighters[k].vitals.dead && d < best) {
+                best = d;
+                c->lock = (int32_t)k;
+            }
+        }
+    }
+    if (c->lock < 0) {
+        return;
+    }
+    const float dx = c->sim.bodies[c->lock].pos[0] - feet[0];
+    const float dz = c->sim.bodies[c->lock].pos[1] - feet[2];
+    const float d = hypotf(dx, dz);
+    if (d > 1.4F) {
+        const float fx = -sinf(camera_yaw);
+        const float fz = -cosf(camera_yaw);
+        const float rx = cosf(camera_yaw);
+        const float rz = -sinf(camera_yaw);
+        in->axis[ENG_AXIS_MOVE] = (EngAxisValue){(dx * rx + dz * rz) / d, (dx * fx + dz * fz) / d};
+    } else if ((tick % 24U) == 0U) {
+        in->pressed |= 1U << ENG_ACTION_ATTACK;
+    }
+    if (c->sim.fighters[PLAYER].stamina < 20.0F && (tick % 90U) == 0U) {
+        in->pressed |= 1U << ENG_ACTION_DODGE; /* recule quand il est à bout de souffle */
+    }
+    in->held |= in->pressed;
+}
+
+/* ── Autotest ── */
+
+typedef struct CombatTest {
+    PlayMode play;
+    bool ok;
+    int checks;
+} CombatTest;
+
+static void check(CombatTest *t, bool cond, const char *what, float value)
+{
+    t->checks++;
+    if (cond) {
+        ENG_LOG_INFO("  ok     %-58s %8.3f", what, (double)value);
+    } else {
+        ENG_LOG_ERROR("  ÉCHEC  %-58s %8.3f", what, (double)value);
+        t->ok = false;
+    }
+}
+
+static void step(CombatTest *t, uint32_t pressed, uint32_t held, float mx, float my)
+{
+    EngInputState in;
+    memset(&in, 0, sizeof in);
+    in.pressed = pressed;
+    in.held = held | pressed;
+    in.axis[ENG_AXIS_MOVE] = (EngAxisValue){mx, my};
+    play_mode_tick(&t->play, &in, 1.0F / 60.0F);
+}
+
+static void put(CombatTest *t, float x, float z, float yaw)
+{
+    const float feet[3] = {x, PLAY_GROUND_TOP + 0.05F, z};
+    (void)eng_character_teleport(t->play.character, feet);
+    const float pivot[3] = {x, feet[1] + PLAY_PIVOT_HEIGHT, z};
+    (void)eng_orbit_camera_init(&t->play.orbit, pivot, yaw, -0.25F, ENG_ORBIT_DISTANCE_DEFAULT);
+    (void)eng_locomotion_init(&t->play.loco, yaw);
+    for (int i = 0; i < 30; i++) {
+        step(t, 0, 0, 0.0F, 0.0F);
+    }
+}
+
+bool play_combat_selftest(void)
+{
+    static CombatTest t;
+    memset(&t, 0, sizeof t);
+    t.ok = true;
+    if (!play_mode_init(&t.play, NULL, 1.0F, false) || !play_mode_enable_combat(&t.play, false)) {
+        ENG_LOG_ERROR("AUTOTEST COMBAT : ÉCHEC (initialisation ; Jolt requis)");
+        play_mode_shutdown(&t.play);
+        return false;
+    }
+    PlayCombat *c = t.play.combat;
+    c->sim.fighters[PLAYER].vitals.max_hp = 2000.0F;
+    c->sim.fighters[PLAYER].vitals.hp = 2000.0F;
+    const uint32_t atk = 1U << ENG_ACTION_ATTACK;
+    PlayCombatStats s;
+
+    /* 1. mannequin : 1,3 m devant, attaques répétées */
+    put(&t, 4.0F, 0.3F, 0.0F);
+    for (int i = 0; i < 300; i++) {
+        step(&t, (i % 30) == 0 ? atk : 0U, 0U, 0.0F, 0.0F);
+    }
+    play_combat_stats(c, &s);
+    check(&t, s.dummy_damage >= 50.0F, "mannequin : dégâts reçus (10 coups légers)",
+          s.dummy_damage);
+    check(&t, c->dummy.hits_taken >= 5U, "mannequin : coups comptés", (float)c->dummy.hits_taken);
+
+    /* 2. verrouillage sur le mannequin (caméra vers -Z) */
+    step(&t, 1U << ENG_ACTION_LOCK_ON, 0U, 0.0F, 0.0F);
+    play_combat_stats(c, &s);
+    check(&t, s.lock_target == (int32_t)DUMMY, "verrouillage : cible = mannequin",
+          (float)s.lock_target);
+    step(&t, 1U << ENG_ACTION_LOCK_ON, 0U, 0.0F, 0.0F);
+    play_combat_stats(c, &s);
+    check(&t, s.lock_target == -1, "verrouillage : relâché", (float)s.lock_target);
+
+    /* 3. esquive : sans direction = pas en arrière, déplace le personnage */
+    put(&t, 4.0F, 3.0F, 0.0F);
+    for (int i = 0; i < 240; i++) { /* l'endurance revient (1 s d'attente puis 25/s) */
+        step(&t, 0U, 0U, 0.0F, 0.0F);
+    }
+    float before[3];
+    (void)eng_character_position(t.play.character, before);
+    step(&t, 1U << ENG_ACTION_DODGE, 0U, 0.0F, 0.0F);
+    bool dodging = false;
+    for (int i = 0; i < 30; i++) {
+        dodging = dodging || c->sim.fighters[PLAYER].fsm.state == ENG_CS_DODGE;
+        step(&t, 0U, 0U, 0.0F, 0.0F);
+    }
+    float after[3];
+    (void)eng_character_position(t.play.character, after);
+    const float moved = hypotf(after[0] - before[0], after[2] - before[2]);
+    check(&t, dodging, "esquive : état Dodge atteint", dodging ? 1.0F : 0.0F);
+    check(&t, moved > 1.5F && after[2] > before[2], "esquive : recul du personnage (m)", moved);
+
+    /* 4. camp : le joueur s'approche et garde ; les ennemis viennent, 2 attaquants au plus */
+    put(&t, -9.0F, -5.0F, 2.3561945F - 3.14159265F);
+    const uint32_t block = 1U << ENG_ACTION_INTERACT;
+    step(&t, block, 0U, 0.0F, 0.0F);
+    for (int i = 0; i < 1500; i++) {
+        step(&t, 0U, block, 0.0F, 0.0F);
+    }
+    play_combat_stats(c, &s);
+    check(&t, s.enemies_engaged >= 1U, "camp : ennemis engagés (maximum simultané)",
+          (float)s.enemies_engaged);
+    check(&t, s.max_attackers <= 2U, "camp : attaquants simultanés (<= 2)", (float)s.max_attackers);
+    check(&t, s.player_hits_taken >= 1U, "camp : coups reçus par le joueur",
+          (float)s.player_hits_taken);
+
+    /* 5. combat : verrouillage + attaques jusqu'à au moins une victoire */
+    for (int i = 0; i < 6000 && s.enemy_kills == 0U; i++) {
+        uint32_t pressed = 0U;
+        if (c->lock < 0 || c->sim.fighters[c->lock].vitals.dead || c->lock == (int32_t)DUMMY) {
+            float best = 1e9F; /* l'automate vise l'ennemi vivant le plus proche */
+            c->lock = -1;
+            for (uint32_t k = FIRST_ENEMY; k < FIGHTERS; k++) {
+                const float d = hypotf(c->sim.bodies[k].pos[0] - c->sim.bodies[PLAYER].pos[0],
+                                       c->sim.bodies[k].pos[1] - c->sim.bodies[PLAYER].pos[1]);
+                if (!c->sim.fighters[k].vitals.dead && d < best) {
+                    best = d;
+                    c->lock = (int32_t)k;
+                }
+            }
+        }
+        float mx = 0.0F;
+        float my = 0.0F;
+        if (c->lock >= 0) {
+            const float dx = c->sim.bodies[c->lock].pos[0] - c->sim.bodies[PLAYER].pos[0];
+            const float dz = c->sim.bodies[c->lock].pos[1] - c->sim.bodies[PLAYER].pos[1];
+            const float d = hypotf(dx, dz);
+            if (d > 1.4F) { /* avance vers la cible (axe de déplacement relatif à la caméra) */
+                const float cy = t.play.orbit.yaw;
+                const float fx = -sinf(cy);
+                const float fz = -cosf(cy);
+                const float rx = cosf(cy);
+                const float rz = -sinf(cy);
+                my = (dx * fx + dz * fz) / d;
+                mx = (dx * rx + dz * rz) / d;
+            } else if ((i % 24) == 0) {
+                pressed |= atk;
+            }
+        }
+        step(&t, pressed, 0U, mx, my);
+        play_combat_stats(c, &s);
+    }
+    check(&t, s.enemy_kills >= 1U, "combat : ennemis vaincus", (float)s.enemy_kills);
+    check(&t, s.total_xp >= 10U * s.enemy_kills, "progression : XP gagnée sur les ennemis",
+          (float)s.total_xp);
+    check(&t, s.max_attackers <= 2U, "combat : attaquants simultanés (<= 2)",
+          (float)s.max_attackers);
+    check(&t, s.attacks_version >= 1U || !c->file_ok, "données : version des attaques chargée",
+          (float)s.attacks_version);
+    ENG_LOG_INFO("AUTOTEST COMBAT : %s (%d mesures, %u ticks)", t.ok ? "OK" : "ÉCHEC", t.checks,
+                 s.tick);
+    play_mode_shutdown(&t.play);
+    return t.ok;
+}

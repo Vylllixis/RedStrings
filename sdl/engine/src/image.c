@@ -57,10 +57,83 @@ bool eng_image_load(EngArena *scratch, const char *path, EngImage *out)
     return ok;
 }
 
+bool eng_image_create(uint32_t width, uint32_t height, const uint8_t *rgba, EngImage *out)
+{
+    *out = (EngImage){0};
+    if (width == 0 || height == 0 || width > ENG_IMAGE_MAX_SIZE || height > ENG_IMAGE_MAX_SIZE) {
+        ENG_LOG_ERROR("image : dimensions hors limites (%u x %u, maximum %u)", width, height,
+                      ENG_IMAGE_MAX_SIZE);
+        return false;
+    }
+    const size_t bytes = (size_t)width * height * 4U;
+    uint8_t *pixels = SDL_malloc(bytes);
+    if (pixels == NULL) {
+        ENG_LOG_ERROR("image : mémoire insuffisante (%zu octets)", bytes);
+        return false;
+    }
+    if (rgba != NULL) {
+        memcpy(pixels, rgba, bytes);
+    } else {
+        memset(pixels, 0, bytes);
+    }
+    out->width = width;
+    out->height = height;
+    out->pixels = pixels;
+    out->sdl_owned = true;
+    return true;
+}
+
+size_t eng_image_encoded_chain_size(uint32_t width, uint32_t height, uint32_t levels)
+{
+    if (width == 0 || height == 0 || levels == 0 || levels > eng_image_mip_count(width, height)) {
+        return 0;
+    }
+    size_t total = 0;
+    for (uint32_t level = 0; level < levels; level++) {
+        uint32_t w = 0;
+        uint32_t h = 0;
+        eng_image_mip_size(width, height, level, &w, &h);
+        total += (((size_t)w + 3U) / 4U) * (((size_t)h + 3U) / 4U) * 16U;
+    }
+    return total;
+}
+
+bool eng_image_create_encoded(uint32_t width, uint32_t height, EngImageEncoding encoding,
+                              uint32_t levels, const uint8_t *chain, size_t chain_bytes,
+                              EngImage *out)
+{
+    *out = (EngImage){0};
+    const size_t expected = eng_image_encoded_chain_size(width, height, levels);
+    if ((encoding != ENG_IMAGE_BC7 && encoding != ENG_IMAGE_BC7_SRGB) || chain == NULL ||
+        width > ENG_IMAGE_MAX_SIZE || height > ENG_IMAGE_MAX_SIZE || expected == 0 ||
+        chain_bytes != expected) {
+        ENG_LOG_ERROR("image : chaîne compressée invalide (%u x %u, %u niveaux, %zu octets)", width,
+                      height, levels, chain_bytes);
+        return false;
+    }
+    uint8_t *pixels = SDL_malloc(expected);
+    if (pixels == NULL) {
+        ENG_LOG_ERROR("image : mémoire insuffisante (%zu octets)", expected);
+        return false;
+    }
+    memcpy(pixels, chain, expected);
+    out->width = width;
+    out->height = height;
+    out->pixels = pixels;
+    out->sdl_owned = true;
+    out->encoding = encoding;
+    out->mip_count = levels;
+    return true;
+}
+
 void eng_image_free(EngImage *image)
 {
     if (image->pixels != NULL) {
-        stbi_image_free(image->pixels);
+        if (image->sdl_owned) {
+            SDL_free(image->pixels);
+        } else {
+            stbi_image_free(image->pixels);
+        }
     }
     *image = (EngImage){0};
 }

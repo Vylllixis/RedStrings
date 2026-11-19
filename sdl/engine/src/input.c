@@ -83,10 +83,21 @@ static void refresh(EngInput *input)
     input->held = now;
 }
 
+/* Mémorise la dernière pression (remappage). Seules les transitions relâché -> pressé comptent. */
+static void note_press(EngInput *input, EngBindKind kind, int code)
+{
+    input->last_serial++;
+    input->last_kind = kind;
+    input->last_code = code;
+}
+
 void eng_input_key(EngInput *input, int scancode, bool down)
 {
     if (scancode < 0 || scancode >= ENG_KEY_CODE_COUNT) {
         return;
+    }
+    if (down && !input->key_down[scancode]) {
+        note_press(input, ENG_BIND_KEY, scancode);
     }
     input->key_down[scancode] = down;
     refresh(input);
@@ -96,6 +107,9 @@ void eng_input_mouse_button(EngInput *input, int button, bool down)
 {
     if (button < 0 || button >= ENG_MOUSE_BUTTON_COUNT) {
         return;
+    }
+    if (down && !input->mouse_down[button]) {
+        note_press(input, ENG_BIND_MOUSE_BUTTON, button);
     }
     input->mouse_down[button] = down;
     refresh(input);
@@ -117,6 +131,9 @@ void eng_input_pad_button(EngInput *input, int button, bool down)
     if (button < 0 || button >= ENG_PAD_BUTTON_COUNT) {
         return;
     }
+    if (down && !input->pad_down[button]) {
+        note_press(input, ENG_BIND_PAD_BUTTON, button);
+    }
     input->pad_down[button] = down;
     refresh(input);
 }
@@ -127,6 +144,11 @@ void eng_input_pad_axis(EngInput *input, int axis, int16_t value)
         return;
     }
     float normalized = value < 0 ? (float)value / 32768.0F : (float)value / 32767.0F;
+    const bool trigger = axis == ENG_PAD_AXIS_LEFT_TRIGGER || axis == ENG_PAD_AXIS_RIGHT_TRIGGER;
+    if (trigger && normalized > ENG_TRIGGER_THRESHOLD &&
+        input->pad_axis[axis] <= ENG_TRIGGER_THRESHOLD) {
+        note_press(input, ENG_BIND_PAD_TRIGGER, axis);
+    }
     input->pad_axis[axis] = normalized;
     refresh(input); /* une gâchette peut être liée à une action */
 }

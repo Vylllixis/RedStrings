@@ -11,10 +11,25 @@
  * Les pixels sont toujours RGBA 8 bits, ligne par ligne, la PREMIÈRE ligne étant le HAUT de
  * l'image (convention des fichiers image) ; une image sans alpha reçoit alpha = 255. */
 
+/* Encodage des pixels. RGBA8 : width * height * 4 octets (le cas général). BC7 (M2-03) : une chaîne
+ * de mipmaps COMPRESSÉE, niveaux consécutifs, chacun en blocs de 4 x 4 texels sur 16 octets
+ * (eng_image_encoded_chain_size) ; le GPU la lit telle quelle. L'espace de couleur est alors fixé
+ * par l'encodage (BC7_SRGB : couleurs ; BC7 : données linéaires). */
+typedef enum EngImageEncoding {
+    ENG_IMAGE_RGBA8 = 0,
+    ENG_IMAGE_BC7,
+    ENG_IMAGE_BC7_SRGB,
+} EngImageEncoding;
+
 typedef struct EngImage {
     uint32_t width;
     uint32_t height;
-    uint8_t *pixels; /* width * height * 4 octets, propriété de l'image (eng_image_free) */
+    uint8_t *pixels; /* RGBA8 : width * height * 4 octets ; sinon la chaîne compressée ;
+                        propriété de l'image (eng_image_free) */
+    bool sdl_owned;  /* alloués par eng_image_create (SDL_malloc) et non par stb_image : usage
+                        interne */
+    EngImageEncoding encoding;
+    uint32_t mip_count; /* encodage compressé : nombre de niveaux de la chaîne ; 0 en RGBA8 */
 } EngImage;
 
 #define ENG_IMAGE_MAX_SIZE 16384U /* côté maximal accepté : au-delà, refusé */
@@ -26,6 +41,24 @@ bool eng_image_decode(const void *data, size_t size, EngImage *out);
 /* Lit puis décode un fichier (chemin relatif à l'exécutable, voir engine/files.h). `scratch`
  * sert à lire le fichier et est restituée dans son état d'origine. */
 bool eng_image_load(EngArena *scratch, const char *path, EngImage *out);
+
+/* Crée une image de `width` x `height` pixels (1 à ENG_IMAGE_MAX_SIZE), copiés depuis `rgba`
+ * (width * height * 4 octets) ; `rgba` NULL : pixels à zéro. Pour les images qui ne viennent pas
+ * d'un décodage (fichiers cuisinés, M2-02). false (journalisé) si une dimension est hors limites ou
+ * si la mémoire manque ; `out` est alors mis à zéro. Se libère avec eng_image_free. */
+bool eng_image_create(uint32_t width, uint32_t height, const uint8_t *rgba, EngImage *out);
+
+/* Octets d'une chaîne BC7 de `levels` niveaux (0 si une dimension est nulle ou si `levels` dépasse
+ * la chaîne complète) : chaque niveau compte ceil(w / 4) * ceil(h / 4) blocs de 16 octets, donc
+ * un niveau de 1 x 1 coûte déjà 16 octets. */
+size_t eng_image_encoded_chain_size(uint32_t width, uint32_t height, uint32_t levels);
+
+/* Crée une image compressée (`encoding` BC7 ou BC7_SRGB) de `levels` niveaux, copiée depuis
+ * `chain` (eng_image_encoded_chain_size(width, height, levels) octets, que `chain_bytes` doit
+ * valoir exactement). false (journalisé) sinon ; `out` est alors mis à zéro. */
+bool eng_image_create_encoded(uint32_t width, uint32_t height, EngImageEncoding encoding,
+                              uint32_t levels, const uint8_t *chain, size_t chain_bytes,
+                              EngImage *out);
 
 /* Libère les pixels. Sans effet sur une image déjà libérée ou nulle. */
 void eng_image_free(EngImage *image);
