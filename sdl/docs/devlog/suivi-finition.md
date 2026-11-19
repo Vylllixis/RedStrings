@@ -11,3 +11,23 @@ RTX 5070 Laptop GPU (8 Go, pilote 580.178.04) + Intel UHD (hybride) ; écran int
 | Tâche | État avant | Ce que j'ai fait | Preuve | État après |
 |---|---|---|---|---|
 | P0-01 Reprise du dépôt | M2 à M9 non commités ; dernière archive (jour/nuit, progression) non extraite ; une archive M8 perdue : la build ne compilait pas | branche `finition-m0-m8` ; archive extraite ; bus du mixeur, son 3D, dernière touche pressée, `play_mode_spawn_point/teleport`, `game_flow.c` dans la build reconstruits d'après `test_game_systems` ; module crash facultatif tant que le patch M9 n'est pas là (Q1) | `cmake --build build/debug` sans avertissement ; ctest Debug : voir P0-02 | fait |
+| P0-02 État des lieux (vrai matériel) | jamais lancé sur un vrai GPU, aucune mesure | builds Debug et Release, ctest dans les deux ; lancement réel piloté (menus, nouvelle partie, marche, attaque, pause, sauvegarde, menu principal, Continuer) ; son enregistré à la sortie PipeWire ; mesures sans vsync de 4 scènes ; benchmark monde | ctest Release 150/150, Debug 150/150 ; captures de la vraie fenêtre (xwd) ; `launcher.log` « partie reprise (version 2, 6 s de jeu) » ; 22 pics sonores aux coups (crête 0,35 à 0,49) ; `docs/devlog/perf-materiel.md`, `perf-world-rtx5070.txt` | fait |
+
+## Phase 0 — ce qui est cassé, laid ou illisible (première liste de bugs)
+
+| # | Constat | Gravité | Suite |
+|---|---|---|---|
+| B1 | Personnage et ennemis = capsules en fil de fer | majeur | M4 (personnage KayKit CC0) |
+| B2 | Image délavée : ciel et sol presque blancs, brouillard qui écrase tout (toutes les scènes) ; chaîne sRGB vérifiée correcte : c'est le réglage (exposition, brouillard) | majeur (laid) | réglage avec M8-07 (jour/nuit) |
+| B3 | Arène de M4 dessinée en fil de fer : on marche sur des marches et une rampe invisibles | moyen | rendre les boîtes de l'arène (M4) |
+| B4 | HUD : police bitmap fine, petite ; heure presque invisible sur le ciel clair | moyen | M8-03 (stb_truetype, ombre/fond) |
+| B5 | 26 allocations dans la boucle de frame en partie interactive (dès l'image 1 : menus ImGui, sauvegarde, reprise) ; 28 au plein écran / redimensionnement | moyen (ADR 0003) | à traiter : préchauffage de l'UI, E/S hors image |
+| B6 | Menus : pas de flèches ni d'Entrée ; Échap quitte le jeu sans confirmation, même en partie | mineur (UX) | M8 (menus) |
+| B7 | Journal « fenêtre ouverte : 2494 x 1531 » en plein écran : taille lue avant la bascule (asynchrone sous X11) ; la swapchain est bien en 2560 x 1600 | mineur | M0 |
+| B8 | M3 : végétation = sphères vertes, rochers = sphères blanches | moyen (laid) | après M4 (assets CC0) |
+| B9 | Démarrage ~5 s : création du périphérique Vulkan 2,8 s, IBL recalculée à chaque lancement 2 s | mineur | à voir (cache IBL) |
+| B10 | Pas de manette sur la machine : non testable ici | — | Théo |
+
+Mesures (détail : `perf-materiel.md`) : M1 avec ombres 694 FPS (1080p) / 365 FPS (2560 x 1600) ;
+M3 1 km² complet 215 / 163 FPS, pire 12,3 ms ; combat 688 / 364 FPS ; combat sur terrain avec herbe
+124 FPS. **Aucun critère 60 FPS n'est menacé** : l'ordre de la phase 1 du prompt reste valable.
