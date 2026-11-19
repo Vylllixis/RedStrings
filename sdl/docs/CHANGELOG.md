@@ -15,6 +15,7 @@ livraisons ; les tags sont posés par Théo après ses tests.
 - Interface : barres de PV / endurance / posture, cible verrouillée, nombres de dégâts.
 - Bus audio (effets, musique, ambiance, interface) et son spatialisé.
 - Post-process dans la passe de tonemapping : FXAA simplifié et bloom en une passe.
+- Cycle jour/nuit : une journée complète dure 20 min réelles par défaut (critère M8-07 ; 24 min avant).
 - Cycle jour / nuit : soleil et ciel suivent l'heure, clair de lune, exposition de nuit, heure au
   HUD et dans la sauvegarde (section TIME) ; `--day-night HEURE`, `--day-length S`.
 - Progression : XP par ennemi vaincu, niveaux 1 à 20 (PV, endurance, dégâts), « Niv. N » et barre

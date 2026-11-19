@@ -18,7 +18,7 @@ void eng_daynight_init(EngDayNight *d, double start_hour)
         return;
     }
     d->hour = isfinite(start_hour) ? wrap_hour(start_hour) : 12.0;
-    d->day_seconds = 1440.0F;
+    d->day_seconds = ENG_DAYNIGHT_DAY_SECONDS;
     d->speed = 1.0F;
     d->max_elevation_deg = 62.0F;
     d->night_exposure_ev = 1.5F;

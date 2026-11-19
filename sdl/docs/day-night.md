@@ -4,8 +4,10 @@ Module : `engine/daynight.h` (fonctions pures, testées dans `tests/test_daynigh
 
 ## Principe
 
-- Une horloge de jeu `EngDayNight.hour` dans [0, 24[. Par défaut 24 h de jeu = 24 min réelles
-  (1 h = 1 min, `day_seconds` = 1440), multipliée par `speed`.
+- Une horloge de jeu `EngDayNight.hour` dans [0, 24[. Par défaut **une journée complète en 20 min
+  réelles** (critère de M8-07 ; 1 h de jeu = 50 s, `day_seconds` = `ENG_DAYNIGHT_DAY_SECONDS` = 1200),
+  multipliée par `speed`. Test : `daynight.a_full_day_lasts_twenty_real_minutes_by_default` (72 000
+  pas de 1/60 s ramènent à la même heure).
 - Le soleil se lève à l'est (+X) à 6 h, culmine au sud (-Z) à midi à 62°, se couche à l'ouest (-X)
   à 18 h ; la nuit il passe sous l'horizon (élévation -62° à minuit). Ce n'est pas un modèle
   astronomique : pas de latitude, pas de saisons, pas de lune visible ni de phases, pas d'étoiles.

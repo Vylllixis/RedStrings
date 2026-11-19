@@ -46,7 +46,7 @@ UTEST(daynight, the_clock_advances_wraps_and_ignores_bad_steps)
 {
     EngDayNight d;
     eng_daynight_init(&d, 23.5);
-    eng_daynight_tick(&d, 60.0); /* 1 min réelle = 1 h de jeu */
+    eng_daynight_tick(&d, 50.0); /* 50 s réelles = 1 h de jeu */
     EXPECT_NEAR(d.hour, 0.5, 1e-9);
     eng_daynight_tick(&d, -5.0);
     eng_daynight_tick(&d, NAN);
@@ -56,10 +56,10 @@ UTEST(daynight, the_clock_advances_wraps_and_ignores_bad_steps)
     eng_daynight_tick(&d, 600.0);
     EXPECT_NEAR(d.hour, 0.5, 1e-9);
     d.speed = 2.0F;
-    eng_daynight_tick(&d, 30.0);
+    eng_daynight_tick(&d, 25.0);
     EXPECT_NEAR(d.hour, 1.5, 1e-9);
-    eng_daynight_tick(&d, 1440.0 * 10.0 + 60.0); /* dix journées et une heure */
-    EXPECT_NEAR(d.hour, 3.5, 1e-6);
+    eng_daynight_tick(&d, 600.0 * 10.0 + 25.0); /* dix journées et une heure (vitesse 2) */
+    EXPECT_NEAR(d.hour, 2.5, 1e-6);
     EXPECT_FALSE(eng_daynight_set_hour(&d, NAN));
     EXPECT_TRUE(eng_daynight_set_hour(&d, -1.0));
     EXPECT_NEAR(d.hour, 23.0, 1e-9);
@@ -72,6 +72,19 @@ UTEST(daynight, the_clock_advances_wraps_and_ignores_bad_steps)
     (void)eng_daynight_format(&d, text, sizeof text);
     EXPECT_STREQ(text, "13:59");
     EXPECT_EQ(eng_daynight_format(&d, text, 5U), 0U);
+}
+
+UTEST(daynight, a_full_day_lasts_twenty_real_minutes_by_default)
+{
+    EngDayNight d;
+    eng_daynight_init(&d, 9.0);
+    EXPECT_NEAR(d.day_seconds, 1200.0F, 1e-6F); /* critère de M8-07 : 20 min */
+    for (int i = 0; i < 20 * 60 * 60; i++) {    /* 20 min de pas fixes à 60 Hz */
+        eng_daynight_tick(&d, 1.0 / 60.0);
+    }
+    EXPECT_NEAR(d.hour, 9.0, 1e-6); /* une journée pile : retour à la même heure */
+    eng_daynight_tick(&d, 600.0);   /* 10 min : une demi-journée */
+    EXPECT_NEAR(d.hour, 21.0, 1e-6);
 }
 
 UTEST(daynight, night_weight_and_exposure_are_smooth_and_bounded)
