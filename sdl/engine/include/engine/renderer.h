@@ -290,6 +290,9 @@ typedef struct EngDrawCmd {
      * les deux nuls : emplacement 8 non lié. */
     EngTextureHandle shadow_map;
     EngSamplerHandle shadow_sampler;
+    /* Passe d'ombre en ATLAS (M7-09, ombres en cascade) : 0 = toute la carte ; 1 à 4 = le quart
+     * k - 1 (gauche-haut, droite-haut, gauche-bas, droite-bas). Ignoré hors passe d'ombre. */
+    uint8_t shadow_tile;
 } EngDrawCmd;
 
 #define ENG_SHADOW_SLOT 8U

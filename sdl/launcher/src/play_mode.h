@@ -63,6 +63,9 @@ typedef struct PlayMode {
     bool on_terrain; /* --terrain : sol = champ de hauteurs (collision Jolt) au lieu de l'arène */
     bool autoplay;   /* --combat-autoplay : le pilote automatique joue */
     bool show_debug; /* F3 : capsules, boîtes et flèche en plus des modèles */
+    /* M7 : sol donné par le monde streamé (play_mode_init_world) ; NULL : arène ou terrain */
+    bool (*ground_fn)(void *user, float x, float z, float *out);
+    void *ground_user;
 } PlayMode;
 
 /* Crée le monde (sol, cubes de la démonstration rendus solides, marches, mur, rampe, plateforme),
@@ -76,6 +79,15 @@ void play_mode_shutdown(PlayMode *play);
  * le relief. Pas d'arène en boîtes. */
 bool play_mode_init_terrain(PlayMode *play, EngTweaks *tweaks, float camera_sensitivity,
                             bool invert_y, const char *heightmap_path);
+
+/* Monde ouvert (M7, --world) : monde physique VIDE (les cellules du monde streamé y ajoutent
+ * leurs corps), personnage aux pieds `spawn` (LOCAL), sol lu par `ground_fn`. */
+bool play_mode_init_world(PlayMode *play, EngTweaks *tweaks, float camera_sensitivity,
+                          bool invert_y, const float spawn[3],
+                          bool (*ground_fn)(void *user, float x, float z, float *out),
+                          void *ground_user);
+/* Origine flottante (M7-10) : ajoute `shift` à la position du personnage et de la caméra. */
+void play_mode_shift(PlayMode *play, const float shift[3]);
 
 /* Hauteur du sol au point (x, z) : relief en mode terrain, PLAY_GROUND_TOP sinon. */
 float play_mode_ground(const PlayMode *play, float x, float z);

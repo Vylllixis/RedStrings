@@ -634,6 +634,9 @@ typedef struct LightCopy {
     float shadow_a[4];
     float shadow_b[4];
     float shadow_c[4];
+    float cascade_info[4]; /* M7-09 */
+    float cascade_texel[4];
+    float cascade_matrix[4][16];
 } LightCopy;
 
 UTEST(eng_model_gpu, draw_queues_one_command_per_part_with_its_material_and_uniforms)
@@ -799,7 +802,29 @@ UTEST(eng_model_gpu, draw_sends_the_shadow_matrix_biases_and_map)
     EXPECT_NEAR(u.shadow_b[3], 3.0F, EPS);
     EXPECT_NEAR(u.shadow_c[0], 2.0F, EPS);
     EXPECT_NEAR(u.shadow_c[1], 0.75F, EPS);
-    EXPECT_NEAR(u.shadow_c[2], 1.0F, EPS); /* ombre active */
+    EXPECT_NEAR(u.shadow_c[2], 1.0F, EPS);     /* ombre active */
+    EXPECT_NEAR(u.cascade_info[0], 0.0F, EPS); /* carte unique : pas de cascades */
+
+    /* M7-09 : 3 cascades : leur nombre, leurs matrices et tailles de texel, la taille et le soleil
+     * de la cascade 0 */
+    EngModelShadow csm = shadow;
+    csm.cascade_count = 3U;
+    for (uint32_t k = 0; k < 3U; k++) {
+        ASSERT_TRUE(eng_shadow_fit(&csm.cascades[k], to_sun, center, 5.0F * (float)(k + 1U), 256U));
+    }
+    init_draw_queue(&d, 2);
+    ASSERT_EQ(eng_model_gpu_draw_shadowed(&gpu, &d.queue, (EngPipelineHandle){0}, identity,
+                                          identity, &light, &csm),
+              1U);
+    memcpy(&u, &d.uniforms[d.queue.commands[0].fragment_uniform_offset], sizeof u);
+    EXPECT_NEAR(u.cascade_info[0], 3.0F, EPS);
+    EXPECT_NEAR(u.shadow_b[0], 256.0F, EPS);
+    for (uint32_t k = 0; k < 3U; k++) {
+        EXPECT_NEAR(u.cascade_texel[k], csm.cascades[k].texel_world, 1e-7F);
+        for (int i = 0; i < 16; i++) {
+            EXPECT_NEAR(u.cascade_matrix[k][i], ((float *)csm.cascades[k].shadow_matrix)[i], 1e-6F);
+        }
+    }
 
     /* des réglages invalides sont corrigés dans la copie envoyée, pas chez l'appelant */
     shadow.params = (EngShadowParams){.constant_bias = -1.0F,

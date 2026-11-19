@@ -106,6 +106,10 @@ static bool build_terrain(PlayMode *play, const char *path)
 
 float play_mode_ground(const PlayMode *play, float x, float z)
 {
+    if (play != NULL && play->ground_fn != NULL) {
+        float h = 0.0F;
+        return play->ground_fn(play->ground_user, x, z, &h) ? h : -1000.0F;
+    }
     if (play == NULL || !play->on_terrain) {
         return PLAY_GROUND_TOP;
     }
@@ -113,22 +117,50 @@ float play_mode_ground(const PlayMode *play, float x, float z)
 }
 
 static bool init_common(PlayMode *play, EngTweaks *tweaks, float camera_sensitivity, bool invert_y,
-                        const char *terrain_path);
+                        const char *terrain_path, const float *spawn);
 
 bool play_mode_init(PlayMode *play, EngTweaks *tweaks, float camera_sensitivity, bool invert_y)
 {
-    return init_common(play, tweaks, camera_sensitivity, invert_y, NULL);
+    return init_common(play, tweaks, camera_sensitivity, invert_y, NULL, NULL);
 }
 
 bool play_mode_init_terrain(PlayMode *play, EngTweaks *tweaks, float camera_sensitivity,
                             bool invert_y, const char *heightmap_path)
 {
     return heightmap_path != NULL &&
-           init_common(play, tweaks, camera_sensitivity, invert_y, heightmap_path);
+           init_common(play, tweaks, camera_sensitivity, invert_y, heightmap_path, NULL);
+}
+
+bool play_mode_init_world(PlayMode *play, EngTweaks *tweaks, float camera_sensitivity,
+                          bool invert_y, const float spawn[3],
+                          bool (*ground_fn)(void *user, float x, float z, float *out),
+                          void *ground_user)
+{
+    if (spawn == NULL || ground_fn == NULL ||
+        !init_common(play, tweaks, camera_sensitivity, invert_y, NULL, spawn)) {
+        return false;
+    }
+    play->ground_fn = ground_fn;
+    play->ground_user = ground_user;
+    return true;
+}
+
+void play_mode_shift(PlayMode *play, const float shift[3])
+{
+    if (play == NULL || !play->ready || shift == NULL) {
+        return;
+    }
+    float feet[3];
+    (void)eng_character_position(play->character, feet);
+    for (int a = 0; a < 3; a++) {
+        feet[a] += shift[a];
+        play->orbit.target[a] += shift[a];
+    }
+    (void)eng_character_teleport(play->character, feet);
 }
 
 static bool init_common(PlayMode *play, EngTweaks *tweaks, float camera_sensitivity, bool invert_y,
-                        const char *terrain_path)
+                        const char *terrain_path, const float *spawn)
 {
     if (play == NULL) {
         return false;
@@ -139,18 +171,22 @@ static bool init_common(PlayMode *play, EngTweaks *tweaks, float camera_sensitiv
         return false;
     }
     play->world = eng_physics_create(NULL);
-    if (play->world == NULL ||
-        !(terrain_path != NULL ? build_terrain(play, terrain_path) : build_arena(play->world))) {
+    const bool built =
+        spawn != NULL /* monde streamé : les cellules ajoutent leurs corps */
+        || (terrain_path != NULL ? build_terrain(play, terrain_path) : build_arena(play->world));
+    if (play->world == NULL || !built) {
         ENG_LOG_ERROR("mode jouable : création de l'arène impossible");
         play_mode_shutdown(play);
         return false;
     }
-    const float spawn_y = play_mode_ground(play, PLAY_SPAWN_X, PLAY_SPAWN_Z);
-    const EngCharacterDesc desc = {.position = {PLAY_SPAWN_X, spawn_y + 0.05F, PLAY_SPAWN_Z},
+    const float sx = spawn != NULL ? spawn[0] : PLAY_SPAWN_X;
+    const float sz = spawn != NULL ? spawn[2] : PLAY_SPAWN_Z;
+    const float spawn_y = spawn != NULL ? spawn[1] : play_mode_ground(play, sx, sz);
+    const EngCharacterDesc desc = {.position = {sx, spawn_y + 0.05F, sz},
                                    .max_slope_deg = PLAY_MAX_SLOPE_DEG};
     play->character = eng_character_create(play->world, &desc);
     const float start_yaw = -1.5707963F; /* regarde vers +X, vers les marches */
-    const float pivot[3] = {PLAY_SPAWN_X, spawn_y + PLAY_PIVOT_HEIGHT, PLAY_SPAWN_Z};
+    const float pivot[3] = {sx, spawn_y + PLAY_PIVOT_HEIGHT, sz};
     if (play->character == NULL ||
         !eng_orbit_camera_init(&play->orbit, pivot, start_yaw, -0.25F,
                                ENG_ORBIT_DISTANCE_DEFAULT) ||

@@ -90,6 +90,14 @@ eng_model_gpu_draw_shadowed(&model, queue, pipeline, model_matrix, view_proj, &l
 désactive l'ombre dans les uniforms. Un dessin qui porte `shadow_map` exige les huit textures de
 l'éclairage par image et un sampler ; sinon le renderer le rejette et le compte (`rejected_commands`).
 
+## Cascades (M7-09)
+
+En mode monde (`launcher --world`), la carte unique est remplacée par 4 cascades (découpage
+`engine/csm.h`, jusqu'à 160 m) rangées dans un **atlas 2 x 2** de 4096² (cascades de 2048 texels) :
+`EngModelShadow.cascade_count` + `cascades[]`, `EngDrawCmd.shadow_tile` pour la passe d'ombre, et
+une boucle dans `model.frag` / `terrain.frag` qui prend la cascade la plus fine contenant le point.
+Détails, test et limites : `docs/world-streaming.md` (section M7-09).
+
 ## Lanceur
 
 Le sol (une boîte de 56 m de côté dont le dessus est à y = −0,5, la base des cubes) reçoit les

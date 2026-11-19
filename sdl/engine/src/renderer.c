@@ -1463,7 +1463,40 @@ uint32_t eng_renderer_run_shadow_pass(EngRenderer *r, SDL_GPUCommandBuffer *comm
         eng_gpu_debug_pop(commands);
         return 0;
     }
-    const uint32_t drawn = eng_renderer_execute(r, queue, commands, pass);
+    /* M7-09 : les commandes consécutives d'une même tuile sont exécutées ensemble, la fenêtre
+     * (viewport + scissor) réduite au quart de l'atlas qu'elles visent */
+    uint32_t drawn = 0;
+    uint32_t start = 0;
+    const float half_w = (float)texture->width * 0.5F;
+    const float half_h = (float)texture->height * 0.5F;
+    while (start < queue->count) {
+        const uint8_t tile = queue->commands[start].shadow_tile;
+        uint32_t end = start + 1U;
+        while (end < queue->count && queue->commands[end].shadow_tile == tile) {
+            end++;
+        }
+        SDL_GPUViewport vp = {.x = 0.0F,
+                              .y = 0.0F,
+                              .w = (float)texture->width,
+                              .h = (float)texture->height,
+                              .min_depth = 0.0F,
+                              .max_depth = 1.0F};
+        if (tile >= 1U && tile <= 4U) {
+            vp.x = ((tile - 1U) % 2U) != 0U ? half_w : 0.0F; /* colonne droite : 2 et 4 */
+            vp.y = (tile - 1U) >= 2U ? half_h : 0.0F;        /* rangée du bas : 3 et 4 */
+            vp.w = half_w;
+            vp.h = half_h;
+        }
+        SDL_SetGPUViewport(pass, &vp);
+        const SDL_Rect scissor = {(int)vp.x, (int)vp.y, (int)vp.w, (int)vp.h};
+        SDL_SetGPUScissor(pass, &scissor);
+        EngRenderQueue part = *queue;
+        part.commands = queue->commands + start;
+        part.count = end - start;
+        part.dropped = start == 0U ? queue->dropped : 0U; /* compté une seule fois */
+        drawn += eng_renderer_execute(r, &part, commands, pass);
+        start = end;
+    }
     SDL_EndGPURenderPass(pass);
     eng_gpu_debug_pop(commands);
     r->stats.shadow_passes++;

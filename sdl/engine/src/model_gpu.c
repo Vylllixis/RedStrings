@@ -34,8 +34,8 @@ typedef struct InstancedUniforms {
     float color[4];
 } InstancedUniforms;
 
-/* Uniforms du fragment shader model.frag : quatorze float4, mêmes types et ordre que son cbuffer.
- * Les couleurs sont déjà multipliées par leur intensité. */
+/* Uniforms du fragment shader model.frag : trente-deux float4, mêmes types et ordre que son
+ * cbuffer. Les couleurs sont déjà multipliées par leur intensité. */
 typedef struct FragmentUniforms {
     float sun_direction[4];   /* xyz : vers le soleil, unitaire */
     float sun_radiance[4];    /* rgb : couleur * intensité */
@@ -48,6 +48,9 @@ typedef struct FragmentUniforms {
     float shadow_a[4];        /* xyz : vers le soleil ; w : côté d'un texel (m) */
     float shadow_b[4];        /* taille de la carte, biais constant, biais de pente, biais normal */
     float shadow_c[4];        /* rayon du PCF, force, 1 si active */
+    float cascade_info[4];    /* x : nombre de cascades (0 ou 1 : carte unique) */
+    float cascade_texel[4];   /* côté d'un texel (m) de chaque cascade */
+    mat4 cascade_matrix[ENG_MODEL_SHADOW_CASCADES]; /* monde -> (u, v, prof.) de chaque cascade */
 } FragmentUniforms;
 
 void eng_model_pipeline_desc(EngPipelineDesc *desc)
@@ -527,6 +530,21 @@ uint32_t eng_model_gpu_draw_ex(const EngModelGpu *gpu, EngRenderQueue *queue,
         fragment.shadow_c[0] = (float)params.pcf_radius;
         fragment.shadow_c[1] = params.strength;
         fragment.shadow_c[2] = 1.0F;
+        const uint32_t cascades = shadow->cascade_count <= ENG_MODEL_SHADOW_CASCADES
+                                      ? shadow->cascade_count
+                                      : ENG_MODEL_SHADOW_CASCADES;
+        if (cascades >= 2U) { /* M7-09 : atlas ; la cascade 0 donne soleil et taille */
+            fragment.cascade_info[0] = (float)cascades;
+            for (int c = 0; c < 3; c++) {
+                fragment.shadow_a[c] = shadow->cascades[0].to_sun[c];
+            }
+            fragment.shadow_b[0] = (float)shadow->cascades[0].size;
+            for (uint32_t k = 0; k < cascades; k++) {
+                memcpy(fragment.cascade_matrix[k], shadow->cascades[k].shadow_matrix,
+                       sizeof fragment.cascade_matrix[k]);
+                fragment.cascade_texel[k] = shadow->cascades[k].texel_world;
+            }
+        }
     }
 
     ModelUniforms uniforms;

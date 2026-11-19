@@ -840,6 +840,12 @@ static void draw_casters(const DemoScene *scene, EngRenderQueue *shadow_queue, d
     const float angle = (float)time_seconds;
     mat4 identity;
     glm_mat4_identity(identity);
+    if (scene->world_mode) { /* M7 : seulement le monde streamé et les personnages */
+        if (scene->model_hook != NULL) {
+            scene->model_hook(scene->model_user, shadow_queue, light_view_proj, NULL, NULL, true);
+        }
+        return;
+    }
     (void)eng_model_gpu_draw_depth(&scene->ground, shadow_queue, scene->model_shadow_pipeline,
                                    identity, light_view_proj);
     const EngDrawCmd cmd = {
@@ -911,6 +917,27 @@ static void apply_moonlight(EngLighting *light, float night)
     }
 }
 
+bool demo_scene_use_cascades(DemoScene *scene, EngRenderer *renderer)
+{
+    if (scene == NULL || renderer == NULL || !scene->has_shadow) {
+        return false;
+    }
+    const EngTextureHandle atlas =
+        eng_renderer_create_shadow_map(renderer, 2U * scene->shadow_size);
+    if (!eng_renderer_texture_is_valid(renderer, atlas)) {
+        ENG_LOG_WARN("ombres en cascade indisponibles : atlas de %u texels refusé",
+                     2U * scene->shadow_size);
+        return false;
+    }
+    (void)eng_renderer_destroy_texture(renderer, scene->shadow_map);
+    scene->shadow_map = atlas;
+    scene->cascades = true;
+    ENG_LOG_INFO("ombres : %u cascades jusqu'à %.0f m, atlas de %u x %u (cascades de %u texels)",
+                 DEMO_CSM_COUNT, (double)DEMO_CSM_FAR, 2U * scene->shadow_size,
+                 2U * scene->shadow_size, scene->shadow_size);
+    return true;
+}
+
 void demo_scene_draw(DemoScene *scene, EngRenderer *renderer, EngRenderQueue *queue,
                      double time_seconds, const EngCamera *camera, float aspect,
                      const EngLighting *lighting, const EngShadowParams *shadow)
@@ -957,8 +984,40 @@ void demo_scene_draw(DemoScene *scene, EngRenderer *renderer, EngRenderQueue *qu
     EngModelShadow receiver = {0};
     const EngModelShadow *receiving = NULL;
     EngRenderQueue *shadow_queue = NULL;
-    if (shadow != NULL && scene->has_shadow && !scene->has_terrain) {
-        static const float center[3] = {0.0F, 0.0F, 0.0F};
+    if (shadow != NULL && scene->has_shadow && scene->world_mode && scene->cascades) {
+        /* M7-09 : 4 cascades autour de la caméra, chacune dans son quart de l'atlas */
+        EngCsmView cv = {.fov_y = camera->fov_y,
+                         .aspect = aspect,
+                         .near_plane = camera->near_z,
+                         .far_plane = DEMO_CSM_FAR};
+        for (int c = 0; c < 3; c++) {
+            cv.position[c] = camera->position[c];
+        }
+        eng_camera_forward(camera, cv.forward);
+        shadow_queue = eng_renderer_begin_shadow_queue(renderer);
+        if (shadow_queue != NULL &&
+            eng_csm_update(&scene->csm, &cv, light.sun_direction, DEMO_CSM_COUNT, DEMO_CSM_LAMBDA,
+                           scene->shadow_size)) {
+            receiver.map = scene->shadow_map;
+            receiver.params = *shadow;
+            receiver.shadow = scene->csm.maps[0];
+            receiver.cascade_count = scene->csm.count;
+            for (uint32_t k = 0; k < scene->csm.count && k < ENG_MODEL_SHADOW_CASCADES; k++) {
+                receiver.cascades[k] = scene->csm.maps[k];
+                const uint32_t first = shadow_queue->count;
+                if (scene->model_hook != NULL) {
+                    scene->model_hook(scene->model_user, shadow_queue, scene->csm.maps[k].view_proj,
+                                      NULL, NULL, true);
+                }
+                for (uint32_t i = first; i < shadow_queue->count; i++) {
+                    shadow_queue->commands[i].shadow_tile = (uint8_t)(k + 1U);
+                }
+            }
+            receiving = &receiver;
+        }
+    } else if (shadow != NULL && scene->has_shadow && !scene->has_terrain) {
+        static const float origin[3] = {0.0F, 0.0F, 0.0F};
+        const float *center = scene->world_mode ? scene->shadow_focus : origin;
         shadow_queue = eng_renderer_begin_shadow_queue(renderer);
         if (shadow_queue != NULL && eng_shadow_fit(&receiver.shadow, light.sun_direction, center,
                                                    SHADOW_RADIUS, scene->shadow_size)) {
@@ -1059,6 +1118,13 @@ void demo_scene_draw(DemoScene *scene, EngRenderer *renderer, EngRenderQueue *qu
         }
         if (scene->model_hook != NULL) {
             scene->model_hook(scene->model_user, queue, view_proj, &light, NULL, false);
+        }
+        return;
+    }
+    if (scene->world_mode) { /* M7 : le monde streamé remplace sol, cubes et modèle */
+        scene->last_sky_intensity = sky_intensity;
+        if (scene->model_hook != NULL) {
+            scene->model_hook(scene->model_user, queue, view_proj, &light, receiving, false);
         }
         return;
     }

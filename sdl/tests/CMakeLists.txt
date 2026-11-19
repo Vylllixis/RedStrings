@@ -525,6 +525,29 @@ if(OW_PHYSICS)
   endif()
 endif()
 
+# Monde ouvert RENDU (M7, --world) : cellules streamées envoyées au GPU, corps Jolt par cellule,
+# origine flottante (traversée de 1 km au moins), personnage posé sur le relief à l'arrêt.
+if(OW_PHYSICS AND OW_SHADERS_OK)
+  add_test(NAME launcher.world_render COMMAND launcher --world 7 --world-autopilot 200 --frames 240
+           --no-audio --env-samples 16 WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR})
+  set_tests_properties(launcher.world_render PROPERTIES
+    ENVIRONMENT "SDL_VIDEODRIVER=offscreen"
+    FAIL_REGULAR_EXPRESSION "ERROR|non détruite|perdu|TROU"
+    PASS_REGULAR_EXPRESSION "MONDE : [0-9]+ m parcourus.* [1-9][0-9]* recentrage")
+  add_test(NAME launcher.world_ground COMMAND launcher --world 7 --frames 240 --no-audio
+           --env-samples 16 WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR})
+  set_tests_properties(launcher.world_ground PROPERTIES
+    ENVIRONMENT "SDL_VIDEODRIVER=offscreen"
+    FAIL_REGULAR_EXPRESSION "ERROR|non détruite|perdu|TROU"
+    PASS_REGULAR_EXPRESSION "MONDE : joueur au sol")
+  if(OW_SOFTWARE_VULKAN_ICD)
+    foreach(t launcher.world_render launcher.world_ground)
+      set_property(TEST ${t} APPEND PROPERTY ENVIRONMENT_MODIFICATION
+        "VK_DRIVER_FILES=set:${OW_SOFTWARE_VULKAN_ICD}" "VK_ICD_FILENAMES=set:${OW_SOFTWARE_VULKAN_ICD}")
+    endforeach()
+  endif()
+endif()
+
 # Monde ouvert (M7-14) : traversée de 2 km à 30 m/s, budget de 25 ms par image, aucun trou sous le
 # joueur (--world-bench 2). Sans fenêtre ni GPU.
 add_test(NAME launcher.world_bench COMMAND launcher --world-bench 2

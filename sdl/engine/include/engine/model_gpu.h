@@ -115,10 +115,17 @@ uint32_t eng_model_gpu_draw(const EngModelGpu *gpu, EngRenderQueue *queue,
  * passe d'ombre (eng_renderer_create_shadow_map) ; `shadow` : la caméra du soleil qui l'a rendue
  * (eng_shadow_fit) ; `params` : biais, filtrage et force (corrigés par eng_shadow_params_sanitize
  * dans la copie envoyée au GPU). `size` de `shadow` doit être celui de la carte. */
+#define ENG_MODEL_SHADOW_CASCADES 4U
 typedef struct EngModelShadow {
     EngTextureHandle map;
     EngShadowMap shadow;
     EngShadowParams params;
+    /* M7-09 : 2 à 4 cascades rangées dans un ATLAS 2 x 2 (`map` fait 2 x cascades[k].size de
+     * côté ; cascade k dans le quart k, comme EngDrawCmd.shadow_tile = k + 1). Le shader prend,
+     * pour chaque pixel, la cascade la plus fine qui le contient. 0 ou 1 : carte unique (`shadow`).
+     */
+    uint32_t cascade_count;
+    EngShadowMap cascades[ENG_MODEL_SHADOW_CASCADES];
 } EngModelShadow;
 
 /* Comme eng_model_gpu_draw, avec l'ombre du soleil. `shadow` NULL, ou une carte nulle ou invalide :

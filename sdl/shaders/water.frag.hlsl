@@ -20,6 +20,9 @@ cbuffer Lighting : register(b0, space3)
     float4 shadow_a;
     float4 shadow_b;
     float4 shadow_c;
+    float4 cascade_info;        // M7-09 (inutilisé ici)
+    float4 cascade_texel;
+    float4x4 cascade_matrix[4];
     // Brouillard (M3-06) ; fog_a.w = 0 : pas de brouillard
     float4 fog_a;
     float4 fog_rayleigh;

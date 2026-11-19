@@ -58,3 +58,25 @@ de travail. **Ce benchmark ne rend rien** : le rendu du monde streamé n'existe 
   est hors de la mesure) : il sous-estime le coût CPU réel du rendu.
 - Non mesuré : un GPU plus modeste (aucune autre machine ici), le temps GPU par passe (SDL_GPU n'a pas de
   requêtes de temps ; voir Tracy / RenderDoc).
+
+## Monde streamé rendu (M7, `--world`) — 2026-11-19
+
+Mesuré par le lanceur lui-même (résumé « MONDE : ... » à l'arrêt, sans instrumentation ajoutée),
+Release, RTX 5070 Laptop, graine 7, pilote automatique vers +X (le personnage glisse sur le relief),
+25 cellules de 256 m chargées autour du joueur. Les 30 premières images (chargement) sont exclues.
+
+| Commande | Distance | Images | Moyenne | p99 | Pire | > 25 ms | Envois | Recentrages |
+|---|---|---|---|---|---|---|---|---|
+| `--world 7 --world-autopilot 60 --frames 6000` (vsync 165 Hz, ombre unique), 2 passes | 2 182 m | 5 969 | — | < 12 ms | 15,7 / 16,7 ms | 0 / 0 | 70 | 4 |
+| `--world 7 --world-autopilot 100 --frames 9900` (vsync, ombre unique) | 6 000 m | 9 869 | — | < 11 ms | 16,6 ms | 0 | 140 | 11 |
+| idem, 4 cascades d'ombre | 6 002 m | 9 869 | — | < 11 ms | 25,4 ms | 1 | 140 | 11 |
+| `--config 1080p-sans-vsync --world 7 --world-autopilot 100 --frames 20000`, 4 cascades | 3 140 m | 19 969 | 1,57 ms | < 5 ms | 15,9 ms | 0 | 85 | 6 |
+
+- La seule image au-dessus de 25 ms (25,4 ms) n'avait ni envoi de cellule ni recentrage, et 0,2 ms
+  de CPU : c'est la présentation (vsync), pas le streaming. Une première passe a aussi montré une
+  image de 62,8 ms jamais reproduite ensuite (4 passes).
+- Coût d'un envoi de cellule sur le thread principal : ~0,9 ms en régime (maillage 0,3 ms,
+  splatmap 0,4 ms, ressources GPU, corps Jolt 0,3 ms), mais la création des ressources GPU monte
+  parfois à 10-15 ms : c'est le pire temps d'image. À traiter si un écran à 60 Hz montre des
+  saccades (créer les tampons d'avance, ou pré-allouer les transferts).
+- Chargement initial (9 cellules) : 110 ms.

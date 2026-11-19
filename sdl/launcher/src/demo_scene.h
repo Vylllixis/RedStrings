@@ -2,6 +2,7 @@
 
 #include <stdbool.h>
 
+#include "engine/csm.h"
 #include "engine/grass.h"
 #include "engine/water.h"
 #include "engine/arena.h"
@@ -53,6 +54,7 @@ typedef void (*DemoModelHook)(void *user, EngRenderQueue *queue, mat4 view_proj,
                               bool shadow_pass);
 
 typedef struct DemoScene {
+    EngCsm csm; /* M7-09 : cascades de l'image (mode monde) ; en tête : alignement des mat4 */
     EngBufferHandle vertices;
     EngBufferHandle indices;
     EngTextureHandle texture;
@@ -80,6 +82,7 @@ typedef struct DemoScene {
     float last_sun_elevation_deg;
     float last_sun_color[3];
     float last_sun_visibility;
+    float last_sky_intensity; /* M7 : brouillard du monde streamé */
     float night; /* M8-07 : poids de la nuit [0, 1] (clair de lune), réglé par le lanceur */
     float last_ambient[3];
     /* Brouillard du terrain (M3-06) : actif si le ciel atmosphérique l'est (sa couleur en vient).
@@ -159,7 +162,10 @@ typedef struct DemoScene {
     void *debug_user;
     DemoModelHook model_hook; /* demo_scene_set_model_hook */
     void *model_user;
-    bool hide_props; /* sol seul : ni cubes ni modèle central (galerie des personnages) */
+    float shadow_focus[3]; /* M7 : centre de la carte d'ombre en mode monde (le joueur) */
+    bool hide_props;       /* sol seul : ni cubes ni modèle central (galerie des personnages) */
+    bool world_mode;       /* M7 : monde streamé (crochet de modèles) : ni sol ni cubes */
+    bool cascades;         /* M7-09 : ombres en cascade (demo_scene_use_cascades) */
     bool has_cook;
     bool world_models_full_warned;
 } DemoScene;
@@ -188,6 +194,9 @@ typedef struct DemoOptions {
 } DemoOptions;
 
 #define DEMO_SHADOW_SIZE 2048U /* côté de la carte d'ombre, en texels */
+#define DEMO_CSM_COUNT 4U      /* M7-09 : cascades du mode monde (atlas 2 x 2) */
+#define DEMO_CSM_FAR 160.0F    /* m : au-delà, pas d'ombre */
+#define DEMO_CSM_LAMBDA 0.8F   /* découpage : 0 uniforme, 1 logarithmique */
 
 /* `permanent` : arène des données du modèle GPU (vit autant que la scène) ; `level` : reçoit
  * temporairement le modèle côté CPU ; `scratch` : travail et lecture des fichiers. `level` et
@@ -216,6 +225,10 @@ bool demo_scene_terrain_view(const DemoScene *scene, float position[3]);
  * cubes texturés, sans éclairage, ne reçoivent pas d'ombre. `shadow` NULL ou ombres indisponibles :
  * aucune passe d'ombre. La carte couvre la sphère de rayon 42 m autour de l'origine, qui contient
  * le sol (±28 m) et la grille de cubes. */
+/* M7-09 : ombres en cascade (mode monde) : la carte d'ombre devient un atlas de 2 x 2 cascades de
+ * DEMO_SHADOW_SIZE texels, recalculées à chaque image autour de la caméra (eng_csm_update). */
+bool demo_scene_use_cascades(DemoScene *scene, EngRenderer *renderer);
+
 void demo_scene_draw(DemoScene *scene, EngRenderer *renderer, EngRenderQueue *queue,
                      double time_seconds, const EngCamera *camera, float aspect,
                      const EngLighting *lighting, const EngShadowParams *shadow);

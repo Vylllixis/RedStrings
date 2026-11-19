@@ -47,6 +47,9 @@ cbuffer Lighting : register(b0, space3)
     float4 shadow_a;        // xyz : vers le soleil (unitaire), w : côté d'un texel en mètres
     float4 shadow_b;        // x : taille de la carte (texels), y : biais constant, z : biais de pente, w : biais normal
     float4 shadow_c;        // x : rayon du PCF, y : force de l'ombre, z : 1 si une ombre est active
+    float4 cascade_info;    // x : nombre de cascades (0 ou 1 : carte unique ; 2 à 4 : atlas 2 x 2)
+    float4 cascade_texel;   // côté d'un texel (m) de chaque cascade
+    float4x4 cascade_matrix[4]; // monde -> (u, v, profondeur) de chaque cascade
 };
 
 static const float PI = 3.14159265358979323846f;
@@ -77,6 +80,39 @@ float shadow_bilinear(float2 uv, float reference, float size)
     return lerp(lerp(a, b, w.x), lerp(c, d, w.x), w.y);
 }
 
+// M7-09 : ombre en cascade. La cascade la plus fine qui contient le point (marge du PCF comprise)
+// est lue dans son quart de l'atlas 2 x 2 ; mêmes biais que la carte unique, à la taille de texel de
+// la cascade. Hors de toutes les cascades : éclairé.
+float shadow_factor_cascades(float3 position, float3 normal, float cos_theta, float sin_theta,
+                             float tan_theta, float radius)
+{
+    float size = shadow_b.x;
+    int count = min((int)cascade_info.x, 4);
+    float margin = (radius + 2.0f) / size;
+    for (int k = 0; k < count; k++) {
+        float3 shifted = position + normal * (shadow_b.w * sin_theta * cascade_texel[k]);
+        float3 uvd = mul(cascade_matrix[k], float4(shifted, 1.0f)).xyz;
+        if (uvd.x < margin || uvd.x > 1.0f - margin || uvd.y < margin || uvd.y > 1.0f - margin ||
+            uvd.z < 0.0f || uvd.z > 1.0f) {
+            continue;
+        }
+        uvd.z -= (shadow_b.y + shadow_b.z * (radius + 1.0f) * tan_theta) / size;
+        float2 corner = float2((float)(k % 2), (float)(k / 2)) * 0.5f;
+        float2 uv = corner + uvd.xy * 0.5f;
+        int r = (int)radius;
+        float sum = 0.0f;
+        for (int j = -r; j <= r; j++) {
+            for (int i = -r; i <= r; i++) {
+                sum += shadow_bilinear(uv + float2((float)i, (float)j) / (2.0f * size), uvd.z,
+                                       2.0f * size);
+            }
+        }
+        float taps = (float)(2 * r + 1);
+        return 1.0f - shadow_c.y * (1.0f - sum / (taps * taps));
+    }
+    return 1.0f;
+}
+
 // Part de lumière du soleil reçue en `position` (monde) de normale géométrique `normal` : décalage le
 // long de la normale, biais constant et de pente en texels de profondeur, puis PCF. Mêmes formules
 // que eng_shadow_receiver, eng_shadow_visibility et eng_shadow_factor.
@@ -90,6 +126,9 @@ float shadow_factor(float3 position, float3 normal)
     float sin_theta = sqrt(1.0f - cos_theta * cos_theta);
     float tan_theta = min(sin_theta / max(cos_theta, 1e-4f), MAX_SHADOW_SLOPE);
     float radius = min(shadow_c.x, (float)MAX_SHADOW_RADIUS);
+    if (cascade_info.x > 1.5f) {
+        return shadow_factor_cascades(position, normal, cos_theta, sin_theta, tan_theta, radius);
+    }
     float3 shifted = position + normal * (shadow_b.w * sin_theta * shadow_a.w);
     float3 uvd = mul(shadow_matrix, float4(shifted, 1.0f)).xyz;
     uvd.z -= (shadow_b.y + shadow_b.z * (radius + 1.0f) * tan_theta) / size;

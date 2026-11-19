@@ -36,6 +36,7 @@ typedef struct Scene {
     EngPipelineHandle pipeline;
     EngPipelineHandle shadow_pipeline;
     EngTextureHandle map;
+    EngTextureHandle atlas; /* M7-09 : 2 x 2 cascades de MAP_SIZE texels */
     EngModelGpu ground;
     EngModelGpu box;
     bool ok;
@@ -86,6 +87,7 @@ static bool open_scene(Scene *s)
     eng_model_shadow_pipeline_desc(&pipeline);
     s->shadow_pipeline = eng_renderer_create_pipeline(&s->r, &pipeline);
     s->map = eng_renderer_create_shadow_map(&s->r, MAP_SIZE);
+    s->atlas = eng_renderer_create_shadow_map(&s->r, 2U * MAP_SIZE);
     const float ground_lo[3] = {-10.0F, -0.5F, -10.0F};
     const float ground_hi[3] = {10.0F, 0.0F, 10.0F};
     const float box_lo[3] = {-1.0F, 0.0F, -1.0F};
@@ -93,6 +95,7 @@ static bool open_scene(Scene *s)
     s->ok = eng_renderer_pipeline_is_valid(&s->r, s->pipeline) &&
             eng_renderer_pipeline_is_valid(&s->r, s->shadow_pipeline) &&
             eng_renderer_texture_is_valid(&s->r, s->map) &&
+            eng_renderer_texture_is_valid(&s->r, s->atlas) &&
             make_gpu_box(s, ground_lo, ground_hi, &s->ground) &&
             make_gpu_box(s, box_lo, box_hi, &s->box);
     return true;
@@ -103,6 +106,7 @@ static uint32_t close_scene(Scene *s)
     eng_model_gpu_destroy(&s->box, &s->r);
     eng_model_gpu_destroy(&s->ground, &s->r);
     (void)eng_renderer_destroy_texture(&s->r, s->map);
+    (void)eng_renderer_destroy_texture(&s->r, s->atlas);
     (void)eng_renderer_destroy_pipeline(&s->r, s->shadow_pipeline);
     (void)eng_renderer_destroy_pipeline(&s->r, s->pipeline);
     const uint32_t leaks = eng_renderer_shutdown(&s->r);
@@ -123,6 +127,7 @@ typedef struct Shot {
     float box_x;      /* décalage de la boîte par sa matrice de modèle (m) */
     EngShadowMap map; /* rempli par render_shot */
     float to_sun[3];
+    int32_t cascade; /* M7-09 : -1 carte unique ; 0 à 3 : `map` est la cascade k d'un atlas de 4 */
 } Shot;
 
 typedef struct ShotContext {
@@ -133,7 +138,8 @@ typedef struct ShotContext {
 static void shot_prepare(SDL_GPUCommandBuffer *commands, void *context)
 {
     ShotContext *c = (ShotContext *)context;
-    (void)eng_renderer_run_shadow_pass(&c->scene->r, commands, c->scene->map,
+    (void)eng_renderer_run_shadow_pass(&c->scene->r, commands,
+                                       c->shot->cascade >= 0 ? c->scene->atlas : c->scene->map,
                                        &c->scene->r.shadow_queue);
 }
 
@@ -187,6 +193,11 @@ static bool render_shot(Scene *s, Shot *shot)
             1U) {
         return false;
     }
+    if (shot->cascade >= 0) { /* les projeteurs vont dans le quart de la cascade */
+        for (uint32_t i = 0; i < sq->count; i++) {
+            sq->commands[i].shadow_tile = (uint8_t)(shot->cascade + 1);
+        }
+    }
 
     /* image : vue du dessus, x vers la droite, -z vers le haut de l'image */
     mat4 view;
@@ -201,6 +212,19 @@ static bool render_shot(Scene *s, Shot *shot)
     glm_mat4_mul(proj, view, view_proj);
 
     EngModelShadow shadow = {.map = s->map, .shadow = shot->map, .params = shot->params};
+    if (shot->cascade >= 0) {
+        /* les autres cascades regardent ailleurs (500 m plus loin) : le shader doit les sauter */
+        EngShadowMap far_map;
+        const float far_center[3] = {500.0F, 0.0F, 500.0F};
+        if (!eng_shadow_fit(&far_map, shot->to_sun, far_center, SPHERE_RADIUS, MAP_SIZE)) {
+            return false;
+        }
+        shadow.map = s->atlas;
+        shadow.cascade_count = 4U;
+        for (int32_t k = 0; k < 4; k++) {
+            shadow.cascades[k] = k == shot->cascade ? shot->map : far_map;
+        }
+    }
     EngRenderQueue *q = eng_renderer_begin_frame(&s->r);
     const EngModelShadow *used = shot->shadows ? &shadow : NULL;
     if (eng_model_gpu_draw_shadowed(&s->ground, q, s->pipeline, identity, view_proj, &light,
@@ -328,7 +352,8 @@ static Shot default_shot(float elevation_deg, float azimuth_deg)
                  .azimuth_deg = azimuth_deg,
                  .shadows = true,
                  .view_half = VIEW_HALF,
-                 .view_x = 0.0F};
+                 .view_x = 0.0F,
+                 .cascade = -1};
     eng_shadow_params_default(&shot.params);
     return shot;
 }
@@ -353,6 +378,32 @@ UTEST(shadow_gpu, the_sun_shadow_of_a_box_lands_where_the_geometry_says)
                 printf("elevation %.0f azimut %.0f : éclairés noircis %u, ombres éclairées %u\n",
                        (double)elevations[e], (double)azimuths[a], st.wrong_lit, st.wrong_shadow);
             }
+        }
+    }
+    EXPECT_EQ(close_scene(&s), 0U);
+}
+
+/* M7-09 : ombres en cascade. La même ombre, rangée dans chacun des quatre quarts d'un atlas (les
+ * projeteurs dessinés avec shadow_tile = k + 1, les trois autres cascades tournées vers un autre
+ * endroit), doit donner exactement le résultat de la carte unique : la tuile visée par la passe
+ * d'ombre et le quart lu par le shader concordent, et le shader saute les cascades qui ne
+ * contiennent pas le point. */
+UTEST(shadow_gpu, each_quarter_of_the_cascade_atlas_gives_the_shadow_of_the_single_map)
+{
+    Scene s;
+    REQUIRE_SCENE(s);
+    for (int32_t k = 0; k < 4; k++) {
+        Shot shot = default_shot(40.0F, 37.0F);
+        shot.cascade = k;
+        ASSERT_TRUE(render_shot(&s, &shot));
+        const Stats st = compare_with_geometry(&shot);
+        EXPECT_GT(st.certain_lit, 3000U);
+        EXPECT_GT(st.certain_shadow, 20U);
+        EXPECT_EQ(st.wrong_lit, 0U);
+        EXPECT_EQ(st.wrong_shadow, 0U);
+        if (st.wrong_lit != 0U || st.wrong_shadow != 0U) {
+            printf("cascade %d : éclairés noircis %u, ombres éclairées %u\n", (int)k, st.wrong_lit,
+                   st.wrong_shadow);
         }
     }
     EXPECT_EQ(close_scene(&s), 0U);

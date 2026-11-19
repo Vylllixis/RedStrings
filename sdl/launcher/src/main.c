@@ -1,4 +1,5 @@
 #include <SDL3/SDL_mouse.h>
+#include <SDL3/SDL_timer.h>
 #include <SDL3/SDL_video.h>
 #include <math.h>
 #include <stdbool.h>
@@ -37,6 +38,7 @@
 #include "engine/daynight.h"
 #include "play_mode.h"
 #include "world_bench.h"
+#include "world_view.h"
 #include "skeleton_view.h"
 #include "avatar_gallery.h"
 
@@ -156,6 +158,109 @@ static void gallery_model_hook(void *user, EngRenderQueue *queue, mat4 view_proj
     avatar_gallery_draw(hook->gallery, hook->lib, queue, view_proj, light, shadow, shadow_pass);
 }
 
+/* --world (M7) : les cellules du monde streamé, puis les personnages. */
+typedef struct WorldHook {
+    WorldView *world;
+    PlayHook *play_hook;
+    const DemoScene *scene;
+} WorldHook;
+
+static void world_model_hook(void *user, EngRenderQueue *queue, mat4 view_proj,
+                             const EngLighting *light, const EngModelShadow *shadow,
+                             bool shadow_pass)
+{
+    WorldHook *hook = user;
+    if (shadow_pass) {
+        world_view_draw_depth(hook->world, queue, view_proj);
+    } else {
+        if (hook->scene->has_atmosphere) {
+            world_view_set_fog(hook->world, &hook->scene->fog, &hook->scene->atmosphere,
+                               hook->scene->last_sky_intensity);
+        }
+        world_view_draw(hook->world, queue, view_proj, light, shadow);
+    }
+    launcher_model_hook(hook->play_hook, queue, view_proj, light, shadow, shadow_pass);
+}
+
+static bool world_ground(void *user, float x, float z, float *out)
+{
+    return world_view_height(user, x, z, out);
+}
+
+/* Point de départ du monde (coordonnées MONDE, m) : au milieu de la cellule (0, 0). */
+#define WORLD_SPAWN_X 128.0
+#define WORLD_SPAWN_Z 128.0
+
+/* --world : monde physique vide, streaming, chargement initial bloquant (les 9 cellules autour du
+ * joueur), puis le personnage posé sur le relief. */
+static bool start_world(WorldView *world, PlayMode *play, EngTweaks *tweaks, float sensitivity,
+                        bool invert_y, EngRenderer *renderer, const DemoScene *scene, int32_t seed)
+{
+    const double spawn_world[3] = {WORLD_SPAWN_X, 0.0, WORLD_SPAWN_Z};
+    const float spawn[3] = {(float)WORLD_SPAWN_X, 0.0F, (float)WORLD_SPAWN_Z};
+    if (!play_mode_init_world(play, tweaks, sensitivity, invert_y, spawn, world_ground, world)) {
+        return false;
+    }
+    const uint64_t t0 = eng_clock_counter();
+    if (!world_view_init(world, seed, renderer, play->world,
+                         scene->has_environment ? &scene->environment : NULL) ||
+        !world_view_prime(world, spawn_world, 1, 60.0)) {
+        world_view_shutdown(world);
+        play_mode_shutdown(play);
+        return false;
+    }
+    float feet[3] = {spawn[0], 0.0F, spawn[2]};
+    feet[1] = play_mode_ground(play, feet[0], feet[2]) + 0.05F;
+    play_mode_teleport(play, feet, -1.5707963F);
+    ENG_LOG_INFO("monde : chargement initial en %.0f ms (%u cellules envoyées), joueur à %.1f m "
+                 "d'altitude",
+                 (double)(eng_clock_counter() - t0) * 1000.0 /
+                     (double)SDL_GetPerformanceFrequency(),
+                 world->uploaded_cells, (double)feet[1]);
+    return true;
+}
+
+/* Une image du monde : pilote automatique éventuel, streaming, recentrage de l'origine. Renvoie
+ * les mètres parcourus par le pilote automatique. */
+static double world_frame(WorldView *world, PlayMode *play, EngCamera *camera,
+                          EngCamera *camera_prev, DemoScene *scene, double autopilot, double dt)
+{
+    double travelled = 0.0;
+    float feet[3];
+    if (!eng_character_position(play->character, feet)) {
+        return 0.0;
+    }
+    if (autopilot > 0.0) { /* traversée mesurée : le personnage glisse vers +X sur le relief */
+        const float step = (float)(autopilot * (dt < 0.1 ? dt : 0.1));
+        float ground = 0.0F;
+        if (world_view_height(world, feet[0] + step, feet[2], &ground)) {
+            const float d[3] = {step, ground + 0.05F - feet[1], 0.0F};
+            play_mode_shift(play, d);
+            for (int a = 0; a < 3; a++) {
+                feet[a] += d[a];
+                camera->position[a] += d[a];
+                camera_prev->position[a] += d[a];
+            }
+            travelled = (double)step;
+        }
+    }
+    double player_world[3];
+    eng_origin_to_world(&world->origin, feet, player_world);
+    float shift[3];
+    if (world_view_update(world, player_world, shift)) {
+        play_mode_shift(play, shift);
+        for (int a = 0; a < 3; a++) {
+            feet[a] += shift[a];
+            camera->position[a] += shift[a];
+            camera_prev->position[a] += shift[a];
+        }
+    }
+    for (int a = 0; a < 3; a++) {
+        scene->shadow_focus[a] = feet[a];
+    }
+    return travelled;
+}
+
 static void launcher_debug_hook(void *user, EngDebugLines *lines, mat4 model, bool has_model)
 {
     const PlayHook *hook = user;
@@ -193,6 +298,9 @@ int main(int argc, char **argv)
     bool start_new_game = false;
     bool crash_test = false;
     const char *world_bench_report = NULL;
+    bool world_mode = false;
+    int32_t world_seed = 1;
+    double world_autopilot = 0.0;
     const char *screenshot_path = NULL;
     long screenshot_frame = 0;
     const char *skeleton_path = NULL;
@@ -255,6 +363,14 @@ int main(int argc, char **argv)
             if (i + 1 < argc && argv[i + 1][0] != '-') {
                 world_bench_km = strtod(argv[++i], NULL);
             }
+        } else if (strcmp(argv[i], "--world") == 0) {
+            world_mode = true;
+            play_enabled = true;
+            if (i + 1 < argc && argv[i + 1][0] != '-') {
+                world_seed = (int32_t)strtol(argv[++i], NULL, 10);
+            }
+        } else if (strcmp(argv[i], "--world-autopilot") == 0 && i + 1 < argc) {
+            world_autopilot = strtod(argv[++i], NULL);
         } else if (strcmp(argv[i], "--world-bench-report") == 0 && i + 1 < argc) {
             world_bench_report = argv[++i];
         } else if (strcmp(argv[i], "--avatar-gallery") == 0) {
@@ -709,11 +825,16 @@ int main(int argc, char **argv)
     SkeletonView skeleton_view = {0};
     PlayHook play_hook = {0};
     bool use_debug_hook = false;
+    static WorldView world; /* M7 : ~1,3 Mo, hors pile */
+    WorldHook world_hook = {&world, &play_hook, &scene};
+    double world_travelled = 0.0;
     if (play_enabled) {
         if (!use_renderer || use_editor) {
             ENG_LOG_WARN("mode jouable indisponible %s",
                          use_editor ? "avec l'éditeur" : "sans rendu GPU");
-        } else if (demo_options.terrain_path != NULL
+        } else if (world_mode ? start_world(&world, &play, &tweaks, config.camera_sensitivity,
+                                            config.camera_invert_y, &renderer, &scene, world_seed)
+                   : demo_options.terrain_path != NULL
                        ? play_mode_init_terrain(&play, &tweaks, config.camera_sensitivity,
                                                 config.camera_invert_y, demo_options.terrain_path)
                        : play_mode_init(&play, &tweaks, config.camera_sensitivity,
@@ -750,6 +871,12 @@ int main(int argc, char **argv)
                                                                          : NULL);
             }
         }
+    }
+    if (world.ready) { /* le monde dessine le sol ; personnages en plus s'ils sont chargés */
+        demo_scene_set_model_hook(&scene, world_model_hook, &world_hook);
+        scene.world_mode = true;
+        (void)demo_scene_use_cascades(&scene, &renderer); /* M7-09 */
+        platform.debug_draw = false;
     }
     static AvatarGallery gallery;
     GalleryHook gallery_hook = {&gallery, &avatars};
@@ -1052,6 +1179,15 @@ int main(int argc, char **argv)
                         }
                         (void)play_combat_ai_text(play.combat, ai_text, sizeof ai_text);
                     }
+                    if (world.ready && use_play) { /* M7 : streaming, origine flottante */
+                        world_travelled += world_frame(&world, &play, &camera, &camera_prev, &scene,
+                                                       world_autopilot, clock.dt);
+                        if (frame > 30U) { /* hors chargement initial et premières images */
+                            world_view_note_frame(&world, (float)(clock.dt * 1000.0),
+                                                  (float)previous_cpu_ms);
+                        }
+                        eng_camera_lerp(&camera_prev, &camera, (float)loop.alpha, &view_camera);
+                    }
                     if (use_play) { /* animation des personnages : une fois par image */
                         play.show_debug = platform.debug_draw;
                         const bool paused = use_flow && eng_menu_is_open(&flow.menu);
@@ -1228,6 +1364,22 @@ int main(int argc, char **argv)
             editor_mode_shutdown(&editor_mode);
         }
         demo_scene_set_debug_hook(&scene, NULL, NULL);
+        if (world.ready) {
+            world_view_log_summary(&world, world_travelled);
+            float feet[3];
+            float ground = 0.0F;
+            if (use_play && eng_character_position(play.character, feet) &&
+                world_view_height(&world, feet[0], feet[2], &ground)) {
+                const float gap = feet[1] - ground;
+                if (fabsf(gap) < 0.3F) {
+                    ENG_LOG_INFO("MONDE : joueur au sol (%.2f m)", (double)gap);
+                } else {
+                    ENG_LOG_ERROR("MONDE : TROU sous le joueur (%.2f m du sol)", (double)gap);
+                }
+            }
+            demo_scene_set_model_hook(&scene, NULL, NULL);
+            world_view_shutdown(&world); /* avant le monde physique : retire ses corps */
+        }
         if (use_play) {
             play_mode_shutdown(&play);
         }
