@@ -36,6 +36,11 @@ bool eng_platform_init(EngPlatform *p, const EngWindowDesc *desc)
     if (desc->fullscreen) {
         SDL_SetWindowFullscreen(p->window, true);
         p->fullscreen = true;
+        /* La bascule est asynchrone (X11, Wayland) : sans attendre, la taille lue ci-dessous est
+         * celle de la fenêtre d'avant (2494 x 1531 au lieu de 2560 x 1600, vu sur la machine de
+         * Théo) et la swapchain naît à la mauvaise taille. SDL_SyncWindow attend la fin de la
+         * transition (avec un délai maximal côté SDL). */
+        (void)SDL_SyncWindow(p->window);
     }
     SDL_GetWindowSizeInPixels(p->window, &p->width, &p->height);
     if (!desc->no_software_surface) {

@@ -5,6 +5,7 @@ on:
     paths: ['sdl/**', '.github/workflows/sdl-ci.yml']
   pull_request:
     paths: ['sdl/**', '.github/workflows/sdl-ci.yml']
+  workflow_dispatch: # lancement à la main depuis l'onglet Actions
 
 permissions:
   contents: read
@@ -28,7 +29,7 @@ jobs:
         os: [ubuntu-24.04, windows-latest]
         preset: [debug, release]
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
         with:
           lfs: false
 
@@ -60,7 +61,21 @@ jobs:
         run: cmake --build --preset ${{ matrix.preset }}
 
       - name: Tests (ctest)
+        # en série : les tests du lanceur chargent le compilateur de shaders et se gênent en parallèle
         run: ctest --preset ${{ matrix.preset }}
+
+      # Exécutable Windows (prérequis du paquet de M9) : le dossier bin/ tel que le lanceur le lit
+      # (exécutable, game.dll, DLL, shaders compilés, assets cuits, config.ini).
+      - name: Artefact Windows (Release)
+        if: runner.os == 'Windows' && matrix.preset == 'release'
+        uses: actions/upload-artifact@v4
+        with:
+          name: openworld-windows-release
+          path: |
+            sdl/build/release/bin/
+            !sdl/build/release/bin/logs/
+          if-no-files-found: error
+          retention-days: 14
 
       - name: Format (clang-format)
         if: runner.os == 'Linux' && matrix.preset == 'debug'

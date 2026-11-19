@@ -333,7 +333,7 @@ uint32_t eng_nav_draw(const EngNavGrid *nav, EngDebugLines *lines, float y)
                 continue;
             }
             float c[2];
-            cell_center(nav, (size_t)z * nav->w + x, c);
+            cell_center(nav, z * nav->w + x, c);
             const vec3 a = {c[0] - h, y, c[1] - h};
             const vec3 b = {c[0] + h, y, c[1] + h};
             const vec3 d = {c[0] - h, y, c[1] + h};

@@ -62,7 +62,7 @@ static const char *invalid_reason(const EngAnimClip *clip)
         return "nombre de canaux hors de [1 ; 768]";
     }
     if (clip->skeleton_path == NULL || clip->skeleton_path[0] == '\0' ||
-        strnlen(clip->skeleton_path, MAX_PATH_BYTES + 1U) > MAX_PATH_BYTES) {
+        SDL_strnlen(clip->skeleton_path, MAX_PATH_BYTES + 1U) > MAX_PATH_BYTES) {
         return "chemin du squelette absent ou trop long";
     }
     uint64_t keys = 0;
@@ -783,7 +783,7 @@ bool eng_anim_from_gltf(EngArena *arena, EngArena *scratch, const void *data, si
     EngAnimImportStats *st = stats != NULL ? stats : &local_stats;
     *st = (EngAnimImportStats){0};
     if (arena == NULL || scratch == NULL || skeleton_path == NULL || skeleton_path[0] == '\0' ||
-        strnlen(skeleton_path, MAX_PATH_BYTES + 1U) > MAX_PATH_BYTES) {
+        SDL_strnlen(skeleton_path, MAX_PATH_BYTES + 1U) > MAX_PATH_BYTES) {
         return refuse(base_path, "argument NULL ou chemin du squelette absent / trop long");
     }
     cgltf_data *gltf = gltf_open(data, size, base_path, true);

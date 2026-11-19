@@ -67,7 +67,7 @@ static const char *invalid_reason(const EngSkeleton *skeleton)
             return "échelle nulle";
         }
         if (j->name != NULL &&
-            strnlen(j->name, ENG_SKELETON_MAX_NAME + 1U) > ENG_SKELETON_MAX_NAME) {
+            SDL_strnlen(j->name, ENG_SKELETON_MAX_NAME + 1U) > ENG_SKELETON_MAX_NAME) {
             return "nom trop long";
         }
     }

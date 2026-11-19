@@ -87,12 +87,12 @@ size_t eng_options_save(const EngGameOptions *o, const EngInput *input, char *ou
     size_t n = 0;
 #define EMIT(...)                                                                                  \
     do {                                                                                           \
-        const int k = snprintf(out + n, capacity - n, __VA_ARGS__);                                \
-        if (k < 0 || (size_t)k >= capacity - n) {                                                  \
+        const int emitted_ = snprintf(out + n, capacity - n, __VA_ARGS__);                         \
+        if (emitted_ < 0 || (size_t)emitted_ >= capacity - n) {                                    \
             out[0] = '\0';                                                                         \
             return 0;                                                                              \
         }                                                                                          \
-        n += (size_t)k;                                                                            \
+        n += (size_t)emitted_;                                                                     \
     } while (0)
     EMIT("# options du jeu (écrites par le menu Options)\n");
     EMIT("volume.master = %.3f\n", (double)o->master);

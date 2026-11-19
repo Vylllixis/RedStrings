@@ -445,7 +445,7 @@ static size_t build_custom(uint8_t *out, size_t capacity, uint32_t size, float s
 
 UTEST(eng_heightmap, the_reader_refuses_every_inconsistent_file)
 {
-    static uint8_t file[16384] __attribute__((aligned(16)));
+    static _Alignas(16) uint8_t file[16384];
     EngHeightmap out = {.size = 5};
     /* Référence valide : 4 x 4. */
     size_t n = build_custom(file, sizeof file, 4, 1.0F, 0.0F, 10.0F, 16, 32, 16);
@@ -498,7 +498,7 @@ UTEST(eng_heightmap, the_reader_refuses_every_inconsistent_file)
     EXPECT_TRUE(eng_heightmap_open(file, n, "rétabli", &out));
     const EngAssetSectionDesc only_info[1] = {
         {.tag = ENG_ASSET_TAG_INFO, .data = file, .size = 16, .count = 1}};
-    static uint8_t other[256] __attribute__((aligned(16)));
+    static _Alignas(16) uint8_t other[256];
     size_t written = 0;
     ASSERT_TRUE(eng_asset_build(ENG_ASSET_MAGIC_HMAP, ENG_ASSET_VERSION_HMAP, only_info, 1, other,
                                 sizeof other, &written));

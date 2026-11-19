@@ -1,5 +1,6 @@
 #include "engine/anim_graph.h"
 
+#include <SDL3/SDL_stdinc.h> /* SDL_strtok_r : strtok_r est POSIX, absent de MSVC */
 #include <ctype.h>
 #include <math.h>
 #include <stdarg.h>
@@ -400,8 +401,8 @@ static void do_line(Parser *p, char *line)
     char *tokens[MAX_TOKENS];
     uint32_t n = 0;
     char *save = NULL;
-    for (char *tok = strtok_r(line, " \t\r", &save); tok != NULL;
-         tok = strtok_r(NULL, " \t\r", &save)) {
+    for (char *tok = SDL_strtok_r(line, " \t\r", &save); tok != NULL;
+         tok = SDL_strtok_r(NULL, " \t\r", &save)) {
         if (n >= MAX_TOKENS) {
             fail(p, "ligne trop longue (plus de %u éléments)", (unsigned)MAX_TOKENS);
             return;

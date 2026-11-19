@@ -717,7 +717,7 @@ UTEST(eng_tex_file, layer_limit_is_inclusive)
         const EngAssetSectionDesc s[3] = {
             {ENG_ASSET_TAG_INFO, info, sizeof info, 1},
             {ENG_ASSET_TAG_MIPS, mips, layers * 8U, layers},
-            {ENG_ASSET_TAG_DATA, data, (size_t)layers * 16U - 12U, (uint32_t)(layers * 16U - 12U)}};
+            {ENG_ASSET_TAG_DATA, data, layers * 16U - 12U, layers * 16U - 12U}};
         size_t size = 0;
         ASSERT_TRUE(eng_asset_build(ENG_ASSET_MAGIC_TEX, ENG_ASSET_VERSION_TEX, s, 3, out,
                                     sizeof out, &size));

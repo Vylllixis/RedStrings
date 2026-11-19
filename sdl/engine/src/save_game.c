@@ -353,12 +353,12 @@ bool eng_save_decode(const void *data, size_t size, EngSaveGame *out, EngWorldSt
             s.has_enemies = sec.ok;
             r.ok = sec.ok;
         } else if (memcmp(tag, "TIME", 4) == 0) {
-            const double h = r_f64(&sec);
-            if (!sec.ok || !isfinite(h) || h < 0.0 || h >= 24.0) {
+            const double hour = r_f64(&sec);
+            if (!sec.ok || !isfinite(hour) || hour < 0.0 || hour >= 24.0) {
                 r.ok = false;
                 break;
             }
-            s.hour = h;
+            s.hour = hour;
             s.has_time = true;
         } else if (memcmp(tag, "PROG", 4) == 0) {
             EngProgress pg;

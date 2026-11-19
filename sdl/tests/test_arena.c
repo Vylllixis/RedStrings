@@ -50,7 +50,7 @@ UTEST(eng_arena, full_arena_returns_null_and_stays_usable)
 
 UTEST(eng_arena, exact_fit_with_alignment_padding)
 {
-    uint8_t buffer[64] __attribute__((aligned(64)));
+    _Alignas(64) uint8_t buffer[64];
     EngArena arena;
     eng_arena_init_buffer(&arena, "buf", buffer, sizeof buffer);
     EXPECT_TRUE(eng_arena_alloc(&arena, 1, 1) != NULL);

@@ -97,7 +97,7 @@ UTEST(eng_array, arena_mode_copies_on_growth)
 
 UTEST(eng_array, arena_full_makes_push_fail_without_corruption)
 {
-    uint8_t buffer[256] __attribute__((aligned(16)));
+    _Alignas(16) uint8_t buffer[256];
     EngArena arena;
     eng_arena_init_buffer(&arena, "small", buffer, sizeof buffer);
     ENG_ARRAY(int) values;

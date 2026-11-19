@@ -1,5 +1,6 @@
 #include "engine/ai_archetype.h"
 
+#include <SDL3/SDL_stdinc.h> /* SDL_strtok_r : strtok_r est POSIX, absent de MSVC */
 #include <ctype.h>
 #include <math.h>
 #include <stdio.h>
@@ -187,8 +188,8 @@ bool eng_arch_parse(const char *text, EngArchSet *out, char *err, size_t err_cap
         char *tok[10];
         int nt = 0;
         char *save = NULL;
-        for (char *t = strtok_r(line, " \t\r", &save); t != NULL;
-             t = strtok_r(NULL, " \t\r", &save)) {
+        for (char *t = SDL_strtok_r(line, " \t\r", &save); t != NULL;
+             t = SDL_strtok_r(NULL, " \t\r", &save)) {
             if (nt >= 10) {
                 fail(err, err_capacity, line_no, "trop de valeurs");
                 return false;

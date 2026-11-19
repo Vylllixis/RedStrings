@@ -42,8 +42,16 @@ endif()
 
 add_library(project_options INTERFACE)
 if(MSVC)
-  # /utf-8 : sources ET chaînes en UTF-8 (sinon MSVC réinterprète les accents du code source)
-  target_compile_options(project_options INTERFACE /W4 /WX /utf-8)
+  # /utf-8 : sources ET chaînes en UTF-8 (sinon MSVC réinterprète les accents du code source).
+  # /W4 /WX comme -Wall -Wextra -Werror, sauf trois avertissements sans équivalent utile ici :
+  #   C4324 : « structure complétée à cause d'un alignement » : informatif ; vient des vec4/mat4 de
+  #           cglm, alignés sur 16 octets (__declspec(align)) dans toute structure qui en contient ;
+  #   C4127 : « expression conditionnelle constante » : faux positifs sur les macros et les tailles ;
+  #   C4996 : fonctions de la CRT dites « non sûres » (fopen, getenv...) : _CRT_SECURE_NO_WARNINGS.
+  # /experimental:c11atomics : <stdatomic.h> en C (jobs.h, M7-02) ; refusé sans cette option.
+  target_compile_options(project_options INTERFACE /W4 /WX /utf-8 /wd4324 /wd4127
+    $<$<COMPILE_LANGUAGE:C>:/experimental:c11atomics>)
+  target_compile_definitions(project_options INTERFACE _CRT_SECURE_NO_WARNINGS)
 else()
   target_compile_options(project_options INTERFACE -Wall -Wextra -Wpedantic -Werror)
   if(OW_SANITIZE)

@@ -41,3 +41,6 @@ livraisons ; les tags sont posés par Théo après ses tests.
 ## v0.0 à v0.4 (M0 à M4)
 - Fondations, rendu (SDL_GPU, PBR, ombres), assets et scènes, monde (terrain, ciel, végétation),
   personnage (Jolt, caméra, animation).
+- M0 (finition) : vérifié sur la machine de Théo (fenêtre, F11, redimensionnement, clavier, vsync,
+  rechargement à chaud du code de jeu) ; portabilité MSVC (atomiques C11, avertissements, fonctions
+  POSIX remplacées) ; la CI publie l'exécutable Windows ; sources d'assets versionnées.
