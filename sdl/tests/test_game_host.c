@@ -1,3 +1,8 @@
+#ifdef _WIN32
+#include <process.h>
+#else
+#include <unistd.h>
+#endif
 #include <SDL3/SDL.h>
 #include <string.h>
 
@@ -254,6 +259,22 @@ UTEST(eng_game_host, hot_copies_are_cleaned_up)
     fixture_stop(&f);
     EXPECT_FALSE(
         SDL_GetPathInfo(LIVE_DIR "/hot", NULL)); /* dossier supprimé avec la dernière copie */
+}
+
+/* B14 : la copie porte l'identifiant du processus : deux lanceurs ouverts en même temps ne
+ * réécrivent jamais la bibliothèque que l'autre exécute. */
+UTEST(eng_game_host, the_hot_copy_name_contains_the_process_id)
+{
+    Fixture f;
+    ASSERT_TRUE(fixture_start(&f, "variant_a"));
+    char pid[32];
+#ifdef _WIN32
+    (void)SDL_snprintf(pid, sizeof pid, ".%lu.", (unsigned long)_getpid());
+#else
+    (void)SDL_snprintf(pid, sizeof pid, ".%lu.", (unsigned long)getpid());
+#endif
+    EXPECT_TRUE(strstr(f.host.loaded_copy, pid) != NULL);
+    fixture_stop(&f);
 }
 
 UTEST(eng_game_host, game_logs_and_assertions_reach_the_engine)

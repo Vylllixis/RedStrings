@@ -2,6 +2,11 @@
 
 #include <SDL3/SDL.h>
 #include <string.h>
+#ifdef _WIN32
+#include <process.h> /* _getpid */
+#else
+#include <unistd.h> /* getpid */
+#endif
 
 #include "engine/assert.h"
 #include "engine/log.h"
@@ -9,6 +14,18 @@
 /* Numéro de copie pour tout le processus (et non par hôte) : un nom de copie n'est jamais
  * réutilisé, même par un second hôte (voir ENG_HOST_DLCLOSE_IS_NOOP dans game_host.h). */
 static unsigned next_copy_id = 0;
+
+/* Identifiant du processus, dans le nom de chaque copie : deux lanceurs ouverts en même temps
+ * partagent le dossier hot/ ; sans lui, le second recopiait game.1.so PAR-DESSUS la bibliothèque
+ * que le premier exécutait (plantage du premier, B14). */
+static unsigned long process_id(void)
+{
+#ifdef _WIN32
+    return (unsigned long)_getpid();
+#else
+    return (unsigned long)getpid();
+#endif
+}
 
 /* Supprime le fichier d'une copie dont la bibliothèque vient d'être déchargée. Voir
  * ENG_HOST_DLCLOSE_IS_NOOP : dans ce cas le fichier est gardé jusqu'à l'arrêt. */
@@ -149,8 +166,8 @@ static bool load_candidate(EngGameHost *host, Candidate *out)
 
     host->generation++;
     next_copy_id++;
-    if (SDL_snprintf(out->copy_path, sizeof out->copy_path, "%s/%s.%u%s", host->hot_dir, stem,
-                     next_copy_id, ext) >= (int)sizeof out->copy_path) {
+    if (SDL_snprintf(out->copy_path, sizeof out->copy_path, "%s/%s.%lu.%u%s", host->hot_dir, stem,
+                     process_id(), next_copy_id, ext) >= (int)sizeof out->copy_path) {
         ENG_LOG_ERROR("jeu : chemin trop long");
         return false;
     }

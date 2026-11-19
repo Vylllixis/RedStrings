@@ -148,8 +148,10 @@ Règles :
 
 1. attend qu'il soit **stable** sur deux contrôles consécutifs (l'éditeur de liens peut encore
    écrire) ;
-2. **copie** la bibliothèque sous un nom neuf dans `hot/` et charge la copie (l'original reste
-   libre pour le compilateur ; sous Windows une DLL chargée est verrouillée) ;
+2. **copie** la bibliothèque sous un nom neuf dans `hot/` (`game.<pid>.<n>.so` : l'identifiant du
+   processus évite que deux lanceurs ouverts en même temps réécrivent la copie de l'autre, B14) et
+   charge la copie (l'original reste libre pour le compilateur ; sous Windows une DLL chargée est
+   verrouillée) ;
 3. vérifie la version de l'API et la taille de l'état : sinon le rechargement est **refusé**
    et l'ancien code continue ;
 4. `ancien.unload(état)`, `nouveau.reload(état, services)`, décharge et supprime l'ancienne copie.
