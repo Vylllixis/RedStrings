@@ -34,6 +34,12 @@ end
 ```
 
 - 32 attaques, 4 hitboxes par attaque, phases de 600 ticks au plus, `hitstop` 0 à 30.
+- `anim CLIP [VITESSE [DÉCALAGE]]` (M4, facultatif) : clip du personnage joué pendant l'attaque,
+  lu à l'instant `DÉCALAGE + tick / 60 × VITESSE` (vitesse ]0 ; 10], décalage [-60 ; 60] s : négatif =
+  première image tenue). Calé pour que le passage de l'arme tombe dans les ticks actifs (test
+  `engine.character_motion`, voir `docs/characters.md`).
+- Une hitbox `hand_r` est remplacée par la **lame animée** quand le jeu la donne à la simulation
+  (`eng_sim_set_weapon`, M5-06) ; les autres noms (ex. `bolt`) restent dans le repère du corps.
 - Tout ou rien : la moindre erreur refuse le fichier entier (« ligne N : … »).
 - Rechargement à chaud : `eng_attackfile_open` puis `eng_attackfile_poll` à chaque image ; une
   version invalide est journalisée et l'ancienne reste active.

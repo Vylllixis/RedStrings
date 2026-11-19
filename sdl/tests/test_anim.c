@@ -1483,3 +1483,30 @@ UTEST(anim, assetc_anim_cooks_a_gltf_into_an_anim_and_refuses_bad_requests)
     remove(dep);
     fx_done(&f);
 }
+
+/* Recherche d'une animation par nom (assetc anim --anim-name, M4) : la première de ce nom gagne ;
+ * nom absent, vide ou NULL, fichier illisible : UINT32_MAX. */
+UTEST(anim, an_animation_is_found_by_its_exact_name)
+{
+    static uint8_t glb[GLB_MAX];
+    const Acc accs[5] = {{T3, 3, "SCALAR"},
+                         {HIPS_T, 3, "VEC3"},
+                         {T2, 2, "SCALAR"},
+                         {SPINE_R, 2, "VEC4"},
+                         {PROP_T, 2, "VEC3"}};
+    const size_t size =
+        build_glb(glb, GLB_MAX, CHAIN, CHAIN_SKIN,
+                  CHAIN_ANIM ",{\"name\":\"course\",\"samplers\":[{\"input\":0,\"output\":1}],"
+                             "\"channels\":[{\"sampler\":0,\"target\":{\"node\":0,\"path\":"
+                             "\"translation\"}}]}," CHAIN_ANIM,
+                  accs, 5);
+    ASSERT_TRUE(size > 0);
+    EXPECT_EQ(eng_anim_gltf_clip_count(glb, size), 3U);
+    EXPECT_EQ(eng_anim_gltf_find(glb, size, "marche"), 0U); /* la première des deux « marche » */
+    EXPECT_EQ(eng_anim_gltf_find(glb, size, "course"), 1U);
+    EXPECT_EQ(eng_anim_gltf_find(glb, size, "Course"), UINT32_MAX); /* casse exacte */
+    EXPECT_EQ(eng_anim_gltf_find(glb, size, "saut"), UINT32_MAX);
+    EXPECT_EQ(eng_anim_gltf_find(glb, size, ""), UINT32_MAX);
+    EXPECT_EQ(eng_anim_gltf_find(glb, size, NULL), UINT32_MAX);
+    EXPECT_EQ(eng_anim_gltf_find(glb, 10, "marche"), UINT32_MAX);
+}

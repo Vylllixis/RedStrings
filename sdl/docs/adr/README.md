@@ -32,3 +32,4 @@ Format : Contexte → Options → Décision → Conséquences. Statuts : Propos�
 | [0023](0023-eau-opaque-profondeur-par-sommet.md) | Eau : opaque, profondeur par sommet, reflet de Fresnel | Accepté |
 | [0024](0024-jolt-via-joltc-isole-derriere-physics-h.md) | Jolt via joltc, isolé derrière physics.h | Accepté |
 | [0025](0025-ia-machine-a-etats-donnees-et-jetons.md) | IA : machine à états à données, jetons d'attaque, navigation en grille | Accepté |
+| [0026](0026-personnages-kaykit-animateur-de-combat-et-roulade.md) | Personnages KayKit (CC0), animateur piloté par l'état de combat, roulade procédurale | Accepté |

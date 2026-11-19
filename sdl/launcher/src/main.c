@@ -38,6 +38,7 @@
 #include "play_mode.h"
 #include "world_bench.h"
 #include "skeleton_view.h"
+#include "avatar_gallery.h"
 
 ENG_LSAN_DEFAULT_SUPPRESSIONS();
 
@@ -94,9 +95,13 @@ static void usage(const char *prog)
     fprintf(stderr, "  --combat-autoplay  comme --combat, joué par un pilote automatique "
                     "(démonstration)\n");
     fprintf(stderr, "  --screenshot F N (développement) écrit l'image n° N en PPM dans F\n");
+    fprintf(stderr, "  --avatar-gallery (développement) rangée de chevaliers, un état d'animation "
+                    "chacun (repos, marche, attaques au tick d'impact, roulade...)\n");
     fprintf(stderr,
             "  --world-bench [KM] benchmark de traversée du monde ouvert (défaut 10 km à 30 "
             "m/s), sans fenêtre ; --world-bench-report F : rapport écrit dans F\n");
+    fprintf(stderr, "  --combat-rig-selftest (développement) le même, avec les personnages "
+                    "animés : hurtboxes sur les os, lame en main\n");
     fprintf(stderr, "  --combat-selftest (développement) autotest du combat sans fenêtre, "
                     "journalise AUTOTEST COMBAT\n");
     fprintf(stderr, "  --no-mipmaps   démo : texture du cube sans mipmaps (montre l'aliasing)\n");
@@ -126,6 +131,31 @@ typedef struct PlayHook {
     double alpha;
 } PlayHook;
 
+/* Personnages animés (M4) : dessinés par la scène dans ses deux passes. */
+static void launcher_model_hook(void *user, EngRenderQueue *queue, mat4 view_proj,
+                                const EngLighting *light, const EngModelShadow *shadow,
+                                bool shadow_pass)
+{
+    const PlayHook *hook = user;
+    if (hook->play != NULL) {
+        play_mode_draw_models(hook->play, queue, view_proj, light, shadow, shadow_pass);
+    }
+}
+
+/* --avatar-gallery : la rangée d'états d'animation. */
+typedef struct GalleryHook {
+    AvatarGallery *gallery;
+    AvatarLibrary *lib;
+} GalleryHook;
+
+static void gallery_model_hook(void *user, EngRenderQueue *queue, mat4 view_proj,
+                               const EngLighting *light, const EngModelShadow *shadow,
+                               bool shadow_pass)
+{
+    const GalleryHook *hook = user;
+    avatar_gallery_draw(hook->gallery, hook->lib, queue, view_proj, light, shadow, shadow_pass);
+}
+
 static void launcher_debug_hook(void *user, EngDebugLines *lines, mat4 model, bool has_model)
 {
     const PlayHook *hook = user;
@@ -149,10 +179,12 @@ int main(int argc, char **argv)
     bool editor_enabled = false;
     bool editor_selftest = false;
     bool play_enabled = false;
+    bool avatar_gallery_mode = false;
     bool play_selftest = false;
     bool combat_enabled = false;
     bool combat_audio = true;
     bool combat_selftest = false;
+    bool combat_selftest_rig = false;
     bool combat_autoplay = false;
     double world_bench_km = 0.0;
     const char *terrain_selftest_path = NULL;
@@ -224,6 +256,8 @@ int main(int argc, char **argv)
             }
         } else if (strcmp(argv[i], "--world-bench-report") == 0 && i + 1 < argc) {
             world_bench_report = argv[++i];
+        } else if (strcmp(argv[i], "--avatar-gallery") == 0) {
+            avatar_gallery_mode = true;
         } else if (strcmp(argv[i], "--combat-autoplay") == 0) {
             play_enabled = true;
             combat_enabled = true;
@@ -235,6 +269,9 @@ int main(int argc, char **argv)
             combat_audio = false;
         } else if (strcmp(argv[i], "--combat-selftest") == 0) {
             combat_selftest = true;
+        } else if (strcmp(argv[i], "--combat-rig-selftest") == 0) {
+            combat_selftest = true;
+            combat_selftest_rig = true;
         } else if (strcmp(argv[i], "--skeleton") == 0 && i + 1 < argc) {
             skeleton_path = argv[++i];
         } else if (strcmp(argv[i], "--anim") == 0 && i + 1 < argc) {
@@ -408,7 +445,7 @@ int main(int argc, char **argv)
         return bench_ok ? 0 : 1;
     }
     if (combat_selftest) { /* sans fenêtre ni GPU : personnage, combat et IA scriptés */
-        const bool combat_ok = play_combat_selftest();
+        const bool combat_ok = play_combat_selftest(combat_selftest_rig);
         eng_log_shutdown();
         return combat_ok ? 0 : 1;
     }
@@ -649,6 +686,7 @@ int main(int argc, char **argv)
 
     /* Mode jouable (M4) : monde physique, personnage, caméra 3e personne. */
     PlayMode play = {0};
+    static AvatarLibrary avatars; /* personnages animés (grand : hors pile) */
     bool use_play = false;
     static GameFlow flow;
     bool use_flow = false;
@@ -685,7 +723,34 @@ int main(int argc, char **argv)
             use_debug_hook = true;
             play_mode_view(&play, &camera);
             camera_prev = camera;
+            /* M4 : chevalier et squelettes animés à la place des capsules */
+            if (avatar_library_load_cpu(&avatars) &&
+                avatar_library_load_gpu(&avatars, &renderer,
+                                        scene.has_environment ? &scene.environment : NULL) &&
+                play_mode_attach_avatars(&play, &avatars)) {
+                demo_scene_set_model_hook(&scene, launcher_model_hook, &play_hook);
+                platform.debug_draw = false; /* capsules et grille : F3 */
+            }
         }
+    }
+    static AvatarGallery gallery;
+    GalleryHook gallery_hook = {&gallery, &avatars};
+    if (avatar_gallery_mode && use_renderer && !use_play) {
+        char attacks_path[1024];
+        (void)snprintf(attacks_path, sizeof attacks_path, "%s/combat/attacks.txt",
+                       OW_ASSET_SOURCE_DIR);
+        char *attacks_text = (char *)SDL_LoadFile(attacks_path, NULL);
+        if (avatar_library_load_cpu(&avatars) &&
+            avatar_library_load_gpu(&avatars, &renderer,
+                                    scene.has_environment ? &scene.environment : NULL) &&
+            avatar_gallery_init(&gallery, &avatars, attacks_text)) {
+            demo_scene_set_model_hook(&scene, gallery_model_hook, &gallery_hook);
+            scene.hide_props = true;
+            avatar_gallery_camera(&gallery, &camera);
+            camera_prev = camera;
+            platform.debug_draw = false;
+        }
+        SDL_free(attacks_text);
     }
     /* Squelette de debug (M4-12) : os superposés au modèle central. */
     if (skeleton_path != NULL || anim_path != NULL) {
@@ -922,6 +987,15 @@ int main(int argc, char **argv)
                     eng_camera_lerp(&camera_prev, &camera, (float)loop.alpha, &view_camera);
                     skeleton_view_update(&skeleton_view, (float)clock.dt,
                                          !use_ui || !eng_ui_wants_keyboard(&ui));
+                    if (gallery.ready) {
+                        avatar_gallery_update(&gallery, &avatars, (float)clock.dt);
+                    }
+                    if (use_play) { /* animation des personnages : une fois par image */
+                        play.show_debug = platform.debug_draw;
+                        const bool paused = use_flow && eng_menu_is_open(&flow.menu);
+                        play_mode_update_visuals(&play, loop.alpha,
+                                                 paused ? 0.0F : (float)clock.dt);
+                    }
                     EngRenderQueue *queue = eng_renderer_begin_frame(&renderer);
                     (void)eng_lighting_set_sun_angles(&lighting, sun_azimuth, sun_elevation);
                     shadow_params.pcf_radius = (uint32_t)shadow_radius;
@@ -1085,6 +1159,8 @@ int main(int argc, char **argv)
             play_mode_shutdown(&play);
         }
         skeleton_view_shutdown(&skeleton_view);
+        demo_scene_set_model_hook(&scene, NULL, NULL);
+        avatar_library_shutdown(&avatars, &renderer);
         demo_scene_shutdown(&scene, &renderer);
         const uint32_t leaked = eng_renderer_shutdown(&renderer);
         if (leaked != 0) {

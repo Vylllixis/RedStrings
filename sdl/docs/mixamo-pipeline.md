@@ -1,5 +1,10 @@
 # Pipeline Mixamo → moteur (M4-21)
 
+> **Personnages du jeu** : ce ne sont pas des fichiers Mixamo (licence : pas de redistribution des
+> fichiers bruts) mais KayKit (CC0), préparés par `tools/scripts/kaykit_prepare.sh` puis cuits par la
+> même chaîne (`assetc skel`, `mesh --skin 0`, `anim --anim-name`) : voir `docs/characters.md` et
+> l'ADR 0026. La procédure ci-dessous reste valable pour un personnage Mixamo.
+
 De la sortie de Mixamo aux fichiers que le moteur charge. **Aucun fichier Mixamo réel n'a été utilisé pour
 écrire ou tester ceci** : toutes les étapes côté moteur sont testées sur des glTF construits en mémoire ;
 les étapes côté Mixamo et Blender décrivent la procédure usuelle et sont **à confirmer sur ton fichier**.

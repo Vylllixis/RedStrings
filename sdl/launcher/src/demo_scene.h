@@ -45,6 +45,13 @@ typedef struct DemoWorldModel {
  * monde éditeur). */
 typedef void (*DemoDebugHook)(void *user, EngDebugLines *lines, mat4 model, bool has_model);
 
+/* Modèles supplémentaires (M4 : personnages animés) : voir demo_scene_set_model_hook. Appelé dans
+ * la passe d'ombre (`shadow_pass`, `view_proj` = matrice du soleil, `light` et `shadow` NULL) puis
+ * dans la passe principale (après le décor). */
+typedef void (*DemoModelHook)(void *user, EngRenderQueue *queue, mat4 view_proj,
+                              const EngLighting *light, const EngModelShadow *shadow,
+                              bool shadow_pass);
+
 typedef struct DemoScene {
     EngBufferHandle vertices;
     EngBufferHandle indices;
@@ -150,6 +157,9 @@ typedef struct DemoScene {
     bool has_lines;
     DemoDebugHook debug_hook; /* demo_scene_set_debug_hook */
     void *debug_user;
+    DemoModelHook model_hook; /* demo_scene_set_model_hook */
+    void *model_user;
+    bool hide_props; /* sol seul : ni cubes ni modèle central (galerie des personnages) */
     bool has_cook;
     bool world_models_full_warned;
 } DemoScene;
@@ -232,6 +242,9 @@ void demo_scene_set_world(DemoScene *scene, EngWorld *world);
 /* `hook` est appelé par demo_scene_draw_debug sur la liste de lignes de la scène, après la grille
  * et avant l'envoi au GPU. NULL : aucun. */
 void demo_scene_set_debug_hook(DemoScene *scene, DemoDebugHook hook, void *user);
+/* `hook` dessine des modèles en plus du décor (arène et terrain), dans les deux passes. NULL :
+ * aucun. */
+void demo_scene_set_model_hook(DemoScene *scene, DemoModelHook hook, void *user);
 /* Bornes locales du modèle d'une entité (EngEditorBoundsFn, user = DemoScene*) ; false si
  * l'entité n'a pas de MeshRenderer ou si son modèle n'est pas chargé. */
 bool demo_scene_entity_bounds(void *scene, EngEntity entity, float min[3], float max[3]);

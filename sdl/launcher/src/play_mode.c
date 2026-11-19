@@ -329,23 +329,89 @@ void play_mode_debug_draw(const PlayMode *play, EngDebugLines *lines, double alp
     }
     float feet[3];
     (void)eng_character_interpolated(play->character, alpha, feet);
+    /* sur le terrain, le maillage du champ de hauteurs remplirait le budget de lignes (et
+     * cacherait le personnage) : seulement les corps non statiques ; avec les personnages animés
+     * (M4) et sans F3 : seulement le décor de l'arène (pas de capsule) */
+    uint32_t mask =
+        play->on_terrain ? (ENG_LAYERS_ALL & ~(1U << ENG_LAYER_STATIC)) : ENG_LAYERS_ALL;
+    const bool models = play->avatars != NULL && play->avatar.ready;
+    if (models && !play->show_debug) {
+        mask &= 1U << ENG_LAYER_STATIC;
+    }
     const EngPhysicsDebugDraw options = {
-        /* sur le terrain, le maillage du champ de hauteurs remplirait le budget de lignes (et
-         * cacherait le personnage) : seulement les corps non statiques */
-        .layer_mask =
-            play->on_terrain ? (ENG_LAYERS_ALL & ~(1U << ENG_LAYER_STATIC)) : ENG_LAYERS_ALL,
-        .focus = {feet[0], feet[1], feet[2]},
-        .radius = 60.0F};
-    (void)eng_physics_debug_draw(play->world, lines, &options);
-    /* flèche de direction du personnage (le lacet 0 regarde vers -Z, positif vers la gauche) */
-    const float f = play->loco.facing;
-    const vec3 from = {feet[0], feet[1] + 0.9F, feet[2]};
-    const vec3 to = {feet[0] - (sinf(f) * 0.9F), feet[1] + 0.9F, feet[2] - (cosf(f) * 0.9F)};
-    eng_debug_lines_set_overlay(lines, true);
-    (void)eng_debug_arrow(lines, from, to, ENG_DEBUG_YELLOW);
-    eng_debug_lines_set_overlay(lines, false);
+        .layer_mask = mask, .focus = {feet[0], feet[1], feet[2]}, .radius = 60.0F};
+    if (mask != 0U) {
+        (void)eng_physics_debug_draw(play->world, lines, &options);
+    }
+    if (!models || play->show_debug) {
+        /* flèche de direction du personnage (le lacet 0 regarde vers -Z, positif vers la gauche) */
+        const float f = play->loco.facing;
+        const vec3 from = {feet[0], feet[1] + 0.9F, feet[2]};
+        const vec3 to = {feet[0] - (sinf(f) * 0.9F), feet[1] + 0.9F, feet[2] - (cosf(f) * 0.9F)};
+        eng_debug_lines_set_overlay(lines, true);
+        (void)eng_debug_arrow(lines, from, to, ENG_DEBUG_YELLOW);
+        eng_debug_lines_set_overlay(lines, false);
+    }
     if (play->combat != NULL) {
         play_combat_draw(play->combat, lines, play);
+    }
+}
+
+/* ── Personnages animés (M4) ── */
+
+bool play_mode_attach_avatars(PlayMode *play, AvatarLibrary *lib)
+{
+    if (play == NULL || !play->ready || lib == NULL || !lib->cpu_ready) {
+        return false;
+    }
+    if (!avatar_init(&play->avatar, lib, AVATAR_KNIGHT, AVATAR_SWORD, AVATAR_SHIELD, 1.0F)) {
+        ENG_LOG_WARN("personnages : chevalier impossible, capsule conservée");
+        return false;
+    }
+    play->avatars = lib;
+    if (play->combat != NULL && !play_combat_attach_avatars(play->combat, lib, play)) {
+        ENG_LOG_WARN("personnages : ennemis impossibles, capsules conservées pour eux");
+    }
+    return true;
+}
+
+void play_mode_update_visuals(PlayMode *play, double alpha, float dt)
+{
+    if (play == NULL || !play->ready || play->avatars == NULL || !play->avatar.ready) {
+        return;
+    }
+    float feet[3];
+    (void)eng_character_interpolated(play->character, alpha, feet);
+    float v[3] = {0.0F, 0.0F, 0.0F};
+    (void)eng_character_velocity(play->character, v);
+    const EngCharacterGround g = eng_character_ground(play->character);
+    EngActorDrive drive = {.ground_speed = sqrtf((v[0] * v[0]) + (v[2] * v[2])),
+                           .grounded = g == ENG_GROUND_SUPPORTED || g == ENG_GROUND_STEEP,
+                           .state = ENG_CS_IDLE,
+                           .tick_fraction = (float)alpha};
+    if (play->combat != NULL) {
+        play_combat_player_drive(play->combat, play->avatars, alpha, &drive);
+    }
+    avatar_update(&play->avatar, play->avatars, &drive, dt, feet, play->loco.facing);
+    if (play->combat != NULL) {
+        play_combat_update_visuals(play->combat, play, alpha, dt);
+    }
+}
+
+void play_mode_draw_models(const PlayMode *play, EngRenderQueue *queue, mat4 view_proj,
+                           const EngLighting *light, const EngModelShadow *shadow, bool shadow_pass)
+{
+    if (play == NULL || !play->ready || play->avatars == NULL) {
+        return;
+    }
+    if (shadow_pass) {
+        avatar_draw_shadow(&play->avatar, play->avatars, queue, view_proj);
+    } else {
+        avatar_draw(&play->avatar, play->avatars, queue, view_proj, light, shadow);
+    }
+    if (play->combat != NULL) {
+        play_combat_draw_models(play->combat, play->avatars, queue, view_proj, light, shadow,
+                                shadow_pass);
     }
 }
 

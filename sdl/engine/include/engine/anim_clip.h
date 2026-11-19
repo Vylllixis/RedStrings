@@ -88,6 +88,10 @@ typedef struct EngAnimImportStats {
 /* Nombre d'animations d'un glTF en mémoire ; 0 si illisible (journalisé). */
 uint32_t eng_anim_gltf_clip_count(const void *data, size_t size);
 
+/* Indice de la PREMIÈRE animation nommée exactement `name` (sensible à la casse) ; UINT32_MAX si
+ * aucune, si le fichier est illisible ou si `name` est NULL ou vide. */
+uint32_t eng_anim_gltf_find(const void *data, size_t size, const char *name);
+
 /* Importe l'animation `anim_index` d'un glTF / GLB en mémoire pour le squelette du skin
  * `skin_index` (le MÊME skin que celui cuit par eng_skeleton_from_gltf : les indices
  * d'articulation du clip sont ceux du squelette, parents d'abord). `skeleton_path` : chemin du

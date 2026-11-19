@@ -121,6 +121,58 @@ bool eng_sim_set_rig(EngCombatSim *s, uint32_t i, const EngCapsule *caps, const 
     return true;
 }
 
+bool eng_sim_set_weapon(EngCombatSim *s, uint32_t i, const EngCapsule *caps, uint32_t count)
+{
+    if (s == NULL || i >= s->count || count > ENG_SIM_WEAPON_MAX || (count > 0U && caps == NULL)) {
+        return false;
+    }
+    EngSimWeapon *w = &s->weapon[i];
+    if (count == 0U) {
+        memset(w, 0, sizeof *w);
+        return true;
+    }
+    if (w->count == count) {
+        memcpy(w->prev, w->cur, sizeof(EngCapsule) * count);
+    } else {
+        memcpy(w->prev, caps, sizeof(EngCapsule) * count); /* première pose : pas de balayage */
+    }
+    memcpy(w->cur, caps, sizeof(EngCapsule) * count);
+    w->count = count;
+    return true;
+}
+
+/* Hitboxes de l'attaque `atk` du combattant `i` : celles du repère du corps, sauf les `hand_r`
+ * remplacées par l'arme animée si l'appelant l'a donnée (eng_sim_set_weapon). */
+static uint32_t attack_capsules(const EngCombatSim *s, uint32_t i, const EngAttack *atk,
+                                EngCapsule prev[ENG_ATTACK_MAX_HITBOXES + ENG_SIM_WEAPON_MAX],
+                                EngCapsule cur[ENG_ATTACK_MAX_HITBOXES + ENG_SIM_WEAPON_MAX])
+{
+    EngCapsule bp[ENG_ATTACK_MAX_HITBOXES];
+    EngCapsule bc[ENG_ATTACK_MAX_HITBOXES];
+    const uint32_t nb = eng_sim_weapons(&s->bodies[i], true, atk, bp);
+    (void)eng_sim_weapons(&s->bodies[i], false, atk, bc);
+    const EngSimWeapon *w = &s->weapon[i];
+    uint32_t n = 0;
+    bool weapon_used = false;
+    for (uint32_t k = 0; k < nb && k < atk->hitbox_count; k++) {
+        if (w->count > 0U && strcmp(atk->hitboxes[k].joint, "hand_r") == 0) {
+            if (!weapon_used) {
+                for (uint32_t c = 0; c < w->count; c++) {
+                    prev[n] = w->prev[c];
+                    cur[n] = w->cur[c];
+                    n++;
+                }
+                weapon_used = true;
+            }
+            continue;
+        }
+        prev[n] = bp[k];
+        cur[n] = bc[k];
+        n++;
+    }
+    return n;
+}
+
 static void move_body(EngCombatSim *s, uint32_t i, const EngFighterInput *in)
 {
     EngFighter *f = &s->fighters[i];
@@ -256,10 +308,9 @@ void eng_sim_step(EngCombatSim *s, const EngFighterInput *inputs)
         }
         const EngAttack *atk = eng_fighter_attack(a, s->attacks);
         atk_of[i] = atk;
-        EngCapsule wprev[ENG_ATTACK_MAX_HITBOXES];
-        EngCapsule wcur[ENG_ATTACK_MAX_HITBOXES];
-        const uint32_t nw = eng_sim_weapons(&s->bodies[i], true, atk, wprev);
-        (void)eng_sim_weapons(&s->bodies[i], false, atk, wcur);
+        EngCapsule wprev[ENG_ATTACK_MAX_HITBOXES + ENG_SIM_WEAPON_MAX];
+        EngCapsule wcur[ENG_ATTACK_MAX_HITBOXES + ENG_SIM_WEAPON_MAX];
+        const uint32_t nw = attack_capsules(s, i, atk, wprev, wcur);
         EngHitTarget targets[ENG_SIM_MAX];
         uint32_t nt = 0;
         for (uint32_t j = 0; j < s->count; j++) {

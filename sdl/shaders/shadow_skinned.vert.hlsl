@@ -8,9 +8,12 @@ cbuffer Uniforms : register(b0, space1)
 };
 
 struct Input {
+    // Indices contigus DANS L'ORDRE de déclaration : la compilation SPIR-V numérote les
+    // locations dans cet ordre (0, 1, 2) alors que D3D12 lit l'indice de TEXCOORD ; les deux
+    // coïncident seulement ainsi (TEXCOORD0/4/5 laissait Vulkan lire les poids au mauvais endroit).
     float3 position : TEXCOORD0;
-    float4 joints : TEXCOORD4;
-    float4 weights : TEXCOORD5;
+    float4 joints : TEXCOORD1;
+    float4 weights : TEXCOORD2;
 };
 
 float4 main(Input input) : SV_Position

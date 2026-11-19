@@ -1,4 +1,4 @@
-add_executable(launcher src/main.c src/demo_scene.c src/editor_mode.c src/play_mode.c src/play_combat.c src/world_bench.c src/skeleton_view.c src/game_flow.c)
+add_executable(launcher src/main.c src/demo_scene.c src/editor_mode.c src/play_mode.c src/play_combat.c src/world_bench.c src/skeleton_view.c src/game_flow.c src/avatar.c src/avatar_gallery.c)
 target_link_libraries(launcher PRIVATE engine)
 add_dependencies(launcher game)
 target_link_libraries(launcher PRIVATE project_options)
@@ -17,7 +17,7 @@ ow_copy_shader_runtime(launcher)
 add_custom_target(launcher_assets ALL
   COMMAND ${CMAKE_COMMAND} -E copy_directory ${CMAKE_SOURCE_DIR}/assets ${CMAKE_BINARY_DIR}/bin/assets
   COMMENT "Copie des assets")
-add_dependencies(launcher launcher_assets cooked_assets)
+add_dependencies(launcher launcher_assets cooked_assets cooked_characters)
 
 # --watch-assets : le lanceur recuit le modèle de démonstration à partir des sources du dépôt (assets/)
 # avec assetc, puis le recharge (M2-06).

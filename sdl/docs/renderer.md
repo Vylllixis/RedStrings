@@ -128,7 +128,7 @@ EngDrawCmd cmd = { /* ... */ .texture = tex, .sampler = smp };
   `+X −X +Y −Y +Z −Z`), tous les niveaux de mip donnés (`mip_levels` entre 1 et la chaîne complète) ;
   `eng_renderer_texture_layers` donne le nombre de couches. Descriptions invalides : refus sans fuite.
 - **UV** : (0, 0) = coin haut-gauche de l'image, v vers le bas.
-- Handles générationnels, pools bornés (256 textures, 32 samplers par défaut), fuites rendues et
+- Handles générationnels, pools bornés (256 textures, 128 samplers par défaut : chaque modèle GPU en crée deux, et les personnages de M4 comptent 14 modèles), fuites rendues et
   comptées à l'arrêt comme pour les buffers et pipelines.
 
 ## Buffers de streaming (M1-11)

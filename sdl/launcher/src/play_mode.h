@@ -12,6 +12,7 @@
 #include "engine/physics.h"
 #include "engine/stamina.h"
 #include "engine/tweak.h"
+#include "avatar.h"
 #include "play_combat.h"
 
 /* Mode jouable du lanceur (M4, option --play) : assemble ce que M4-06 à M4-11 ont construit, dans
@@ -54,6 +55,9 @@ typedef struct PlayMode {
     float combat_time; /* secondes de jeu (rechargement des attaques) */
     bool autoplay;     /* --combat-autoplay : le pilote automatique joue */
     uint32_t ticks;
+    AvatarLibrary *avatars; /* M4 : personnages animés ; NULL : capsules en fil de fer */
+    Avatar avatar;          /* le chevalier du joueur */
+    bool show_debug;        /* F3 : capsules, boîtes et flèche en plus des modèles */
 } PlayMode;
 
 /* Crée le monde (sol, cubes de la démonstration rendus solides, marches, mur, rampe, plateforme),
@@ -86,6 +90,17 @@ bool play_mode_enable_combat(PlayMode *play, bool audio);
 
 /* Un pas fixe de `dt` secondes (0 < dt <= 0,1). */
 void play_mode_tick(PlayMode *play, const EngInputState *input, float dt);
+
+/* M4 : branche les personnages animés (bibliothèque chargée, GPU compris) ; le joueur devient un
+ * chevalier, les combattants des squelettes. false (journalisé) : capsules conservées. */
+bool play_mode_attach_avatars(PlayMode *play, AvatarLibrary *lib);
+/* Une fois par IMAGE, avant le dessin : anime les personnages (`alpha` : interpolation entre deux
+ * pas, `dt` : durée réelle de l'image). */
+void play_mode_update_visuals(PlayMode *play, double alpha, float dt);
+/* Dessine les personnages (crochet de modèles de la scène, demo_scene_set_model_hook). */
+void play_mode_draw_models(const PlayMode *play, EngRenderQueue *queue, mat4 view_proj,
+                           const EngLighting *light, const EngModelShadow *shadow,
+                           bool shadow_pass);
 
 /* Écrit position et orientation de la caméra du pas courant dans `out` (champ de vision et plans
  * inchangés). */

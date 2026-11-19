@@ -13,6 +13,8 @@
 #include "engine/combat_audio.h"
 #include "engine/damage_numbers.h"
 #include "engine/files.h"
+#include "engine/hurtbox.h"
+#include "engine/pose.h"
 #include "engine/lockon.h"
 #include "engine/log.h"
 #include "engine/mixer.h"
@@ -34,27 +36,38 @@
 /* Valeurs intégrées : copie de assets/combat/ (utilisées si les fichiers manquent). */
 static const char DEFAULT_ATTACKS[] =
     "attack light1\n startup 8\n active 4\n recovery 14\n damage 10\n posture 8\n stamina 10\n"
-    " hitstop 3\n cancel_from 6\n next light2\n hitbox hand_r 0 0 0.3 0 0 1.4 0.15\nend\n"
+    " hitstop 3\n cancel_from 6\n next light2\n anim slash_h 1.0 0.075\n "
+    " hitbox hand_r 0 0 0.3 0 0 1.4 0.15\nend\n"
     "attack light2\n startup 7\n active 4\n recovery 14\n damage 10\n posture 8\n stamina 10\n"
-    " hitstop 3\n cancel_from 6\n next light3\n hitbox hand_r 0 0 0.3 0 0 1.4 0.15\nend\n"
+    " hitstop 3\n cancel_from 6\n next light3\n anim slash_d 1.0 0.26\n "
+    " hitbox hand_r 0 0 0.3 0 0 1.4 0.15\nend\n"
     "attack light3\n startup 10\n active 5\n recovery 20\n damage 14\n posture 14\n stamina 14\n"
-    " hitstop 4\n hitbox hand_r 0 0 0.3 0 0 1.5 0.18\nend\n"
+    " hitstop 4\n anim chop 1.0 0.375\n "
+    " hitbox hand_r 0 0 0.3 0 0 1.5 0.18\nend\n"
     "attack heavy\n startup 20\n active 5\n recovery 24\n damage 25\n posture 30\n stamina 25\n"
-    " hitstop 6\n hitbox hand_r 0 0 0.3 0 0 1.6 0.2\nend\n"
+    " hitstop 6\n anim stab 1.0 0\n "
+    " hitbox hand_r 0 0 0.3 0 0 1.6 0.2\nend\n"
     "attack g_slash\n startup 18\n active 4\n recovery 18\n damage 6\n posture 8\n stamina 5\n"
-    " hitstop 3\n cancel_from 6\n next g_slash2\n hitbox hand_r 0 0 0.3 0 0 1.5 0.15\nend\n"
+    " hitstop 3\n cancel_from 6\n next g_slash2\n anim slash_d 1.0 0.075\n "
+    " hitbox hand_r 0 0 0.3 0 0 1.5 0.15\nend\n"
     "attack g_slash2\n startup 18\n active 4\n recovery 20\n damage 6\n posture 8\n stamina 5\n"
-    " hitstop 3\n hitbox hand_r 0 0 0.3 0 0 1.5 0.15\nend\n"
+    " hitstop 3\n anim slash_h 0.75 0\n "
+    " hitbox hand_r 0 0 0.3 0 0 1.5 0.15\nend\n"
     "attack g_lunge\n startup 24\n active 6\n recovery 30\n damage 10\n posture 14\n stamina 5\n"
-    " hitstop 4\n hitbox hand_r 0 0 0.3 0 0 2.0 0.15\nend\n"
+    " hitstop 4\n anim stab 0.9 0\n "
+    " hitbox hand_r 0 0 0.3 0 0 2.0 0.15\nend\n"
     "attack b_swing\n startup 28\n active 5\n recovery 30\n damage 14\n posture 20\n stamina 5\n"
-    " hitstop 5\n hitbox hand_r 0 0 0.3 0 0 1.8 0.2\nend\n"
+    " hitstop 5\n anim slash_2h 0.8 0\n "
+    " hitbox hand_r 0 0 0.3 0 0 1.8 0.2\nend\n"
     "attack b_slam\n startup 40\n active 6\n recovery 40\n damage 22\n posture 30\n stamina 5\n"
-    " hitstop 6\n hitbox hand_r 0 0 0.3 0 0 2.2 0.25\nend\n"
+    " hitstop 6\n anim chop_2h 1.0 0\n "
+    " hitbox hand_r 0 0 0.3 0 0 2.2 0.25\nend\n"
     "attack a_stab\n startup 24\n active 4\n recovery 40\n damage 8\n posture 8\n stamina 5\n"
-    " hitstop 3\n hitbox hand_r 0 0 0.5 0 0 5.5 0.12\nend\n"
+    " hitstop 3\n anim shoot 1.0 -0.29\n "
+    " hitbox hand_r 0 0 0.5 0 0 5.5 0.12\nend\n"
     "attack a_pierce\n startup 36\n active 5\n recovery 50\n damage 12\n posture 12\n stamina 5\n"
-    " hitstop 4\n hitbox hand_r 0 0 0.5 0 0 6.5 0.12\nend\n";
+    " hitstop 4\n anim shoot 1.0 -0.49\n "
+    " hitbox hand_r 0 0 0.5 0 0 6.5 0.12\nend\n";
 
 static const char DEFAULT_ENEMIES[] =
     "archetype grunt\n hp 50\n speed 1.15\n sight 16\n fov 120\n hearing 12\n standoff 4\n"
@@ -67,10 +80,8 @@ static const char DEFAULT_ENEMIES[] =
     " plan heavy 4 7 200 1 1\nend\n";
 
 struct PlayCombat {
-    bool ready;
     EngArena scratch;
     EngAttackFile file;
-    bool file_ok;
     EngAttackSet attacks; /* copie utilisée par la simulation */
     uint32_t attacks_version;
     EngArchSet arch;
@@ -88,10 +99,23 @@ struct PlayCombat {
     int32_t lock; /* indice de combattant verrouillé, -1 */
     uint32_t dead_ticks;
     uint32_t cleared_ticks;
+    bool ready;
+    bool file_ok;
     bool was_dead[FIGHTERS];
-    EngProgress progress;   /* M8-08 */
-    uint32_t levelup_ticks; /* message « Niveau N » encore affiché */
+    bool has_avatar[FIGHTERS];
+    bool rig_ready[FIGHTERS]; /* M5-05 / M5-06 : pose au rythme des ticks (ci-dessous) */
+    EngProgress progress;     /* M8-08 */
+    uint32_t levelup_ticks;   /* message « Niveau N » encore affiché */
     PlayCombatStats stats;
+    AvatarLibrary *avatars;  /* M4 : NULL tant que les personnages ne sont pas branchés */
+    Avatar avatar[FIGHTERS]; /* le joueur (0) est dans PlayMode */
+    /* M5-05 / M5-06 : pose au rythme des ticks pour les hurtboxes et la lame */
+    EngHurtboxSet hurt;
+    EngActorAnim rig_anim[FIGHTERS];
+    mat4 rig_world[FIGHTERS][AVATAR_MAX_JOINTS];
+    AvatarProp rig_prop[FIGHTERS];
+    float rig_scale[FIGHTERS];
+    EngPose reach_pose; /* mesure des portées (play_combat_attach_avatars) */
 };
 
 /* applique les statistiques du niveau au joueur ; `heal` : PV et endurance au maximum */
@@ -310,6 +334,8 @@ static void poll_attacks(PlayCombat *c, double now)
     ENG_LOG_INFO("combat : attaques rechargées (version %u)", c->attacks_version);
 }
 
+static void rig_tick(PlayCombat *c);
+
 void play_combat_tick(PlayCombat *c, const EngInputState *input, const float feet[3], float facing,
                       const float move_dir[2], float camera_yaw, double now_seconds,
                       PlayCombatStep *out)
@@ -377,6 +403,7 @@ void play_combat_tick(PlayCombat *c, const EngInputState *input, const float fee
     eng_aig_tick(&c->group, &c->sim, attacking ? 12.0F : (moving ? 8.0F : 0.0F), in);
 
     const float before[2] = {c->sim.bodies[PLAYER].pos[0], c->sim.bodies[PLAYER].pos[1]};
+    rig_tick(c); /* M5-05 / M5-06 : hurtboxes sur les os, lame en main */
     eng_sim_step(&c->sim, in);
     /* le mannequin est un poteau : ni recul ni poussée */
     (void)eng_sim_place(&c->sim, DUMMY, DUMMY_X, DUMMY_Z, c->sim.bodies[DUMMY].yaw);
@@ -506,24 +533,38 @@ void play_combat_draw(const PlayCombat *c, EngDebugLines *lines, const PlayMode 
             const vec3 e = {b->pos[0] + 0.5F, 0.05F, b->pos[1]};
             (void)eng_debug_line(lines, a, e, ENG_DEBUG_GRAY);
         } else {
-            if (i != PLAYER) { /* le joueur a déjà sa capsule physique */
-                EngCapsule box[ENG_SIM_HURTBOXES];
-                EngHitZone zones[ENG_SIM_HURTBOXES];
-                eng_sim_hurtboxes(b, false, box, zones);
+            if (i != PLAYER && (!c->has_avatar[i] || play->show_debug)) {
+                /* le joueur a déjà sa capsule physique ; avec les modèles animés : F3 seulement */
+                EngCapsule box[ENG_HURTBOX_MAX];
+                EngHitZone zones[ENG_HURTBOX_MAX];
+                uint32_t nb = ENG_SIM_HURTBOXES;
+                if (c->sim.rig[i].count > 0U) { /* hurtboxes sur les os (M5-05) */
+                    nb = c->sim.rig[i].count;
+                    memcpy(box, c->sim.rig[i].cur, sizeof(EngCapsule) * nb);
+                    memcpy(zones, c->sim.rig[i].zones, sizeof(EngHitZone) * nb);
+                } else {
+                    eng_sim_hurtboxes(b, false, box, zones);
+                }
                 const bool touchable = eng_fighter_hittable(f);
-                for (uint32_t k = 0; k < ENG_SIM_HURTBOXES; k++) {
+                for (uint32_t k = 0; k < nb; k++) {
                     (void)eng_capsule_debug_draw(
                         lines, &box[k], touchable ? eng_zone_color(zones[k]) : ENG_DEBUG_GRAY);
                 }
             }
-            if (f->fsm.state == ENG_CS_ATTACK) {
+            const bool modeled = i == PLAYER ? play->avatars != NULL : c->has_avatar[i];
+            if (f->fsm.state == ENG_CS_ATTACK && (!modeled || play->show_debug)) {
                 /* arme : orange pendant l'anticipation d'un ennemi, rouge quand elle peut toucher
                  */
                 const bool active = eng_fighter_hitboxes_active(f, c->sim.attacks);
                 if (active || i >= FIRST_ENEMY) {
                     EngCapsule w[ENG_ATTACK_MAX_HITBOXES];
-                    const uint32_t nw =
-                        eng_sim_weapons(b, false, eng_fighter_attack(f, c->sim.attacks), w);
+                    uint32_t nw = 0;
+                    if (c->sim.weapon[i].count > 0U) { /* la lame animée (M5-06) */
+                        nw = c->sim.weapon[i].count;
+                        memcpy(w, c->sim.weapon[i].cur, sizeof(EngCapsule) * nw);
+                    } else {
+                        nw = eng_sim_weapons(b, false, eng_fighter_attack(f, c->sim.attacks), w);
+                    }
                     for (uint32_t k = 0; k < nw; k++) {
                         (void)eng_capsule_debug_draw(
                             lines, &w[k], active ? ENG_DEBUG_RED : ENG_DEBUG_RGB(255, 150, 30));
@@ -544,10 +585,273 @@ void play_combat_draw(const PlayCombat *c, EngDebugLines *lines, const PlayMode 
     /* cônes de l'IA et particules : posés à la hauteur du sol sous le joueur (approximation) */
     const uint32_t d0 = lines->depth_count;
     const uint32_t o0 = lines->overlay_count;
-    (void)eng_aidbg_draw(&c->group, &c->sim, -1, lines);
+    if (c->avatars == NULL || play->show_debug) {
+        (void)eng_aidbg_draw(&c->group, &c->sim, -1, lines); /* cônes de vision : debug (F3) */
+    }
     (void)eng_particles_draw_debug(&c->particles, lines);
     shift(lines, d0, o0,
           play_mode_ground(play, c->sim.bodies[PLAYER].pos[0], c->sim.bodies[PLAYER].pos[1]));
+}
+
+/* ── Personnages animés (M4) ── */
+
+static float smooth01(float u)
+{
+    u = u < 0.0F ? 0.0F : (u > 1.0F ? 1.0F : u);
+    return u * u * (3.0F - (2.0F * u)); /* même courbe que l'esquive du combattant (fighter.c) */
+}
+
+static void fighter_drive(const PlayCombat *c, uint32_t i, const AvatarLibrary *lib, double alpha,
+                          EngActorDrive *d)
+{
+    const EngFighter *f = &c->sim.fighters[i];
+    const EngSimBody *b = &c->sim.bodies[i];
+    d->tick_fraction = c->sim.hitstop > 0U ? 0.0F : (float)alpha; /* gel d'impact : figé */
+    d->state = f->vitals.dead ? ENG_CS_DEAD : f->fsm.state;
+    d->state_ticks = f->fsm.ticks;
+    if (d->state == ENG_CS_ATTACK) {
+        const EngAttack *atk = eng_fighter_attack(f, c->sim.attacks);
+        d->state_ticks = f->attack_tick;
+        d->attack_clip = atk != NULL && atk->anim[0] != '\0' ? avatar_clip(lib, atk->anim) : NULL;
+        d->attack_speed = atk != NULL ? atk->anim_speed : 1.0F;
+        d->attack_offset = atk != NULL ? atk->anim_offset : 0.0F;
+        d->attack_serial = f->attack_serial;
+    } else if (d->state == ENG_CS_DODGE) {
+        const float total = (float)f->params.dodge_total;
+        d->dodge_progress = smooth01(((float)f->state_tick + d->tick_fraction) / total);
+        /* monde -> repère du rig (avant +Z, gauche +X) */
+        const float yaw = b->yaw;
+        const float fwd = (f->dodge_dir[0] * -sinf(yaw)) + (f->dodge_dir[1] * -cosf(yaw));
+        const float right = (f->dodge_dir[0] * cosf(yaw)) + (f->dodge_dir[1] * -sinf(yaw));
+        d->dodge_dir[0] = -right;
+        d->dodge_dir[1] = fwd;
+    }
+}
+
+void play_combat_player_drive(const PlayCombat *c, const AvatarLibrary *lib, double alpha,
+                              EngActorDrive *d)
+{
+    if (c == NULL || !c->ready || d == NULL) {
+        return;
+    }
+    fighter_drive(c, PLAYER, lib, alpha, d);
+}
+
+/* Portée réelle d'une attaque (M4) : plus grande avancée de la lame devant le corps (lacet 0 :
+ * avant = -Z) pendant ses ticks actifs, clip calé comme en jeu ; 0 si rien à mesurer (pas de clip,
+ * arme sans tranchant). */
+static float blade_reach(PlayCombat *c, const AvatarLibrary *lib, const EngAttack *atk,
+                         AvatarProp prop, float scale)
+{
+    const EngAnimClip *clip = atk != NULL ? avatar_clip(lib, atk->anim) : NULL;
+    if (clip == NULL || c->reach_pose.joint_count == 0U) {
+        return 0.0F;
+    }
+    static mat4 world[AVATAR_MAX_JOINTS];
+    const float feet[3] = {0.0F, 0.0F, 0.0F};
+    mat4 model;
+    avatar_model_matrix(feet, 0.0F, scale, model);
+    float best = 0.0F;
+    for (uint32_t k = atk->startup; k < atk->startup + atk->active; k++) {
+        const float t = atk->anim_offset + ((float)k / 60.0F * atk->anim_speed);
+        EngCapsule blade;
+        if (eng_pose_sample(&c->reach_pose, &lib->skeleton, clip, t, ENG_ANIM_WRAP_CLAMP) &&
+            eng_pose_world(&c->reach_pose, &lib->skeleton, world) &&
+            avatar_blade_world(lib, prop, world, model, scale, &blade)) {
+            best = fmaxf(best, fmaxf(-blade.a[2], -blade.b[2]) + blade.radius);
+        }
+    }
+    return best;
+}
+
+/* Les plans d'attaque de l'IA (portée maximale) sont bornés par la portée réelle de la lame, plus
+ * le rayon d'un torse (0,2 m) : sans cela, un ennemi frapperait dans le vide (données écrites pour
+ * l'ancienne hitbox « corps » de 1,5 m). */
+static void fit_plans_to_reach(PlayCombat *c, const AvatarLibrary *lib, uint32_t arch,
+                               AvatarProp prop, float scale)
+{
+    EngArchetype *a = &c->arch.a[arch];
+    for (uint32_t p = 0; p < a->plan_count; p++) {
+        EngArchPlan *plan = &a->plans[p];
+        const uint32_t idx = eng_attackset_find(&c->attacks, plan->heavy ? a->heavy : a->light);
+        const EngAttack *atk = idx != ENG_ATTACK_NONE ? &c->attacks.attacks[idx] : NULL;
+        const float reach = blade_reach(c, lib, atk, prop, scale);
+        if (reach <= 0.0F) {
+            continue;
+        }
+        const float limit = fmaxf(plan->range_min + 0.1F, reach + 0.2F);
+        ENG_LOG_INFO("combat : %s %s (%s) : lame à %.2f m, portée du plan %.2f -> %.2f m", a->name,
+                     plan->heavy ? "lourde" : "légère", atk->name, (double)reach,
+                     (double)plan->range_max, (double)fminf(plan->range_max, limit));
+        plan->range_max = fminf(plan->range_max, limit);
+    }
+}
+
+bool play_combat_attach_avatars(PlayCombat *c, AvatarLibrary *lib, const PlayMode *play)
+{
+    (void)play;
+    if (c == NULL || !c->ready || lib == NULL || !lib->cpu_ready) {
+        return false;
+    }
+    c->avatars = lib;
+    bool ok = true;
+    /* hurtboxes du rig (source du dépôt d'abord : rechargées à chaque partie) */
+    const char *text = NULL;
+    const EngArenaMark mark = eng_arena_mark(&c->scratch);
+    char err[160] = "fichier absent";
+    eng_hurtboxset_init(&c->hurt);
+    const bool hurt_ok = read_text(&c->scratch, "characters/hurtboxes.txt", &text) &&
+                         eng_hurtboxset_parse(text, &lib->skeleton, &c->hurt, err, sizeof err);
+    eng_arena_reset_to(&c->scratch, mark);
+    if (!hurt_ok) {
+        ENG_LOG_WARN("combat : hurtboxes du rig illisibles (%s) : corps simplifié", err);
+    }
+    for (uint32_t i = DUMMY; i < c->sim.count && i < FIGHTERS; i++) {
+        AvatarBody body = AVATAR_SKELETON_MINION;
+        AvatarProp right = AVATAR_SKELETON_BLADE;
+        AvatarProp left = AVATAR_PROP_NONE;
+        float scale = 1.0F;
+        if (i == DUMMY) {
+            right = AVATAR_PROP_NONE; /* squelette d'entraînement, mains nues */
+        } else {
+            const uint32_t k = i - FIRST_ENEMY;
+            const uint32_t arch = k < c->camp.count ? c->camp.m[k].arch : UINT32_MAX;
+            const char *name = arch < c->arch.count ? c->arch.a[arch].name : "";
+            if (strcmp(name, "brute") == 0) {
+                body = AVATAR_SKELETON_WARRIOR;
+                right = AVATAR_SKELETON_AXE;
+                scale = 1.2F;
+            } else if (strcmp(name, "archer") == 0) {
+                body = AVATAR_SKELETON_ROGUE;
+                right = AVATAR_SKELETON_CROSSBOW;
+            } else {
+                left = AVATAR_SKELETON_SHIELD;
+            }
+        }
+        c->has_avatar[i] = avatar_init(&c->avatar[i], lib, body, right, left, scale);
+        ok = ok && c->has_avatar[i];
+        c->rig_prop[i] = right;
+        c->rig_scale[i] = scale;
+        if (i >= FIRST_ENEMY && c->reach_pose.joint_count == 0U) {
+            (void)eng_pose_init(&lib->arena, &lib->skeleton, &c->reach_pose);
+        }
+        if (i >= FIRST_ENEMY && i - FIRST_ENEMY < c->camp.count) {
+            fit_plans_to_reach(c, lib, c->camp.m[i - FIRST_ENEMY].arch, right, scale);
+        }
+    }
+    if (c->reach_pose.joint_count > 0U) {
+        const uint32_t light = eng_attackset_find(&c->attacks, "light1");
+        ENG_LOG_INFO("combat : portée de l'épée du joueur (light1) : %.2f m",
+                     (double)blade_reach(
+                         c, lib, light != ENG_ATTACK_NONE ? &c->attacks.attacks[light] : NULL,
+                         AVATAR_SWORD, 1.0F));
+    }
+    c->rig_prop[PLAYER] = AVATAR_SWORD; /* le chevalier (PlayMode) */
+    c->rig_scale[PLAYER] = 1.0F;
+    for (uint32_t i = 0; hurt_ok && i < c->sim.count && i < FIGHTERS; i++) {
+        c->rig_ready[i] =
+            (i == PLAYER || c->has_avatar[i]) &&
+            eng_actor_anim_init(&c->rig_anim[i], &lib->arena, &lib->skeleton, &lib->set);
+    }
+    return ok;
+}
+
+/* Avant chaque pas de simulation : pose au rythme des ticks (dt = 1/60, sans interpolation), puis
+ * hurtboxes et lame dans le plan de la simulation (pieds à y = 0, comme son corps simplifié et les
+ * hitboxes du repère du corps). */
+static void rig_tick(PlayCombat *c)
+{
+    if (c->avatars == NULL) {
+        return;
+    }
+    const AvatarLibrary *lib = c->avatars;
+    for (uint32_t i = 0; i < c->sim.count && i < FIGHTERS; i++) {
+        if (!c->rig_ready[i]) {
+            continue;
+        }
+        const EngSimBody *b = &c->sim.bodies[i];
+        const float dx = b->pos[0] - b->prev_pos[0];
+        const float dz = b->pos[1] - b->prev_pos[1];
+        EngActorDrive d = {.ground_speed = sqrtf((dx * dx) + (dz * dz)) * 60.0F, .grounded = true};
+        fighter_drive(c, i, lib, 0.0, &d);
+        if (d.state == ENG_CS_ATTACK) {
+            d.state_ticks += 1U; /* le tick que la simulation va jouer */
+        }
+        d.ground_speed /= AVATAR_SCALE * c->rig_scale[i];
+        (void)eng_actor_anim_update(&c->rig_anim[i], &d, 1.0F / 60.0F);
+        if (!eng_pose_world(&c->rig_anim[i].pose, &lib->skeleton, c->rig_world[i])) {
+            continue;
+        }
+        const float feet[3] = {b->pos[0], 0.0F, b->pos[1]};
+        mat4 model;
+        avatar_model_matrix(feet, b->yaw, c->rig_scale[i], model);
+        EngCapsule caps[ENG_HURTBOX_MAX];
+        EngHitZone zones[ENG_HURTBOX_MAX];
+        if (eng_hurtboxset_world(&c->hurt, c->rig_world[i], lib->skeleton.joint_count, model,
+                                 caps)) {
+            for (uint32_t k = 0; k < c->hurt.count; k++) {
+                zones[k] = c->hurt.boxes[k].zone;
+            }
+            (void)eng_sim_set_rig(&c->sim, i, caps, zones, c->hurt.count);
+        }
+        EngCapsule blade;
+        if (avatar_blade_world(lib, c->rig_prop[i], c->rig_world[i], model, c->rig_scale[i],
+                               &blade)) {
+            (void)eng_sim_set_weapon(&c->sim, i, &blade, 1);
+        } else {
+            (void)eng_sim_set_weapon(&c->sim, i, NULL, 0);
+        }
+    }
+}
+
+static float lerp_angle(float a, float b, float t)
+{
+    float d = fmodf(b - a + 3.14159265F, 6.28318531F);
+    if (d < 0.0F) {
+        d += 6.28318531F;
+    }
+    return a + ((d - 3.14159265F) * t);
+}
+
+void play_combat_update_visuals(PlayCombat *c, const PlayMode *play, double alpha, float dt)
+{
+    if (c == NULL || !c->ready || c->avatars == NULL) {
+        return;
+    }
+    const float t = (float)alpha;
+    for (uint32_t i = DUMMY; i < c->sim.count && i < FIGHTERS; i++) {
+        if (!c->has_avatar[i]) {
+            continue;
+        }
+        const EngSimBody *b = &c->sim.bodies[i];
+        const float x = b->prev_pos[0] + ((b->pos[0] - b->prev_pos[0]) * t);
+        const float z = b->prev_pos[1] + ((b->pos[1] - b->prev_pos[1]) * t);
+        const float feet[3] = {x, play_mode_ground(play, x, z), z};
+        const float dx = b->pos[0] - b->prev_pos[0];
+        const float dz = b->pos[1] - b->prev_pos[1];
+        EngActorDrive d = {.ground_speed = sqrtf((dx * dx) + (dz * dz)) * 60.0F, .grounded = true};
+        fighter_drive(c, i, c->avatars, alpha, &d);
+        avatar_update(&c->avatar[i], c->avatars, &d, dt, feet, lerp_angle(b->prev_yaw, b->yaw, t));
+    }
+}
+
+void play_combat_draw_models(const PlayCombat *c, const AvatarLibrary *lib, EngRenderQueue *queue,
+                             mat4 view_proj, const EngLighting *light, const EngModelShadow *shadow,
+                             bool shadow_pass)
+{
+    if (c == NULL || !c->ready || lib == NULL) {
+        return;
+    }
+    for (uint32_t i = DUMMY; i < c->sim.count && i < FIGHTERS; i++) {
+        if (!c->has_avatar[i]) {
+            continue;
+        }
+        if (shadow_pass) {
+            avatar_draw_shadow(&c->avatar[i], lib, queue, view_proj);
+        } else {
+            avatar_draw(&c->avatar[i], lib, queue, view_proj, light, shadow);
+        }
+    }
 }
 
 void play_combat_reset(PlayCombat *c)
@@ -821,9 +1125,10 @@ static void put(CombatTest *t, float x, float z, float yaw)
     }
 }
 
-bool play_combat_selftest(void)
+bool play_combat_selftest(bool rig)
 {
     static CombatTest t;
+    static AvatarLibrary lib;
     memset(&t, 0, sizeof t);
     t.ok = true;
     if (!play_mode_init(&t.play, NULL, 1.0F, false) || !play_mode_enable_combat(&t.play, false)) {
@@ -832,6 +1137,17 @@ bool play_combat_selftest(void)
         return false;
     }
     PlayCombat *c = t.play.combat;
+    if (rig) { /* M4 / M5-05 / M5-06 : personnages KayKit (partie CPU), hurtboxes et lame animées */
+        if (!avatar_library_load_cpu(&lib) || !play_mode_attach_avatars(&t.play, &lib) ||
+            c->hurt.count == 0U) {
+            ENG_LOG_ERROR("AUTOTEST COMBAT : ÉCHEC (personnages cuits introuvables)");
+            play_mode_shutdown(&t.play);
+            avatar_library_shutdown(&lib, NULL);
+            return false;
+        }
+        ENG_LOG_INFO("autotest : rig animé, %u hurtboxes par combattant, lame en main",
+                     c->hurt.count);
+    }
     c->sim.fighters[PLAYER].vitals.max_hp = 2000.0F;
     c->sim.fighters[PLAYER].vitals.hp = 2000.0F;
     const uint32_t atk = 1U << ENG_ACTION_ATTACK;
@@ -932,8 +1248,16 @@ bool play_combat_selftest(void)
           (float)s.max_attackers);
     check(&t, s.attacks_version >= 1U || !c->file_ok, "données : version des attaques chargée",
           (float)s.attacks_version);
-    ENG_LOG_INFO("AUTOTEST COMBAT : %s (%d mesures, %u ticks)", t.ok ? "OK" : "ÉCHEC", t.checks,
-                 s.tick);
+    if (rig) {
+        check(&t, c->sim.rig[PLAYER].count == c->hurt.count && c->sim.rig[FIRST_ENEMY].count > 0U,
+              "rig : hurtboxes sur les os données à la simulation",
+              (float)c->sim.rig[FIRST_ENEMY].count);
+    }
+    ENG_LOG_INFO("AUTOTEST COMBAT : %s (%d mesures, %u ticks%s)", t.ok ? "OK" : "ÉCHEC", t.checks,
+                 s.tick, rig ? ", rig animé" : "");
     play_mode_shutdown(&t.play);
+    if (rig) {
+        avatar_library_shutdown(&lib, NULL);
+    }
     return t.ok;
 }

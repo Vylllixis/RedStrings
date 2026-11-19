@@ -94,10 +94,11 @@ void eng_model_skinned_shadow_pipeline_desc(EngPipelineDesc *desc)
     desc->vertex_shader = "shadow_skinned.vert";
     desc->vertex_stride = sizeof(SkinnedGpuVertex);
     desc->attribute_count = 3;
-    desc->attributes[1] = (EngVertexAttribute){.location = 4,
+    /* locations 0, 1, 2 : voir shadow_skinned.vert (contiguës dans l'ordre de déclaration) */
+    desc->attributes[1] = (EngVertexAttribute){.location = 1,
                                                .format = ENG_VERTEX_UBYTE4_NORM,
                                                .offset = offsetof(SkinnedGpuVertex, skin.joints)};
-    desc->attributes[2] = (EngVertexAttribute){.location = 5,
+    desc->attributes[2] = (EngVertexAttribute){.location = 2,
                                                .format = ENG_VERTEX_UBYTE4_NORM,
                                                .offset = offsetof(SkinnedGpuVertex, skin.weights)};
 }

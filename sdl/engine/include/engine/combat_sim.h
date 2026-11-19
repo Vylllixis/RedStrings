@@ -56,6 +56,17 @@ typedef struct EngSimRig {
     EngHitZone zones[ENG_HURTBOX_MAX];
 } EngSimRig;
 
+/* Arme animée (M5-06) : si `count` > 0, ces capsules (monde) REMPLACENT, pour ce combattant, les
+ * hitboxes `hand_r` de l'attaque en cours (données dans le repère du corps) : la touche suit alors
+ * la lame que l'animation déplace. Les autres hitboxes (ex. `bolt`, le carreau d'un tir) restent
+ * dans le repère du corps. Comme le rig, l'appelant les donne avant chaque `eng_sim_step`. */
+#define ENG_SIM_WEAPON_MAX 2U
+typedef struct EngSimWeapon {
+    uint32_t count;
+    EngCapsule cur[ENG_SIM_WEAPON_MAX];
+    EngCapsule prev[ENG_SIM_WEAPON_MAX];
+} EngSimWeapon;
+
 typedef struct EngCombatSim {
     const EngAttackSet *attacks;
     uint32_t count;
@@ -66,6 +77,7 @@ typedef struct EngCombatSim {
     EngSimEvent events[ENG_SIM_EVENTS]; /* touches du DERNIER tick */
     uint32_t event_count;
     EngSimRig rig[ENG_SIM_MAX];
+    EngSimWeapon weapon[ENG_SIM_MAX];
     float speed_scale[ENG_SIM_MAX]; /* multiplie la marche (1 par défaut) */
     float radius[ENG_SIM_MAX];      /* rayon de collision corps-corps (0 : aucune séparation) */
     const EngAiWorld *world;        /* obstacles statiques (NULL : aucun) */
@@ -79,6 +91,10 @@ bool eng_sim_init(EngCombatSim *s, const EngAttackSet *attacks, uint32_t count);
  * `count` = 0 revient au corps simplifié. Retourne false si les arguments sont invalides. */
 bool eng_sim_set_rig(EngCombatSim *s, uint32_t i, const EngCapsule *caps, const EngHitZone *zones,
                      uint32_t count);
+
+/* Capsules de l'arme tenue pour le tick à venir (monde) ; les précédentes deviennent « prev »
+ * (balayage). `count` = 0 revient aux hitboxes du repère du corps. false si invalide. */
+bool eng_sim_set_weapon(EngCombatSim *s, uint32_t i, const EngCapsule *caps, uint32_t count);
 
 bool eng_sim_place(EngCombatSim *s, uint32_t i, float x, float z, float yaw);
 

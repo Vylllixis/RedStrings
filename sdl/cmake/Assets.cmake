@@ -85,3 +85,77 @@ function(ow_cook_assets target)
 
   add_custom_target(${target} ALL DEPENDS ${outputs})
 endfunction()
+
+# Cuisson d'un personnage animé (M4) : squelette, maillage skinné (+ poids .skin et textures), et
+# un .anim par clip. Les clips sont choisis par NOM d'animation glTF (assetc anim --anim-name).
+#
+#   ow_cook_character(<cible>
+#     TOOL assetc OUTPUT_DIR <dossier> BASE_DIR <dossier des sources>
+#     NAME knight                          (-> OUTPUT_DIR/knight.skel, knight.mesh, knight.skin)
+#     SOURCE characters/knight.glb
+#     [SKELETON_PATH assets/cooked/characters/knight.skel]  (chemin inscrit dans les clips, relatif
+#                                                           à l'exécutable ; défaut ci-contre)
+#     [CLIPS idle walk run ...]            (-> OUTPUT_DIR/knight/<clip>.anim)
+#     [NO_SKELETON])                       (maillage et clips d'un squelette déjà cuit ailleurs)
+#
+# La cible dépend de tout ; à ajouter aux dépendances du lanceur (add_dependencies).
+function(ow_cook_character target)
+  cmake_parse_arguments(ARG "NO_SKELETON" "TOOL;OUTPUT_DIR;BASE_DIR;NAME;SOURCE;SKELETON_PATH" "CLIPS"
+                        ${ARGN})
+  foreach(required IN ITEMS OUTPUT_DIR NAME SOURCE)
+    if(NOT ARG_${required})
+      message(FATAL_ERROR "ow_cook_character : ${required} est obligatoire")
+    endif()
+  endforeach()
+  if(NOT ARG_TOOL)
+    set(ARG_TOOL assetc)
+  endif()
+  if(NOT ARG_BASE_DIR)
+    set(ARG_BASE_DIR ${CMAKE_CURRENT_SOURCE_DIR})
+  endif()
+  if(NOT ARG_SKELETON_PATH)
+    set(ARG_SKELETON_PATH assets/cooked/characters/${ARG_NAME}.skel)
+  endif()
+  cmake_path(ABSOLUTE_PATH ARG_SOURCE BASE_DIRECTORY ${ARG_BASE_DIR} OUTPUT_VARIABLE source_path)
+  set(out ${ARG_OUTPUT_DIR}/${ARG_NAME})
+  set(outputs)
+  if(NOT ARG_NO_SKELETON)
+    add_custom_command(
+      OUTPUT ${out}.skel
+      COMMAND ${CMAKE_COMMAND} -E make_directory ${ARG_OUTPUT_DIR}
+      COMMAND ${ARG_TOOL} skel ${source_path} ${out}.skel --skin 0
+      DEPENDS ${source_path} ${ARG_TOOL}
+      COMMENT "Squelette ${ARG_NAME}"
+      VERBATIM)
+    list(APPEND outputs ${out}.skel)
+  endif()
+  add_custom_command(
+    OUTPUT ${out}.mesh
+    BYPRODUCTS ${out}.skin
+    COMMAND ${CMAKE_COMMAND} -E make_directory ${ARG_OUTPUT_DIR}
+    COMMAND ${ARG_TOOL} mesh ${source_path} ${out}.mesh --skin 0
+    DEPENDS ${source_path} ${ARG_TOOL}
+    COMMENT "Personnage ${ARG_NAME}"
+    VERBATIM)
+  list(APPEND outputs ${out}.mesh)
+  foreach(clip IN LISTS ARG_CLIPS)
+    add_custom_command(
+      OUTPUT ${out}/${clip}.anim
+      COMMAND ${CMAKE_COMMAND} -E make_directory ${out}
+      COMMAND ${ARG_TOOL} anim ${source_path} ${out}/${clip}.anim --anim-name ${clip}
+              --skeleton ${ARG_SKELETON_PATH}
+      DEPENDS ${source_path} ${ARG_TOOL}
+      COMMENT "Clip ${ARG_NAME}/${clip}"
+      VERBATIM)
+    list(APPEND outputs ${out}/${clip}.anim)
+  endforeach()
+  add_custom_target(${target} ALL DEPENDS ${outputs})
+endfunction()
+
+# Maillage statique cuit SANS sa hiérarchie de scène (arme rangée sous un os : voir
+# tools/scripts/gltf_extract.py --root-node) : comme ow_cook_assets MODELS, sous un autre nom.
+function(ow_cook_props target)
+  cmake_parse_arguments(ARG "" "TOOL;OUTPUT_DIR;BASE_DIR" "MODELS" ${ARGN})
+  ow_cook_assets(${target} TOOL ${ARG_TOOL} OUTPUT_DIR ${ARG_OUTPUT_DIR} BASE_DIR ${ARG_BASE_DIR}
+                 MODELS ${ARG_MODELS})
+endfunction()

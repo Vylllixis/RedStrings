@@ -9,6 +9,7 @@
 #include "engine/math.h"
 #include "engine/save_game.h"
 #include "engine/ui_game.h"
+#include "avatar.h"
 
 /* Combat dans le mode jouable (raccord M4 + M5 + M6, option --play --combat).
  *
@@ -69,6 +70,22 @@ void play_combat_apply_options(PlayCombat *c, const EngGameOptions *o);
 void play_combat_fill_hud(const PlayCombat *c, const struct PlayMode *play, mat4 view_proj,
                           int width, int height, EngHud *hud);
 
+/* ── Personnages animés (M4) ── */
+
+/* Un squelette par combattant (mannequin, grunt, brute, archer) ; false si la bibliothèque n'est
+ * pas prête. Dès lors, à chaque tick, la simulation reçoit des hurtboxes qui suivent les os
+ * (assets/characters/hurtboxes.txt, M5-05) et la lame tenue en main (M5-06), calculées sur une
+ * pose avancée au rythme des ticks (déterministe, indépendante de l'affichage). */
+bool play_combat_attach_avatars(PlayCombat *c, AvatarLibrary *lib, const struct PlayMode *play);
+/* Complète `d` (état de combat, attaque et son clip, esquive) pour le joueur. */
+void play_combat_player_drive(const PlayCombat *c, const AvatarLibrary *lib, double alpha,
+                              EngActorDrive *d);
+/* Anime les combattants autres que le joueur (une fois par image). */
+void play_combat_update_visuals(PlayCombat *c, const struct PlayMode *play, double alpha, float dt);
+void play_combat_draw_models(const PlayCombat *c, const AvatarLibrary *lib, EngRenderQueue *queue,
+                             mat4 view_proj, const EngLighting *light, const EngModelShadow *shadow,
+                             bool shadow_pass);
+
 /* Mesures pour l'autotest et le journal. */
 typedef struct PlayCombatStats {
     uint32_t tick;
@@ -88,5 +105,6 @@ typedef struct PlayCombatStats {
 void play_combat_stats(const PlayCombat *c, PlayCombatStats *out);
 
 /* Autotest sans fenêtre (option --combat-selftest) : nécessite Jolt. Journalise
- * « AUTOTEST COMBAT : OK » ou la première erreur. */
-bool play_combat_selftest(void);
+ * « AUTOTEST COMBAT : OK » ou la première erreur. `rig` (--combat-rig-selftest) : avec les
+ * personnages KayKit (partie CPU) : hurtboxes sur les os et lame animée (M5-05, M5-06). */
+bool play_combat_selftest(bool rig);

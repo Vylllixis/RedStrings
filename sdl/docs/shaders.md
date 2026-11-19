@@ -29,6 +29,12 @@ qui le déclarent.
 - Fragment : textures et samplers en `register(t0, space2)` / `register(s0, space2)`, tampons
   uniformes en `register(b0, space3)` (octets passés à `eng_render_draw_uniforms2`).
 - Les entrées de sommet utilisent la sémantique `TEXCOORDn` (c'est le `location` n côté GPU).
+  **Les indices doivent être contigus et dans l'ordre de déclaration** (`TEXCOORD0`, `1`, `2`...) :
+  la compilation SPIR-V (Vulkan) numérote les locations dans l'ordre de déclaration, D3D12 lit
+  l'indice de `TEXCOORD` ; les deux ne coïncident qu'ainsi. Défaut trouvé à la finition :
+  `shadow_skinned.vert` déclarait `TEXCOORD0/4/5` ; sous Vulkan, l'ombre des personnages lisait ses
+  poids au mauvais endroit (refusé par la couche de validation en Debug). Test :
+  `skin.every_model_pipeline_declares_contiguous_vertex_locations`.
 
 - Uniforms de vertex : un `cbuffer` en `register(b0, space1)`. Le renderer pousse sur le slot 0 les
   octets passés à `eng_render_draw_uniforms`. Le nombre de tampons uniformes vient de la réflexion

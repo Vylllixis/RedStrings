@@ -58,6 +58,14 @@ typedef struct EngAttack {
     uint32_t next;        /* indice de l'attaque suivante ou ENG_ATTACK_NONE */
     uint32_t hitbox_count;
     EngAttackHitbox hitboxes[ENG_ATTACK_MAX_HITBOXES];
+    /* Animation (M4, ligne `anim CLIP [VITESSE [DÉCALAGE]]`, facultative) : le clip joué pendant
+     * l'attaque, lu à l'instant DÉCALAGE + tick / 60 x VITESSE (engine/actor_anim.h). Vide : aucun
+     * clip (repos). Vitesse dans ]0 ; 10] (1 par défaut), décalage dans [-60 ; 60] s (0) ; un
+     * décalage NÉGATIF tient la première image du clip pendant le début de l'attaque (ex. viser
+     * avant de tirer). */
+    char anim[ENG_ATTACK_MAX_NAME];
+    float anim_speed;
+    float anim_offset;
 } EngAttack;
 
 typedef struct EngAttackSet {

@@ -849,8 +849,9 @@ static void draw_casters(const DemoScene *scene, EngRenderQueue *shadow_queue, d
         .index_type = ENG_INDEX_U16,
         .count = CUBE_INDICES,
     };
-    for (int gz = -GRID_HALF; gz <= GRID_HALF; gz++) {
-        for (int gx = -GRID_HALF; gx <= GRID_HALF; gx++) {
+    const int casters_half = scene->hide_props ? -1 : GRID_HALF; /* -1 : boucle vide */
+    for (int gz = -casters_half; gz <= casters_half; gz++) {
+        for (int gx = -casters_half; gx <= casters_half; gx++) {
             mat4 model;
             mat4 mvp;
             glm_translate_make(model,
@@ -874,6 +875,9 @@ static void draw_casters(const DemoScene *scene, EngRenderQueue *shadow_queue, d
         }
     }
     draw_world(scene, shadow_queue, light_view_proj, NULL, NULL, true);
+    if (scene->model_hook != NULL) {
+        scene->model_hook(scene->model_user, shadow_queue, light_view_proj, NULL, NULL, true);
+    }
 }
 
 /* Clair de lune (M8-07) : quand le soleil est couché (poids `night` > 0), une lumière faible et
@@ -1053,6 +1057,9 @@ void demo_scene_draw(DemoScene *scene, EngRenderer *renderer, EngRenderQueue *qu
             (void)eng_model_gpu_draw_ex(&scene->rocks, queue, scene->rock_pipeline, identity,
                                         view_proj, &light, NULL, &rock_options);
         }
+        if (scene->model_hook != NULL) {
+            scene->model_hook(scene->model_user, queue, view_proj, &light, NULL, false);
+        }
         return;
     }
     if (scene->has_ground) {
@@ -1071,8 +1078,9 @@ void demo_scene_draw(DemoScene *scene, EngRenderer *renderer, EngRenderQueue *qu
         .texture = scene->texture,
         .sampler = scene->sampler,
     };
-    for (int gz = -GRID_HALF; gz <= GRID_HALF; gz++) {
-        for (int gx = -GRID_HALF; gx <= GRID_HALF; gx++) {
+    const int props_half = scene->hide_props ? -1 : GRID_HALF; /* -1 : boucle vide */
+    for (int gz = -props_half; gz <= props_half; gz++) {
+        for (int gx = -props_half; gx <= props_half; gx++) {
             mat4 model;
             mat4 mvp;
             glm_translate_make(model,
@@ -1095,6 +1103,9 @@ void demo_scene_draw(DemoScene *scene, EngRenderer *renderer, EngRenderQueue *qu
         }
     }
     draw_world(scene, queue, view_proj, &light, receiving, false);
+    if (scene->model_hook != NULL) {
+        scene->model_hook(scene->model_user, queue, view_proj, &light, receiving, false);
+    }
 }
 
 void demo_scene_draw_debug(DemoScene *scene, EngRenderer *renderer, EngRenderQueue *queue,
@@ -1165,6 +1176,12 @@ void demo_scene_set_debug_hook(DemoScene *scene, DemoDebugHook hook, void *user)
 {
     scene->debug_hook = hook;
     scene->debug_user = user;
+}
+
+void demo_scene_set_model_hook(DemoScene *scene, DemoModelHook hook, void *user)
+{
+    scene->model_hook = hook;
+    scene->model_user = user;
 }
 
 void demo_scene_shutdown(DemoScene *scene, EngRenderer *renderer)

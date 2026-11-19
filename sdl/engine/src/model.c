@@ -73,11 +73,74 @@ typedef struct SkinSel {
     EngSkinVertex *out; /* un élément par sommet du modèle */
 } SkinSel;
 
+/* Articulation du skin la plus proche parmi les ANCÊTRES de `node` (indice dans skin->joints), ou
+ * -1. Sert aux maillages rigides rattachés à un os (casque, cape, arme rangée sous la main) : en
+ * glTF un maillage non skinné enfant d'une articulation suit cette articulation. */
+static int32_t rigid_joint(const cgltf_node *node, const cgltf_skin *skin)
+{
+    for (const cgltf_node *n = node->parent; n != NULL; n = n->parent) {
+        for (cgltf_size j = 0; j < skin->joints_count; j++) {
+            if (skin->joints[j] == n) {
+                return (int32_t)j;
+            }
+        }
+    }
+    return -1;
+}
+
 /* Le nœud entre-t-il dans le modèle ? Ordinaire : tout nœud qui porte un maillage ; personnage :
- * seulement ceux qui utilisent le skin choisi. */
+ * ceux qui utilisent le skin choisi, et les maillages rigides (sans skin) rattachés sous une de ses
+ * articulations. */
 static bool node_selected(const cgltf_node *node, const SkinSel *sel)
 {
-    return node->mesh != NULL && (sel == NULL || node->skin == sel->skin);
+    if (node->mesh == NULL) {
+        return false;
+    }
+    if (sel == NULL || node->skin == sel->skin) {
+        return true;
+    }
+    return node->skin == NULL && rigid_joint(node, sel->skin) >= 0;
+}
+
+/* Maillage rigide sous l'articulation `j` : ses sommets sont placés dans la pose de LIAISON (là où
+ * le skin attend les sommets) : liaison(j) x global(j)^-1 x global(nœud), avec liaison(j) =
+ * inverse_bind(j)^-1 (identité si le skin n'en a pas). Un sommet de poids 1 sur `j` revient donc à
+ * sa place exacte quand la pose est celle de liaison, et suit l'os ensuite. */
+static bool rigid_matrices(const cgltf_node *node, const cgltf_skin *skin, int32_t j, mat4 world,
+                           mat3 normal_matrix, bool *flip)
+{
+    cgltf_float raw[16];
+    mat4 node_global;
+    mat4 joint_global;
+    mat4 joint_inv;
+    mat4 bind = GLM_MAT4_IDENTITY_INIT;
+    cgltf_node_transform_world(node, raw);
+    memcpy(node_global, raw, sizeof(mat4));
+    cgltf_node_transform_world(skin->joints[j], raw);
+    memcpy(joint_global, raw, sizeof(mat4));
+    if (skin->inverse_bind_matrices != NULL) {
+        cgltf_float ibm[16];
+        if (!cgltf_accessor_read_float(skin->inverse_bind_matrices, (cgltf_size)j, ibm, 16)) {
+            return false;
+        }
+        mat4 inverse_bind;
+        memcpy(inverse_bind, ibm, sizeof(mat4));
+        glm_mat4_inv(inverse_bind, bind);
+    }
+    glm_mat4_inv(joint_global, joint_inv);
+    mat4 local;
+    glm_mat4_mul(joint_inv, node_global, local);
+    glm_mat4_mul(bind, local, world);
+    mat3 linear;
+    glm_mat4_pick3(world, linear);
+    const float det = glm_mat3_det(linear);
+    if (!isfinite(det) || fabsf(det) < 1.0e-12F) {
+        return false;
+    }
+    glm_mat3_inv(linear, normal_matrix);
+    glm_mat3_transpose(normal_matrix);
+    *flip = det < 0.0F;
+    return true;
 }
 
 static PrimResult inspect_primitive(const cgltf_primitive *prim, PrimInfo *info)
@@ -412,7 +475,25 @@ static bool fill_primitive(EngModel *model, EngArena *scratch, const cgltf_data 
     mat4 world;
     mat3 normal_matrix;
     bool flip = false;
-    if (sel != NULL) {
+    const int32_t rigid = sel != NULL && node->skin == NULL ? rigid_joint(node, sel->skin) : -1;
+    if (rigid >= 0) {
+        /* maillage rigide rattaché à un os : poids 1 sur cet os, sommets mis en pose de liaison */
+        if (!rigid_matrices(node, sel->skin, rigid, world, normal_matrix, &flip)) {
+            ENG_LOG_ERROR("glTF : matrice singulière pour le maillage rattaché « %s »",
+                          node->name != NULL ? node->name : "?");
+            return false;
+        }
+        if ((uint32_t)rigid >= sel->remap_count) {
+            ENG_LOG_ERROR("glTF : articulation %d hors du squelette (%u)", (int)rigid,
+                          sel->remap_count);
+            return false;
+        }
+        EngSkinVertex *sv = &sel->out[cursor->vertex];
+        for (uint32_t v = 0; v < info->vertex_count; v++) {
+            sv[v] = (EngSkinVertex){.joints = {(uint8_t)sel->remap[rigid], 0, 0, 0},
+                                    .weights = {255, 0, 0, 0}};
+        }
+    } else if (sel != NULL) {
         /* maillage skinné : la matrice du nœud est ignorée (spécification glTF) */
         glm_mat4_identity(world);
         glm_mat3_identity(normal_matrix);
@@ -420,7 +501,8 @@ static bool fill_primitive(EngModel *model, EngArena *scratch, const cgltf_data 
         ENG_LOG_ERROR("glTF : matrice de nœud singulière");
         return false;
     }
-    if (sel != NULL && !read_skin(prim, sel, info->vertex_count, &sel->out[cursor->vertex])) {
+    if (sel != NULL && rigid < 0 &&
+        !read_skin(prim, sel, info->vertex_count, &sel->out[cursor->vertex])) {
         return false;
     }
     const uint32_t vcount = info->vertex_count;

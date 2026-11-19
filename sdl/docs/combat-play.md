@@ -66,7 +66,7 @@ jusqu'à une victoire, toujours au plus 2 attaquants.
 
 ## Limites
 
-- **Fil de fer seulement** : pas de modèle animé (ni joueur ni ennemis) ; l'arène est celle de M4,
+- ~~Fil de fer seulement~~ : depuis la finition de M4, chevalier et squelettes animés (`docs/characters.md`) ; F3 montre les capsules. L'arène est celle de M4,
   pas la carte procédurale.
 - Le personnage physique (Jolt) reste l'autorité de position du joueur : la simulation lui renvoie
   esquive, recul et séparation, bornés à 0,6 m par tick. Les ennemis se déplacent dans la

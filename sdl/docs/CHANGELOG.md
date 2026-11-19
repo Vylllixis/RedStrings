@@ -41,6 +41,12 @@ livraisons ; les tags sont posés par Théo après ses tests.
 ## v0.0 à v0.4 (M0 à M4)
 - Fondations, rendu (SDL_GPU, PBR, ombres), assets et scènes, monde (terrain, ciel, végétation),
   personnage (Jolt, caméra, animation).
+- M4 (finition) : personnages animés dans le jeu (chevalier KayKit CC0 pour le joueur, squelettes pour
+  les ennemis) : maillage skinné, casque et cape rigides, armes aux sockets des mains, ombres ;
+  animateur piloté par l'état de combat (attaques calées sur la frame data, roulade procédurale sans
+  glissement, fondus, mélange lissé) ; hurtboxes sur les os et lame animée dans la simulation ;
+  portées de l'IA bornées par les vraies lames ; galerie `--avatar-gallery`. ADR 0026.
+  Correctif : entrées du shader d'ombre skinné (locations non contiguës, refusées par Vulkan).
 - M0 (finition) : vérifié sur la machine de Théo (fenêtre, F11, redimensionnement, clavier, vsync,
   rechargement à chaud du code de jeu) ; portabilité MSVC (atomiques C11, avertissements, fonctions
   POSIX remplacées) ; la CI publie l'exécutable Windows ; sources d'assets versionnées.

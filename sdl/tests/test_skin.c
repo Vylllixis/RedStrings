@@ -4,6 +4,7 @@
 #include <stdio.h>
 #include <string.h>
 
+#include "engine/model_gpu.h"
 #include "engine/skeleton.h"
 #include "engine/skin.h"
 #include "utest.h"
@@ -363,4 +364,83 @@ UTEST(skin, attribute_order_is_irrelevant_and_a_second_influence_set_is_ignored)
     EXPECT_EQ(skin[1].weights[0], 255U);
     EXPECT_EQ(skin[2].joints[1], 1U);
     fx_done(&f);
+}
+
+/* Maillage rigide rattaché à un os (M4, personnages KayKit : casque, cape) : un nœud sans skin
+ * rangé sous l'articulation Spine suit Spine. Il est inclus avec un poids 255 sur Spine et ses
+ * sommets sont placés en pose de LIAISON. Ici la liaison diffère du repos : inverse_bind(Spine) =
+ * T(0, -1, 0) (Spine liée à y = 1) alors que Spine est au repos à y = 1,5 ; le casque est à T(0,
+ * 0,25, 0) x rotation de 90° autour de Z sous Spine. Attendu : sommet = T(0, 1,25, 0) x R(90° Z) x
+ * p. Un maillage rigide qui n'est sous AUCUNE articulation reste exclu. */
+UTEST(skin, a_rigid_mesh_under_a_joint_follows_that_joint_in_the_bind_pose)
+{
+    static uint8_t glb[GLB_MAX];
+    static const float ibm[32] = {1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, -1, 0, 1,
+                                  1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, -1, 0, 1};
+    const Piece pieces[5] = {{POS, sizeof POS, 5126, 3, "VEC3"},
+                             {JNT, sizeof JNT, 5121, 3, "VEC4"},
+                             {WGT, sizeof WGT, 5126, 3, "VEC4"},
+                             {IDX, sizeof IDX, 5123, 3, "SCALAR"},
+                             {ibm, sizeof ibm, 5126, 2, "MAT4"}};
+    /* 0 Hips, 1 Spine (enfant 3), 2 maillage skinné, 3 casque rigide sous Spine, 4 maillage rigide
+     * hors du squelette ; le maillage 1 (sans poids) est fermé dans la chaîne de la primitive. */
+    const char *nodes = "{\"name\":\"Hips\",\"translation\":[0,1,0],\"children\":[1]},"
+                        "{\"name\":\"Spine\",\"translation\":[0,0.5,0],\"children\":[3]},"
+                        "{\"mesh\":0,\"skin\":0},"
+                        "{\"name\":\"Helmet\",\"mesh\":1,\"translation\":[0,0.25,0],"
+                        "\"rotation\":[0,0,0.70710678,0.70710678]},"
+                        "{\"name\":\"Loose\",\"mesh\":1,\"translation\":[5,0,0]}";
+    const char *prims = PRIM "}]},{\"primitives\":[{\"attributes\":{\"POSITION\":0},\"indices\":3";
+    const size_t size =
+        build_glb(glb, nodes, "{\"joints\":[0,1],\"inverseBindMatrices\":4}", prims, pieces, 5);
+    Fx f;
+    ASSERT_TRUE(fx_init(&f));
+    EngSkeleton sk;
+    uint32_t *remap = NULL;
+    ASSERT_TRUE(eng_skeleton_from_gltf(&f.arena, &f.scratch, glb, size, NULL, 0, &sk, &remap));
+    EngModel model;
+    EngSkinVertex *skin = NULL;
+    ASSERT_TRUE(
+        eng_model_parse_skinned(&f.arena, &f.scratch, glb, size, NULL, 0, remap, 2, &model, &skin));
+    ASSERT_EQ(model.vertex_count, 6U); /* 3 skinnés + 3 du casque ; « Loose » exclu */
+    const float expect[3][3] = {{0.0F, 1.25F, 0.0F}, {0.0F, 2.25F, 0.0F}, {-1.0F, 1.25F, 0.0F}};
+    for (uint32_t v = 0; v < 3U; v++) {
+        for (int a = 0; a < 3; a++) {
+            EXPECT_NEAR(model.vertices[3U + v].position[a], expect[v][a], 1e-5F);
+        }
+        EXPECT_EQ(skin[3U + v].joints[0], (uint8_t)remap[1]); /* Spine */
+        EXPECT_EQ(skin[3U + v].weights[0], 255U);
+        EXPECT_EQ(skin[3U + v].weights[1], 0U);
+    }
+    /* les sommets skinnés ne sont pas touchés */
+    EXPECT_NEAR(model.vertices[1].position[0], 1.0F, 1e-6F);
+    EXPECT_EQ(f.scratch.used, (size_t)0);
+    fx_done(&f);
+}
+
+/* Les entrées de sommets d'un pipeline doivent avoir des locations 0, 1, 2... dans l'ordre : la
+ * compilation SPIR-V (Vulkan) les numérote dans l'ordre de déclaration du shader, D3D12 lit
+ * l'indice de TEXCOORD. Le pipeline d'ombre skinné décrivait 0, 4, 5 : sous Vulkan, la validation
+ * le refusait et l'ombre d'un personnage lisait ses poids au mauvais endroit. */
+static bool contiguous(const EngPipelineDesc *d)
+{
+    for (uint32_t i = 0; i < d->attribute_count; i++) {
+        if (d->attributes[i].location != i) {
+            return false;
+        }
+    }
+    return d->attribute_count > 0U;
+}
+
+UTEST(skin, every_model_pipeline_declares_contiguous_vertex_locations)
+{
+    EngPipelineDesc d;
+    eng_model_pipeline_desc(&d);
+    EXPECT_TRUE(contiguous(&d));
+    eng_model_shadow_pipeline_desc(&d);
+    EXPECT_TRUE(contiguous(&d));
+    eng_model_skinned_pipeline_desc(&d);
+    EXPECT_TRUE(contiguous(&d));
+    eng_model_skinned_shadow_pipeline_desc(&d);
+    EXPECT_TRUE(contiguous(&d));
 }

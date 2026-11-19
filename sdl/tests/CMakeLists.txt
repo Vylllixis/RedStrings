@@ -137,6 +137,13 @@ ow_add_test(audio_device test_audio_device.c)
 ow_add_test(vfx test_vfx.c)
 ow_add_test(anim_graph test_anim_graph.c)
 ow_add_test(anim_machine test_anim_machine.c)
+ow_add_test(actor_anim test_actor_anim.c)
+# M4 : vrais fichiers cuits du chevalier (cible cooked_characters) et données de combat de la source.
+ow_add_test(character_motion test_character_motion.c)
+target_compile_definitions(test_character_motion PRIVATE
+  OW_COOKED_DIR="${CMAKE_BINARY_DIR}/bin/assets/cooked"
+  OW_ATTACKS_FILE="${CMAKE_SOURCE_DIR}/assets/combat/attacks.txt")
+add_dependencies(test_character_motion cooked_characters)
 ow_add_test(skin test_skin.c)
 ow_add_test(socket test_socket.c)
 ow_add_test(skin_file test_skin_file.c)
@@ -475,6 +482,23 @@ if(OW_PHYSICS)
   set_tests_properties(launcher.combat PROPERTIES
     ENVIRONMENT "${LAUNCHER_ENV}"
     PASS_REGULAR_EXPRESSION "AUTOTEST COMBAT : OK")
+  # Le même avec les personnages KayKit (M4) : hurtboxes sur les os, lame animée (M5-05, M5-06).
+  add_test(NAME launcher.combat_rig COMMAND launcher --combat-rig-selftest
+           WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR})
+  set_tests_properties(launcher.combat_rig PROPERTIES
+    ENVIRONMENT "${LAUNCHER_ENV}"
+    PASS_REGULAR_EXPRESSION "AUTOTEST COMBAT : OK \\([0-9]+ mesures, [0-9]+ ticks, rig animé\\)")
+  # Galerie des états d'animation (M4) : personnages cuits chargés sur le GPU et dessinés.
+  add_test(NAME launcher.avatar_gallery COMMAND launcher --avatar-gallery --frames 10
+           --env-samples 16 WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR})
+  set_tests_properties(launcher.avatar_gallery PROPERTIES
+    ENVIRONMENT "SDL_VIDEODRIVER=offscreen"
+    FAIL_REGULAR_EXPRESSION "ERROR|non détruite"
+    PASS_REGULAR_EXPRESSION "5/5 corps, 9/9 armes")
+  if(OW_SOFTWARE_VULKAN_ICD) # comme les autres tests GPU (voir plus haut)
+    set_property(TEST launcher.avatar_gallery APPEND PROPERTY ENVIRONMENT_MODIFICATION
+      "VK_DRIVER_FILES=set:${OW_SOFTWARE_VULKAN_ICD}" "VK_ICD_FILENAMES=set:${OW_SOFTWARE_VULKAN_ICD}")
+  endif()
 endif()
 
 # Monde ouvert (M7-14) : traversée de 2 km à 30 m/s, budget de 25 ms par image, aucun trou sous le

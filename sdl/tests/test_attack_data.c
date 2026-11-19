@@ -365,3 +365,38 @@ UTEST(attack_data, a_phase_boundary_is_checked_at_the_exact_tick_for_other_data)
         EXPECT_EQ(eng_attack_can_cancel(a, t), t >= 7 && t < 10);
     }
 }
+
+/* Ligne `anim CLIP [VITESSE [DÉCALAGE]]` (M4) : facultative ; défauts vitesse 1, décalage 0. */
+UTEST(attack_data, the_optional_anim_line_names_the_clip_its_speed_and_offset)
+{
+    EngAttackSet s;
+    char err[160];
+    const char *text = "attack a\n startup 8\n active 4\n recovery 14\n damage 10\n"
+                       " anim slash_h 1.6 0.05\n hitbox hand_r 0 0 0 0 0 1 0.1\nend\n"
+                       "attack b\n startup 8\n active 4\n recovery 14\n damage 10\n"
+                       " anim chop\n hitbox hand_r 0 0 0 0 0 1 0.1\nend\n"
+                       "attack c\n startup 8\n active 4\n recovery 14\n damage 10\n"
+                       " hitbox hand_r 0 0 0 0 0 1 0.1\nend\n";
+    ASSERT_TRUE(eng_attackset_parse(text, &s, err, sizeof err));
+    ASSERT_EQ(s.count, 3U);
+    EXPECT_STREQ(s.attacks[0].anim, "slash_h");
+    EXPECT_NEAR(s.attacks[0].anim_speed, 1.6F, 1e-6F);
+    EXPECT_NEAR(s.attacks[0].anim_offset, 0.05F, 1e-6F);
+    EXPECT_STREQ(s.attacks[1].anim, "chop");
+    EXPECT_NEAR(s.attacks[1].anim_speed, 1.0F, 1e-6F);
+    EXPECT_NEAR(s.attacks[1].anim_offset, 0.0F, 1e-6F);
+    EXPECT_STREQ(s.attacks[2].anim, ""); /* pas de clip : repos */
+    EXPECT_NEAR(s.attacks[2].anim_speed, 1.0F, 1e-6F);
+    EXPECT_TRUE(bad("attack a\nanim\nend\n", "`anim CLIP [VITESSE [DÉCALAGE]]`"));
+    EXPECT_TRUE(bad("attack a\nanim x 1 0 9\nend\n", "`anim CLIP [VITESSE [DÉCALAGE]]`"));
+    EXPECT_TRUE(bad("attack a\nanim x$\nend\n", "nom de clip invalide"));
+    EXPECT_TRUE(bad("attack a\nanim x 0\nend\n", "vitesse dans ]0 ; 10]"));
+    EXPECT_TRUE(bad("attack a\nanim x 11\nend\n", "vitesse dans ]0 ; 10]"));
+    EXPECT_TRUE(bad("attack a\nanim x 1 -61\nend\n", "décalage dans [-60 ; 60]"));
+    EXPECT_TRUE(bad("attack a\nanim x 1 61\nend\n", "décalage dans [-60 ; 60]"));
+    ASSERT_TRUE(eng_attackset_parse("attack a\n startup 8\n active 4\n recovery 14\n damage 1\n"
+                                    " anim shoot 1 -0.29\n hitbox h 0 0 0 0 0 1 0.1\nend\n",
+                                    &s, err, sizeof err));
+    EXPECT_NEAR(s.attacks[0].anim_offset, -0.29F, 1e-6F); /* première image tenue au départ */
+    EXPECT_TRUE(bad("attack a\nanim x\nanim y\nend\n", "`anim` déclaré deux fois"));
+}

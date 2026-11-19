@@ -449,6 +449,27 @@ uint32_t eng_anim_gltf_clip_count(const void *data, size_t size)
     return count;
 }
 
+uint32_t eng_anim_gltf_find(const void *data, size_t size, const char *name)
+{
+    if (name == NULL || name[0] == '\0') {
+        return UINT32_MAX;
+    }
+    cgltf_data *gltf = gltf_open(data, size, NULL, false);
+    if (gltf == NULL) {
+        return UINT32_MAX;
+    }
+    uint32_t found = UINT32_MAX;
+    for (cgltf_size i = 0; i < gltf->animations_count; i++) {
+        const char *n = gltf->animations[i].name;
+        if (n != NULL && strcmp(n, name) == 0) {
+            found = (uint32_t)i;
+            break;
+        }
+    }
+    cgltf_free(gltf);
+    return found;
+}
+
 /* Une série de clés en cours de construction (mémoire de travail). */
 typedef struct Track {
     uint32_t joint; /* NO_CHANNEL : supprimée (remplacée par un recalcul) */

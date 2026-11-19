@@ -398,7 +398,7 @@ typedef struct EngRendererDesc {
     uint32_t max_buffers;       /* 0 : 1024 */
     uint32_t max_pipelines;     /* 0 : 64 */
     uint32_t max_textures;      /* 0 : 256 */
-    uint32_t max_samplers;      /* 0 : 32 */
+    uint32_t max_samplers;      /* 0 : 128 (deux par modèle GPU : personnages M4) */
     uint32_t max_commands;      /* dessins par image, 0 : 4096 */
     uint32_t max_uniform_bytes; /* uniforms de toute l'image, 0 : 256 Kio */
     /* Passe d'ombre (M1-17) : dessins de la file d'ombre par image (0 : pas de file d'ombre) et

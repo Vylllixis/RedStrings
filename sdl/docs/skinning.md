@@ -48,7 +48,15 @@ deux, la même image (≤ 3/255) que le même maillage **déformé sur le CPU** 
 d'indice **255** d'une palette de **256** matrices fonctionne (et déplacer l'os 254 change l'image). `tests/
 test_skin.c` couvre le chargement. Mutations : voir le message de livraison.
 
-## Ce qui n'a pas été vu
+## Vu sur un vrai personnage (finition, 19/11)
+
+Chevalier et squelettes KayKit (41 articulations, 3 716 sommets pour le chevalier, casque et cape
+rigides inclus) dessinés dans le lanceur sur le RTX 5070 : `launcher --avatar-gallery` (tous les
+états), `launcher --combat` (joueur et ennemis). Coût non isolé : la scène de combat reste à
+688 FPS en 1080p (docs/devlog/perf-materiel.md, mesure d'avant les personnages ; à refaire).
+Voir `docs/characters.md`.
+
+## Ce qui n'a pas été vu (première passe)
 
 - Aucun personnage réel (Mixamo) : maillage de test = une colonne de 24 sommets, deux os. Les poids multi-os
   sur un vrai maillage à plusieurs milliers de sommets, la déformation d'un coude ou d'un genou, l'aspect

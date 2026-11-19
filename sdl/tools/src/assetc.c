@@ -31,8 +31,8 @@
  *       (assetc skel --skin N). Incompatible avec --bench.
  *   assetc tex <entrée.png|.jpg|...> <sortie.tex> [--linear] [--raw] [--depfile <fichier.d>]
  *   assetc skel <entrée.gltf|.glb> <sortie.skel> [--skin N] [--depfile <fichier.d>]
- *   assetc anim <entrée.gltf|.glb> <sortie.anim> [--anim N] [--skin N] [--skeleton chemin.skel]
- *               [--depfile <fichier.d>]
+ *   assetc anim <entrée.gltf|.glb> <sortie.anim> [--anim N | --anim-name NOM] [--skin N]
+ *               [--skeleton chemin.skel] [--depfile <fichier.d>]
  *       Une image en .tex BC7 avec ses mips (RGBA8 avec --raw). sRGB par défaut ; --linear pour
  *       des données (normales, rugosité...).
  *   assetc heightmap <sortie.hmap> [--size N] [--spacing M] [--alt-min A] [--alt-max B] [--seed S]
@@ -567,8 +567,8 @@ static int cmd_skel(const char *in_arg, const char *out_arg, uint32_t skin, cons
 
 /* ── anim ── */
 
-static int cmd_anim(const char *in_arg, const char *out_arg, uint32_t anim, uint32_t skin,
-                    const char *skeleton_path, const char *depfile)
+static int cmd_anim(const char *in_arg, const char *out_arg, uint32_t anim, const char *anim_name,
+                    uint32_t skin, const char *skeleton_path, const char *depfile)
 {
     char in_path[1024];
     char out_path[1024];
@@ -611,6 +611,14 @@ static int cmd_anim(const char *in_arg, const char *out_arg, uint32_t anim, uint
     } else {
         const uint32_t clips = eng_anim_gltf_clip_count(file.data, file.size);
         const uint32_t skins = eng_skeleton_gltf_skin_count(file.data, file.size);
+        if (anim_name != NULL) {
+            anim = eng_anim_gltf_find(file.data, file.size, anim_name);
+            if (anim == UINT32_MAX) {
+                fprintf(stderr, "assetc : aucune animation nommée « %s » dans %s\n", anim_name,
+                        in_arg);
+                anim = clips; /* refusé plus bas */
+            }
+        }
         EngAnimClip clip = {0};
         EngAnimImportStats stats;
         if (clips == 0) {
@@ -932,11 +940,13 @@ static int usage(void)
     fprintf(
         stderr,
         "assetc (moteur %s)\n"
-        "usage : assetc mesh <entrée.gltf|.glb> <sortie.mesh> [--bench N] [--raw] [--depfile f.d]\n"
+        "usage : assetc mesh <entrée.gltf|.glb> <sortie.mesh> [--bench N] [--raw] [--skin N] "
+        "[--depfile f.d]\n"
         "        assetc tex <entrée.png|.jpg|...> <sortie.tex> [--linear] [--raw] [--depfile f.d]\n"
         "        assetc skel <entrée.gltf|.glb> <sortie.skel> [--skin N] [--depfile f.d]\n"
-        "        assetc anim <entrée.gltf|.glb> <sortie.anim> [--anim N] [--skin N] [--skeleton "
-        "chemin.skel]\n"
+        "        assetc anim <entrée.gltf|.glb> <sortie.anim> [--anim N | --anim-name NOM] [--skin "
+        "N]\n"
+        "                    [--skeleton chemin.skel]\n"
         "                    [--depfile f.d]\n"
         "        assetc heightmap <sortie.hmap> [--size N] [--spacing M] [--alt-min A] [--alt-max "
         "B]\n"
@@ -1024,6 +1034,7 @@ int main(int argc, char **argv)
     if (argc >= 4 && strcmp(argv[1], "anim") == 0) {
         uint32_t anim = 0;
         uint32_t skin = 0;
+        const char *anim_name = NULL;
         const char *skeleton_path = NULL;
         const char *depfile = NULL;
         for (int i = 4; i < argc; i++) {
@@ -1031,6 +1042,8 @@ int main(int argc, char **argv)
             const bool has_value = i + 1 < argc;
             if (strcmp(argv[i], "--depfile") == 0 && has_value) {
                 depfile = argv[++i];
+            } else if (strcmp(argv[i], "--anim-name") == 0 && has_value) {
+                anim_name = argv[++i];
             } else if (strcmp(argv[i], "--skeleton") == 0 && has_value) {
                 skeleton_path = argv[++i];
             } else if ((strcmp(argv[i], "--anim") == 0 || strcmp(argv[i], "--skin") == 0) &&
@@ -1049,7 +1062,7 @@ int main(int argc, char **argv)
                 return usage();
             }
         }
-        return cmd_anim(argv[2], argv[3], anim, skin, skeleton_path, depfile);
+        return cmd_anim(argv[2], argv[3], anim, anim_name, skin, skeleton_path, depfile);
     }
     if (argc >= 3 && strcmp(argv[1], "heightmap") == 0) {
         EngHeightmapParams params = eng_heightmap_default_params();

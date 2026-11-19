@@ -31,7 +31,11 @@ typedef struct EngSkinVertex {
  * restituée : indice de skin hors limites, `remap` incohérent, aucun maillage utilisant ce skin,
  * primitive sans JOINTS_0 / WEIGHTS_0 (vec4, même nombre d'éléments que POSITION), indice
  * d'articulation hors du skin, poids négatif, non fini, ou de somme nulle, et toutes les erreurs
- * de eng_model_parse. Les maillages qui n'utilisent pas ce skin sont ignorés (avertissement). */
+ * de eng_model_parse. Les maillages qui n'utilisent pas ce skin sont ignorés (avertissement), SAUF
+ * les maillages rigides (sans skin) rangés sous une articulation de ce skin (casque, cape, arme
+ * dans la main) : comme en glTF, ils suivent l'articulation ancêtre la plus proche ; ils sont
+ * inclus, placés en pose de liaison, avec un poids 255 sur cette articulation. Pour ne pas les
+ * inclure, retire-les de la source (tools/scripts/gltf_extract.py --drop-node). */
 bool eng_model_parse_skinned(EngArena *arena, EngArena *scratch, const void *data, size_t size,
                              const char *base_path, uint32_t skin_index, const uint32_t *remap,
                              uint32_t remap_count, EngModel *model, EngSkinVertex **skin);

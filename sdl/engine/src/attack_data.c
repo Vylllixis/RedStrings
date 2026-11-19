@@ -85,7 +85,7 @@ static bool parse_float(const char *s, float *out)
 
 /* Valeurs lues pour l'attaque en cours, avec « a-t-on vu cette clé ». */
 typedef struct Seen {
-    bool startup, active, recovery, damage, posture, stamina, hitstop, cancel_from, next;
+    bool startup, active, recovery, damage, posture, stamina, hitstop, cancel_from, next, anim;
 } Seen;
 
 static void unresolved_next(EngAttack *a)
@@ -202,6 +202,29 @@ static void do_key(Parser *p, EngAttack *a, Seen *seen, NextName *nn, char *cons
         snprintf(nn->name, sizeof nn->name, "%s", tok[1]);
         nn->line = p->line;
         nn->used = true;
+    } else if (strcmp(k, "anim") == 0) {
+        if (n < 2 || n > 4) {
+            fail(p, "`anim CLIP [VITESSE [DÉCALAGE]]` attendu");
+            return;
+        }
+        if (!valid_name(tok[1])) {
+            fail(p, "`anim` : nom de clip invalide « %s »", tok[1]);
+            return;
+        }
+        float speed = 1.0F;
+        float offset = 0.0F;
+        if (n >= 3 && (!parse_float(tok[2], &speed) || !(speed > 0.0F) || speed > 10.0F)) {
+            fail(p, "`anim` : vitesse dans ]0 ; 10] attendue, reçu « %s »", tok[2]);
+            return;
+        }
+        if (n == 4 && (!parse_float(tok[3], &offset) || offset < -60.0F || offset > 60.0F)) {
+            fail(p, "`anim` : décalage dans [-60 ; 60] s attendu, reçu « %s »", tok[3]);
+            return;
+        }
+        DUP(seen->anim)
+        snprintf(a->anim, sizeof a->anim, "%s", tok[1]);
+        a->anim_speed = speed;
+        a->anim_offset = offset;
     } else if (strcmp(k, "hitbox") == 0) {
         if (n != 9) {
             fail(p, "`hitbox OS ax ay az bx by bz RAYON` attendu (9 mots)");
@@ -302,6 +325,7 @@ bool eng_attackset_parse(const char *text, EngAttackSet *out, char *err, size_t 
             snprintf(cur->name, sizeof cur->name, "%s", tok[1]);
             unresolved_next(cur);
             cur->cancel_from = UINT32_MAX; /* « non donné » : fixé à `end` */
+            cur->anim_speed = 1.0F;
             seen = (Seen){0};
         } else if (strcmp(tok[0], "end") == 0) {
             if (cur == NULL || n != 1) {
