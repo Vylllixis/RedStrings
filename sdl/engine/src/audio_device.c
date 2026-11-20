@@ -47,7 +47,7 @@ EngAudioDevice *eng_audio_device_open(EngMixer *mixer)
         ENG_LOG_WARN("audio : SDL_INIT_AUDIO a échoué : %s", SDL_GetError());
         return NULL;
     }
-    EngAudioDevice *d = (EngAudioDevice *)calloc(1, sizeof *d);
+    EngAudioDevice *d = (EngAudioDevice *)SDL_calloc(1, sizeof *d);
     if (d == NULL) {
         SDL_QuitSubSystem(SDL_INIT_AUDIO);
         return NULL;
@@ -58,14 +58,14 @@ EngAudioDevice *eng_audio_device_open(EngMixer *mixer)
         SDL_OpenAudioDeviceStream(SDL_AUDIO_DEVICE_DEFAULT_PLAYBACK, &spec, audio_callback, d);
     if (d->stream == NULL) {
         ENG_LOG_WARN("audio : ouverture du périphérique impossible : %s", SDL_GetError());
-        free(d);
+        SDL_free(d);
         SDL_QuitSubSystem(SDL_INIT_AUDIO);
         return NULL;
     }
     if (!SDL_ResumeAudioStreamDevice(d->stream)) {
         ENG_LOG_WARN("audio : démarrage impossible : %s", SDL_GetError());
         SDL_DestroyAudioStream(d->stream);
-        free(d);
+        SDL_free(d);
         SDL_QuitSubSystem(SDL_INIT_AUDIO);
         return NULL;
     }
@@ -78,7 +78,7 @@ void eng_audio_device_close(EngAudioDevice *d)
         return;
     }
     SDL_DestroyAudioStream(d->stream); /* ferme aussi le périphérique */
-    free(d);
+    SDL_free(d);
     SDL_QuitSubSystem(SDL_INIT_AUDIO);
 }
 
