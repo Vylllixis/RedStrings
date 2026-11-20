@@ -42,7 +42,8 @@ RTX 5070 Laptop GPU (8 Go, pilote 580.178.04) + Intel UHD (hybride) ; écran int
 | B15 | `tools/scripts/lint.sh` en échec : `engine/src/audio_device.c` allouait avec `calloc`/`free` de la libc (invisibles du compteur d'allocations, règle M0-12) | mineur | **corrigé** (`SDL_calloc`/`SDL_free`) |
 | B16 | Nuit : les cubes de la démonstration restent blancs (pipeline non éclairé) | mineur (laid) | **corrigé** (`textured_lit.vert` : teinte × lumière) |
 | B17 | Nuit : terrain blanc-bleu, plus clair que le ciel : le brouillard prenait la couleur d'un ciel de jour (direction de la lune au lieu du soleil) | majeur (laid) | **corrigé** (vrai soleil dans les uniforms du brouillard ; test GPU de nuit, mutation détectée) |
-| B18 | Debug : la capture d'écran (`--screenshot`) déclenche 3 erreurs de validation Vulkan (copie depuis l'image de la chaîne d'affichage : disposition et usage) ; préexistant, même sur la scène simple | mineur (Debug seulement, la capture est juste) | à faire |
+| B18 | Debug : la capture d'écran (`--screenshot`) déclenche 3 erreurs de validation Vulkan (copie depuis l'image de la chaîne d'affichage : disposition et usage) ; préexistant, même sur la scène simple | mineur (Debug seulement, la capture est juste) | **corrigé** (l'image capturée est dessinée dans une texture à nous, recopiée vers l'écran puis relue ; test `launcher.screenshot` sans erreur de validation, mutation détectée) |
+| B19 | Le plein écran enregistré (`graphics.fullscreen = 1`) n'était jamais appliqué au lancement : l'état de la fenêtre écrasait l'option avant sa lecture (vu en préparant la mesure en plein écran) | mineur | **corrigé** (appliqué après le chargement des options ; test `launcher.options_fullscreen`, mutation détectée) |
 
 Mesures (détail : `perf-materiel.md`) : M1 avec ombres 694 FPS (1080p) / 365 FPS (2560 x 1600) ;
 M3 1 km² complet 215 / 163 FPS, pire 12,3 ms ; combat 688 / 364 FPS ; combat sur terrain avec herbe

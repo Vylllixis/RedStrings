@@ -472,7 +472,8 @@ typedef struct EngRenderer {
     bool ssao_projection_ok;  /* eng_renderer_set_projection a donné une matrice valable */
     EngPipelineHandle tonemap_pipeline;
     struct SDL_GPUSampler *hdr_sampler;
-    uint32_t resolve_format; /* format de la cible de la résolution */
+    struct SDL_GPUSampler *hdr_linear_sampler; /* M8-06 : agrandissement à l'échelle < 1 */
+    uint32_t resolve_format;                   /* format de la cible de la résolution */
     EngRendererStats stats;
 } EngRenderer;
 

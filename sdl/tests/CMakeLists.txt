@@ -556,6 +556,54 @@ if(OW_SHADERS_OK)
   endif()
 endif()
 
+# B18 : la capture d'écran passe par une texture à nous (la swapchain ne se relit pas) : aucune
+# erreur de validation (couches de validation actives en Debug), image écrite.
+if(OW_SHADERS_OK)
+  add_test(NAME launcher.screenshot COMMAND launcher --frames 6 --no-audio --env-samples 16
+           --screenshot ${CMAKE_CURRENT_BINARY_DIR}/screenshot_test.ppm 3
+           WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR})
+  set_tests_properties(launcher.screenshot PROPERTIES
+    ENVIRONMENT "SDL_VIDEODRIVER=offscreen"
+    FAIL_REGULAR_EXPRESSION "ERROR|Validation Error|non détruite"
+    PASS_REGULAR_EXPRESSION "capture : .*screenshot_test.ppm")
+  if(OW_SOFTWARE_VULKAN_ICD)
+    set_property(TEST launcher.screenshot APPEND PROPERTY ENVIRONMENT_MODIFICATION
+      "VK_DRIVER_FILES=set:${OW_SOFTWARE_VULKAN_ICD}" "VK_ICD_FILENAMES=set:${OW_SOFTWARE_VULKAN_ICD}")
+  endif()
+endif()
+
+# B19 : le plein écran enregistré dans options.txt est appliqué au lancement (il était écrasé par
+# l'état de la fenêtre avant d'être lu). Options isolées dans un dossier du test.
+if(OW_SHADERS_OK)
+  add_test(NAME launcher.options_fullscreen
+           COMMAND sh -c "rm -rf \"$1\" && mkdir -p \"$1/RedStrings/game\" && printf 'graphics.fullscreen = 1\\n' > \"$1/RedStrings/game/options.txt\" && XDG_DATA_HOME=\"$1\" \"$2\" --combat --new-game --no-audio --frames 3 --env-samples 16"
+                   sh ${CMAKE_CURRENT_BINARY_DIR}/options_fullscreen $<TARGET_FILE:launcher>
+           WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR})
+  set_tests_properties(launcher.options_fullscreen PROPERTIES
+    ENVIRONMENT "SDL_VIDEODRIVER=offscreen"
+    FAIL_REGULAR_EXPRESSION "ERROR|plein écran non"
+    PASS_REGULAR_EXPRESSION "options graphiques : .*plein écran oui")
+  if(OW_SOFTWARE_VULKAN_ICD)
+    set_property(TEST launcher.options_fullscreen APPEND PROPERTY ENVIRONMENT_MODIFICATION
+      "VK_DRIVER_FILES=set:${OW_SOFTWARE_VULKAN_ICD}" "VK_ICD_FILENAMES=set:${OW_SOFTWARE_VULKAN_ICD}")
+  endif()
+endif()
+
+# Coût de chaque effet de post-process (finition M8-06) : la mesure parcourt ses 7 configurations
+# (FXAA, bloom, SSAO, échelles 75 et 50 %) et quitte d'elle-même.
+if(OW_SHADERS_OK)
+  add_test(NAME launcher.post_bench COMMAND launcher --post-bench 5 --no-audio --env-samples 16
+           WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR})
+  set_tests_properties(launcher.post_bench PROPERTIES
+    ENVIRONMENT "SDL_VIDEODRIVER=offscreen"
+    FAIL_REGULAR_EXPRESSION "ERROR|non détruite|perdu"
+    PASS_REGULAR_EXPRESSION "mesure du post-process : 7 configurations.*tout, échelle 50 %")
+  if(OW_SOFTWARE_VULKAN_ICD)
+    set_property(TEST launcher.post_bench APPEND PROPERTY ENVIRONMENT_MODIFICATION
+      "VK_DRIVER_FILES=set:${OW_SOFTWARE_VULKAN_ICD}" "VK_ICD_FILENAMES=set:${OW_SOFTWARE_VULKAN_ICD}")
+  endif()
+endif()
+
 # Monde ouvert RENDU (M7, --world) : cellules streamées envoyées au GPU, corps Jolt par cellule,
 # origine flottante (traversée de 1 km au moins), personnage posé sur le relief à l'arrêt.
 if(OW_PHYSICS AND OW_SHADERS_OK)

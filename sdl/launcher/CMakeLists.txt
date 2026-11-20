@@ -1,4 +1,4 @@
-add_executable(launcher src/main.c src/demo_scene.c src/editor_mode.c src/play_mode.c src/play_combat.c src/world_bench.c src/skeleton_view.c src/game_flow.c src/avatar.c src/avatar_gallery.c src/world_view.c)
+add_executable(launcher src/main.c src/post_bench.c src/demo_scene.c src/editor_mode.c src/play_mode.c src/play_combat.c src/world_bench.c src/skeleton_view.c src/game_flow.c src/avatar.c src/avatar_gallery.c src/world_view.c)
 target_link_libraries(launcher PRIVATE engine)
 add_dependencies(launcher game)
 target_link_libraries(launcher PRIVATE project_options)

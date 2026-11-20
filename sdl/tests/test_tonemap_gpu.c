@@ -1280,6 +1280,61 @@ UTEST(eng_tonemap_gpu, ssao_darkens_a_crease_and_leaves_flat_ground_wall_and_sky
     CLOSE_TONEMAP(t);
 }
 
+/* M8-06 : échelle de résolution : une scène de 32 x 32 (moitié gauche 0,2, droite 0,8) résolue dans
+ * 64 x 64 : à l'échelle 1 la lecture est au plus proche (deux valeurs seulement), à l'échelle 0,5
+ * elle est bilinéaire (des valeurs intermédiaires apparaissent à la frontière, aucune ailleurs). */
+UTEST(eng_tonemap_gpu, a_scaled_scene_is_upscaled_bilinearly_and_a_full_one_is_not)
+{
+    TonemapTest t;
+    if (!open_tonemap(&t, FORMAT_F32)) {
+        EXPECT_FALSE(render_gpu_required());
+        return;
+    }
+    static float half[32 * 32 * 4];
+    for (uint32_t y = 0; y < 32U; y++) {
+        for (uint32_t x = 0; x < 32U; x++) {
+            float *px = &half[(((size_t)y * 32U) + x) * 4U];
+            px[0] = px[1] = px[2] = x < 16U ? 0.2F : 0.8F;
+            px[3] = 1.0F;
+        }
+    }
+    SDL_GPUTexture *hdr = upload_hdr(t.f.gpu.device, 32, 32, half);
+    ASSERT_TRUE(hdr != NULL);
+    EngTonemap setting;
+    eng_tonemap_default(&setting);
+    setting.op = ENG_TONEMAP_NONE;
+    eng_renderer_set_tonemap(&t.r, &setting);
+    const float low = eng_srgb_encode(0.2F);
+    const float high = eng_srgb_encode(0.8F);
+    for (int scaled = 0; scaled < 2; scaled++) {
+        eng_gpu_set_render_scale(&t.f.gpu, scaled != 0 ? 0.5F : 1.0F);
+        ASSERT_TRUE(resolve_to_floats(&t, hdr, g_floats));
+        uint32_t between = 0;
+        uint32_t far_off = 0;
+        for (uint32_t y = 0; y < SIZE; y++) {
+            for (uint32_t x = 0; x < SIZE; x++) {
+                const float v = g_floats[(((size_t)y * SIZE) + x) * 4U];
+                const bool is_low = fabsf(v - low) < 2e-3F;
+                const bool is_high = fabsf(v - high) < 2e-3F;
+                between += (!is_low && !is_high) ? 1U : 0U;
+                /* loin de la frontière (colonnes 0-27 et 36-63) : la valeur du côté */
+                if ((x < 28U && !is_low) || (x >= 36U && !is_high)) {
+                    far_off++;
+                }
+            }
+        }
+        if (scaled != 0) {
+            EXPECT_GE(between, 2U * SIZE); /* au moins deux colonnes de transition */
+        } else {
+            EXPECT_EQ(between, 0U);
+        }
+        EXPECT_EQ(far_off, 0U);
+    }
+    eng_gpu_set_render_scale(&t.f.gpu, 1.0F);
+    SDL_ReleaseGPUTexture(t.f.gpu.device, hdr);
+    CLOSE_TONEMAP(t);
+}
+
 #else /* sans shaders compilés */
 
 UTEST(eng_tonemap_gpu, needs_compiled_shaders)

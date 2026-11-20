@@ -1,4 +1,5 @@
 #include <SDL3/SDL.h>
+#include <math.h>
 #include <stdio.h>
 #include <stdint.h>
 #include <stdlib.h>
@@ -429,6 +430,50 @@ UTEST(eng_gpu_hdr, is_off_until_enabled_and_the_scene_format_follows)
     eng_gpu_disable_hdr(&f.gpu); /* répétable */
     ASSERT_TRUE(run_frames(&f, 2));
     EXPECT_TRUE(f.gpu.hdr_texture == NULL);
+    close_fixture(&f);
+}
+
+/* M8-06 : échelle de résolution : la scène HDR et sa profondeur suivent l'échelle, l'écran reste
+ * plein ; sans HDR, l'échelle est sans effet ; bornes et arrondi. */
+UTEST(eng_gpu_hdr, the_render_scale_shrinks_the_scene_targets_but_not_the_screen)
+{
+    EXPECT_EQ(eng_gpu_scaled_size(1280U, 0.5F), 640U);
+    EXPECT_EQ(eng_gpu_scaled_size(1281U, 0.75F), 961U); /* 960,75 arrondi */
+    EXPECT_EQ(eng_gpu_scaled_size(1280U, 1.0F), 1280U);
+    EXPECT_EQ(eng_gpu_scaled_size(1280U, 0.0F), 1280U); /* hors ]0 ; 1[ : plein */
+    EXPECT_EQ(eng_gpu_scaled_size(1U, 0.5F), 1U);       /* jamais 0 */
+    Fixture f = {0};
+    if (!open_fixture(&f)) {
+        EXPECT_FALSE(gpu_required());
+        return;
+    }
+    EXPECT_NEAR(f.gpu.render_scale, 1.0F, 0.0F);
+    eng_gpu_set_render_scale(&f.gpu, 0.1F);
+    EXPECT_NEAR(f.gpu.render_scale, 0.5F, 0.0F); /* borné */
+    eng_gpu_set_render_scale(&f.gpu, NAN);
+    EXPECT_NEAR(f.gpu.render_scale, 1.0F, 0.0F);
+    ASSERT_TRUE(eng_gpu_enable_depth(&f.gpu));
+    ASSERT_TRUE(eng_gpu_enable_hdr(&f.gpu));
+    eng_gpu_set_render_scale(&f.gpu, 0.5F);
+    ASSERT_TRUE(eng_gpu_begin_frame(&f.gpu));
+    const uint32_t w = f.gpu.swapchain_width;
+    const uint32_t h = f.gpu.swapchain_height;
+    EXPECT_EQ(f.gpu.hdr_width, eng_gpu_scaled_size(w, 0.5F));
+    EXPECT_EQ(f.gpu.hdr_height, eng_gpu_scaled_size(h, 0.5F));
+    EXPECT_EQ(f.gpu.depth_width, f.gpu.hdr_width); /* la passe principale : mêmes tailles */
+    EXPECT_EQ(f.gpu.depth_height, f.gpu.hdr_height);
+    EXPECT_EQ(f.gpu.target_width, w); /* l'écran (interface, taille annoncée) reste plein */
+    eng_gpu_end_frame(&f.gpu);
+    eng_gpu_set_render_scale(&f.gpu, 1.0F);
+    ASSERT_TRUE(eng_gpu_begin_frame(&f.gpu));
+    EXPECT_EQ(f.gpu.hdr_width, w);
+    EXPECT_EQ(f.gpu.depth_width, w);
+    eng_gpu_end_frame(&f.gpu);
+    eng_gpu_disable_hdr(&f.gpu);
+    eng_gpu_set_render_scale(&f.gpu, 0.5F); /* sans HDR : la scène est l'écran */
+    ASSERT_TRUE(eng_gpu_begin_frame(&f.gpu));
+    EXPECT_EQ(f.gpu.depth_width, w);
+    eng_gpu_end_frame(&f.gpu);
     close_fixture(&f);
 }
 

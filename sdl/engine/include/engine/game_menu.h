@@ -54,6 +54,7 @@ typedef struct EngGameOptions {
     uint32_t shadow_quality; /* 0 bas (sans filtre), 1 moyen, 2 haut */
     uint32_t view_distance;  /* 0 proche, 1 moyenne, 2 loin (monde : 1, 2 ou 3 cellules) */
     bool ssao;               /* occlusion ambiante (finition M8-06) */
+    float render_scale;      /* échelle de résolution : 0,5, 0,75 ou 1 (finition M8-06) */
 } EngGameOptions;
 
 #define ENG_MENU_MAX_ITEMS 20U

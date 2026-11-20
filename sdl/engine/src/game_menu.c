@@ -57,6 +57,7 @@ void eng_options_default(EngGameOptions *o)
     o->text_scale = 1.0F;
     o->fxaa = true;
     o->ssao = true;
+    o->render_scale = 1.0F;
     o->bloom = 0.5F;
     o->vsync = true;
     o->fullscreen = false;
@@ -116,6 +117,7 @@ size_t eng_options_save(const EngGameOptions *o, const EngInput *input, char *ou
     EMIT("graphics.bloom = %.3f\n", (double)o->bloom);
     EMIT("graphics.vsync = %d\n", o->vsync ? 1 : 0);
     EMIT("graphics.ssao = %d\n", o->ssao ? 1 : 0);
+    EMIT("graphics.render_scale = %.2f\n", (double)o->render_scale);
     EMIT("graphics.fullscreen = %d\n", o->fullscreen ? 1 : 0);
     EMIT("graphics.shadows = %u\n", (unsigned)o->shadow_quality);
     EMIT("graphics.view_distance = %u\n", (unsigned)o->view_distance);
@@ -193,6 +195,10 @@ bool eng_options_load(EngGameOptions *o, EngInput *input, const char *text)
             t.bloom = v;
         } else if (strcmp(key, "graphics.ssao") == 0) {
             t.ssao = v != 0.0F;
+        } else if (strcmp(key, "graphics.render_scale") == 0) {
+            if (v >= 0.5F && v <= 1.0F) { /* hors bornes : ignoré */
+                t.render_scale = v;
+            }
         } else if (strcmp(key, "graphics.vsync") == 0) {
             t.vsync = v != 0.0F;
         } else if (strcmp(key, "graphics.fullscreen") == 0) {
@@ -350,6 +356,8 @@ uint32_t eng_menu_items(const EngMenu *m, EngMenuItem *out, uint32_t max)
         set_item(&out[n++], "Qualité des ombres", quality[o->shadow_quality % 3U], true);
         set_item(&out[n++], "Distance de vue", distance[o->view_distance % 3U], true);
         set_item(&out[n++], "Occlusion ambiante (SSAO)", o->ssao ? "oui" : "non", true);
+        (void)snprintf(v, sizeof v, "%d %%", (int)lroundf(o->render_scale * 100.0F));
+        set_item(&out[n++], "Échelle de résolution", v, true);
         set_item(&out[n++], "Contrôles...", NULL, m->input != NULL);
         set_item(&out[n++], "Retour", NULL, true);
         break;
@@ -412,6 +420,9 @@ static bool adjust(EngMenu *m, int dir)
         o->view_distance = (uint32_t)((int32_t)o->view_distance + dir + 3) % 3U;
     } else if (s == (int32_t)ENG_BUS_COUNT + 11) {
         o->ssao = !o->ssao;
+    } else if (s == (int32_t)ENG_BUS_COUNT + 12) { /* 50, 75, 100 % sans boucler */
+        o->render_scale =
+            clampf(roundf((o->render_scale + (0.25F * (float)dir)) * 4.0F) / 4.0F, 0.5F, 1.0F);
     } else {
         return false;
     }

@@ -37,6 +37,7 @@
 #endif
 #include "game_flow.h"
 #include "engine/daynight.h"
+#include "post_bench.h"
 #include "play_mode.h"
 #include "world_bench.h"
 #include "world_view.h"
@@ -103,6 +104,9 @@ static void usage(const char *prog)
     fprintf(stderr,
             "  --at-boss      avec --combat --terrain : commence devant l'entrée de l'arène "
             "du boss (M6-09)\n");
+    fprintf(stderr,
+            "  --post-bench N mesure le coût de chaque effet (FXAA, bloom, SSAO, échelle) : N "
+            "images par configuration, sans vsync, puis quitte\n");
     fprintf(stderr, "  --screenshot F N (développement) écrit l'image n° N en PPM dans F\n");
     fprintf(stderr, "  --avatar-gallery (développement) rangée de chevaliers, un état d'animation "
                     "chacun (repos, marche, attaques au tick d'impact, roulade...)\n");
@@ -310,6 +314,7 @@ int main(int argc, char **argv)
     bool world_mode = false;
     bool weapon_greatsword = false; /* --weapon greatsword (M8-08) */
     bool at_boss = false;           /* --at-boss (M6-09) */
+    long post_bench_frames = 0;     /* --post-bench N (finition M8-06) */
     int32_t world_seed = 1;
     double world_autopilot = 0.0;
     const char *screenshot_path = NULL;
@@ -376,6 +381,13 @@ int main(int argc, char **argv)
             }
         } else if (strcmp(argv[i], "--at-boss") == 0) {
             at_boss = true;
+        } else if (strcmp(argv[i], "--post-bench") == 0 && i + 1 < argc) {
+            char *end = NULL;
+            post_bench_frames = strtol(argv[++i], &end, 10);
+            if (*end != '\0' || post_bench_frames < 1 || post_bench_frames > 100000) {
+                fprintf(stderr, "--post-bench : nombre d'images de 1 à 100000 attendu\n");
+                return 2;
+            }
         } else if (strcmp(argv[i], "--weapon") == 0 && i + 1 < argc) {
             weapon_greatsword = strcmp(argv[++i], "greatsword") == 0;
         } else if (strcmp(argv[i], "--world") == 0) {
@@ -906,6 +918,11 @@ int main(int argc, char **argv)
             play.autoplay = combat_autoplay;
             /* M8 : menus, sauvegarde, options ; la démonstration automatique saute le menu */
             use_flow = play.combat != NULL && game_flow_init(&flow, &play, &platform.input, NULL);
+            if (use_flow && flow.options.fullscreen != platform.fullscreen) {
+                /* B19 : le plein écran enregistré, appliqué au lancement (ensuite les options
+                 * suivent l'état de la fenêtre, image par image) */
+                eng_platform_toggle_fullscreen(&platform);
+            }
             if (use_flow && (start_new_game || combat_autoplay)) {
                 game_flow_start_new(&flow, &play);
             }
@@ -1098,6 +1115,8 @@ int main(int argc, char **argv)
         return 1;
     }
     uint64_t frame = 0;
+    PostBench post_bench;
+    post_bench_init(&post_bench, (uint32_t)post_bench_frames);
     ENG_PROF_THREAD_NAME("principal");
     while (alive && (max_frames < 0 || (long)frame < max_frames)) {
         ENG_PROF_ZONE(z_frame, "frame");
@@ -1160,6 +1179,9 @@ int main(int argc, char **argv)
                     tonemap.fxaa = flow.options.fxaa;  /* appliqué au renderer plus bas */
                     tonemap.bloom = flow.options.bloom;
                     tonemap.ssao = flow.options.ssao ? LAUNCHER_SSAO : 0.0F;
+                    if (use_gpu) {
+                        eng_gpu_set_render_scale(&gpu, flow.options.render_scale);
+                    }
                     /* finition M8 : vsync, plein écran, qualité des ombres, distance de vue */
                     const EngPresentMode mode =
                         flow.options.vsync ? ENG_PRESENT_VSYNC : ENG_PRESENT_IMMEDIATE;
@@ -1175,16 +1197,16 @@ int main(int argc, char **argv)
                     const float base_far = demo_options.terrain_path != NULL ? 3000.0F : 1000.0F;
                     camera.far_z = base_far * (0.5F + (0.5F * (float)flow.options.view_distance));
                     static const char *const quality[3] = {"bas", "moyen", "haut"};
-                    ENG_LOG_INFO("options graphiques : vsync %s (présentation %s), plein écran %s, "
-                                 "ombres %s, plan lointain %.0f m, FXAA %s, bloom %.0f %%, "
-                                 "SSAO %s",
-                                 flow.options.vsync ? "oui" : "non",
-                                 gpu.present_mode == ENG_PRESENT_VSYNC ? "vsync" : "immédiate",
-                                 platform.fullscreen ? "oui" : "non",
-                                 quality[flow.options.shadow_quality % 3U], (double)camera.far_z,
-                                 flow.options.fxaa ? "oui" : "non",
-                                 (double)(flow.options.bloom * 100.0F),
-                                 flow.options.ssao ? "oui" : "non");
+                    ENG_LOG_INFO(
+                        "options graphiques : vsync %s (présentation %s), plein écran %s, "
+                        "ombres %s, plan lointain %.0f m, FXAA %s, bloom %.0f %%, "
+                        "SSAO %s, échelle %.0f %%",
+                        flow.options.vsync ? "oui" : "non",
+                        gpu.present_mode == ENG_PRESENT_VSYNC ? "vsync" : "immédiate",
+                        platform.fullscreen ? "oui" : "non",
+                        quality[flow.options.shadow_quality % 3U], (double)camera.far_z,
+                        flow.options.fxaa ? "oui" : "non", (double)(flow.options.bloom * 100.0F),
+                        flow.options.ssao ? "oui" : "non", (double)(gpu.render_scale * 100.0F));
                     flow.graphics_dirty = false;
                 }
             } else {
@@ -1245,6 +1267,10 @@ int main(int argc, char **argv)
                             eng_daynight_exposure_bias(daynight, sun_elevation);
                         daynight_hour_ui = (float)daynight->hour;
                         daynight_hour_shown = daynight_hour_ui;
+                    }
+                    if (post_bench.active && /* finition M8-06 : coût de chaque effet */
+                        !post_bench_frame(&post_bench, clock.dt * 1000.0, &frame_tonemap, &gpu)) {
+                        alive = false;
                     }
                     eng_renderer_set_tonemap(&renderer, &frame_tonemap);
                     const float aspect =

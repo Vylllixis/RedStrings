@@ -137,17 +137,25 @@ static void setup_hdr(EngRenderer *r, uint32_t resolve_format)
     named_sampler.props = sampler_props;
     r->hdr_sampler = SDL_CreateGPUSampler(r->gpu->device, &named_sampler);
     eng_gpu_debug_props_free(sampler_props);
+    SDL_GPUSamplerCreateInfo linear_info = sampler_info; /* M8-06 : agrandissement bilinéaire */
+    linear_info.min_filter = SDL_GPU_FILTER_LINEAR;
+    linear_info.mag_filter = SDL_GPU_FILTER_LINEAR;
+    const uint32_t linear_props = eng_gpu_debug_props(
+        "sampler", SDL_PROP_GPU_SAMPLER_CREATE_NAME_STRING, "HDR scene linear sampler");
+    linear_info.props = linear_props;
+    r->hdr_linear_sampler = SDL_CreateGPUSampler(r->gpu->device, &linear_info);
+    eng_gpu_debug_props_free(linear_props);
     const EngPipelineDesc pipeline = {.name = "tonemap",
                                       .vertex_shader = "tonemap.vert",
                                       .fragment_shader = "tonemap.frag",
                                       .cull_mode = ENG_CULL_NONE,
                                       .color_format = r->resolve_format,
                                       .no_depth_target = true};
-    if (r->hdr_sampler != NULL) {
+    if (r->hdr_sampler != NULL && r->hdr_linear_sampler != NULL) {
         r->tonemap_pipeline = eng_renderer_create_pipeline(r, &pipeline);
     }
-    if (r->hdr_sampler == NULL || !eng_renderer_pipeline_is_valid(r, r->tonemap_pipeline) ||
-        !eng_gpu_enable_hdr(r->gpu)) {
+    if (r->hdr_sampler == NULL || r->hdr_linear_sampler == NULL ||
+        !eng_renderer_pipeline_is_valid(r, r->tonemap_pipeline) || !eng_gpu_enable_hdr(r->gpu)) {
         ENG_LOG_WARN("renderer : HDR indisponible (sampler, shaders tonemap.* ou GPU) : la scène "
                      "est dessinée directement dans l'écran");
         if (eng_renderer_pipeline_is_valid(r, r->tonemap_pipeline)) {
@@ -157,6 +165,10 @@ static void setup_hdr(EngRenderer *r, uint32_t resolve_format)
         if (r->hdr_sampler != NULL) {
             SDL_ReleaseGPUSampler(r->gpu->device, r->hdr_sampler);
             r->hdr_sampler = NULL;
+        }
+        if (r->hdr_linear_sampler != NULL) {
+            SDL_ReleaseGPUSampler(r->gpu->device, r->hdr_linear_sampler);
+            r->hdr_linear_sampler = NULL;
         }
         return;
     }
@@ -244,6 +256,10 @@ uint32_t eng_renderer_shutdown(EngRenderer *r)
         eng_gpu_disable_hdr(r->gpu);
         (void)eng_renderer_destroy_pipeline(r, r->tonemap_pipeline);
         SDL_ReleaseGPUSampler(r->gpu->device, r->hdr_sampler);
+        if (r->hdr_linear_sampler != NULL) {
+            SDL_ReleaseGPUSampler(r->gpu->device, r->hdr_linear_sampler);
+            r->hdr_linear_sampler = NULL;
+        }
     }
     uint32_t leaked = 0;
     EngHandle handle;
@@ -1304,11 +1320,15 @@ bool eng_renderer_resolve_hdr_depth(EngRenderer *r, SDL_GPUCommandBuffer *comman
     /* M8-06 : SSAO seulement avec une profondeur et une projection ; sinon la texture HDR tient la
      * place de la profondeur (jamais lue : force nulle) */
     const bool ssao = r->tonemap.ssao > 0.0F && depth != NULL && r->ssao_projection_ok;
-    const SDL_GPUTextureSamplerBinding bindings[2] = {
+    const SDL_GPUTextureSamplerBinding bindings[3] = {
         {.texture = hdr, .sampler = r->hdr_sampler},
-        {.texture = ssao ? depth : hdr, .sampler = r->hdr_sampler}};
-    SDL_BindGPUFragmentSamplers(pass, 0, bindings, 2);
-    const float params[12] = {eng_tonemap_exposure_scale(&r->tonemap),
+        {.texture = ssao ? depth : hdr, .sampler = r->hdr_sampler},
+        {.texture = hdr, .sampler = r->hdr_linear_sampler}};
+    SDL_BindGPUFragmentSamplers(pass, 0, bindings, 3);
+    /* M8-06 : scène à l'échelle < 1 : la couleur de base est agrandie en bilinéaire */
+    const bool upscale = r->gpu != NULL && r->gpu->hdr_enabled && r->gpu->render_scale > 0.0F &&
+                         r->gpu->render_scale < 1.0F;
+    const float params[16] = {eng_tonemap_exposure_scale(&r->tonemap),
                               (float)r->tonemap.op,
                               format_is_srgb(r->resolve_format) ? 0.0F : 1.0F,
                               0.0F,
@@ -1319,7 +1339,11 @@ bool eng_renderer_resolve_hdr_depth(EngRenderer *r, SDL_GPUCommandBuffer *comman
                               r->ssao_projection[0],
                               r->ssao_projection[1],
                               r->ssao_projection[2],
-                              r->ssao_projection[3]};
+                              r->ssao_projection[3],
+                              upscale ? 1.0F : 0.0F,
+                              0.0F,
+                              0.0F,
+                              0.0F};
     SDL_PushGPUFragmentUniformData(commands, 0, params, sizeof params);
     SDL_DrawGPUPrimitives(pass, 3, 1, 0, 0); /* un triangle plein écran, sans buffer */
     r->stats.resolve_draws++;

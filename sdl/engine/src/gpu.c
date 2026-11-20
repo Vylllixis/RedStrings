@@ -3,6 +3,7 @@
 #include <stdio.h>
 
 #include <SDL3/SDL.h>
+#include <math.h>
 
 #include "engine/gpu_debug.h"
 #include "engine/log.h"
@@ -66,6 +67,7 @@ bool eng_gpu_init(EngGpu *gpu, SDL_Window *window, const EngGpuDesc *desc)
         gpu->frames_in_flight = ENG_GPU_DEFAULT_FRAMES_IN_FLIGHT;
     }
     gpu->present_mode = ENG_PRESENT_VSYNC; /* mode par défaut de SDL après le rattachement */
+    gpu->render_scale = 1.0F;
     if (desc->present_mode != ENG_PRESENT_VSYNC &&
         !eng_gpu_set_present_mode(gpu, desc->present_mode)) {
         ENG_LOG_WARN("GPU : mode de présentation %d indisponible : repli sur la synchronisation "
@@ -447,7 +449,11 @@ bool eng_gpu_begin_frame(EngGpu *gpu)
         gpu->frames_skipped++;
         return false;
     }
-    if (!ensure_depth(gpu, width, height) || !ensure_hdr(gpu, width, height)) {
+    /* M8-06 : scène HDR (et sa profondeur) à l'échelle de résolution ; l'écran reste plein */
+    const float scale = gpu->hdr_enabled ? gpu->render_scale : 1.0F;
+    const uint32_t scene_w = eng_gpu_scaled_size(width, scale);
+    const uint32_t scene_h = eng_gpu_scaled_size(height, scale);
+    if (!ensure_depth(gpu, scene_w, scene_h) || !ensure_hdr(gpu, scene_w, scene_h)) {
         (void)SDL_SubmitGPUCommandBuffer(gpu->command_buffer); /* l'image est présentée vide */
         gpu->command_buffer = NULL;
         gpu->frames_skipped++;
@@ -456,6 +462,28 @@ bool eng_gpu_begin_frame(EngGpu *gpu)
     gpu->swapchain_texture = texture;
     gpu->swapchain_width = width;
     gpu->swapchain_height = height;
+    gpu->output_texture = texture;
+    if (gpu->capture_path != NULL && !gpu->captured &&
+        gpu->frames_submitted + 1U >= gpu->capture_frame) {
+        /* B18 : l'image capturée est dessinée dans une texture à nous (la swapchain ne se relit
+         * pas : ni usage de copie, ni disposition), recopiée vers l'écran puis relue */
+        SDL_GPUTextureCreateInfo info;
+        SDL_zero(info);
+        info.type = SDL_GPU_TEXTURETYPE_2D;
+        info.format = SDL_GetGPUSwapchainTextureFormat(gpu->device, gpu->window);
+        info.usage = SDL_GPU_TEXTUREUSAGE_COLOR_TARGET | SDL_GPU_TEXTUREUSAGE_SAMPLER;
+        info.width = width;
+        info.height = height;
+        info.layer_count_or_depth = 1;
+        info.num_levels = 1;
+        gpu->capture_texture = SDL_CreateGPUTexture(gpu->device, &info);
+        if (gpu->capture_texture != NULL) {
+            gpu->output_texture = gpu->capture_texture;
+        } else {
+            ENG_LOG_ERROR("capture : texture %ux%u impossible : %s", (unsigned)width,
+                          (unsigned)height, SDL_GetError());
+        }
+    }
     if (width != gpu->target_width || height != gpu->target_height) {
         gpu->target_width =
             width; /* cibles déjà recréées ci-dessus : on annonce la nouvelle taille */
@@ -482,6 +510,26 @@ void eng_gpu_fill_depth_target(struct SDL_GPUTexture *texture, SDL_GPUDepthStenc
     out->stencil_store_op = SDL_GPU_STOREOP_DONT_CARE;
 }
 
+uint32_t eng_gpu_scaled_size(uint32_t full, float scale)
+{
+    if (!(scale > 0.0F) || !(scale < 1.0F)) {
+        return full;
+    }
+    const uint32_t scaled = (uint32_t)lroundf((float)full * scale);
+    return scaled > 0U ? scaled : 1U;
+}
+
+void eng_gpu_set_render_scale(EngGpu *gpu, float scale)
+{
+    if (gpu == NULL) {
+        return;
+    }
+    if (!isfinite(scale)) {
+        scale = 1.0F;
+    }
+    gpu->render_scale = scale < 0.5F ? 0.5F : (scale > 1.0F ? 1.0F : scale);
+}
+
 void eng_gpu_fill_scene_depth_target(const EngGpu *gpu, SDL_GPUDepthStencilTargetInfo *out)
 {
     eng_gpu_fill_depth_target(gpu->depth_texture, out);
@@ -493,7 +541,7 @@ void eng_gpu_fill_scene_depth_target(const EngGpu *gpu, SDL_GPUDepthStencilTarge
 static bool open_pass(EngGpu *gpu, SDL_GPURenderPass **out)
 {
     SDL_GPUColorTargetInfo target = {
-        .texture = gpu->hdr_texture != NULL ? gpu->hdr_texture : gpu->swapchain_texture,
+        .texture = gpu->hdr_texture != NULL ? gpu->hdr_texture : gpu->output_texture,
         .clear_color = {gpu->clear_color[0], gpu->clear_color[1], gpu->clear_color[2],
                         gpu->clear_color[3]},
         .load_op = SDL_GPU_LOADOP_CLEAR,
@@ -529,7 +577,7 @@ static void end_main_pass(EngGpu *gpu, SDL_GPURenderPass *main_pass)
         return;
     }
     SDL_GPUColorTargetInfo target;
-    eng_gpu_fill_resolve_target(gpu->swapchain_texture, &target);
+    eng_gpu_fill_resolve_target(gpu->output_texture, &target);
     eng_gpu_debug_push(gpu->command_buffer, ENG_GPU_PASS_TONEMAP);
     SDL_GPURenderPass *pass = SDL_BeginGPURenderPass(gpu->command_buffer, &target, 1, NULL);
     if (pass == NULL) {
@@ -578,7 +626,7 @@ SDL_GPURenderPass *eng_gpu_begin_overlay_pass(EngGpu *gpu)
         gpu->main_pass_ended = true; /* si l'overlay échoue, end_frame ne doit pas ré-effacer */
     }
     SDL_GPUColorTargetInfo target;
-    eng_gpu_fill_overlay_target(gpu->swapchain_texture, &target);
+    eng_gpu_fill_overlay_target(gpu->output_texture, &target);
     eng_gpu_debug_push(gpu->command_buffer, ENG_GPU_PASS_OVERLAY);
     gpu->render_pass = SDL_BeginGPURenderPass(gpu->command_buffer, &target, 1, NULL);
     if (gpu->render_pass == NULL) {
@@ -611,8 +659,24 @@ static void capture(EngGpu *gpu)
         ENG_LOG_ERROR("capture : tampon impossible : %s", SDL_GetError());
         return;
     }
+    if (gpu->capture_texture == NULL) {
+        SDL_ReleaseGPUTransferBuffer(gpu->device, buffer);
+        return;
+    }
+    /* B18 : l'image est dans notre texture : recopiée vers l'écran, puis relue */
+    SDL_GPUBlitInfo blit;
+    SDL_zero(blit);
+    blit.source.texture = gpu->capture_texture;
+    blit.source.w = w;
+    blit.source.h = h;
+    blit.destination.texture = gpu->swapchain_texture;
+    blit.destination.w = w;
+    blit.destination.h = h;
+    blit.load_op = SDL_GPU_LOADOP_DONT_CARE;
+    blit.filter = SDL_GPU_FILTER_NEAREST;
+    SDL_BlitGPUTexture(gpu->command_buffer, &blit);
     SDL_GPUCopyPass *copy = SDL_BeginGPUCopyPass(gpu->command_buffer);
-    const SDL_GPUTextureRegion region = {.texture = gpu->swapchain_texture, .w = w, .h = h, .d = 1};
+    const SDL_GPUTextureRegion region = {.texture = gpu->capture_texture, .w = w, .h = h, .d = 1};
     const SDL_GPUTextureTransferInfo dst = {
         .transfer_buffer = buffer, .pixels_per_row = w, .rows_per_layer = h};
     SDL_DownloadFromGPUTexture(copy, &region, &dst);
@@ -622,6 +686,8 @@ static void capture(EngGpu *gpu)
     if (fence == NULL) {
         ENG_LOG_ERROR("capture : soumission refusée : %s", SDL_GetError());
         SDL_ReleaseGPUTransferBuffer(gpu->device, buffer);
+        SDL_ReleaseGPUTexture(gpu->device, gpu->capture_texture);
+        gpu->capture_texture = NULL;
         return;
     }
     gpu->frames_submitted++;
@@ -649,6 +715,8 @@ static void capture(EngGpu *gpu)
         SDL_UnmapGPUTransferBuffer(gpu->device, buffer);
     }
     SDL_ReleaseGPUTransferBuffer(gpu->device, buffer);
+    SDL_ReleaseGPUTexture(gpu->device, gpu->capture_texture); /* le GPU a fini (barrière) */
+    gpu->capture_texture = NULL;
 }
 
 void eng_gpu_end_frame(EngGpu *gpu)

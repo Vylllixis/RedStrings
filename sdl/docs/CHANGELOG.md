@@ -38,6 +38,11 @@ livraisons ; les tags sont posés par Théo après ses tests.
   Les arbres et rochers arrêtent le joueur et la caméra (une capsule Jolt par instance).
 - Finition (M8-06) : SSAO dans la passe de résolution (profondeur conservée et relue, 12 prises,
   moyenne 2 x 2 par les dérivées) ; option « Occlusion ambiante (SSAO) » au menu.
+- Finition (M8-06) : échelle de résolution (50 à 100 %, agrandissement bilinéaire, menu) ; mesure du
+  coût de chaque effet (`--post-bench N`) ; FXAA moins coûteux avec le bloom (voisins sans halo).
+- Finition (B19) : le plein écran enregistré dans les options est appliqué au lancement.
+- Finition (B18) : la capture d'écran (`--screenshot`) passe par une texture à nous : plus d'erreur
+  de validation Vulkan en Debug.
 
 ## v0.7 (M7, partiel) — monde ouvert
 - Cellules de 256 m (format RSCL), pool de threads, streaming asynchrone, origine flottante,

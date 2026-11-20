@@ -48,6 +48,9 @@ typedef struct EngGpu {
     struct SDL_Window *window;
     struct SDL_GPUCommandBuffer *command_buffer; /* image en cours, NULL hors image */
     struct SDL_GPUTexture *swapchain_texture;    /* cible de l'image en cours */
+    struct SDL_GPUTexture *output_texture;       /* où la résolution et l'interface dessinent : la
+                                                    swapchain, ou la texture de capture (B18) */
+    struct SDL_GPUTexture *capture_texture;      /* B18 : image capturée, recopiée puis relue */
     struct SDL_GPURenderPass *render_pass; /* passe ouverte (principale ou overlay), ou NULL */
     bool overlay_open;                     /* la passe ouverte est l'overlay */
     bool main_pass_ended;                  /* la passe principale a été terminée (overlay) */
@@ -58,6 +61,7 @@ typedef struct EngGpu {
     uint32_t depth_height;
     uint32_t depth_format; /* SDL_GPUTextureFormat retenu ; 0 : profondeur désactivée */
     bool depth_sampleable; /* la profondeur se lit aussi en texture (SSAO, M8-06) */
+    float render_scale;    /* M8-06 : taille de la scène HDR / taille de l'écran, [0,5 ; 1] */
     bool hdr_enabled;      /* la scène est dessinée en HDR puis résolue (M1-14) */
     struct SDL_GPUTexture *hdr_texture; /* cible couleur HDR de la passe principale (si activée) */
     uint32_t hdr_width;                 /* taille de hdr_texture */
@@ -152,6 +156,14 @@ void eng_gpu_fill_depth_target(struct SDL_GPUTexture *texture,
  * mais CONSERVÉE si elle est échantillonnable et le HDR actif (le SSAO de la résolution la relit,
  * M8-06 ; non conservée, son contenu serait indéfini). */
 void eng_gpu_fill_scene_depth_target(const EngGpu *gpu, struct SDL_GPUDepthStencilTargetInfo *out);
+
+/* Échelle de résolution (M8-06) : la scène HDR et sa profondeur sont dessinées à `scale` fois la
+ * taille de l'écran (bornée à [0,5 ; 1] ; non finie : 1), puis agrandies par la résolution ;
+ * l'interface reste à pleine taille. Sans HDR, sans effet (la scène est dessinée dans l'écran).
+ * Les cibles sont recréées à l'image suivante. */
+void eng_gpu_set_render_scale(EngGpu *gpu, float scale);
+/* Côté d'une cible à l'échelle : arrondi, au moins 1 ; `scale` hors ]0 ; 1[ : `full`. */
+uint32_t eng_gpu_scaled_size(uint32_t full, float scale);
 
 /* Passe « overlay » (M1-12 : interface de debug) : une seconde passe sur la MÊME image, qui
  * CONSERVE ce que la première a dessiné (chargement de la couleur au lieu d'un effacement) et n'a

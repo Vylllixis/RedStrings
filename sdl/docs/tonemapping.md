@@ -79,7 +79,9 @@ ajouter de texture intermédiaire :
   lanceur les active (FXAA oui, bloom 0,5) ; le menu **Options** du jeu (« Anticrénelage (FXAA) »,
   « Halo lumineux (bloom) ») et le panneau de debug F1 les règlent ; les valeurs sont enregistrées
   dans `options.txt` (`graphics.fxaa`, `graphics.bloom`).
-- Coût : 16 lectures (bloom) + 9 à 13 lectures (FXAA) par pixel en plus. Non mesuré sur un vrai GPU.
+- Coût : 16 lectures (bloom) + 9 à 13 lectures (FXAA) par pixel en plus ; mesuré, voir « Coût par
+  effet » ci-dessous. Les voisins de la détection d'arête du FXAA sont lus **sans** bloom (avant :
+  64 lectures de plus par pixel, « tout » coûtait 1,81 ms au lieu de 1,01).
 
 ## SSAO (finition M8-06)
 
@@ -105,6 +107,35 @@ principale :
 
 ![SSAO coupé (à gauche) et actif : pied du mur, herbe, personnages](devlog/img/m8-ssao-avant-apres.png)
 
+## Échelle de résolution (finition M8-06)
+
+`eng_gpu_set_render_scale` (0,5 à 1) : la scène HDR et sa profondeur sont dessinées plus petites,
+l'interface reste à pleine taille ; la résolution agrandit la couleur de base en **bilinéaire**
+(un deuxième échantillonneur, linéaire, sur la même texture ; le bloom, le FXAA et le SSAO restent
+calculés sur la grille de la scène). Sans HDR : sans effet. Menu **Options** « Échelle de résolution »
+(50, 75, 100 %), `graphics.render_scale`.
+
+## Coût par effet (finition M8-06)
+
+`launcher --post-bench N` dessine N images par configuration (après 30 de mise en route), sans vsync,
+et journalise la durée moyenne d'une image. SDL_GPU n'a pas de requêtes de temps GPU : c'est la durée
+de l'image entière, qui mesure le GPU quand c'est lui qui limite. Mesure (RTX 5070 Laptop, plein écran
+2560 x 1600, combat devant l'arène du boss sur le terrain de la tranche, herbe et 5 424 arbres,
+600 images par configuration, 4 251 attentes du GPU sur 4 411 images : limité par le GPU) :
+
+| Configuration | ms par image | écart à la base |
+|---|---|---|
+| aucun effet | 5,34 | — |
+| FXAA | 5,53 | +0,19 |
+| bloom (0,5) | 5,54 | +0,20 |
+| SSAO (0,6) | 6,09 | +0,76 |
+| FXAA + bloom + SSAO | 6,35 | +1,01 |
+| les trois, échelle 75 % | 5,34 | +0,00 |
+| les trois, échelle 50 % | 4,63 | −0,71 |
+
+En fenêtre 1280 x 720 (limité par le processeur) les écarts tombent à quelques centièmes de ms.
+Test `launcher.post_bench` : la mesure parcourt ses 7 configurations et quitte.
+
 ## Vérification
 
 - `tests/test_tonemap.c` (CPU) : valeurs ACES, NONE et sRGB **calculées à la main** ; AgX comparé à
@@ -125,6 +156,10 @@ principale :
   profondeur synthétique (caméra à 60°, sol, mur à 6 m, ciel) : le coin s'assombrit (0,044 en moyenne
   sur la bande), le sol proche, le haut du mur et le ciel ne changent pas (0,000) ; rien sans
   profondeur ni avec une projection qui n'est pas une perspective. `tests/test_tonemap.c` : bornes.
+- `a_scaled_scene_is_upscaled_bilinearly_and_a_full_one_is_not` : une scène de 32 x 32 résolue dans
+  64 x 64 donne des valeurs intermédiaires à la frontière à l'échelle 0,5, aucune à l'échelle 1 ;
+  `tests/test_gpu.c` : tailles des cibles à l'échelle (scène et profondeur réduites, écran plein,
+  sans effet sans HDR), bornes et arrondi. Mutations détectées.
 
 ## Limites connues
 

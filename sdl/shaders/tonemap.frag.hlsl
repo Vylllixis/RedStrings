@@ -5,6 +5,8 @@ Texture2D<float4> hdr : register(t0, space2);
 Texture2D<float4> depth_tex : register(t1, space2); // M8-06 (SSAO) : profondeur 0 à 1 dans .r
 SamplerState hdr_sampler : register(s0, space2);
 SamplerState depth_sampler : register(s1, space2);
+Texture2D<float4> hdr_linear : register(t2, space2); // M8-06 : la même scène, échantillonneur linéaire
+SamplerState hdr_linear_sampler : register(s2, space2);
 
 cbuffer Tonemap : register(b0, space3)
 {
@@ -13,6 +15,7 @@ cbuffer Tonemap : register(b0, space3)
     float4 post;   // x : 1 = FXAA (M8-06) ; y : force du bloom (0 : coupé) ; z : force du SSAO
                    // (0 : coupé) ; w : rayon du SSAO (m)
     float4 proj;   // SSAO : P00, P11, A, B de la projection ; distance z = B / (d + A)
+    float4 scale;  // x : 1 = scène à l'échelle < 1, agrandie en bilinéaire (M8-06) ; yzw : inutilisés
 };
 
 float3 aces(float3 x)
@@ -101,9 +104,12 @@ float3 bloom_at(int2 p, int2 size)
     return sum;
 }
 
-float3 ldr_at(int2 p, int2 size)
+// pixel de l'écran : texel, bloom, tonemapping ; la couleur de base est lue en bilinéaire à `uv`
+// quand la scène est plus petite que l'écran (échelle de résolution, M8-06)
+float3 ldr_screen(float2 uv, int2 p, int2 size)
 {
-    float3 c = texel(p, size);
+    float3 c = scale.x > 0.5f ? hdr_linear.SampleLevel(hdr_linear_sampler, uv, 0.0f).rgb
+                              : texel(p, size);
     if (post.y > 0.0f) {
         c += post.y * bloom_at(p, size);
     }
@@ -201,15 +207,17 @@ float4 main(float2 uv : TEXCOORD0) : SV_Target0
     int2 size = int2((int)w, (int)h);
     float2 px = uv * float2((float)w, (float)h);
     int2 p = (int2)floor(px);
-    float3 color = ldr_at(p, size);
+    float3 color = ldr_screen(uv, p, size);
     if (post.x > 0.5f) {
         // FXAA « simple » (Lottes) : direction de l'arête par les quatre diagonales, deux et quatre
         // prises le long de l'arête, la plus sûre gardée
         float lm = luma(color);
-        float nw = luma(ldr_at(p + int2(-1, -1), size));
-        float ne = luma(ldr_at(p + int2(1, -1), size));
-        float sw = luma(ldr_at(p + int2(-1, 1), size));
-        float se = luma(ldr_at(p + int2(1, 1), size));
+        // voisins sans bloom : la détection d'arête n'a pas besoin du halo (64 lectures de moins
+        // par pixel, mesuré : docs/devlog/m8-revue.md)
+        float nw = luma(tonemap_ldr(texel(p + int2(-1, -1), size)));
+        float ne = luma(tonemap_ldr(texel(p + int2(1, -1), size)));
+        float sw = luma(tonemap_ldr(texel(p + int2(-1, 1), size)));
+        float se = luma(tonemap_ldr(texel(p + int2(1, 1), size)));
         float lmin = min(lm, min(min(nw, ne), min(sw, se)));
         float lmax = max(lm, max(max(nw, ne), max(sw, se)));
         if (lmax - lmin > max(0.0312f, lmax * 0.125f)) {

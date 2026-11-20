@@ -381,7 +381,7 @@ UTEST(game_menu, graphics_options_toggle_persist_and_controls_returns_to_its_lin
     eng_menu_open(&m, ENG_MENU_OPTIONS);
     EngMenuItem items[ENG_MENU_MAX_ITEMS];
     const uint32_t n = eng_menu_items(&m, items, ENG_MENU_MAX_ITEMS);
-    ASSERT_EQ(n, (uint32_t)ENG_BUS_COUNT + 14U);
+    ASSERT_EQ(n, (uint32_t)ENG_BUS_COUNT + 15U);
     EXPECT_NE(strstr(items[ENG_BUS_COUNT + 5].label, "FXAA"), NULL);
     EXPECT_NE(strstr(items[ENG_BUS_COUNT + 6].label, "bloom"), NULL);
     m.selected = (int32_t)ENG_BUS_COUNT + 5;
@@ -435,6 +435,22 @@ UTEST(game_menu, graphics_options_toggle_persist_and_controls_returns_to_its_lin
     EXPECT_TRUE(o2.ssao);
     ASSERT_TRUE(eng_options_load(&o2, NULL, text));
     EXPECT_FALSE(o2.ssao);
+    /* échelle de résolution : 100 -> 75 -> 50 %, bornée, enregistrée et relue */
+    EXPECT_NEAR(opt.render_scale, 1.0F, 0.0F);
+    EXPECT_NE(strstr(items[ENG_BUS_COUNT + 12].label, "chelle"), NULL);
+    m.selected = (int32_t)ENG_BUS_COUNT + 12;
+    (void)stick(&m, -1.0F, 0.0F);
+    EXPECT_NEAR(opt.render_scale, 0.75F, 1e-6F);
+    (void)stick(&m, -1.0F, 0.0F);
+    (void)stick(&m, -1.0F, 0.0F);
+    EXPECT_NEAR(opt.render_scale, 0.5F, 1e-6F); /* borné, sans boucler */
+    ASSERT_GT(eng_options_save(&opt, &input, text, sizeof text), 50U);
+    EXPECT_NE(strstr(text, "graphics.render_scale = 0.50"), NULL);
+    eng_options_default(&o2);
+    ASSERT_TRUE(eng_options_load(&o2, NULL, text));
+    EXPECT_NEAR(o2.render_scale, 0.5F, 1e-6F);
+    ASSERT_TRUE(eng_options_load(&o2, NULL, "graphics.render_scale = 0.2\n")); /* ignoré */
+    EXPECT_NEAR(o2.render_scale, 0.5F, 1e-6F);
     ASSERT_GT(eng_options_save(&opt, &input, text, sizeof text), 50U);
     EXPECT_NE(strstr(text, "graphics.vsync = 0"), NULL);
     EXPECT_NE(strstr(text, "graphics.shadows = 0"), NULL);

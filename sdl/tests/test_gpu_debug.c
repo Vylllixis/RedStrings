@@ -1089,6 +1089,7 @@ UTEST(eng_gpu_debug_renderer, sdl_receives_the_names_of_samplers_pipelines_and_s
     EXPECT_EQ(spy_count(&spy, 'H', "triangle.frag"), 1U);
     if (eng_renderer_hdr_enabled(&t.r)) { /* créés à l'initialisation : l'espion était déjà là */
         EXPECT_EQ(spy_count(&spy, 'S', "HDR scene sampler"), 1U);
+        EXPECT_EQ(spy_count(&spy, 'S', "HDR scene linear sampler"), 1U); /* M8-06 */
         EXPECT_EQ(spy_count(&spy, 'P', "tonemap"), 1U);
     }
     spy_remove();
