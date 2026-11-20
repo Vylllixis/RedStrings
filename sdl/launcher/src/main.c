@@ -104,6 +104,8 @@ static void usage(const char *prog)
     fprintf(stderr,
             "  --at-boss      avec --combat --terrain : commence devant l'entrée de l'arène "
             "du boss (M6-09)\n");
+    fprintf(stderr, "  --at-zone N    avec --world --combat : commence 20 m avant la zone N de la "
+                    "grande carte (0 à 11 : farm facile, farm dur, boss de chaque biome)\n");
     fprintf(stderr,
             "  --post-bench N mesure le coût de chaque effet (FXAA, bloom, SSAO, échelle) : N "
             "images par configuration, sans vsync, puis quitte\n");
@@ -205,10 +207,11 @@ static bool world_ground(void *user, float x, float z, float *out)
 /* --world : monde physique vide, streaming, chargement initial bloquant (les 9 cellules autour du
  * joueur), puis le personnage posé sur le relief. */
 static bool start_world(WorldView *world, PlayMode *play, EngTweaks *tweaks, float sensitivity,
-                        bool invert_y, EngRenderer *renderer, const DemoScene *scene, int32_t seed)
+                        bool invert_y, EngRenderer *renderer, const DemoScene *scene, int32_t seed,
+                        const double start[2])
 {
-    const double spawn_world[3] = {WORLD_SPAWN_X, 0.0, WORLD_SPAWN_Z};
-    const float spawn[3] = {(float)WORLD_SPAWN_X, 0.0F, (float)WORLD_SPAWN_Z};
+    const double spawn_world[3] = {start[0], 0.0, start[1]};
+    const float spawn[3] = {(float)start[0], 0.0F, (float)start[1]};
     if (!play_mode_init_world(play, tweaks, sensitivity, invert_y, spawn, world_ground, world)) {
         return false;
     }
@@ -220,7 +223,12 @@ static bool start_world(WorldView *world, PlayMode *play, EngTweaks *tweaks, flo
         play_mode_shutdown(play);
         return false;
     }
-    float feet[3] = {spawn[0], 0.0F, spawn[2]};
+    /* le chargement initial a pu recentrer l'origine flottante (départ loin de (0, 0), --at-zone) :
+     * le joueur et son point de départ sont placés dans le repère LOCAL */
+    float feet[3];
+    eng_origin_to_local(&world->origin, spawn_world, feet);
+    play->spawn[0] = feet[0];
+    play->spawn[2] = feet[2];
     feet[1] = play_mode_ground(play, feet[0], feet[2]) + 0.05F;
     play_mode_teleport(play, feet, -1.5707963F);
     ENG_LOG_INFO("monde : chargement initial en %.0f ms (%u cellules envoyées), joueur à %.1f m "
@@ -234,12 +242,17 @@ static bool start_world(WorldView *world, PlayMode *play, EngTweaks *tweaks, flo
 /* M7 : le camp de combat garde sa place dans le MONDE à travers les recentrages de l'origine
  * flottante (sa position locale est décalée avec elle). Journalise l'ancrage, le premier
  * recentrage, et une ERREUR si le camp a bougé. */
-static void check_camp_anchor(const WorldView *world, const PlayMode *play, bool shifted)
+static void check_camp_anchor(const WorldView *world, const PlayMode *play, bool shifted,
+                              bool rebase)
 {
     static bool known;
+    static bool reported;
     static double anchor[3];
     static uint32_t shifts;
     float c[2];
+    if (rebase) {
+        known = false; /* la zone a changé : le camp est ailleurs */
+    }
     if (play->combat == NULL || !play_combat_camp_center(play->combat, c)) {
         return;
     }
@@ -259,9 +272,71 @@ static void check_camp_anchor(const WorldView *world, const PlayMode *play, bool
     const double gap = hypot(w[0] - anchor[0], w[2] - anchor[2]);
     if (gap > 0.05) {
         ENG_LOG_ERROR("monde : le camp a bougé de %.2f m au recentrage n° %u", gap, shifts);
-    } else if (shifts == 1U) {
+    } else if (!reported) {
+        reported = true;
         ENG_LOG_INFO("monde : origine recentrée, le camp reste en place (écart %.3f m)", gap);
     }
+}
+
+/* Grande carte : la zone d'ennemis la plus proche du joueur (110 m) remplace la zone chargée, sauf
+ * en plein combat (à moins que le joueur soit déjà à plus de 150 m de l'ancienne). Au départ : le
+ * camp de réveil, sans ennemis. Un boss vaincu ne revient pas. Renvoie true si la zone a changé. */
+static bool update_zone(const WorldView *world, PlayMode *play, const float feet[3])
+{
+    static EngMapZone zones[ENG_MAPZONE_COUNT];
+    static bool built;
+    static int32_t active = -2; /* -2 : rien chargé ; -1 : camp de réveil */
+    static uint32_t beaten;     /* bit i : boss de la zone i vaincu */
+    if (play->combat == NULL) {
+        return false;
+    }
+    if (!built) {
+        built = eng_mapzones_build(&world->gen.biomes, zones);
+        if (!built) {
+            return false;
+        }
+    }
+    bool changed = false;
+    if (active == -2) {
+        changed = play_combat_load_zone(play->combat, NULL, play->spawn[0], play->spawn[2]);
+        active = -1;
+        ENG_LOG_INFO("monde : camp de réveil (aucun ennemi) ; %u zones sur la carte",
+                     (unsigned)ENG_MAPZONE_COUNT);
+    }
+    uint32_t tier = 0;
+    if (active >= 0 && play_combat_take_reward(play->combat, &tier)) {
+        beaten |= 1U << (uint32_t)active;
+        ENG_LOG_INFO("monde : boss de « %s » vaincu : butin de palier %u", zones[active].name,
+                     tier);
+    }
+    double pw[3];
+    eng_origin_to_world(&world->origin, feet, pw);
+    const int32_t near = eng_mapzones_nearest(zones, pw[0], pw[2], 110.0);
+    if (near < 0 || near == active) {
+        return changed;
+    }
+    const bool far_from_active =
+        active < 0 || hypot(zones[active].x - pw[0], zones[active].z - pw[2]) > 150.0;
+    if (play_combat_busy(play->combat) && !far_from_active) {
+        return changed;
+    }
+    EngMapZone zone = zones[near];
+    if ((beaten & (1U << (uint32_t)near)) != 0U) {
+        zone.enemy_count = 0; /* boss déjà vaincu : la zone reste vide */
+    }
+    const double centre[3] = {zone.x, 0.0, zone.z};
+    float local[3];
+    eng_origin_to_local(&world->origin, centre, local);
+    if (play_combat_load_zone(play->combat, &zone, local[0], local[2])) {
+        active = near;
+        changed = true;
+        ENG_LOG_INFO("monde : zone %d « %s » chargée (%s, %u ennemi(s), %.0f PV, dégâts x %.1f)",
+                     (int)near, zone.name, eng_biome_name(zone.biome), zone.enemy_count,
+                     (double)zone.hp, (double)zone.damage_scale);
+    } else {
+        ENG_LOG_ERROR("monde : zone %d « %s » impossible à charger", (int)near, zone.name);
+    }
+    return changed;
 }
 
 /* Une image du monde : pilote automatique éventuel, streaming, recentrage de l'origine. Renvoie
@@ -300,7 +375,8 @@ static double world_frame(WorldView *world, PlayMode *play, EngCamera *camera,
             camera_prev->position[a] += shift[a];
         }
     }
-    check_camp_anchor(world, play, shifted);
+    const bool zone_changed = update_zone(world, play, feet);
+    check_camp_anchor(world, play, shifted, zone_changed);
     for (int a = 0; a < 3; a++) {
         scene->shadow_focus[a] = feet[a];
     }
@@ -350,6 +426,8 @@ int main(int argc, char **argv)
     bool weapon_greatsword = false; /* --weapon greatsword (M8-08) */
     bool at_boss = false;           /* --at-boss (M6-09) */
     long post_bench_frames = 0;     /* --post-bench N (finition M8-06) */
+    long at_zone = -1;              /* --at-zone N : départ devant la zone N de la grande carte */
+    double world_start[2] = {WORLD_SPAWN_X, WORLD_SPAWN_Z};
     int32_t world_seed = 1;
     double world_autopilot = 0.0;
     const char *screenshot_path = NULL;
@@ -416,6 +494,18 @@ int main(int argc, char **argv)
             }
         } else if (strcmp(argv[i], "--at-boss") == 0) {
             at_boss = true;
+        } else if (strcmp(argv[i], "--at-zone") == 0 && i + 1 < argc) {
+            char *end = NULL;
+            at_zone = strtol(argv[++i], &end, 10);
+            EngMapZone zones[ENG_MAPZONE_COUNT];
+            if (*end != '\0' || at_zone < 0 || at_zone >= (long)ENG_MAPZONE_COUNT ||
+                !eng_mapzones_build(NULL, zones)) {
+                fprintf(stderr, "--at-zone : numéro de zone de 0 à %u attendu\n",
+                        (unsigned)ENG_MAPZONE_COUNT - 1U);
+                return 2;
+            }
+            world_start[0] = zones[at_zone].x - 20.0; /* 20 m avant la zone, sur le chemin */
+            world_start[1] = zones[at_zone].z;
         } else if (strcmp(argv[i], "--post-bench") == 0 && i + 1 < argc) {
             char *end = NULL;
             post_bench_frames = strtol(argv[++i], &end, 10);
@@ -924,7 +1014,8 @@ int main(int argc, char **argv)
             ENG_LOG_WARN("mode jouable indisponible %s",
                          use_editor ? "avec l'éditeur" : "sans rendu GPU");
         } else if (world_mode ? start_world(&world, &play, &tweaks, config.camera_sensitivity,
-                                            config.camera_invert_y, &renderer, &scene, world_seed)
+                                            config.camera_invert_y, &renderer, &scene, world_seed,
+                                            world_start)
                    : demo_options.terrain_path != NULL
                        ? play_mode_init_terrain(&play, &tweaks, config.camera_sensitivity,
                                                 config.camera_invert_y, demo_options.terrain_path)

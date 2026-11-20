@@ -64,6 +64,8 @@ livraisons ; les tags sont posés par Théo après ses tests.
 
 - Grande carte (demande du 2026-11-20) : quatre biomes en bandes dans le monde ouvert (plaine,
   montagne enneigée, désert, volcan) : relief et matières par biome, frontières fondues.
+- Grande carte : 12 zones d'ennemis (farm facile, farm dur, boss dans chaque biome), difficulté
+  croissante, camp de réveil sans ennemis ; `--at-zone N` pour commencer devant une zone.
 - M7 (finition) : un camp d'ennemis dans le monde ouvert (`launcher --world --combat`), ancré dans le
   monde à travers les recentrages de l'origine flottante.
 

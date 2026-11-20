@@ -101,6 +101,38 @@ monde : pas de couture entre cellules.
 Limites : le désert et le volcan n'ont pas encore leur teinte (sable brun, roche grise) ni de lave ;
 pas de décor propre à chaque biome.
 
+## Zones d'ennemis de la grande carte — `map_zones`
+
+Dans chaque biome, le long du chemin (+X) : une zone de **farm facile**, une zone de **farm dure**,
+puis une zone de **boss** (`engine/map_zones.h`, 12 zones). Les ennemis sont les archétypes du jeu
+mis à l'échelle par la zone :
+
+| Biome | Facile (3 ennemis) | Dur (2 ennemis, 2 fois plus grands) | Boss | Dégâts |
+|---|---|---|---|---|
+| Plaine | 30 PV (3 coups au niveau 1) | 60 PV (6 coups) | 200 PV (20 coups) | x 1 |
+| Montagne | 55 PV | 110 PV | 360 PV | x 1,5 |
+| Désert | 95 PV | 190 PV | 620 PV | x 2,2 |
+| Volcan | 150 PV | 300 PV | 1 000 PV | x 3 |
+
+- Le joueur se réveille dans un **camp sans ennemis** (le mannequin d'entraînement y reste).
+- Le lanceur charge la zone la plus proche à moins de 110 m (`play_combat_load_zone` : ennemis, PV,
+  dégâts, taille, grille de navigation reconstruite autour de la zone sur le relief chargé) ; il ne
+  change pas de zone en plein combat, sauf si le joueur est déjà à plus de 150 m de l'ancienne.
+- Rien n'est verrouillé : on peut aller droit au volcan, à ses risques.
+- Un **boss de zone** ne réapparaît pas ; sa victoire donne un palier de butin (1 à 4) ; les zones de
+  farm réapparaissent 10 s après avoir été vidées. Le nom de la zone s'affiche à son chargement.
+- `--at-zone N` (0 à 11) fait commencer 20 m avant la zone N. Le pilote automatique suit le chemin
+  quand il n'a personne à combattre.
+- Tests : `engine.map_zones` (ordre, bande de chaque zone, 3 / 6 / 20 coups en plaine, difficulté
+  croissante, zone la plus proche) ; `launcher.world_combat` (départ devant la zone 0 : elle se
+  charge, ses ennemis s'engagent) ; `launcher.world_combat_shift` (traversée : zones 0, 1, 2 chargées
+  dans l'ordre, camp en place après recentrage).
+
+![Zones : brute géante, boss de la plaine, de la montagne, du volcan](devlog/img/zones.png)
+
+Limites : les boss sont encore le même guerrier squelette (« Seigneur des os ») avec plus de PV ;
+pas encore de butin réel, de château ni de décor de zone ; boss vaincus oubliés au redémarrage.
+
 ## Streaming (M7-03) — `world_stream`
 
 Carré de (2r+1)² cellules autour du joueur (r = 2 : 25 cellules, 1,3 km de côté). Chaque image :

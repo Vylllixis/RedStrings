@@ -108,11 +108,21 @@ struct PlayCombat {
     EngTrainingDummy dummy;
     EngParticles particles;
     EngDamageNumbers numbers;
+    uint32_t zone_ticks; /* nom de la zone encore affiché */
     EngMixer mixer;
     EngCombatAudio audio;
     EngAudioDevice *device;
     int32_t lock;        /* indice de combattant verrouillé, -1 */
     uint32_t boss_agent; /* M6-09 : indice du boss dans le groupe d'IA */
+    /* grande carte : zone chargée (play_combat_load_zone) ; PV, dégâts et taille de ses ennemis */
+    float zone_hp;
+    float zone_damage;
+    float zone_size;
+    uint32_t zone_reward;
+    char zone_name[64];
+    float (*relief_fn)(void *user, float x, float z); /* gardé pour recharger une zone */
+    void *relief_user;
+    float relief_slope;
     uint32_t dead_ticks;
     uint32_t cleared_ticks;
     bool ready;
@@ -121,6 +131,10 @@ struct PlayCombat {
     bool boss_defeated;  /* tué : ne renaît plus (déduit de la sauvegarde au chargement) */
     bool boss_reachable; /* l'entrée mène au boss sur ce relief (play_combat_set_relief) */
     bool invincible; /* mode créatif : le joueur ne perd pas de PV (ses dégâts sont inchangés) */
+    bool zone_boss; /* grande carte : la zone chargée est une zone de boss (pas de réapparition) */
+    bool roam;      /* grande carte : sans cible, le pilote automatique suit le chemin (+X) */
+    bool zone_reward_pending;  /* le boss de la zone vient d'être vaincu : butin à donner */
+    bool hidden[FIGHTERS_MAX]; /* combattant sans rôle dans la zone : ni dessiné, ni ciblé */
     bool was_dead[FIGHTERS_MAX];
     bool has_avatar[FIGHTERS_MAX];
     bool rig_ready[FIGHTERS_MAX]; /* M5-05 / M5-06 : pose au rythme des ticks (ci-dessous) */
@@ -324,8 +338,14 @@ static void spawn_all(PlayCombat *c)
 {
     for (uint32_t i = 0; i < c->camp.count && i < c->group.count; i++) {
         (void)eng_aig_reset_agent(&c->group, &c->sim, i);
-        (void)eng_sim_place(&c->sim, c->group.agents[i].fighter, c->camp.m[i].pos[0],
-                            c->camp.m[i].pos[1], c->camp.m[i].yaw);
+        const uint32_t f = c->group.agents[i].fighter;
+        (void)eng_sim_place(&c->sim, f, c->camp.m[i].pos[0], c->camp.m[i].pos[1], c->camp.m[i].yaw);
+        if (c->zone_hp > 0.0F) { /* grande carte : PV, dégâts et carrure de la zone */
+            c->sim.fighters[f].vitals.max_hp = c->zone_hp;
+            c->sim.fighters[f].vitals.hp = c->zone_hp;
+            c->sim.fighters[f].params.damage_scale = c->zone_damage;
+            c->sim.radius[f] *= c->zone_size > 0.0F ? c->zone_size : 1.0F;
+        }
     }
 }
 
@@ -369,6 +389,106 @@ void play_combat_shift(PlayCombat *c, float dx, float dz)
     }
     eng_particles_init(&c->particles, 12345U);
     eng_dmgnum_init(&c->numbers);
+}
+
+static void enemy_look(const PlayCombat *c, uint32_t fighter, AvatarBody *body, AvatarProp *right,
+                       AvatarProp *left, float *scale);
+static void fit_plans_to_reach(PlayCombat *c, const AvatarLibrary *lib, uint32_t arch,
+                               AvatarProp prop, float scale);
+
+bool play_combat_load_zone(PlayCombat *c, const EngMapZone *zone, float cx, float cz)
+{
+    if (c == NULL || !c->ready || c->has_boss || !isfinite(cx) || !isfinite(cz)) {
+        return false;
+    }
+    const uint32_t slots = c->sim.count - FIRST_ENEMY;
+    const uint32_t count =
+        zone == NULL ? 0U : (zone->enemy_count < slots ? zone->enemy_count : slots);
+    eng_aig_init(&c->group, &c->arch, &c->world, &c->nav, PLAYER);
+    eng_camp_init(&c->camp);
+    c->zone_hp = zone != NULL ? zone->hp : 0.0F;
+    c->zone_damage = zone != NULL ? zone->damage_scale : 1.0F;
+    c->zone_size = zone != NULL ? zone->size_scale : 1.0F;
+    c->zone_boss = zone != NULL && zone->kind == ENG_MAPZONE_BOSS && count > 0U;
+    c->zone_reward = zone != NULL ? zone->reward : 0U;
+    c->zone_reward_pending = false;
+    c->zone_ticks = zone != NULL ? 240U : 0U;
+    c->roam = true;
+    (void)snprintf(c->zone_name, sizeof c->zone_name, "%s", zone != NULL ? zone->name : "");
+    const float face = 1.5707963F; /* tournés vers -X : d'où vient le joueur */
+    bool ok = true;
+    for (uint32_t i = 0; i < count && ok; i++) {
+        const uint32_t arch = eng_arch_find(&c->arch, zone->arch[i]);
+        const float angle = 6.2831853F * (float)i / (float)count;
+        const float ring = count > 1U ? 5.0F : 0.0F;
+        const float px = cx + (ring * cosf(angle));
+        const float pz = cz + (ring * sinf(angle));
+        const float patrol[2][2] = {{px, pz}, {px, pz + 8.0F}};
+        const bool walks = i == 0U && count > 1U; /* le premier fait sa ronde */
+        ok = arch != UINT32_MAX &&
+             eng_camp_add(&c->camp, arch, px, pz, face, walks ? patrol : NULL, walks ? 2U : 0U);
+    }
+    ok = ok && (count == 0U || eng_camp_spawn(&c->camp, &c->group, &c->sim, FIRST_ENEMY));
+    for (uint32_t f = FIRST_ENEMY; f < c->sim.count; f++) {
+        const bool used = ok && f - FIRST_ENEMY < c->camp.count;
+        c->hidden[f] = !used;
+        c->was_dead[f] = !used;
+        if (!used) { /* sans rôle dans cette zone : mort, hors de la scène */
+            c->sim.fighters[f].vitals.hp = 0.0F;
+            c->sim.fighters[f].vitals.dead = true;
+            c->sim.fighters[f].fsm.state = ENG_CS_DEAD;
+            (void)eng_sim_place(&c->sim, f, cx, cz - 4000.0F, 0.0F);
+        }
+    }
+    const float mn[2] = {cx - 30.0F, cz - 30.0F};
+    const float mx[2] = {cx + 30.0F, cz + 30.0F};
+    ok = ok && eng_nav_build(&c->nav, &c->world, mn, mx, 0.5F, 0.55F);
+    if (ok && c->relief_fn != NULL) {
+        (void)play_combat_set_relief(c, c->relief_fn, c->relief_user, c->relief_slope);
+    } else if (ok) {
+        spawn_all(c);
+    }
+    for (uint32_t f = FIRST_ENEMY; ok && c->avatars != NULL && f < c->sim.count; f++) {
+        if (c->hidden[f] || !c->has_avatar[f]) {
+            continue;
+        }
+        float scale = 1.0F;
+        enemy_look(c, f, &c->avatar[f].body, &c->avatar[f].right, &c->avatar[f].left, &scale);
+        c->avatar[f].scale = scale;
+        c->rig_prop[f] = c->avatar[f].right;
+        c->rig_scale[f] = scale;
+        fit_plans_to_reach(c, c->avatars, fighter_arch(c, f), c->avatar[f].right, scale);
+    }
+    c->lock = -1;
+    c->cleared_ticks = 0;
+    return ok;
+}
+
+bool play_combat_busy(const PlayCombat *c)
+{
+    if (c == NULL || !c->ready) {
+        return false;
+    }
+    for (uint32_t i = 0; i < c->group.count; i++) {
+        const EngAiAgent *a = &c->group.agents[i];
+        if (!c->sim.fighters[a->fighter].vitals.dead &&
+            (a->state == ENG_AI_CHASE || a->state == ENG_AI_ENGAGE)) {
+            return true;
+        }
+    }
+    return false;
+}
+
+bool play_combat_take_reward(PlayCombat *c, uint32_t *tier)
+{
+    if (c == NULL || !c->ready || !c->zone_reward_pending) {
+        return false;
+    }
+    c->zone_reward_pending = false;
+    if (tier != NULL) {
+        *tier = c->zone_reward;
+    }
+    return true;
 }
 
 void play_combat_set_invincible(PlayCombat *c, bool invincible)
@@ -724,7 +844,15 @@ void play_combat_tick(PlayCombat *c, const EngInputState *input, const float fee
             c->weapon_ticks = 300U;
             ENG_LOG_INFO("combat : camp vaincu : espadon obtenu (R pour changer d'arme)");
         }
-        if (++c->cleared_ticks >= CAMP_RESPAWN_TICKS) {
+        if (c->zone_boss) { /* grande carte : un boss de zone ne réapparaît pas, il donne son butin
+                             */
+            if (c->cleared_ticks == 0U) {
+                c->zone_reward_pending = true;
+                c->boss_ticks = 300U;
+                ENG_LOG_INFO("combat : boss de la zone « %s » vaincu", c->zone_name);
+            }
+            c->cleared_ticks = 1U;
+        } else if (++c->cleared_ticks >= CAMP_RESPAWN_TICKS) {
             c->cleared_ticks = 0;
             spawn_all(c);
             ENG_LOG_INFO("combat : camp vaincu, il réapparaît");
@@ -740,6 +868,9 @@ void play_combat_tick(PlayCombat *c, const EngInputState *input, const float fee
     }
     if (c->boss_ticks > 0U) {
         c->boss_ticks--;
+    }
+    if (c->zone_ticks > 0U) {
+        c->zone_ticks--;
     }
     c->stats.level = c->progress.level;
     c->stats.total_xp = c->progress.total_xp;
@@ -950,6 +1081,35 @@ static void fit_plans_to_reach(PlayCombat *c, const AvatarLibrary *lib, uint32_t
     }
 }
 
+/* Apparence d'un ennemi selon son archétype (corps, armes, taille), fois la taille de la zone. */
+static void enemy_look(const PlayCombat *c, uint32_t fighter, AvatarBody *body, AvatarProp *right,
+                       AvatarProp *left, float *scale)
+{
+    *body = AVATAR_SKELETON_MINION;
+    *right = AVATAR_SKELETON_BLADE;
+    *left = AVATAR_PROP_NONE;
+    *scale = 1.0F;
+    const uint32_t arch = fighter_arch(c, fighter);
+    const char *name = arch < c->arch.count ? c->arch.a[arch].name : "";
+    if (strcmp(name, "boss") == 0) { /* M6-09 : guerrier squelette géant à l'espadon */
+        *body = AVATAR_SKELETON_WARRIOR;
+        *right = AVATAR_GREATSWORD;
+        *scale = 1.45F;
+    } else if (strcmp(name, "brute") == 0) {
+        *body = AVATAR_SKELETON_WARRIOR;
+        *right = AVATAR_SKELETON_AXE;
+        *scale = 1.2F;
+    } else if (strcmp(name, "archer") == 0) {
+        *body = AVATAR_SKELETON_ROGUE;
+        *right = AVATAR_SKELETON_CROSSBOW;
+    } else {
+        *left = AVATAR_SKELETON_SHIELD;
+    }
+    if (c->zone_size > 0.0F) {
+        *scale *= c->zone_size;
+    }
+}
+
 bool play_combat_attach_avatars(PlayCombat *c, AvatarLibrary *lib, const PlayMode *play)
 {
     (void)play;
@@ -977,22 +1137,7 @@ bool play_combat_attach_avatars(PlayCombat *c, AvatarLibrary *lib, const PlayMod
         if (i == DUMMY) {
             right = AVATAR_PROP_NONE; /* squelette d'entraînement, mains nues */
         } else {
-            const uint32_t arch = fighter_arch(c, i);
-            const char *name = arch < c->arch.count ? c->arch.a[arch].name : "";
-            if (strcmp(name, "boss") == 0) { /* M6-09 : guerrier squelette géant à l'espadon */
-                body = AVATAR_SKELETON_WARRIOR;
-                right = AVATAR_GREATSWORD;
-                scale = 1.45F;
-            } else if (strcmp(name, "brute") == 0) {
-                body = AVATAR_SKELETON_WARRIOR;
-                right = AVATAR_SKELETON_AXE;
-                scale = 1.2F;
-            } else if (strcmp(name, "archer") == 0) {
-                body = AVATAR_SKELETON_ROGUE;
-                right = AVATAR_SKELETON_CROSSBOW;
-            } else {
-                left = AVATAR_SKELETON_SHIELD;
-            }
+            enemy_look(c, i, &body, &right, &left, &scale);
         }
         c->has_avatar[i] = avatar_init(&c->avatar[i], lib, body, right, left, scale);
         ok = ok && c->has_avatar[i];
@@ -1149,7 +1294,7 @@ void play_combat_draw_models(const PlayCombat *c, const AvatarLibrary *lib, EngR
         return;
     }
     for (uint32_t i = DUMMY; i < c->sim.count && i < FIGHTERS_MAX; i++) {
-        if (!c->has_avatar[i]) {
+        if (!c->has_avatar[i] || c->hidden[i]) {
             continue;
         }
         if (shadow_pass) {
@@ -1166,6 +1311,9 @@ uint32_t play_combat_set_relief(PlayCombat *c, float (*height)(void *user, float
     if (c == NULL || !c->ready) {
         return 0;
     }
+    c->relief_fn = height; /* gardé : une zone de la grande carte se recharge sur le même relief */
+    c->relief_user = user;
+    c->relief_slope = max_slope_deg;
     const uint32_t n = eng_nav_block_steep(&c->nav, height, user, max_slope_deg);
     const uint32_t islands = eng_nav_remove_islands(&c->nav, PLAY_NAV_MIN_REGION);
     c->sim.nav = &c->nav; /* les ennemis ne montent jamais sur une pente bloquée */
@@ -1482,8 +1630,12 @@ void play_combat_fill_hud(const PlayCombat *c, const PlayMode *play, mat4 view_p
     if (pf->vitals.dead) {
         (void)snprintf(hud->message, sizeof hud->message, "%s",
                        "Tu es tombé... renaissance dans un instant");
+    } else if (c->boss_ticks > 0U && c->zone_name[0] != '\0') {
+        (void)snprintf(hud->message, sizeof hud->message, "%s", "Boss vaincu !");
     } else if (c->boss_ticks > 0U) {
         (void)snprintf(hud->message, sizeof hud->message, "%s vaincu !", BOSS_NAME);
+    } else if (c->zone_ticks > 0U) {
+        (void)snprintf(hud->message, sizeof hud->message, "%s", c->zone_name);
     } else if (c->levelup_ticks > 0U) {
         (void)snprintf(hud->message, sizeof hud->message, "Niveau %u !", c->progress.level);
     } else if (c->weapon_ticks > 200U) {
@@ -1564,6 +1716,9 @@ void play_combat_autopilot(PlayCombat *c, const float feet[3], float camera_yaw,
         }
     }
     if (c->lock < 0) {
+        if (c->roam) { /* grande carte : personne à combattre, on suit le chemin vers +X */
+            in->axis[ENG_AXIS_MOVE] = (EngAxisValue){cosf(camera_yaw), -sinf(camera_yaw)};
+        }
         return;
     }
     float dx = c->sim.bodies[c->lock].pos[0] - feet[0];

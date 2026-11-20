@@ -8,6 +8,7 @@
 #include "engine/input_state.h"
 #include "engine/math.h"
 #include "engine/save_game.h"
+#include "engine/map_zones.h"
 #include "engine/ui_game.h"
 #include "avatar.h"
 
@@ -47,6 +48,17 @@ PlayCombat *play_combat_create(bool audio, bool arena_obstacles, bool boss_arena
 void play_combat_shift(PlayCombat *c, float dx, float dz);
 /* M7 : position (x, z) du poste du premier ennemi du camp ; false sans camp. */
 bool play_combat_camp_center(const PlayCombat *c, float out[2]);
+
+/* Grande carte : remplace le camp courant par les ennemis de `zone`, autour de (cx, cz) du repère
+ * local : archétypes, PV, dégâts et taille de la zone ; la grille de navigation est reconstruite
+ * autour de la zone sur le relief courant. `zone` NULL : aucun ennemi (camp de réveil). Une zone de
+ * boss ne réapparaît pas : sa victoire met un butin en attente (play_combat_take_reward). false si
+ * un archétype manque ou sur un terrain à arène (M6-09). */
+bool play_combat_load_zone(PlayCombat *c, const EngMapZone *zone, float cx, float cz);
+/* Un ennemi vivant poursuit ou combat le joueur ? (ne pas changer de zone à ce moment) */
+bool play_combat_busy(const PlayCombat *c);
+/* Le boss de la zone vient d'être vaincu : renvoie true une fois, avec son palier de butin. */
+bool play_combat_take_reward(PlayCombat *c, uint32_t *tier);
 /* Mode créatif : le joueur ne perd plus de PV (remis au maximum avant chaque pas de simulation) ;
  * ses attaques et leurs dégâts ne changent pas. */
 void play_combat_set_invincible(PlayCombat *c, bool invincible);

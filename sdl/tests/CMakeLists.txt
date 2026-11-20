@@ -24,6 +24,7 @@ ow_add_test(heightmap test_heightmap.c)
 ow_add_test(terrain test_terrain.c)
 ow_add_test(splatmap test_splatmap.c)
 ow_add_test(biome test_biome.c)
+ow_add_test(map_zones test_map_zones.c)
 ow_add_test(frustum test_frustum.c)
 ow_add_test(atmosphere test_atmosphere.c)
 ow_add_test(fog test_fog.c)
@@ -590,23 +591,23 @@ if(OW_SHADERS_OK)
   endif()
 endif()
 
-# M7 : un camp d'ennemis dans le monde ouvert. (1) le pilote de combat rejoint le camp posé près
-# du départ : des ennemis s'engagent ; (2) traversée à 200 m/s : l'origine est recentrée et le camp
-# reste à sa place dans le monde.
+# Grande carte : zones d'ennemis dans le monde ouvert. (1) départ devant la zone 0 (avant-poste de
+# la plaine) : elle se charge et ses ennemis s'engagent ; (2) traversée à 200 m/s : les zones se
+# chargent dans l'ordre du chemin, l'origine est recentrée et le camp reste à sa place.
 if(OW_PHYSICS AND OW_SHADERS_OK)
-  add_test(NAME launcher.world_combat COMMAND launcher --world 7 --combat-autoplay --no-audio
-           --frames 500 --env-samples 16 WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR})
+  add_test(NAME launcher.world_combat COMMAND launcher --world 7 --combat-autoplay --at-zone 0
+           --no-audio --frames 500 --env-samples 16 WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR})
   set_tests_properties(launcher.world_combat PROPERTIES
     ENVIRONMENT "SDL_VIDEODRIVER=offscreen"
     FAIL_REGULAR_EXPRESSION "ERROR|non détruite|perdu|TROU"
-    PASS_REGULAR_EXPRESSION "camp de combat ancré.*monde : combat : [1-9][0-9]* ennemi\\(s\\) engagé")
+    PASS_REGULAR_EXPRESSION "zone 0 « Plaine : avant-poste des soldats » chargée.*monde : combat : [1-9][0-9]* ennemi\\(s\\) engagé")
   add_test(NAME launcher.world_combat_shift COMMAND launcher --world 7 --combat-autoplay
            --world-autopilot 200 --no-audio --frames 240 --env-samples 16
            WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR})
   set_tests_properties(launcher.world_combat_shift PROPERTIES
     ENVIRONMENT "SDL_VIDEODRIVER=offscreen"
     FAIL_REGULAR_EXPRESSION "ERROR|non détruite|perdu|TROU|a bougé"
-    PASS_REGULAR_EXPRESSION "origine recentrée, le camp reste en place")
+    PASS_REGULAR_EXPRESSION "camp de réveil.*zone 0 « .*chargée.*zone 1 « .*chargée.*zone 2 « .*chargée")
   if(OW_SOFTWARE_VULKAN_ICD)
     foreach(t launcher.world_combat launcher.world_combat_shift)
       set_property(TEST ${t} APPEND PROPERTY ENVIRONMENT_MODIFICATION
