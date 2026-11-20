@@ -301,6 +301,58 @@ static float relief_height(void *user, float x, float z)
     return play_mode_ground((const PlayMode *)user, x, z);
 }
 
+/* M6-09 : les murs de l'arène du boss sur le relief : chaque mur en segments de 2 m au plus, du sol
+ * le plus bas sous le segment (- 0,5 m) à 3 m au-dessus du plus haut ; boîtes Jolt (le joueur et la
+ * caméra butent dessus) et placements pour le dessin. */
+#define PLAY_WALL_HEIGHT 3.0F
+#define PLAY_WALL_PIECE 2.0F
+
+static void build_boss_walls(PlayMode *play)
+{
+    float boxes[8][4];
+    const uint32_t n = play_combat_boss_walls(play->combat, boxes, 8U);
+    uint32_t refused = 0;
+    play->wall_count = 0;
+    for (uint32_t i = 0; i < n; i++) {
+        const bool along_x = boxes[i][2] >= boxes[i][3];
+        const float length = 2.0F * (along_x ? boxes[i][2] : boxes[i][3]);
+        const uint32_t pieces = (uint32_t)ceilf(length / PLAY_WALL_PIECE);
+        const float piece = length / (float)pieces;
+        for (uint32_t k = 0; k < pieces && play->wall_count < PLAY_WALL_SEGMENTS; k++) {
+            const float offset = (-0.5F * length) + (((float)k + 0.5F) * piece);
+            const float cx = boxes[i][0] + (along_x ? offset : 0.0F);
+            const float cz = boxes[i][1] + (along_x ? 0.0F : offset);
+            const float hx = along_x ? 0.5F * piece : boxes[i][2];
+            const float hz = along_x ? boxes[i][3] : 0.5F * piece;
+            float lo = 1e9F;
+            float hi = -1e9F;
+            for (uint32_t corner = 0; corner < 4U; corner++) {
+                const float g = play_mode_ground(play, cx + ((corner & 1U) != 0U ? hx : -hx),
+                                                 cz + ((corner & 2U) != 0U ? hz : -hz));
+                lo = fminf(lo, g);
+                hi = fmaxf(hi, g);
+            }
+            lo -= 0.5F;
+            hi += PLAY_WALL_HEIGHT;
+            const float half[3] = {hx, 0.5F * (hi - lo), hz};
+            const float center[3] = {cx, 0.5F * (lo + hi), cz};
+            if (eng_physics_add_box(play->world, half, center, ENG_LAYER_STATIC) ==
+                ENG_BODY_INVALID) {
+                refused++;
+                continue;
+            }
+            mat4 place;
+            glm_translate_make(place, (vec3){center[0], center[1], center[2]});
+            glm_scale(place, (vec3){2.0F * hx, hi - lo, 2.0F * hz});
+            glm_mat4_copy(place, play->wall_place[play->wall_count++]);
+        }
+    }
+    if (n > 0U) {
+        ENG_LOG_INFO("combat : arène du boss : %u segment(s) de mur sur le relief, %u refusé(s)",
+                     play->wall_count, refused);
+    }
+}
+
 bool play_mode_enable_combat(PlayMode *play, bool audio)
 {
     if (play == NULL || !play->ready || play->combat != NULL) {
@@ -311,6 +363,7 @@ bool play_mode_enable_combat(PlayMode *play, bool audio)
         /* M6-03 : les ennemis vont partout où le personnage peut aller, et pas ailleurs : même
          * pente limite que le personnage Jolt */
         (void)play_combat_set_relief(play->combat, relief_height, play, PLAY_MAX_SLOPE_DEG);
+        build_boss_walls(play); /* M6-09 */
     }
     return play->combat != NULL;
 }
@@ -470,11 +523,39 @@ static bool add_piece(PlayMode *play, EngRenderer *renderer, EngArena *arena,
     return true;
 }
 
+/* M6-09 : le modèle des segments de mur de l'arène du boss (boîte unité, pierre sombre). */
+static bool load_wall_visuals(PlayMode *play, EngRenderer *renderer, EngArena *arena,
+                              const EngEnvironment *env)
+{
+    if (play->wall_count == 0U || play->wall_ready) {
+        return play->wall_ready;
+    }
+    const EngModelMaterial stone = arena_material(0.36F, 0.34F, 0.32F, 0.9F);
+    const float lo[3] = {-0.5F, -0.5F, -0.5F};
+    const float hi[3] = {0.5F, 0.5F, 0.5F};
+    const EngArenaMark mark = eng_arena_mark(arena);
+    EngModel box;
+    if (!eng_model_make_box(arena, lo, hi, &stone, &box) ||
+        !eng_model_gpu_create(&play->wall_model, renderer, arena, &box, 0.0F)) {
+        eng_arena_reset_to(arena, mark);
+        return false;
+    }
+    if (env != NULL) {
+        (void)eng_model_gpu_set_environment(&play->wall_model, renderer, env);
+    }
+    play->wall_ready = true;
+    ENG_LOG_INFO("arène du boss : %u segment(s) de mur dessiné(s)", play->wall_count);
+    return true;
+}
+
 bool play_mode_load_arena_visuals(PlayMode *play, EngRenderer *renderer, EngArena *arena,
                                   const EngEnvironment *env)
 {
-    if (play == NULL || !play->ready || renderer == NULL || arena == NULL || play->on_terrain) {
+    if (play == NULL || !play->ready || renderer == NULL || arena == NULL) {
         return false;
+    }
+    if (play->on_terrain) { /* M6-09 : sur un terrain, seulement les murs de l'arène du boss */
+        return load_wall_visuals(play, renderer, arena, env);
     }
     const EngModelMaterial stone = arena_material(0.42F, 0.40F, 0.38F, 0.85F);
     const EngModelMaterial wood = arena_material(0.45F, 0.30F, 0.18F, 0.7F);
@@ -517,6 +598,10 @@ void play_mode_unload_visuals(PlayMode *play, EngRenderer *renderer)
         eng_model_gpu_destroy(&play->arena_models[i], renderer);
     }
     play->arena_count = 0;
+    if (play->wall_ready) {
+        eng_model_gpu_destroy(&play->wall_model, renderer);
+        play->wall_ready = false;
+    }
 }
 
 /* ── Personnages animés (M4) ── */
@@ -576,6 +661,17 @@ void play_mode_draw_models(const PlayMode *play, EngRenderQueue *queue, mat4 vie
         } else {
             (void)eng_model_gpu_draw_shadowed(&play->arena_models[i], queue, play->avatars->prop,
                                               place, view_proj, light, shadow);
+        }
+    }
+    for (uint32_t i = 0; play->wall_ready && i < play->wall_count; i++) { /* M6-09 */
+        mat4 place;
+        glm_mat4_copy((vec4 *)play->wall_place[i], place);
+        if (shadow_pass) {
+            (void)eng_model_gpu_draw_depth(&play->wall_model, queue, play->avatars->prop_shadow,
+                                           place, view_proj);
+        } else {
+            (void)eng_model_gpu_draw_shadowed(&play->wall_model, queue, play->avatars->prop, place,
+                                              view_proj, light, shadow);
         }
     }
     if (shadow_pass) {

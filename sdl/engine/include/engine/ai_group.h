@@ -63,6 +63,7 @@ typedef struct EngAiAgent {
     uint32_t presses_left;
     uint32_t press_gap;
     uint32_t atk_phase; /* 0 aucune, 1 appui envoyé, 2 attaque en cours */
+    uint32_t step_next; /* plan pattern (M6-09) : indice de la prochaine attaque de la suite */
     uint32_t atk_wait;
     uint32_t token_hold;
     uint32_t token_cd;

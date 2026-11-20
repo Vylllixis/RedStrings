@@ -18,6 +18,8 @@
  *    light NOM              # attaque légère (jeu d'attaques de combat)
  *    heavy NOM              # attaque lourde
  *    plan light 0 1.8 60 3 1  # genre portée_min portée_max recharge(ticks) poids appuis
+ *    plan pattern 0 2.6 300 1 LLH  # enchaînement scripté (M6-09) : 2 à 4 attaques L (légère) /
+ *                                  #   H (lourde) jouées l'une après l'autre, jeton gardé
  *    phase 0.5 NOM_L NOM_H 1.3 0.6   # boss : sous cette fraction de PV, change d'attaques,
  *                                    #   vitesse (x) et recharges (x)
  *   end
@@ -34,14 +36,17 @@
 #define ENG_ARCH_PLANS 4U
 #define ENG_ARCH_PHASES 3U
 #define ENG_ARCH_MIN_TELEGRAPH 18U /* 300 ms à 60 Hz */
+#define ENG_ARCH_PATTERN_MAX 4U    /* attaques d'un enchaînement scripté (plan pattern) */
 
 typedef struct EngArchPlan {
-    bool heavy;
+    bool heavy;                       /* pattern : vrai si la PREMIÈRE attaque est lourde */
+    bool steps[ENG_ARCH_PATTERN_MAX]; /* pattern : vrai = lourde, pour chaque attaque */
     float range_min;
     float range_max;
     uint32_t cooldown;
     uint32_t weight;
-    uint32_t presses; /* appuis consécutifs (enchaînement léger) */
+    uint32_t presses;    /* appuis consécutifs (enchaînement léger) ; 1 pour un pattern */
+    uint32_t step_count; /* 0 : plan simple ; 2 à ENG_ARCH_PATTERN_MAX : pattern */
 } EngArchPlan;
 
 typedef struct EngArchPhase {

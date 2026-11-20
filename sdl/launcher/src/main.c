@@ -98,6 +98,9 @@ static void usage(const char *prog)
             "journalise AUTOTEST PARTIE\n");
     fprintf(stderr, "  --combat-autoplay  comme --combat, joué par un pilote automatique "
                     "(démonstration)\n");
+    fprintf(stderr,
+            "  --at-boss      avec --combat --terrain : commence devant l'entrée de l'arène "
+            "du boss (M6-09)\n");
     fprintf(stderr, "  --screenshot F N (développement) écrit l'image n° N en PPM dans F\n");
     fprintf(stderr, "  --avatar-gallery (développement) rangée de chevaliers, un état d'animation "
                     "chacun (repos, marche, attaques au tick d'impact, roulade...)\n");
@@ -304,6 +307,7 @@ int main(int argc, char **argv)
     float ambient_arg = NAN;  /* --ambient X : intensité de l'environnement ; NAN : défaut */
     bool world_mode = false;
     bool weapon_greatsword = false; /* --weapon greatsword (M8-08) */
+    bool at_boss = false;           /* --at-boss (M6-09) */
     int32_t world_seed = 1;
     double world_autopilot = 0.0;
     const char *screenshot_path = NULL;
@@ -368,6 +372,8 @@ int main(int argc, char **argv)
             if (i + 1 < argc && argv[i + 1][0] != '-') {
                 world_bench_km = strtod(argv[++i], NULL);
             }
+        } else if (strcmp(argv[i], "--at-boss") == 0) {
+            at_boss = true;
         } else if (strcmp(argv[i], "--weapon") == 0 && i + 1 < argc) {
             weapon_greatsword = strcmp(argv[++i], "greatsword") == 0;
         } else if (strcmp(argv[i], "--world") == 0) {
@@ -897,6 +903,13 @@ int main(int argc, char **argv)
             use_flow = play.combat != NULL && game_flow_init(&flow, &play, &platform.input, NULL);
             if (use_flow && (start_new_game || combat_autoplay)) {
                 game_flow_start_new(&flow, &play);
+            }
+            float gate[3];
+            if (at_boss && play.combat != NULL && play_combat_boss_gate(play.combat, gate)) {
+                gate[1] = play_mode_ground(&play, gate[0], gate[2]) + 0.05F; /* M6-09 */
+                play_mode_teleport(&play, gate, 0.0F); /* regarde -Z : l'entrée, le boss */
+            } else if (at_boss) {
+                ENG_LOG_WARN("--at-boss : pas d'arène de boss (il faut --combat --terrain)");
             }
             if (weapon_greatsword &&
                 play.combat != NULL) { /* M8-08 : essai de l'espadon (après la nouvelle partie) */

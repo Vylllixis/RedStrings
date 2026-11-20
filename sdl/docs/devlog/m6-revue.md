@@ -23,14 +23,15 @@ Tests : `test_ai_core` (16), `test_ai_camp` (11). Décisions : ADR 0025 ; module
 | M6-06 Décisions de combat | plans pondérés (distance, recharge), se tourne avant de frapper | Prouvé |
 | M6-07 Coordination | jetons (max 2), rotation, cercle d'attente | Prouvé |
 | M6-08 Archétypes | fichier texte ; nouvel archétype sans recompiler | Prouvé ; « à distance » = poussée à longue portée, **sans projectile** |
-| M6-09 Boss | 2 phases (attaques, vitesse, recharges), arène murée, battable en simulation | Partiel : pas de « patterns » scriptés, pas d'arène visuelle |
+| M6-09 Boss | 2 phases (attaques, vitesse, recharges), arène murée, battable en simulation ; **finition** : dans le jeu sur un terrain (arène de pierre avec entrée, murs Jolt + IA, Seigneur des os à l'espadon, barre de vie, ne renaît pas une fois vaincu, sauvegardé), enchaînements scriptés `plan pattern` (LLH) | Fait : `--combat-terrain-selftest` (vaincu, enchaînement et phase 2 vus, ne renaît pas) ; `ai_camp` (pattern, camp vaincu sur une plage) ; mutations détectées ; ressenti du combat à juger (Q6) |
 | M6-10 Débogueur d'IA | info, texte, sélection par rayon, dessin (cône, cible, jeton, chemin) ; **finition** : F1 + clic dans la vue sélectionne l'ennemi sous le curseur, section « IA » du panneau (état, perception, jeton, plan, recharges, distance, chemin) | Fait : vérifié dans la vraie fenêtre (balayage de 25 clics : la colonne de l'archer le sélectionne, les voisines non ; `docs/devlog/img/m5-m6-gel-panneau-selection.png`) |
 | M6-11 Camps | création, repos (refusé pendant un combat), vaincu | Prouvé |
 
 ## Ce que les preuves ne disent pas
 
 (Finition, 2026-11-19) Branché au jeu dans `--combat` avec les personnages animés de M4 ; vu sur le
-RTX 5070. Reste : les patterns de boss (M6-09), le ressenti (2 testeurs, Q6).
+RTX 5070. Le boss est dans le jeu depuis la finition (M6-09, sur un terrain). Reste : le ressenti
+(2 testeurs, Q6).
 
 Texte d'origine : rien de M6 n'est branché au jeu ni visible à l'écran. Les ennemis tournent instantanément ; le déplacement
 est en plan (x, z) ; la sim de combat est limitée à 8 combattants (joueur + 7). Le tag v0.6 et le test

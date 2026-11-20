@@ -31,6 +31,32 @@ build/release/bin/assetc heightmap raide.hmap --size 257 --spacing 2 --alt-max 6
 build/release/bin/launcher --combat-terrain-selftest raide.hmap   # « AUTOTEST CAMP TERRAIN : OK »
 ```
 
+## Le boss (M6-09, sur un terrain)
+
+Sur un terrain (`--terrain`), une **arène murée** se dresse au sud-est de la clairière : centre
+(16, −16), 14 m de côté, murs de pierre de 3 m en segments de 2 m qui suivent le relief, **entrée de
+4 m au nord** (côté du départ). Les murs arrêtent le joueur et la caméra (boîtes Jolt), l'IA les
+contourne (ils sont dans sa grille). Dedans : le **Seigneur des os** (archétype `boss` de
+`assets/combat/enemies.txt`, guerrier squelette 1,45 fois plus grand, à l'espadon), 420 PV :
+
+- attaques légère `boss_l`, lourde `boss_h`, et un **enchaînement scripté** léger, léger, lourd
+  (`plan pattern 0 2.8 420 2 LLH`, voir `docs/ai.md`) ;
+- sous la moitié de ses PV : phase 2, attaques plus vives (`boss_l2`, `boss_h2`), 25 % plus
+  rapide, recharges raccourcies ;
+- une barre de vie en bas de l'écran (« Seigneur des os ») tant qu'il combat ou qu'il est
+  verrouillé ; « Seigneur des os vaincu ! » ;
+- il ne renaît pas une fois vaincu (même après la mort du joueur ou un rechargement : son état est
+  dans la sauvegarde) ; s'il tue le joueur, il revient à neuf à son poste.
+
+`--at-boss` (avec `--combat --terrain`) fait commencer la partie 4 m devant l'entrée, pour l'essayer
+tout de suite.
+
+![Le Seigneur des os à l'entrée de son arène, barre de vie en bas](devlog/img/m6-boss-arene.png)
+
+Si l'entrée tombe dans une pente infranchissable (relief très raide), le jeu le journalise
+(« arène du boss inaccessible sur ce relief ») : la place de l'arène est fixe. Le pilote automatique
+(`--combat-autoplay`) préfère le camp et passe par l'entrée pour rejoindre le boss.
+
 ## Commandes (en plus de celles de `--play`)
 
 | Action | Clavier / souris | Manette |
@@ -90,7 +116,13 @@ l'effet est immédiat (refusé et journalisé si invalide ou si une attaque enne
 300 ms ; différé si une attaque est en cours). `assets/combat/enemies.txt` (archétypes) est lu au
 lancement. Sans ces fichiers, des valeurs intégrées identiques sont utilisées.
 
-## Ce que l'autotest vérifie (12 mesures)
+## Ce que l'autotest vérifie (12 mesures ; terrain : 16)
+
+`--combat-terrain-selftest` vérifie en plus le boss (M6-09) : présent dans son arène, accessibilité
+de l'entrée bien signalée, contournement du mur sud ; puis un joueur automate entre, verrouille et
+frappe : le boss est vaincu (environ 5 100 ticks sur le terrain raide), l'enchaînement léger, léger,
+lourd et les attaques de la phase 2 sont vus, et il ne renaît pas quand le joueur meurt.
+
 
 Dégâts sur le mannequin (10 coups légers = 100), verrouillage puis relâche, esquive (état Dodge,
 recul de 3 m), camp : ennemis engagés, au plus 2 attaquants, coups reçus ; puis combat verrouillé

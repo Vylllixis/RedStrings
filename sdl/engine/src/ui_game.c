@@ -115,6 +115,18 @@ void eng_ui_draw_hud(EngUi *ui, const EngHud *hud, int width, int height)
         bar(dl, tx + tw * 0.2F, ty + px * 1.15F + 20.0F * u, tw * 0.6F, 8.0F * u,
             hud->target_posture / hud->target_posture_max, rgba(0.95F, 0.8F, 0.2F, 0.9F), hc);
     }
+    /* M6-09 : boss : nom et longue barre en bas au centre */
+    if (hud->has_boss && hud->boss_hp_max > 0.0F) {
+        const float bw = 760.0F * u;
+        const float bx = ((float)width - bw) * 0.5F;
+        const float by = (float)height - 110.0F * u;
+        plate(dl, px, ((float)width - text_width(px, hud->boss_name)) * 0.5F, by - px * 1.2F,
+              hud->boss_name, hc);
+        text(dl, px, ((float)width - text_width(px, hud->boss_name)) * 0.5F, by - px * 1.2F,
+             rgba(1, 0.92F, 0.8F, 1), hud->boss_name, true);
+        bar(dl, bx, by, bw, 14.0F * u, hud->boss_hp / hud->boss_hp_max,
+            rgba(0.75F, 0.1F, 0.08F, 0.95F), hc);
+    }
     /* nombres de dégâts, au-dessus des têtes */
     for (uint32_t i = 0; i < hud->number_count && i < ENG_HUD_NUMBERS; i++) {
         const EngHudNumber *n = &hud->numbers[i];

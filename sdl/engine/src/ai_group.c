@@ -89,6 +89,7 @@ bool eng_aig_reset_agent(EngAiGroup *g, EngCombatSim *sim, uint32_t ai)
     a->plan = -1;
     a->presses_left = 0;
     a->atk_phase = 0;
+    a->step_next = 0;
     a->token_hold = 0;
     a->token_cd = 0;
     a->pause = 0;
@@ -360,11 +361,24 @@ void eng_aig_tick(EngAiGroup *g, EngCombatSim *sim, float noise_radius, EngFight
             } else if (a->atk_wait > 20U) {
                 a->atk_phase = 0;
                 a->presses_left = 0;
+                a->step_next = 0;
             }
         } else if (a->atk_phase == 2U) {
             a->atk_wait++;
-            if (!in_attack) {
+            const uint32_t steps = a->plan >= 0 ? ar->plans[a->plan].step_count : 0U;
+            if (!in_attack && a->step_next < steps) {
+                /* M6-09 : pattern : l'attaque suivante de la suite, jeton gardé */
+                if (ar->plans[a->plan].steps[a->step_next]) {
+                    in->heavy = true;
+                } else {
+                    in->light = true;
+                }
+                a->step_next++;
+                a->atk_phase = 1;
+                a->atk_wait = 0;
+            } else if (!in_attack) {
                 a->atk_phase = 0;
+                a->step_next = 0;
                 a->presses_left = 0;
                 if (eng_tokens_has(&g->tokens, a->fighter)) {
                     eng_tokens_release(&g->tokens, a->fighter);
@@ -516,7 +530,10 @@ void eng_aig_tick(EngAiGroup *g, EngCombatSim *sim, float noise_radius, EngFight
                             in->light = true;
                         }
                         a->plan = (int32_t)k;
-                        a->presses_left = ar->plans[k].heavy ? 0U : ar->plans[k].presses - 1U;
+                        a->presses_left = ar->plans[k].heavy || ar->plans[k].step_count > 0U
+                                              ? 0U
+                                              : ar->plans[k].presses - 1U;
+                        a->step_next = 1U; /* pattern : la première attaque est partie */
                         a->atk_phase = 1;
                         a->atk_wait = 0;
                         const float scale = a->cooldown_scale > 0.0F ? a->cooldown_scale : 1.0F;

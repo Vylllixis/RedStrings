@@ -55,7 +55,10 @@ static const char ARCH[] =
     "archetype boss\n hp 300\n speed 0.8\n radius 0.6\n sight 25\n fov 180\n hearing 25\n standoff "
     "5\n"
     " light boss_l\n heavy boss_h\n plan light 0 2.6 60 3 1\n plan heavy 0 3.0 150 1 1\n"
-    " phase 0.6 boss_l2 boss_h2 1.25 0.7\nend\n";
+    " phase 0.6 boss_l2 boss_h2 1.25 0.7\nend\n"
+    /* M6-09 : un seul plan, l'enchaînement scripté léger, léger, lourd */
+    "archetype duelist\n hp 5000\n speed 0.8\n radius 0.5\n sight 25\n fov 180\n hearing 25\n"
+    " standoff 4\n light boss_l\n heavy boss_h\n plan pattern 0 2.6 400 1 LLH\nend\n";
 
 static EngAttackSet g_atk;
 static EngArchSet g_arch;
@@ -418,6 +421,47 @@ UTEST(ai_camp, boss_has_two_distinct_phases_and_can_be_beaten)
     EXPECT_GT(g_sim.speed_scale[1], 0.8F); /* phase 2 : plus rapide */
 }
 
+/* M6-09 : un plan « pattern » joue sa suite (léger, léger, lourd) attaque après attaque, chacune
+ * partant dès la fin de la précédente, puis respecte sa recharge. Le joueur reste immobile. */
+UTEST(ai_camp, a_pattern_plays_its_attacks_back_to_back_then_waits_its_cooldown)
+{
+    eng_aiw_init(&g_world);
+    setup(2, true);
+    ASSERT_TRUE(eng_aig_add(&g_group, &g_sim, 1, 4, 0.0F, -2.5F, 3.14159265F, NULL,
+                            0)); /* face au joueur */
+    ASSERT_TRUE(eng_sim_place(&g_sim, 0, 0.0F, 0.0F, 0.0F));
+    char names[8][32] = {{0}};
+    uint32_t starts[8] = {0};
+    uint32_t ends[8] = {0};
+    uint32_t n = 0;
+    bool was_attacking = false;
+    for (uint32_t t = 0; t < 1500 && n < 8U; t++) {
+        EngFighterInput in[2];
+        memset(in, 0, sizeof in);
+        eng_aig_tick(&g_group, &g_sim, 0.0F, in);
+        eng_sim_step(&g_sim, in);
+        const bool attacking = g_sim.fighters[1].fsm.state == ENG_CS_ATTACK;
+        if ((g_sim.fighters[1].events & ENG_FEV_ATTACK_START) != 0U) {
+            const EngAttack *a = eng_fighter_attack(&g_sim.fighters[1], &g_atk);
+            (void)snprintf(names[n], sizeof names[0], "%s", a->name);
+            starts[n++] = t;
+        } else if (was_attacking && !attacking && n > 0U) {
+            ends[n - 1U] = t;
+        }
+        was_attacking = attacking;
+    }
+    ASSERT_GE(n, 4U);
+    EXPECT_STREQ(names[0], "boss_l");
+    EXPECT_STREQ(names[1], "boss_l");
+    EXPECT_STREQ(names[2], "boss_h");
+    EXPECT_STREQ(names[3], "boss_l");   /* la suite recommence après la recharge */
+    for (uint32_t k = 0; k < 2U; k++) { /* chaque attaque part dès la fin de la précédente */
+        EXPECT_GT(ends[k], starts[k]);
+        EXPECT_LE(starts[k + 1U] - ends[k], 3U);
+    }
+    EXPECT_GE(starts[3] - starts[0], 400U); /* recharge du plan, comptée dès le premier appui */
+}
+
 UTEST(ai_camp, rest_resets_the_whole_camp_but_is_refused_during_a_fight)
 {
     build_camp_world();
@@ -571,6 +615,30 @@ UTEST(ai_camp, arena_walls_enclose_exactly_the_requested_rectangle)
     EXPECT_FALSE(
         eng_arena_walls(&full, 0.0F, 0.0F, 8.0F, 6.0F)); /* pas la place : rien d'à moitié */
     EXPECT_EQ(full.count, ENG_AI_MAX_OBSTACLES - 2U);
+}
+
+/* M6-09 : le camp peut être vaincu alors qu'un boss du même groupe vit encore. */
+UTEST(ai_camp, a_range_of_agents_is_cleared_independently_of_the_others)
+{
+    eng_aiw_init(&g_world);
+    setup(4, false);
+    ASSERT_TRUE(eng_aig_add(&g_group, &g_sim, 1, 0, -4.0F, 0.0F, 0.0F, NULL, 0));
+    ASSERT_TRUE(eng_aig_add(&g_group, &g_sim, 2, 1, 4.0F, 0.0F, 0.0F, NULL, 0));
+    ASSERT_TRUE(eng_aig_add(&g_group, &g_sim, 3, 3, 0.0F, 8.0F, 0.0F, NULL, 0)); /* boss */
+    EXPECT_FALSE(eng_camp_cleared_range(&g_group, &g_sim, 0, 2));
+    g_sim.fighters[1].vitals.dead = true;
+    EXPECT_FALSE(eng_camp_cleared_range(&g_group, &g_sim, 0, 2));
+    g_sim.fighters[2].vitals.dead = true;
+    EXPECT_TRUE(eng_camp_cleared_range(&g_group, &g_sim, 0, 2));
+    EXPECT_FALSE(eng_camp_cleared(&g_group, &g_sim)); /* le boss vit */
+    EXPECT_FALSE(eng_camp_cleared_range(&g_group, &g_sim, 2, 1));
+    g_sim.fighters[3].vitals.dead = true;
+    EXPECT_TRUE(eng_camp_cleared_range(&g_group, &g_sim, 2, 1));
+    EXPECT_TRUE(eng_camp_cleared(&g_group, &g_sim));
+    EXPECT_FALSE(eng_camp_cleared_range(&g_group, &g_sim, 0, 0)); /* plage vide */
+    EXPECT_FALSE(eng_camp_cleared_range(&g_group, &g_sim, 2, 2)); /* déborde */
+    EXPECT_FALSE(eng_camp_cleared_range(&g_group, &g_sim, 3, 1));
+    EXPECT_FALSE(eng_camp_cleared_range(NULL, &g_sim, 0, 1));
 }
 
 UTEST(ai_camp, camp_arguments_are_validated)

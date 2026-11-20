@@ -70,10 +70,16 @@ bool eng_camp_rest(const EngCamp *c, EngAiGroup *g, EngCombatSim *sim)
 
 bool eng_camp_cleared(const EngAiGroup *g, const EngCombatSim *sim)
 {
-    if (g == NULL || sim == NULL || g->count == 0U) {
+    return g != NULL && eng_camp_cleared_range(g, sim, 0U, g->count);
+}
+
+bool eng_camp_cleared_range(const EngAiGroup *g, const EngCombatSim *sim, uint32_t first,
+                            uint32_t count)
+{
+    if (g == NULL || sim == NULL || count == 0U || first >= g->count || count > g->count - first) {
         return false;
     }
-    for (uint32_t i = 0; i < g->count; i++) {
+    for (uint32_t i = first; i < first + count; i++) {
         if (!sim->fighters[g->agents[i].fighter].vitals.dead) {
             return false;
         }

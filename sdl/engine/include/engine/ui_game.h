@@ -29,7 +29,11 @@ typedef struct EngHud {
     float stamina_max;
     float posture;
     float posture_max;
+    bool has_boss; /* M6-09 : barre du boss en bas au centre pendant le combat */
     bool has_target;
+    char boss_name[32];
+    float boss_hp;
+    float boss_hp_max;
     char target_name[32];
     float target_hp;
     float target_hp_max;

@@ -37,3 +37,20 @@ archetype archer
  plan light 3 6 90 3 1
  plan heavy 4 7 200 1 1
 end
+# M6-09 : le boss de l'arène murée (terrain seulement) : enchaînement scripté léger, léger, lourd ;
+# sous la moitié de ses PV, attaques plus vives, plus rapide, recharges raccourcies.
+archetype boss
+ hp 420
+ speed 0.75
+ radius 0.6
+ sight 18
+ fov 160
+ hearing 14
+ standoff 5
+ light boss_l
+ heavy boss_h
+ plan light 0 2.6 70 3 1
+ plan heavy 0 3.0 170 2 1
+ plan pattern 0 2.8 420 2 LLH
+ phase 0.5 boss_l2 boss_h2 1.25 0.7
+end

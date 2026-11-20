@@ -35,6 +35,10 @@ bool eng_camp_rest(const EngCamp *c, EngAiGroup *g, EngCombatSim *sim);
 
 /* Tous les ennemis du camp sont morts ? */
 bool eng_camp_cleared(const EngAiGroup *g, const EngCombatSim *sim);
+/* Les agents [first, first + count[ du groupe sont-ils tous morts ? (M6-09 : le camp seul quand
+ * un boss partage le groupe.) Plage vide ou hors du groupe : false. */
+bool eng_camp_cleared_range(const EngAiGroup *g, const EngCombatSim *sim, uint32_t first,
+                            uint32_t count);
 
 /* Arène rectangulaire fermée (4 murs d'épaisseur 1 m) centrée en (cx, cz) : demi-côtés hx, hz
  * (M6-09 : arène dédiée du boss). */

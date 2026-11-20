@@ -548,7 +548,7 @@ if(OW_SHADERS_OK)
            WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR})
   set_tests_properties(launcher.combat_terrain_render PROPERTIES
     ENVIRONMENT "SDL_VIDEODRIVER=offscreen"
-    FAIL_REGULAR_EXPRESSION "ERROR|non détruite|perdu|dessin ignoré"
+    FAIL_REGULAR_EXPRESSION "ERROR|non détruite|perdu|dessin ignoré|inaccessible"
     PASS_REGULAR_EXPRESSION "arbres \\(KayKit\\).*ombres : 4 cascades.*renderer : 60 image\\(s\\), 60 passe\\(s\\) d'ombre")
   if(OW_SOFTWARE_VULKAN_ICD)
     set_property(TEST launcher.combat_terrain_render APPEND PROPERTY ENVIRONMENT_MODIFICATION

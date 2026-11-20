@@ -33,6 +33,7 @@
 #define PLAY_GROUND_TOP (-0.5F) /* dessus du sol de la démonstration (demo_scene.c) */
 #define PLAY_PIVOT_HEIGHT 1.5F  /* m au-dessus des pieds : le haut du dos */
 #define PLAY_ARENA_PIECES 6U
+#define PLAY_WALL_SEGMENTS 48U /* M6-09 : segments des murs de l'arène du boss (terrain) */
 
 typedef struct PlayMode {
     EngPhysics *world;
@@ -56,6 +57,10 @@ typedef struct PlayMode {
     AvatarLibrary *avatars; /* M4 : personnages animés ; NULL : capsules en fil de fer */
     EngModelGpu arena_models[PLAY_ARENA_PIECES]; /* arène dessinée (marches, mur, rampe...) */
     mat4 arena_place[PLAY_ARENA_PIECES];
+    mat4 wall_place[PLAY_WALL_SEGMENTS]; /* M6-09 : segment de mur sur le relief (boîte unité) */
+    EngModelGpu wall_model;
+    uint32_t wall_count;
+    bool wall_ready; /* `wall_model` créé (play_mode_load_arena_visuals) */
     uint32_t arena_count;
     Avatar avatar; /* le chevalier du joueur */
     bool sprinting;

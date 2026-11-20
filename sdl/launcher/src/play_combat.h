@@ -41,6 +41,12 @@ typedef struct PlayCombatStep {
 PlayCombat *play_combat_create(bool audio, bool arena_obstacles);
 void play_combat_destroy(PlayCombat *c);
 
+/* M6-09 : murs de l'arène du boss (terrain seulement), en boîtes au sol : centre x, z et
+ * demi-côtés x, z (m). Renvoie leur nombre (0 sans boss, ou si `max` est trop petit). */
+uint32_t play_combat_boss_walls(const PlayCombat *c, float out[][4], uint32_t max);
+/* M6-09 : un point 4 m devant l'entrée de l'arène (x, 0, z) ; false sans boss. */
+bool play_combat_boss_gate(const PlayCombat *c, float out[3]);
+
 /* Un pas fixe. `feet` : pieds du personnage ; `facing` : son lacet ; `move_dir` : direction de
  * marche voulue (x, z), nulle si immobile ; `camera_yaw` : pour le verrouillage. */
 void play_combat_tick(PlayCombat *c, const EngInputState *input, const float feet[3], float facing,

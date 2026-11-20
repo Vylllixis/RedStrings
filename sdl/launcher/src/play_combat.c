@@ -28,7 +28,14 @@
 #define PLAYER 0U
 #define DUMMY 1U
 #define FIRST_ENEMY 2U
-#define FIGHTERS 5U
+#define FIGHTERS_MAX 6U /* joueur, mannequin, 3 ennemis du camp, boss (terrain seulement) */
+#define BOSS 5U         /* M6-09 : indice du boss dans la simulation (s'il y en a un) */
+#define BOSS_X 16.0F    /* centre de l'arène murée du boss */
+#define BOSS_Z (-16.0F)
+#define BOSS_HALF 7.0F /* demi-côté de l'aire (m) */
+#define BOSS_GATE 4.0F /* largeur de l'entrée, au nord (+Z, côté du départ) */
+#define BOSS_WALLS 5U
+#define BOSS_NAME "Seigneur des os"
 #define RESPAWN_TICKS 180U
 #define CAMP_RESPAWN_TICKS 600U
 #define MAX_PUSH 0.6F
@@ -104,31 +111,36 @@ struct PlayCombat {
     EngMixer mixer;
     EngCombatAudio audio;
     EngAudioDevice *device;
-    int32_t lock; /* indice de combattant verrouillé, -1 */
+    int32_t lock;        /* indice de combattant verrouillé, -1 */
+    uint32_t boss_agent; /* M6-09 : indice du boss dans le groupe d'IA */
     uint32_t dead_ticks;
     uint32_t cleared_ticks;
     bool ready;
     bool file_ok;
-    bool was_dead[FIGHTERS];
-    bool has_avatar[FIGHTERS];
-    bool rig_ready[FIGHTERS]; /* M5-05 / M5-06 : pose au rythme des ticks (ci-dessous) */
-    EngProgress progress;     /* M8-08 */
-    uint32_t levelup_ticks;   /* message « Niveau N » encore affiché */
-    EngEquipment equip;       /* M8-08 : armes possédées, arme en main */
+    bool has_boss;       /* M6-09 : arène et boss (terrain seulement) */
+    bool boss_defeated;  /* tué : ne renaît plus (déduit de la sauvegarde au chargement) */
+    bool boss_reachable; /* l'entrée mène au boss sur ce relief (play_combat_set_relief) */
+    bool was_dead[FIGHTERS_MAX];
+    bool has_avatar[FIGHTERS_MAX];
+    bool rig_ready[FIGHTERS_MAX]; /* M5-05 / M5-06 : pose au rythme des ticks (ci-dessous) */
+    EngProgress progress;         /* M8-08 */
+    uint32_t levelup_ticks;       /* message « Niveau N » encore affiché */
+    EngEquipment equip;           /* M8-08 : armes possédées, arme en main */
     uint32_t weapon_ticks;    /* message « Espadon obtenu » / « Arme : ... » encore affiché */
     uint32_t weapon_switches; /* changements d'arme depuis le début (journal, autotest) */
     PlayCombatStats stats;
-    AvatarLibrary *avatars;  /* M4 : NULL tant que les personnages ne sont pas branchés */
-    Avatar avatar[FIGHTERS]; /* le joueur (0) est dans PlayMode */
+    AvatarLibrary *avatars;      /* M4 : NULL tant que les personnages ne sont pas branchés */
+    Avatar avatar[FIGHTERS_MAX]; /* le joueur (0) est dans PlayMode */
     /* M5-05 / M5-06 : pose au rythme des ticks pour les hurtboxes et la lame */
     EngHurtboxSet hurt;
-    EngActorAnim rig_anim[FIGHTERS];
-    mat4 rig_world[FIGHTERS][AVATAR_MAX_JOINTS];
-    AvatarProp rig_prop[FIGHTERS];
-    float rig_scale[FIGHTERS];
-    EngPose reach_pose;             /* mesure des portées (play_combat_attach_avatars) */
-    EngWeaponTrail trail[FIGHTERS]; /* M5-20 : traînée de la lame pendant une attaque */
-    int32_t ai_selected;            /* M6-10 : agent choisi au clic, -1 */
+    uint32_t boss_ticks; /* message « Seigneur des os vaincu » encore affiché */
+    EngActorAnim rig_anim[FIGHTERS_MAX];
+    mat4 rig_world[FIGHTERS_MAX][AVATAR_MAX_JOINTS];
+    AvatarProp rig_prop[FIGHTERS_MAX];
+    float rig_scale[FIGHTERS_MAX];
+    EngPose reach_pose;                 /* mesure des portées (play_combat_attach_avatars) */
+    EngWeaponTrail trail[FIGHTERS_MAX]; /* M5-20 : traînée de la lame pendant une attaque */
+    int32_t ai_selected;                /* M6-10 : agent choisi au clic, -1 */
 };
 
 /* applique les statistiques du niveau au joueur ; `heal` : PV et endurance au maximum */
@@ -229,9 +241,87 @@ static void build_world(EngAiWorld *w)
     (void)eng_aiw_add_box(w, 14.0F, 4.0F, 4.0F, 3.0F);  /* marches : les ennemis les évitent */
 }
 
-static void spawn_all(PlayCombat *c)
+/* M6-09 : murs de l'arène du boss, en boîtes de l'IA (centre x, z, demi-côtés x, z) : 1 m
+ * d'épaisseur hors de l'aire, une entrée de BOSS_GATE m au nord (+Z, côté du départ). */
+static uint32_t boss_wall_boxes(float out[BOSS_WALLS][4])
+{
+    const float h = BOSS_HALF;
+    const float t = 0.5F;                                      /* demi-épaisseur */
+    const float side = 0.5F * (h + 1.0F - (0.5F * BOSS_GATE)); /* demi-longueur d'un pan nord */
+    const float boxes[BOSS_WALLS][4] = {
+        {BOSS_X, BOSS_Z - h - t, h + 1.0F, t},               /* sud */
+        {BOSS_X - h - t, BOSS_Z, t, h},                      /* ouest */
+        {BOSS_X + h + t, BOSS_Z, t, h},                      /* est */
+        {BOSS_X - h - 1.0F + side, BOSS_Z + h + t, side, t}, /* nord, à gauche de l'entrée */
+        {BOSS_X + (0.5F * BOSS_GATE) + side, BOSS_Z + h + t, side, t}, /* nord, à droite */
+    };
+    memcpy(out, boxes, sizeof boxes);
+    return BOSS_WALLS;
+}
+
+uint32_t play_combat_boss_walls(const PlayCombat *c, float out[][4], uint32_t max)
+{
+    if (c == NULL || !c->ready || !c->has_boss || out == NULL || max < BOSS_WALLS) {
+        return 0;
+    }
+    float boxes[BOSS_WALLS][4];
+    const uint32_t n = boss_wall_boxes(boxes);
+    memcpy(out, boxes, sizeof boxes);
+    return n;
+}
+
+bool play_combat_boss_gate(const PlayCombat *c, float out[3])
+{
+    if (c == NULL || !c->ready || !c->has_boss || out == NULL) {
+        return false;
+    }
+    out[0] = BOSS_X;
+    out[1] = 0.0F;
+    out[2] = BOSS_Z + BOSS_HALF + 4.0F;
+    return true;
+}
+
+/* Nom affiché d'un archétype (HUD) ; le nom de fichier sinon. */
+static const char *display_name(const char *arch)
+{
+    static const char *const names[][2] = {{"grunt", "Soldat squelette"},
+                                           {"brute", "Brute squelette"},
+                                           {"archer", "Archer squelette"},
+                                           {"boss", BOSS_NAME}};
+    for (size_t i = 0; i < sizeof names / sizeof names[0]; i++) {
+        if (strcmp(arch, names[i][0]) == 0) {
+            return names[i][1];
+        }
+    }
+    return arch;
+}
+
+/* Archétype du combattant `fighter` (groupe d'IA), UINT32_MAX s'il n'y est pas. */
+static uint32_t fighter_arch(const PlayCombat *c, uint32_t fighter)
 {
     for (uint32_t i = 0; i < c->group.count; i++) {
+        if (c->group.agents[i].fighter == fighter) {
+            return c->group.agents[i].arch;
+        }
+    }
+    return UINT32_MAX;
+}
+
+/* M6-09 : le boss à neuf, chez lui, tourné vers l'entrée. */
+static void spawn_boss(PlayCombat *c)
+{
+    if (!c->has_boss) {
+        return;
+    }
+    (void)eng_aig_reset_agent(&c->group, &c->sim, c->boss_agent);
+    const EngAiAgent *a = &c->group.agents[c->boss_agent];
+    (void)eng_sim_place(&c->sim, BOSS, a->home[0], a->home[1], 3.14159265F);
+    c->was_dead[BOSS] = false;
+}
+
+static void spawn_all(PlayCombat *c)
+{
+    for (uint32_t i = 0; i < c->camp.count && i < c->group.count; i++) {
         (void)eng_aig_reset_agent(&c->group, &c->sim, i);
         (void)eng_sim_place(&c->sim, c->group.agents[i].fighter, c->camp.m[i].pos[0],
                             c->camp.m[i].pos[1], c->camp.m[i].yaw);
@@ -291,10 +381,26 @@ PlayCombat *play_combat_create(bool audio, bool arena_obstacles)
     } else {
         eng_aiw_init(&c->world);
     }
+    /* M6-09 : sur un terrain, l'arène murée du boss (s'il est décrit dans enemies.txt) */
+    const uint32_t boss_arch = arena_obstacles ? UINT32_MAX : eng_arch_find(&c->arch, "boss");
+    if (boss_arch != UINT32_MAX) {
+        float walls[BOSS_WALLS][4];
+        const uint32_t n = boss_wall_boxes(walls);
+        bool walls_ok = true;
+        for (uint32_t i = 0; i < n; i++) {
+            walls_ok =
+                eng_aiw_add_box(&c->world, walls[i][0], walls[i][1], walls[i][2], walls[i][3]) &&
+                walls_ok;
+        }
+        c->has_boss = walls_ok;
+        if (!walls_ok) {
+            ENG_LOG_WARN("combat : murs de l'arène refusés par l'IA, pas de boss");
+        }
+    }
     const float mn[2] = {-30.0F, -30.0F};
     const float mx[2] = {30.0F, 30.0F};
     if (!eng_nav_build(&c->nav, &c->world, mn, mx, 0.5F, 0.55F) ||
-        !eng_sim_init(&c->sim, &c->attacks, FIGHTERS)) {
+        !eng_sim_init(&c->sim, &c->attacks, c->has_boss ? FIGHTERS_MAX : FIGHTERS_MAX - 1U)) {
         play_combat_destroy(c);
         return NULL;
     }
@@ -317,6 +423,10 @@ PlayCombat *play_combat_create(bool audio, bool arena_obstacles)
         eng_camp_add(&c->camp, eng_arch_find(&c->arch, "brute"), -14.0F, -10.0F, face, NULL, 0) &&
         eng_camp_add(&c->camp, eng_arch_find(&c->arch, "archer"), -18.0F, -12.0F, face, NULL, 0) &&
         eng_camp_spawn(&c->camp, &c->group, &c->sim, FIRST_ENEMY);
+    if (ok && c->has_boss) { /* M6-09 : le boss, au centre de son arène, tourné vers l'entrée */
+        ok = eng_aig_add(&c->group, &c->sim, BOSS, boss_arch, BOSS_X, BOSS_Z, 3.14159265F, NULL, 0);
+        c->boss_agent = c->group.count - 1U;
+    }
     if (!ok) {
         ENG_LOG_ERROR(
             "combat : création du camp impossible (archétypes grunt/brute/archer requis)");
@@ -338,7 +448,8 @@ PlayCombat *play_combat_create(bool audio, bool arena_obstacles)
     ENG_LOG_INFO("combat : clic gauche = légère, clic droit = lourde, Ctrl = esquive, E maintenu = "
                  "garde (pression au bon moment = parade), A (AZERTY) / Q (QWERTY) = verrouillage "
                  "; mannequin en (4, -1), "
-                 "camp de 3 ennemis vers (-14, -11)");
+                 "camp de 3 ennemis vers (-14, -11)%s",
+                 c->has_boss ? " ; boss dans l'arène murée vers (16, -16), entrée au nord" : "");
     return c;
 }
 
@@ -407,8 +518,8 @@ void play_combat_tick(PlayCombat *c, const EngInputState *input, const float fee
     const float player_xz[2] = {feet[0], feet[2]};
 
     /* verrouillage */
-    EngLockCandidate cand[FIGHTERS];
-    for (uint32_t i = 0; i < FIGHTERS; i++) {
+    EngLockCandidate cand[FIGHTERS_MAX];
+    for (uint32_t i = 0; i < c->sim.count; i++) {
         cand[i].pos[0] = c->sim.bodies[i].pos[0];
         cand[i].pos[1] = c->sim.bodies[i].pos[1];
         cand[i].alive = !c->sim.fighters[i].vitals.dead;
@@ -428,15 +539,15 @@ void play_combat_tick(PlayCombat *c, const EngInputState *input, const float fee
         }
     }
     if (eng_action_pressed(input, ENG_ACTION_LOCK_ON)) {
-        c->lock = c->lock >= 0
-                      ? -1
-                      : eng_lockon_acquire(player_xz, camera_yaw, cand, FIGHTERS, (int32_t)PLAYER);
+        c->lock = c->lock >= 0 ? -1
+                               : eng_lockon_acquire(player_xz, camera_yaw, cand, c->sim.count,
+                                                    (int32_t)PLAYER);
     }
-    if (c->lock >= 0 && !eng_lockon_valid(player_xz, cand, FIGHTERS, c->lock)) {
+    if (c->lock >= 0 && !eng_lockon_valid(player_xz, cand, c->sim.count, c->lock)) {
         c->lock = -1;
     }
 
-    EngFighterInput in[FIGHTERS];
+    EngFighterInput in[FIGHTERS_MAX];
     memset(in, 0, sizeof in);
     if (!pf->vitals.dead) {
         in[PLAYER].light = eng_action_pressed(input, ENG_ACTION_ATTACK);
@@ -499,10 +610,15 @@ void play_combat_tick(PlayCombat *c, const EngInputState *input, const float fee
     }
     eng_particles_update(&c->particles);
     eng_dmgnum_update(&c->numbers);
-    for (uint32_t i = FIRST_ENEMY; i < FIGHTERS; i++) {
+    for (uint32_t i = FIRST_ENEMY; i < c->sim.count; i++) {
         const bool dead = c->sim.fighters[i].vitals.dead;
         if (dead && !c->was_dead[i]) {
             c->stats.enemy_kills++;
+            if (c->has_boss && i == BOSS && !c->boss_defeated) { /* M6-09 */
+                c->boss_defeated = true;
+                c->boss_ticks = 300U;
+                ENG_LOG_INFO("combat : %s vaincu", BOSS_NAME);
+            }
             const uint32_t xp = eng_prog_kill_xp(c->sim.fighters[i].vitals.max_hp);
             if (eng_prog_add_xp(&c->progress, xp) > 0U) {
                 apply_progress(c, true); /* montée de niveau : soins complets */
@@ -533,10 +649,13 @@ void play_combat_tick(PlayCombat *c, const EngInputState *input, const float fee
             apply_progress(c, true); /* la renaissance garde le niveau */
             c->dead_ticks = 0;
             spawn_all(c);
+            if (!c->boss_defeated) {
+                spawn_boss(c); /* M6-09 : le boss aussi, s'il vit encore */
+            }
             ENG_LOG_INFO("combat : le joueur renaît, le camp est remis à neuf");
         }
     }
-    if (eng_camp_cleared(&c->group, &c->sim)) {
+    if (eng_camp_cleared_range(&c->group, &c->sim, 0U, c->camp.count)) {
         if (eng_equip_give(&c->equip, ENG_WEAPON_GREATSWORD)) { /* M8-08 : récompense */
             c->weapon_ticks = 300U;
             ENG_LOG_INFO("combat : camp vaincu : espadon obtenu (R pour changer d'arme)");
@@ -554,6 +673,9 @@ void play_combat_tick(PlayCombat *c, const EngInputState *input, const float fee
     }
     if (c->weapon_ticks > 0U) {
         c->weapon_ticks--;
+    }
+    if (c->boss_ticks > 0U) {
+        c->boss_ticks--;
     }
     c->stats.level = c->progress.level;
     c->stats.total_xp = c->progress.total_xp;
@@ -783,7 +905,7 @@ bool play_combat_attach_avatars(PlayCombat *c, AvatarLibrary *lib, const PlayMod
     if (!hurt_ok) {
         ENG_LOG_WARN("combat : hurtboxes du rig illisibles (%s) : corps simplifié", err);
     }
-    for (uint32_t i = DUMMY; i < c->sim.count && i < FIGHTERS; i++) {
+    for (uint32_t i = DUMMY; i < c->sim.count && i < FIGHTERS_MAX; i++) {
         AvatarBody body = AVATAR_SKELETON_MINION;
         AvatarProp right = AVATAR_SKELETON_BLADE;
         AvatarProp left = AVATAR_PROP_NONE;
@@ -791,10 +913,13 @@ bool play_combat_attach_avatars(PlayCombat *c, AvatarLibrary *lib, const PlayMod
         if (i == DUMMY) {
             right = AVATAR_PROP_NONE; /* squelette d'entraînement, mains nues */
         } else {
-            const uint32_t k = i - FIRST_ENEMY;
-            const uint32_t arch = k < c->camp.count ? c->camp.m[k].arch : UINT32_MAX;
+            const uint32_t arch = fighter_arch(c, i);
             const char *name = arch < c->arch.count ? c->arch.a[arch].name : "";
-            if (strcmp(name, "brute") == 0) {
+            if (strcmp(name, "boss") == 0) { /* M6-09 : guerrier squelette géant à l'espadon */
+                body = AVATAR_SKELETON_WARRIOR;
+                right = AVATAR_GREATSWORD;
+                scale = 1.45F;
+            } else if (strcmp(name, "brute") == 0) {
                 body = AVATAR_SKELETON_WARRIOR;
                 right = AVATAR_SKELETON_AXE;
                 scale = 1.2F;
@@ -812,8 +937,8 @@ bool play_combat_attach_avatars(PlayCombat *c, AvatarLibrary *lib, const PlayMod
         if (i >= FIRST_ENEMY && c->reach_pose.joint_count == 0U) {
             (void)eng_pose_init(&lib->arena, &lib->skeleton, &c->reach_pose);
         }
-        if (i >= FIRST_ENEMY && i - FIRST_ENEMY < c->camp.count) {
-            fit_plans_to_reach(c, lib, c->camp.m[i - FIRST_ENEMY].arch, right, scale);
+        if (i >= FIRST_ENEMY && fighter_arch(c, i) != UINT32_MAX) {
+            fit_plans_to_reach(c, lib, fighter_arch(c, i), right, scale);
         }
     }
     if (c->reach_pose.joint_count > 0U) {
@@ -823,13 +948,13 @@ bool play_combat_attach_avatars(PlayCombat *c, AvatarLibrary *lib, const PlayMod
                          c, lib, light != ENG_ATTACK_NONE ? &c->attacks.attacks[light] : NULL,
                          AVATAR_SWORD, 1.0F));
     }
-    for (uint32_t i = 0; i < FIGHTERS; i++) {
+    for (uint32_t i = 0; i < FIGHTERS_MAX; i++) {
         (void)eng_trail_init(&c->trail[i], 10U); /* 10 ticks de rémanence */
     }
     c->rig_prop[PLAYER] = /* le chevalier (PlayMode), arme en main (M8-08) */
         c->equip.equipped == ENG_WEAPON_GREATSWORD ? AVATAR_GREATSWORD : AVATAR_SWORD;
     c->rig_scale[PLAYER] = 1.0F;
-    for (uint32_t i = 0; hurt_ok && i < c->sim.count && i < FIGHTERS; i++) {
+    for (uint32_t i = 0; hurt_ok && i < c->sim.count && i < FIGHTERS_MAX; i++) {
         c->rig_ready[i] =
             (i == PLAYER || c->has_avatar[i]) &&
             eng_actor_anim_init(&c->rig_anim[i], &lib->arena, &lib->skeleton, &lib->set);
@@ -846,7 +971,7 @@ static void rig_tick(PlayCombat *c)
         return;
     }
     const AvatarLibrary *lib = c->avatars;
-    for (uint32_t i = 0; i < c->sim.count && i < FIGHTERS; i++) {
+    for (uint32_t i = 0; i < c->sim.count && i < FIGHTERS_MAX; i++) {
         if (!c->rig_ready[i]) {
             continue;
         }
@@ -935,7 +1060,7 @@ void play_combat_update_visuals(PlayCombat *c, const PlayMode *play, double alph
         return;
     }
     const float t = (float)alpha;
-    for (uint32_t i = DUMMY; i < c->sim.count && i < FIGHTERS; i++) {
+    for (uint32_t i = DUMMY; i < c->sim.count && i < FIGHTERS_MAX; i++) {
         if (!c->has_avatar[i]) {
             continue;
         }
@@ -959,7 +1084,7 @@ void play_combat_draw_models(const PlayCombat *c, const AvatarLibrary *lib, EngR
     if (c == NULL || !c->ready || lib == NULL) {
         return;
     }
-    for (uint32_t i = DUMMY; i < c->sim.count && i < FIGHTERS; i++) {
+    for (uint32_t i = DUMMY; i < c->sim.count && i < FIGHTERS_MAX; i++) {
         if (!c->has_avatar[i]) {
             continue;
         }
@@ -996,7 +1121,25 @@ uint32_t play_combat_set_relief(PlayCombat *c, float (*height)(void *user, float
             (void)eng_nav_nearest_walkable(&c->nav, a->patrol[k], a->patrol[k]);
         }
     }
+    if (c->has_boss) { /* M6-09 : le centre de l'arène, sur le praticable le plus proche */
+        EngAiAgent *a = &c->group.agents[c->boss_agent];
+        moved += eng_nav_walkable(&c->nav, a->home) ? 0U : 1U;
+        (void)eng_nav_nearest_walkable(&c->nav, a->home, a->home);
+    }
     spawn_all(c);
+    spawn_boss(c);
+    if (c->has_boss) { /* M6-09 : l'entrée de l'arène mène-t-elle au boss sur ce relief ? */
+        float gate[2] = {BOSS_X, BOSS_Z + BOSS_HALF + 3.0F};
+        (void)eng_nav_nearest_walkable(&c->nav, gate, gate);
+        const float *home = c->group.agents[c->boss_agent].home;
+        float route[64][2];
+        const uint32_t steps = eng_nav_path(&c->nav, gate, home, route, 64);
+        c->boss_reachable = steps > 0U && hypotf(route[steps - 1U][0] - home[0],
+                                                 route[steps - 1U][1] - home[1]) < 0.75F;
+        if (!c->boss_reachable) {
+            ENG_LOG_WARN("combat : arène du boss inaccessible sur ce relief (pente à l'entrée)");
+        }
+    }
     ENG_LOG_INFO("combat : navigation sur le relief, %u cellule(s) trop raide(s) (> %.0f°), %u en "
                  "îlots isolés, %u poste(s) d'ennemi déplacé(s) hors pente",
                  n, (double)max_slope_deg, islands, moved);
@@ -1008,14 +1151,14 @@ size_t play_combat_debug_text(const PlayCombat *c, char *buf, size_t cap)
     if (c == NULL || !c->ready || buf == NULL || cap == 0U) {
         return 0;
     }
-    static const char *const names[FIGHTERS] = {"joueur", "mannequin", "ennemi 1", "ennemi 2",
-                                                "ennemi 3"};
+    static const char *const names[FIGHTERS_MAX] = {"joueur",   "mannequin", "ennemi 1",
+                                                    "ennemi 2", "ennemi 3",  "boss"};
     static const char *const phases[4] = {"anticipation", "ACTIF", "récupération", "fini"};
     size_t n = 0;
     buf[0] = '\0';
     n += (size_t)snprintf(buf + n, cap - n, "tick %u%s\n", (unsigned)c->sim.tick,
                           c->sim.hitstop > 0U ? "  (gel d'impact)" : "");
-    for (uint32_t i = 0; i < c->sim.count && i < FIGHTERS && n < cap; i++) {
+    for (uint32_t i = 0; i < c->sim.count && i < FIGHTERS_MAX && n < cap; i++) {
         const EngFighter *f = &c->sim.fighters[i];
         char what[96] = "";
         if (f->fsm.state == ENG_CS_ATTACK) {
@@ -1103,6 +1246,9 @@ void play_combat_reset(PlayCombat *c)
     c->weapon_ticks = 0;
     apply_weapon(c);
     apply_progress(c, true);
+    c->boss_defeated = false; /* M6-09 */
+    c->boss_ticks = 0;
+    spawn_boss(c);
 }
 
 void play_combat_snapshot(const PlayCombat *c, EngSaveGame *s)
@@ -1167,6 +1313,8 @@ void play_combat_restore(PlayCombat *c, const EngSaveGame *s)
             c->was_dead[f] = true;
         }
     }
+    /* M6-09 : un boss mort dans la sauvegarde reste vaincu (sauvegardes sans lui : il vit) */
+    c->boss_defeated = c->has_boss && c->sim.fighters[BOSS].vitals.dead;
 }
 
 void play_combat_apply_options(PlayCombat *c, const EngGameOptions *o)
@@ -1229,7 +1377,7 @@ void play_combat_fill_hud(const PlayCombat *c, const PlayMode *play, mat4 view_p
         const char *name = "Mannequin";
         for (uint32_t i = 0; i < c->group.count; i++) {
             if (c->group.agents[i].fighter == (uint32_t)c->lock) {
-                name = c->arch.a[c->group.agents[i].arch].name;
+                name = display_name(c->arch.a[c->group.agents[i].arch].name);
             }
         }
         (void)snprintf(hud->target_name, sizeof hud->target_name, "%s", name);
@@ -1237,6 +1385,16 @@ void play_combat_fill_hud(const PlayCombat *c, const PlayMode *play, mat4 view_p
         hud->target_hp_max = tf->vitals.max_hp;
         hud->target_posture = tf->posture;
         hud->target_posture_max = tf->params.max_posture;
+    }
+    hud->has_boss = false; /* M6-09 : barre du boss tant qu'il combat (ou qu'il est verrouillé) */
+    if (c->has_boss && !c->sim.fighters[BOSS].vitals.dead) {
+        const EngAiState st = c->group.agents[c->boss_agent].state;
+        if (st == ENG_AI_CHASE || st == ENG_AI_ENGAGE || c->lock == (int32_t)BOSS) {
+            hud->has_boss = true;
+            (void)snprintf(hud->boss_name, sizeof hud->boss_name, "%s", BOSS_NAME);
+            hud->boss_hp = c->sim.fighters[BOSS].vitals.hp;
+            hud->boss_hp_max = c->sim.fighters[BOSS].vitals.max_hp;
+        }
     }
     hud->number_count = 0;
     for (uint32_t i = 0; i < ENG_DMGNUM_MAX && hud->number_count < ENG_HUD_NUMBERS; i++) {
@@ -1258,6 +1416,8 @@ void play_combat_fill_hud(const PlayCombat *c, const PlayMode *play, mat4 view_p
     if (pf->vitals.dead) {
         (void)snprintf(hud->message, sizeof hud->message, "%s",
                        "Tu es tombé... renaissance dans un instant");
+    } else if (c->boss_ticks > 0U) {
+        (void)snprintf(hud->message, sizeof hud->message, "%s vaincu !", BOSS_NAME);
     } else if (c->levelup_ticks > 0U) {
         (void)snprintf(hud->message, sizeof hud->message, "Niveau %u !", c->progress.level);
     } else if (c->weapon_ticks > 200U) {
@@ -1266,7 +1426,7 @@ void play_combat_fill_hud(const PlayCombat *c, const PlayMode *play, mat4 view_p
     } else if (c->weapon_ticks > 0U) {
         (void)snprintf(hud->message, sizeof hud->message, "Arme : %s",
                        eng_weapon_def(c->equip.equipped)->label);
-    } else if (eng_camp_cleared(&c->group, &c->sim)) {
+    } else if (eng_camp_cleared_range(&c->group, &c->sim, 0U, c->camp.count)) {
         (void)snprintf(hud->message, sizeof hud->message, "%s", "Camp vaincu !");
     } else {
         hud->message[0] = '\0';
@@ -1326,9 +1486,11 @@ void play_combat_autopilot(PlayCombat *c, const float feet[3], float camera_yaw,
     if (c->lock < 0 || c->sim.fighters[c->lock].vitals.dead || c->lock == (int32_t)DUMMY) {
         float best = 1e9F;
         c->lock = -1;
-        for (uint32_t k = FIRST_ENEMY; k < FIGHTERS; k++) {
+        for (uint32_t k = FIRST_ENEMY; k < c->sim.count; k++) {
+            /* M6-09 : le boss compte 40 m de plus : le camp d'abord, tant qu'il vit */
             const float d =
-                hypotf(c->sim.bodies[k].pos[0] - feet[0], c->sim.bodies[k].pos[1] - feet[2]);
+                hypotf(c->sim.bodies[k].pos[0] - feet[0], c->sim.bodies[k].pos[1] - feet[2]) +
+                (c->has_boss && k == BOSS ? 40.0F : 0.0F);
             if (!c->sim.fighters[k].vitals.dead && d < best) {
                 best = d;
                 c->lock = (int32_t)k;
@@ -1338,8 +1500,32 @@ void play_combat_autopilot(PlayCombat *c, const float feet[3], float camera_yaw,
     if (c->lock < 0) {
         return;
     }
-    const float dx = c->sim.bodies[c->lock].pos[0] - feet[0];
-    const float dz = c->sim.bodies[c->lock].pos[1] - feet[2];
+    float dx = c->sim.bodies[c->lock].pos[0] - feet[0];
+    float dz = c->sim.bodies[c->lock].pos[1] - feet[2];
+    const bool outside = fabsf(feet[0] - BOSS_X) > BOSS_HALF || fabsf(feet[2] - BOSS_Z) > BOSS_HALF;
+    const bool target_inside = fabsf(c->sim.bodies[c->lock].pos[0] - BOSS_X) < BOSS_HALF &&
+                               fabsf(c->sim.bodies[c->lock].pos[1] - BOSS_Z) < BOSS_HALF;
+    if (c->has_boss && outside && target_inside) {
+        /* M6-09 : cible dans l'arène, joueur dehors : passer par l'entrée (2 m devant elle,
+         * puis 2 m dedans) plutôt que buter contre le mur */
+        const float ahead = feet[2] > BOSS_Z + BOSS_HALF + 1.5F ? 2.5F : -2.0F;
+        dx = BOSS_X - feet[0];
+        dz = (BOSS_Z + BOSS_HALF + ahead) - feet[2];
+        if (fabsf(dx) > 0.6F || ahead < 0.0F) {
+            const float l = hypotf(dx, dz);
+            if (l > 1e-3F) {
+                const float fx = -sinf(camera_yaw);
+                const float fz = -cosf(camera_yaw);
+                const float rx = cosf(camera_yaw);
+                const float rz = -sinf(camera_yaw);
+                in->axis[ENG_AXIS_MOVE] =
+                    (EngAxisValue){(dx * rx + dz * rz) / l, (dx * fx + dz * fz) / l};
+            }
+            return;
+        }
+        dx = c->sim.bodies[c->lock].pos[0] - feet[0];
+        dz = c->sim.bodies[c->lock].pos[1] - feet[2];
+    }
     const float d = hypotf(dx, dz);
     if (d > 1.4F) {
         const float fx = -sinf(camera_yaw);
@@ -1397,6 +1583,131 @@ static void put(CombatTest *t, float x, float z, float yaw)
     }
 }
 
+/* M6-09 : le boss sur le terrain : chez lui dans l'arène, joignable par l'entrée, pas à travers les
+ * murs ; combattu par un joueur automate (PV énormes) : enchaînement scripté vu, phase 2 vue,
+ * vaincu, et il ne renaît pas avec le joueur. */
+static bool boss_selftest(CombatTest *t)
+{
+    PlayCombat *c = t->play.combat;
+    check(t, c->has_boss, "boss présent sur un terrain", c->has_boss ? 1.0F : 0.0F);
+    if (!c->has_boss) {
+        return false;
+    }
+    const float *bp = c->sim.bodies[BOSS].pos;
+    const bool home = fabsf(bp[0] - BOSS_X) < BOSS_HALF && fabsf(bp[1] - BOSS_Z) < BOSS_HALF;
+    check(t, home, "boss dans son arène (m du centre)", hypotf(bp[0] - BOSS_X, bp[1] - BOSS_Z));
+    float route[64][2];
+    float gate[2] = {BOSS_X, BOSS_Z + BOSS_HALF + 3.0F};
+    (void)eng_nav_nearest_walkable(&c->nav, gate, gate); /* devant l'entrée, hors pente */
+    const uint32_t via_gate = eng_nav_path(&c->nav, gate, bp, route, 64);
+    const bool reach = via_gate > 0U && hypotf(route[via_gate - 1U][0] - bp[0],
+                                               route[via_gate - 1U][1] - bp[1]) < 0.75F;
+    /* sur un relief trop raide, l'entrée peut être en pente : le jeu doit alors le signaler */
+    check(t, reach == c->boss_reachable, "accessibilité de l'arène bien signalée (points)",
+          (float)via_gate);
+    float back[2] = {BOSS_X, BOSS_Z - BOSS_HALF - 3.0F}; /* derrière le mur sud */
+    (void)eng_nav_nearest_walkable(&c->nav, back, back);
+    const uint32_t around = eng_nav_path(&c->nav, back, bp, route, 64);
+    float length = 0.0F;
+    float prev[2] = {back[0], back[1]};
+    for (uint32_t k = 0; k < around; k++) {
+        length += hypotf(route[k][0] - prev[0], route[k][1] - prev[1]);
+        prev[0] = route[k][0];
+        prev[1] = route[k][1];
+    }
+    check(t, around == 0U || length > 2.0F * (BOSS_HALF + 3.0F),
+          "derrière le mur : on fait le tour (longueur du chemin, m)", length);
+    /* murs dans Jolt : un rayon vertical au-dessus du mur sud touche son sommet (3 m au-dessus du
+     * sol) ; au-dessus de l'entrée, il touche le sol */
+    const float down[3] = {0.0F, -1.0F, 0.0F};
+    const float wall_x = BOSS_X;
+    const float wall_z = BOSS_Z - BOSS_HALF - 0.5F;
+    const float wall_ground = play_mode_ground(&t->play, wall_x, wall_z);
+    const float top[3] = {wall_x, wall_ground + 30.0F, wall_z};
+    EngRayHit hit;
+    const bool wall_hit =
+        eng_physics_raycast(t->play.world, top, down, 60.0F, 1U << ENG_LAYER_STATIC, &hit);
+    check(t, wall_hit && hit.point[1] > wall_ground + 2.0F,
+          "mur sud dans la physique (m au-dessus du sol)",
+          wall_hit ? hit.point[1] - wall_ground : -1.0F);
+    const float gate_z = BOSS_Z + BOSS_HALF + 0.5F;
+    const float gate_ground = play_mode_ground(&t->play, BOSS_X, gate_z);
+    const float above_gate[3] = {BOSS_X, gate_ground + 30.0F, gate_z};
+    const bool gate_hit =
+        eng_physics_raycast(t->play.world, above_gate, down, 60.0F, 1U << ENG_LAYER_STATIC, &hit);
+    check(t, gate_hit && hit.point[1] < gate_ground + 0.5F, "entrée ouverte (m au-dessus du sol)",
+          gate_hit ? hit.point[1] - gate_ground : -1.0F);
+    /* le camp vaincu donne l'espadon même si le boss vit (eng_camp_cleared_range) */
+    for (uint32_t i = 0; i < c->camp.count; i++) {
+        EngFighter *f = &c->sim.fighters[c->group.agents[i].fighter];
+        f->vitals.hp = 0.0F;
+        f->vitals.dead = true;
+        f->fsm.state = ENG_CS_DEAD;
+    }
+    step(t, 0U, 0U, 0.0F, 0.0F);
+    check(t, eng_equip_owns(&c->equip, ENG_WEAPON_GREATSWORD),
+          "camp vaincu, boss vivant : espadon obtenu", 1.0F);
+    /* combat : le joueur entre, verrouille le boss et le frappe dès qu'il est à portée */
+    c->sim.fighters[PLAYER].vitals.max_hp = 100000.0F;
+    c->sim.fighters[PLAYER].vitals.hp = 100000.0F;
+    float feet[3] = {BOSS_X, 0.0F, BOSS_Z + 3.0F};
+    feet[1] = play_mode_ground(&t->play, feet[0], feet[2]) + 0.05F;
+    play_mode_teleport(&t->play, feet, 0.0F); /* regarde -Z : vers le boss */
+    step(t, 1U << ENG_ACTION_LOCK_ON, 0U, 0.0F, 0.0F);
+    char last[3][32] = {{0}};
+    uint32_t starts[3] = {0};
+    bool pattern = false;
+    bool phase2 = false;
+    uint32_t ticks = 0;
+    for (; ticks < 15000U && !c->sim.fighters[BOSS].vitals.dead; ticks++) {
+        float pf[3];
+        (void)eng_character_position(t->play.character, pf);
+        const float dx = c->sim.bodies[BOSS].pos[0] - pf[0];
+        const float dz = c->sim.bodies[BOSS].pos[1] - pf[2];
+        const float l = hypotf(dx, dz);
+        const float yaw = t->play.orbit.yaw;
+        float mx = 0.0F;
+        float my = 0.0F;
+        uint32_t press = 0U;
+        if (l > 2.0F) {
+            mx = ((dx * cosf(yaw)) - (dz * sinf(yaw))) / l;
+            my = ((-dx * sinf(yaw)) - (dz * cosf(yaw))) / l;
+        } else if (ticks % 12U == 0U) {
+            press = 1U << ENG_ACTION_ATTACK;
+        }
+        if (c->lock != (int32_t)BOSS && ticks % 30U == 0U) {
+            press |= 1U << ENG_ACTION_LOCK_ON;
+        }
+        step(t, press, 0U, mx, my);
+        if ((c->sim.fighters[BOSS].events & ENG_FEV_ATTACK_START) != 0U) {
+            const EngAttack *a = eng_fighter_attack(&c->sim.fighters[BOSS], c->sim.attacks);
+            memmove(last[0], last[1], sizeof last[0] * 2U);
+            memmove(&starts[0], &starts[1], sizeof starts[0] * 2U);
+            (void)snprintf(last[2], sizeof last[2], "%s", a != NULL ? a->name : "?");
+            starts[2] = c->sim.tick;
+            phase2 = phase2 || strcmp(last[2], "boss_l2") == 0 || strcmp(last[2], "boss_h2") == 0;
+            /* léger, léger, lourd en moins de 4 s : l'enchaînement scripté (LLH) */
+            const bool l1 = strncmp(last[0], "boss_l", 6) == 0;
+            const bool l2 = strncmp(last[1], "boss_l", 6) == 0;
+            const bool h3 = strncmp(last[2], "boss_h", 6) == 0;
+            pattern = pattern || (l1 && l2 && h3 && starts[2] - starts[0] < 240U);
+        }
+    }
+    check(t, c->sim.fighters[BOSS].vitals.dead, "boss vaincu (ticks)", (float)ticks);
+    check(t, pattern, "enchaînement léger, léger, lourd vu", pattern ? 1.0F : 0.0F);
+    check(t, phase2, "attaques de la phase 2 vues", phase2 ? 1.0F : 0.0F);
+    check(t, c->boss_defeated, "boss marqué vaincu", c->boss_defeated ? 1.0F : 0.0F);
+    /* le joueur meurt : il renaît, le boss reste mort */
+    c->sim.fighters[PLAYER].vitals.hp = 0.0F;
+    c->sim.fighters[PLAYER].vitals.dead = true;
+    for (uint32_t i = 0; i < RESPAWN_TICKS + 30U; i++) {
+        step(t, 0U, 0U, 0.0F, 0.0F);
+    }
+    check(t, !c->sim.fighters[PLAYER].vitals.dead, "le joueur renaît", 1.0F);
+    check(t, c->sim.fighters[BOSS].vitals.dead, "le boss vaincu ne renaît pas", 1.0F);
+    return t->ok;
+}
+
 bool play_combat_terrain_selftest(const char *heightmap_path)
 {
     static CombatTest t;
@@ -1424,16 +1735,16 @@ bool play_combat_terrain_selftest(const char *heightmap_path)
     play_mode_teleport(&t.play, feet, 2.3561945F - 3.14159265F);
     const uint32_t block = 1U << ENG_ACTION_INTERACT;
     uint32_t in_steep = 0;
-    bool was_walkable[FIGHTERS] = {false};
+    bool was_walkable[FIGHTERS_MAX] = {false};
     uint32_t start_steep = 0;
-    for (uint32_t k = FIRST_ENEMY; k < FIGHTERS; k++) {
+    for (uint32_t k = FIRST_ENEMY; k < c->sim.count; k++) {
         start_steep += eng_nav_walkable(&c->nav, c->sim.bodies[k].pos) ? 0U : 1U;
     }
     uint32_t closest_tick = 0;
     float closest = 1e9F;
     for (int i = 0; i < 1800; i++) {
         step(&t, i == 0 ? block : 0U, block, 0.0F, 0.0F);
-        for (uint32_t k = FIRST_ENEMY; k < FIGHTERS; k++) {
+        for (uint32_t k = FIRST_ENEMY; k < c->sim.count; k++) {
             if (c->sim.fighters[k].vitals.dead) {
                 continue;
             }
@@ -1477,6 +1788,7 @@ bool play_combat_terrain_selftest(const char *heightmap_path)
           (float)s.max_attackers);
     check(&t, s.player_hits_taken >= 1U, "camp sur relief : coups reçus par le joueur",
           (float)s.player_hits_taken);
+    (void)boss_selftest(&t); /* M6-09 : après le camp (ses mesures sont prises) */
     ENG_LOG_INFO("AUTOTEST CAMP TERRAIN : %s (%d mesures)", t.ok ? "OK" : "ÉCHEC", t.checks);
     play_mode_shutdown(&t.play);
     return t.ok;
@@ -1589,7 +1901,7 @@ bool play_combat_selftest(bool rig)
         if (c->lock < 0 || c->sim.fighters[c->lock].vitals.dead || c->lock == (int32_t)DUMMY) {
             float best = 1e9F; /* l'automate vise l'ennemi vivant le plus proche */
             c->lock = -1;
-            for (uint32_t k = FIRST_ENEMY; k < FIGHTERS; k++) {
+            for (uint32_t k = FIRST_ENEMY; k < c->sim.count; k++) {
                 const float d = hypotf(c->sim.bodies[k].pos[0] - c->sim.bodies[PLAYER].pos[0],
                                        c->sim.bodies[k].pos[1] - c->sim.bodies[PLAYER].pos[1]);
                 if (!c->sim.fighters[k].vitals.dead && d < best) {

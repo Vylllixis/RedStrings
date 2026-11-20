@@ -265,7 +265,8 @@ static const char ARCH[] = "# camp de test\n"
                            "plan light 0 1.8 60 3 2\n"
                            " plan heavy 0.5 2.2 150 1 1\nend\n"
                            "archetype boss\n hp 400\n light b1\n heavy b2\n plan light 0 2 60 1 1\n"
-                           " phase 0.6 b3 b4 1.2 0.7\n phase 0.3 b5 b6 1.4 0.5\nend\n";
+                           " phase 0.6 b3 b4 1.2 0.7\n phase 0.3 b5 b6 1.4 0.5\n"
+                           " plan pattern 0 2.6 300 2 LLH\nend\n";
 
 UTEST(ai_archetype, a_text_file_defines_archetypes_with_defaults_and_phases)
 {
@@ -282,6 +283,17 @@ UTEST(ai_archetype, a_text_file_defines_archetypes_with_defaults_and_phases)
     EXPECT_EQ(set.a[1].phase_count, 2U);
     EXPECT_NEAR(set.a[1].phases[1].cooldown_scale, 0.5F, 1e-6F);
     EXPECT_EQ(eng_arch_find(&set, "boss"), 1U);
+    /* M6-09 : enchaînement scripté LLH */
+    ASSERT_EQ(set.a[1].plan_count, 2U);
+    const EngArchPlan *pat = &set.a[1].plans[1];
+    EXPECT_EQ(pat->step_count, 3U);
+    EXPECT_FALSE(pat->steps[0]);
+    EXPECT_FALSE(pat->steps[1]);
+    EXPECT_TRUE(pat->steps[2]);
+    EXPECT_FALSE(pat->heavy);
+    EXPECT_EQ(pat->weight, 2U);
+    EXPECT_EQ(pat->cooldown, 300U);
+    EXPECT_EQ(set.a[0].plans[0].step_count, 0U); /* plan simple */
     EXPECT_EQ(eng_arch_find(&set, "nope"), UINT32_MAX);
 }
 
@@ -302,6 +314,11 @@ UTEST(ai_archetype, every_error_is_refused_with_its_line)
         "archetype a\n light l\n heavy h\n plan light 0 1 10 1 1\n phase 0.3 a b 1 1\n "
         "phase 0.5 a b 1 1\nend\n", /* PV qui remontent */
         "archetype a\n fov 400\nend\n",
+        "archetype a\n light l\n heavy h\n plan pattern 0 1 10 1 LXH\nend\n",   /* lettre */
+        "archetype a\n light l\n heavy h\n plan pattern 0 1 10 1 LLLLH\nend\n", /* trop long */
+        "archetype a\n light l\n heavy h\n plan pattern 0 1 10 1 L\nend\n",     /* trop court */
+        "archetype a\n light l\n heavy h\n plan pattern 2 1 10 1 LH\nend\n",    /* portée */
+        "archetype a\n light l\n heavy h\n plan pattern 0 1 10 0 LH\nend\n",    /* poids nul */
         "archetype a\n light l\n heavy h\n plan light 0 1 10 1 1\nend\narchetype "
         "a\nend\n", /* doublon
                      */

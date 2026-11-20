@@ -115,6 +115,28 @@ static bool apply(EngArchetype *a, const char *key, char *tok[], int nt, char *e
             return false;
         }
         EngArchPlan *p = &a->plans[a->plan_count];
+        memset(p, 0, sizeof *p);
+        if (strcmp(tok[1], "pattern") == 0) { /* M6-09 : enchaînement scripté */
+            const size_t n = strlen(tok[6]);
+            bool letters = n >= 2U && n <= ENG_ARCH_PATTERN_MAX;
+            for (size_t k = 0; letters && k < n; k++) {
+                letters = tok[6][k] == 'L' || tok[6][k] == 'H';
+                p->steps[k] = tok[6][k] == 'H';
+            }
+            if (!letters || !to_float(tok[2], &p->range_min) || !to_float(tok[3], &p->range_max) ||
+                !to_u32(tok[4], &p->cooldown) || !to_u32(tok[5], &p->weight) ||
+                p->range_min < 0.0F || p->range_max <= p->range_min || p->weight == 0U) {
+                fail(err, cap, line,
+                     "`plan pattern` : portée_min portée_max recharge poids suite (2 à 4 lettres "
+                     "L ou H, par exemple LLH)");
+                return false;
+            }
+            p->step_count = (uint32_t)n;
+            p->presses = 1U;
+            p->heavy = p->steps[0];
+            a->plan_count++;
+            return true;
+        }
         if ((strcmp(tok[1], "light") != 0 && strcmp(tok[1], "heavy") != 0) ||
             !to_float(tok[2], &p->range_min) || !to_float(tok[3], &p->range_max) ||
             !to_u32(tok[4], &p->cooldown) || !to_u32(tok[5], &p->weight) ||

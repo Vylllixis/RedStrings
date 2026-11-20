@@ -17,8 +17,11 @@ Décisions : `docs/adr/0025-ia-machine-a-etats-donnees-et-jetons.md`. Modules (t
 ## Archétypes (format)
 
 Voir l'en-tête de `ai_archetype.h`. `light`/`heavy` nomment des attaques du jeu d'attaques de combat ;
-`plan light|heavy portée_min portée_max recharge poids appuis` ; `phase fraction_PV légère lourde vitesse
-recharge` (boss : jusqu'à 3, PV décroissants). Une erreur donne un message avec le numéro de ligne.
+`plan light|heavy portée_min portée_max recharge poids appuis` ; `plan pattern portée_min portée_max
+recharge poids SUITE` (M6-09 : 2 à 4 lettres `L` légère / `H` lourde, par exemple `LLH`, jouées l'une
+après l'autre : chacune part dès la fin de la précédente, le jeton est gardé, la recharge compte dès la
+première) ; `phase fraction_PV légère lourde vitesse recharge` (boss : jusqu'à 3, PV décroissants). Une
+erreur donne un message avec le numéro de ligne.
 
 ## Règles vérifiées par test (`test_ai_core`, `test_ai_camp`)
 
@@ -28,6 +31,10 @@ recharge` (boss : jusqu'à 3, PV décroissants). Une erreur donne un message ave
 - Un ennemi contourne un mur pour rejoindre un joueur qu'il n'entend que (pas de vue).
 - Cycle Patrol → Alert → Chase → Engage → Return → Patrol observé ; l'archer blessé fuit.
 - Boss : 2 phases (changement d'attaques, vitesse, recharges) ; battable.
+- Enchaînement scripté (`plan pattern ... LLH`) : léger, léger, lourd, chaque attaque partant au plus
+  3 ticks après la fin de la précédente, puis la recharge du plan (mutations détectées : suite non
+  poursuivie, lettres inversées).
+- `eng_camp_cleared_range` : le camp est vaincu même si un boss du même groupe vit.
 - Repos : camp remis à neuf (morts comprises), refusé pendant un combat.
 - Même scénario → même hash (déterminisme, même binaire).
 

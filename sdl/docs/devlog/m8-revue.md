@@ -9,7 +9,7 @@ Tests : `test_game_systems` (8), `launcher.game` (« AUTOTEST PARTIE : OK »). D
 |---|---|---|---|
 | 1 | Partie démarrée, sauvegardée, quittée et reprise sans perte | `--game-selftest` : nouvelle partie, sauvegarde, tout détruit, relance, Continuer : position (écart 0), temps de jeu, PV, endurance, ennemis identiques | Prouvé (pour ce que contient la sauvegarde : voir docs/game-flow.md) |
 | 2 | Options graphiques et remappage des contrôles | remappage de toutes les actions + options audio/caméra/texte/contraste, enregistrés et relus ; **finition** : options graphiques FXAA, bloom, vsync, plein écran, qualité des ombres, distance de vue (menu, `options.txt`, appliquées et journalisées ; `engine.game_systems`) | **Partiel** : manquent SSAO, échelle de résolution, bloom en chaîne, FXAA 3.11, coût par effet |
-| 3 | Vertical slice jouée 30 min sans crash | — | **À faire** (de ton côté ; le rapport de crash est prêt) |
+| 3 | Vertical slice jouée 30 min sans crash | `tools/scripts/tranche-verticale.sh`, `docs/tranche-verticale.md` ; essai d'endurance de 30 min en pilote automatique sur le terrain de la tranche : 297 000 images, aucune erreur, aucune fuite, mémoire stable (détails dans le guide) | **Partiel** : prouvé sans humain ; la session humaine de 30 min reste (Q10) |
 
 ## Tâches
 

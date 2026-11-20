@@ -61,6 +61,10 @@ livraisons ; les tags sont posés par Théo après ses tests.
   relief marqué (`launcher.camp_terrain`). Télégraphe : l'arme d'un ennemi s'allume en orange pendant
   l'anticipation puis en rouge pendant le coup (émissif par dessin). Clic dans la vue avec F1 :
   sélection d'un ennemi et son état dans le panneau. F3 : hitbox et hurtbox par-dessus les modèles.
+- M6-09 (finition) : le boss dans le jeu, sur un terrain : arène de pierre murée avec entrée (murs
+  Jolt sur le relief, contournés par l'IA), Seigneur des os (guerrier squelette géant à l'espadon,
+  2 phases), barre de vie en bas de l'écran, ne renaît pas une fois vaincu ; enchaînements scriptés
+  `plan pattern ... LLH` dans les archétypes ; arène inaccessible signalée au journal.
 
 ## v0.5 (M5) — combat
 - Machine à états, frame data en données rechargeables, hitbox/hurtbox, esquive, garde, parade,

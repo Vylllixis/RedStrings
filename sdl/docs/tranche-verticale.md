@@ -15,7 +15,8 @@ Le script génère une fois le terrain (`build/release/bin/tranche-verticale.hma
 513², 2 m, 25 m de relief, toujours le même) puis lance
 `launcher --combat --terrain tranche-verticale.hmap --grass --placement`. Les options du lanceur
 passées en plus sont transmises (par exemple `--day-night 21` pour commencer de nuit,
-`--weapon greatsword` pour avoir l'espadon tout de suite). Journal : `build/release/bin/logs/` ;
+`--weapon greatsword` pour avoir l'espadon tout de suite, `--at-boss` pour commencer devant l'arène
+du boss). Journal : `build/release/bin/logs/` ;
 rapport de crash éventuel : `build/release/bin/logs/crash-*.txt`.
 
 ## Ce qu'elle contient
@@ -30,6 +31,9 @@ rapport de crash éventuel : `build/release/bin/logs/crash-*.txt`.
 - **Clairière** au centre (45 m) : le mannequin d'entraînement et un camp de 3 squelettes (soldat,
   brute, archer) qui patrouillent, donnent l'alerte et attaquent à tour de rôle ; le camp réapparaît
   10 s après avoir été battu.
+- **Boss** : au sud-est de la clairière, une arène de pierre (entrée au nord) et le Seigneur des os :
+  enchaînement léger, léger, lourd, phase 2 plus vive sous la moitié de ses PV, barre de vie en bas
+  de l'écran ; vaincu, il ne revient pas.
 - **Combat** : attaque légère (clic), lourde (clic droit), garde (E), parade (garde au bon moment),
   esquive (Ctrl), endurance, posture, verrouillage de cible (A / Q), arrêt sur impact, télégraphes
   des ennemis (lueur orange puis rouge).
@@ -45,7 +49,7 @@ rapport de crash éventuel : `build/release/bin/logs/crash-*.txt`.
 | 0 – 3 | Menu principal ; Options : essayer vsync, plein écran, qualité des ombres ; revenir ; Nouvelle partie |
 | 3 – 10 | Mannequin (attaques, garde, parade, esquive) puis le camp ; le battre pour gagner l'espadon |
 | 10 – 15 | R : espadon ; rebattre le camp quand il réapparaît ; revenir à l'épée |
-| 15 – 20 | Sortir de la clairière, marcher dans la forêt, attendre ou forcer la nuit (`--day-night 21` au lancement suivant) |
+| 15 – 20 | Le boss (arène au sud-est, entrée au nord) ; puis sortir de la clairière, marcher dans la forêt |
 | 20 – 25 | Pause → Sauvegarder ; Menu principal → Quitter ; relancer ; Continuer : tout doit être là |
 | 25 – 30 | Jouer librement ; mourir au moins une fois (réapparition) |
 
@@ -62,11 +66,19 @@ rapport de crash éventuel : `build/release/bin/logs/crash-*.txt`.
 - La collision des arbres est une capsule autour du tronc : la tête peut frôler les branches basses des
   plus grands arbres ; on glisse autour d'un tronc pris de biais.
 - Un seul modèle d'arbre et un seul de rocher ; le relief ne projette pas d'ombre.
-- Pas de boss (M6-09), pas de quête (M8-09), pas d'inventaire d'objets.
+- Pas de quête (M8-09), pas d'inventaire d'objets. L'arène du boss a une place fixe.
 
 ## Preuves obtenues sans humain
 
 - `launcher.combat_terrain_render` (ctest) : combat en pilote automatique sur un terrain doux avec
   placement : arbres KayKit, 4 cascades, 60 passes d'ombre, aucun dessin perdu ni rejeté.
 - Mesure RTX 5070, 1280 × 720 sans vsync : 1,4 ms par image en moyenne (herbe, 5 424 arbres, ombres).
-- Essai d'endurance en pilote automatique : voir `docs/devlog/m8-revue.md` (critère 3).
+- Essai d'endurance en pilote automatique (2026-11-20, RTX 5070, vsync à 165 Hz, son actif à volume
+  nul) : `launcher --combat-autoplay --terrain tranche-verticale.hmap --grass --placement --frames
+  297000`, soit **30 min** : 297 000 images, 108 025 pas de simulation, arrêt propre (code 0),
+  **aucune erreur**, aucune fuite (GPU et arènes), mémoire du processus stable à 307,8 Mo de la 14e à
+  la 30e minute (278 Mo avant : une hausse unique vers la 14e minute, puis plat) ; le joueur
+  automatique est monté au niveau 7, a obtenu l'espadon, est mort et a renaît 19 fois ; le camp a été
+  vaincu et a réapparu 7 fois ; la nuit est venue (soleil à −44°) ; 274 recuissons de l'éclairage par
+  image ; 12 allocations dans la boucle d'image en tout (B5). Cet essai précède l'arrivée du boss
+  (le pilote automatique préfère le camp). Ce n'est pas la session humaine du critère (Q10).
