@@ -1,5 +1,7 @@
 #include "engine/save_game.h"
 
+#include "engine/gear.h"
+
 #include <SDL3/SDL.h>
 #include <math.h>
 #include <stdio.h>
@@ -175,6 +177,13 @@ size_t eng_save_encode(const EngSaveGame *s, const EngWorldState *world, void *o
         w_u32(&w, s->progress.level);
         w_u32(&w, s->progress.xp);
         w_u32(&w, s->progress.total_xp);
+        section_end(&w, at);
+        sections++;
+    }
+    if (s->has_gear) { /* grande carte : palier de butin, boss vaincus */
+        at = section_begin(&w, "GEAR");
+        w_u32(&w, s->gear_tier);
+        w_u32(&w, s->bosses_beaten);
         section_end(&w, at);
         sections++;
     }
@@ -379,6 +388,16 @@ bool eng_save_decode(const void *data, size_t size, EngSaveGame *out, EngWorldSt
             }
             s.progress = pg;
             s.has_progress = true;
+        } else if (memcmp(tag, "GEAR", 4) == 0) {
+            const uint32_t tier = r_u32(&sec);
+            const uint32_t beaten = r_u32(&sec);
+            if (!sec.ok || tier >= ENG_GEAR_TIERS) {
+                r.ok = false;
+                break;
+            }
+            s.gear_tier = tier;
+            s.bosses_beaten = beaten;
+            s.has_gear = true;
         } else if (memcmp(tag, "EQUI", 4) == 0) {
             EngEquipment eq;
             eq.owned = r_u32(&sec);

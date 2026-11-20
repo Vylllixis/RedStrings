@@ -418,7 +418,11 @@ EngHitOutcome eng_combat_apply_hit(EngFighter *attacker, EngFighter *defender, c
         attacker->params.damage_scale > 0.0F && isfinite(attacker->params.damage_scale)
             ? attacker->params.damage_scale
             : 1.0F;
-    const float damage = atk->damage * scale;
+    const float armor =
+        defender->params.armor_scale > 0.0F && isfinite(defender->params.armor_scale)
+            ? defender->params.armor_scale
+            : 1.0F;
+    const float damage = atk->damage * scale * armor;
     o.dir = eng_react_dir(defender->yaw, force_dir);
     const float klen = sqrtf(force_dir[0] * force_dir[0] + force_dir[1] * force_dir[1]);
     const bool has_dir = isfinite(klen) && klen > 1e-6F;

@@ -130,8 +130,31 @@ mis à l'échelle par la zone :
 
 ![Zones : brute géante, boss de la plaine, de la montagne, du volcan](devlog/img/zones.png)
 
-Limites : les boss sont encore le même guerrier squelette (« Seigneur des os ») avec plus de PV ;
-pas encore de butin réel, de château ni de décor de zone ; boss vaincus oubliés au redémarrage.
+**Butin des boss** (`engine/gear.h`) : chaque boss de zone donne une arme, une armure et un
+bouclier, sous la forme d'un palier d'équipement de 0 (départ) à 4 :
+
+| Palier | Donné par | Dégâts infligés | Dégâts reçus | La garde laisse passer |
+|---|---|---|---|---|
+| 0 | départ | x 1 | x 1 | 20 % |
+| 1 | Chevalier noir (plaine) | x 1,35 | x 0,8 | 15 % |
+| 2 | Seigneur du givre (montagne) | x 1,8 | x 0,65 | 10 % |
+| 3 | Roi des sables (désert) | x 2,4 | x 0,5 | 6 % |
+| 4 | Dragon de lave (volcan) | x 3,2 | x 0,4 | 3 % |
+
+Le palier ne redescend jamais (battre un boss plus faible ensuite ne change rien). Il s'applique au
+joueur avec la progression (`EngFighterParams.damage_scale`, `armor_scale`, `block_multiplier`),
+s'affiche à côté de l'arme (« Épée et bouclier du givre ») et dans un message (« Butin : Lame du
+givre, Armure du givre, Écu du givre »). Le palier et les boss vaincus sont dans la sauvegarde
+(section GEAR ; un boss vaincu ne revient pas). `--gear N` commence avec le palier N. Le boss d'une
+zone a son nom sur la barre de vie (« Chevalier noir », « Seigneur du givre », « Roi des sables »,
+« Dragon de lave »).
+
+Tests : `engine.gear` (3), `fighter.the_defender_armor_scale...`, `save_game.the_gear_section...`,
+autotest du combat (palier 2 : dégâts x 1,8, armure x 0,65, garde 0,1).
+
+Limites : les boss sont encore le même guerrier squelette avec plus de PV (le chevalier à cheval et
+le dragon viennent ensuite) ; pas de château ni de décor de zone ; les pièces du butin n'ont pas
+de modèle propre (même épée, même bouclier).
 
 ## Streaming (M7-03) — `world_stream`
 

@@ -26,7 +26,8 @@ typedef enum EngMapZoneKind {
 #define ENG_MAPZONE_COUNT (ENG_BIOME_COUNT * ENG_MAPZONES_PER_BIOME)
 
 typedef struct EngMapZone {
-    const char *name; /* affiché à l'entrée de la zone */
+    const char *boss_title; /* zone de boss : nom du boss (barre de vie) ; NULL sinon */
+    const char *name;       /* affiché à l'entrée de la zone */
     EngBiome biome;
     EngMapZoneKind kind;
     double x; /* centre, mètres monde */

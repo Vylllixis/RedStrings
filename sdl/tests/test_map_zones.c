@@ -44,7 +44,10 @@ UTEST(eng_map_zones, the_plain_matches_the_requested_hit_counts_and_difficulty_o
     EXPECT_NEAR(z[0].hp / 10.0F, 3.0F, 1e-6F);
     EXPECT_NEAR(z[1].hp / 10.0F, 6.0F, 1e-6F);
     EXPECT_NEAR(z[2].hp / 10.0F, 20.0F, 1e-6F);
-    EXPECT_NEAR(z[1].size_scale, 2.0F, 1e-6F); /* les durs : deux fois plus grands */
+    EXPECT_NEAR(z[1].size_scale * 1.2F, 2.0F, 0.01F); /* brute x 1,2 : deux fois un soldat */
+    EXPECT_STREQ(z[2].boss_title, "Chevalier noir");
+    EXPECT_STREQ(z[11].boss_title, "Dragon de lave");
+    EXPECT_TRUE(z[0].boss_title == NULL);
     EXPECT_STREQ(z[0].arch[0], "grunt");
     EXPECT_STREQ(z[1].arch[0], "brute");
     EXPECT_STREQ(z[2].arch[0], "boss");

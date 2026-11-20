@@ -104,6 +104,9 @@ static void usage(const char *prog)
     fprintf(stderr,
             "  --at-boss      avec --combat --terrain : commence devant l'entrée de l'arène "
             "du boss (M6-09)\n");
+    fprintf(stderr,
+            "  --gear N       avec --combat : commence avec le palier d'équipement N (0 à 4 : "
+            "butin des boss de la grande carte)\n");
     fprintf(stderr, "  --at-zone N    avec --world --combat : commence 20 m avant la zone N de la "
                     "grande carte (0 à 11 : farm facile, farm dur, boss de chaque biome)\n");
     fprintf(stderr,
@@ -286,7 +289,6 @@ static bool update_zone(const WorldView *world, PlayMode *play, const float feet
     static EngMapZone zones[ENG_MAPZONE_COUNT];
     static bool built;
     static int32_t active = -2; /* -2 : rien chargé ; -1 : camp de réveil */
-    static uint32_t beaten;     /* bit i : boss de la zone i vaincu */
     if (play->combat == NULL) {
         return false;
     }
@@ -298,16 +300,10 @@ static bool update_zone(const WorldView *world, PlayMode *play, const float feet
     }
     bool changed = false;
     if (active == -2) {
-        changed = play_combat_load_zone(play->combat, NULL, play->spawn[0], play->spawn[2]);
+        changed = play_combat_load_zone(play->combat, NULL, -1, play->spawn[0], play->spawn[2]);
         active = -1;
         ENG_LOG_INFO("monde : camp de réveil (aucun ennemi) ; %u zones sur la carte",
                      (unsigned)ENG_MAPZONE_COUNT);
-    }
-    uint32_t tier = 0;
-    if (active >= 0 && play_combat_take_reward(play->combat, &tier)) {
-        beaten |= 1U << (uint32_t)active;
-        ENG_LOG_INFO("monde : boss de « %s » vaincu : butin de palier %u", zones[active].name,
-                     tier);
     }
     double pw[3];
     eng_origin_to_world(&world->origin, feet, pw);
@@ -320,19 +316,18 @@ static bool update_zone(const WorldView *world, PlayMode *play, const float feet
     if (play_combat_busy(play->combat) && !far_from_active) {
         return changed;
     }
-    EngMapZone zone = zones[near];
-    if ((beaten & (1U << (uint32_t)near)) != 0U) {
-        zone.enemy_count = 0; /* boss déjà vaincu : la zone reste vide */
-    }
+    const EngMapZone zone = zones[near];
     const double centre[3] = {zone.x, 0.0, zone.z};
     float local[3];
     eng_origin_to_local(&world->origin, centre, local);
-    if (play_combat_load_zone(play->combat, &zone, local[0], local[2])) {
+    if (play_combat_load_zone(play->combat, &zone, near, local[0], local[2])) {
         active = near;
         changed = true;
-        ENG_LOG_INFO("monde : zone %d « %s » chargée (%s, %u ennemi(s), %.0f PV, dégâts x %.1f)",
+        ENG_LOG_INFO("monde : zone %d « %s » chargée (%s, %u ennemi(s), %.0f PV, dégâts x %.1f)%s",
                      (int)near, zone.name, eng_biome_name(zone.biome), zone.enemy_count,
-                     (double)zone.hp, (double)zone.damage_scale);
+                     (double)zone.hp, (double)zone.damage_scale,
+                     play_combat_zone_beaten(play->combat, near) ? " : boss déjà vaincu, vide"
+                                                                 : "");
     } else {
         ENG_LOG_ERROR("monde : zone %d « %s » impossible à charger", (int)near, zone.name);
     }
@@ -426,7 +421,8 @@ int main(int argc, char **argv)
     bool weapon_greatsword = false; /* --weapon greatsword (M8-08) */
     bool at_boss = false;           /* --at-boss (M6-09) */
     long post_bench_frames = 0;     /* --post-bench N (finition M8-06) */
-    long at_zone = -1;              /* --at-zone N : départ devant la zone N de la grande carte */
+    long gear_tier = 0; /* --gear N : commence avec le palier d'équipement N (0 à 4) */
+    long at_zone = -1;  /* --at-zone N : départ devant la zone N de la grande carte */
     double world_start[2] = {WORLD_SPAWN_X, WORLD_SPAWN_Z};
     int32_t world_seed = 1;
     double world_autopilot = 0.0;
@@ -494,6 +490,13 @@ int main(int argc, char **argv)
             }
         } else if (strcmp(argv[i], "--at-boss") == 0) {
             at_boss = true;
+        } else if (strcmp(argv[i], "--gear") == 0 && i + 1 < argc) {
+            char *end = NULL;
+            gear_tier = strtol(argv[++i], &end, 10);
+            if (*end != '\0' || gear_tier < 0 || gear_tier > 4) {
+                fprintf(stderr, "--gear : palier d'équipement de 0 à 4 attendu\n");
+                return 2;
+            }
         } else if (strcmp(argv[i], "--at-zone") == 0 && i + 1 < argc) {
             char *end = NULL;
             at_zone = strtol(argv[++i], &end, 10);
@@ -1058,6 +1061,9 @@ int main(int argc, char **argv)
                 play_mode_teleport(&play, gate, 0.0F); /* regarde -Z : l'entrée, le boss */
             } else if (at_boss) {
                 ENG_LOG_WARN("--at-boss : pas d'arène de boss (il faut --combat --terrain)");
+            }
+            if (gear_tier > 0 && play.combat != NULL) { /* butin des boss : palier d'essai */
+                (void)play_combat_give_gear(play.combat, (uint32_t)gear_tier);
             }
             if (weapon_greatsword &&
                 play.combat != NULL) { /* M8-08 : essai de l'espadon (après la nouvelle partie) */

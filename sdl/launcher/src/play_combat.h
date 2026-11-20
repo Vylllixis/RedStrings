@@ -54,11 +54,18 @@ bool play_combat_camp_center(const PlayCombat *c, float out[2]);
  * autour de la zone sur le relief courant. `zone` NULL : aucun ennemi (camp de réveil). Une zone de
  * boss ne réapparaît pas : sa victoire met un butin en attente (play_combat_take_reward). false si
  * un archétype manque ou sur un terrain à arène (M6-09). */
-bool play_combat_load_zone(PlayCombat *c, const EngMapZone *zone, float cx, float cz);
+bool play_combat_load_zone(PlayCombat *c, const EngMapZone *zone, int32_t index, float cx,
+                           float cz);
 /* Un ennemi vivant poursuit ou combat le joueur ? (ne pas changer de zone à ce moment) */
 bool play_combat_busy(const PlayCombat *c);
-/* Le boss de la zone vient d'être vaincu : renvoie true une fois, avec son palier de butin. */
-bool play_combat_take_reward(PlayCombat *c, uint32_t *tier);
+/* Le boss de la zone `index` a-t-il été vaincu ? (il ne revient pas ; enregistré dans la
+ * sauvegarde, section GEAR) */
+bool play_combat_zone_beaten(const PlayCombat *c, int32_t index);
+/* Butin des boss : palier d'équipement du joueur (0 à 4, engine/gear.h). Battre le boss d'une zone
+ * donne le palier de sa zone s'il est meilleur. */
+uint32_t play_combat_gear(const PlayCombat *c);
+/* Donne un palier (option --gear, autotest). true s'il a monté. */
+bool play_combat_give_gear(PlayCombat *c, uint32_t tier);
 /* Mode créatif : le joueur ne perd plus de PV (remis au maximum avant chaque pas de simulation) ;
  * ses attaques et leurs dégâts ne changent pas. */
 void play_combat_set_invincible(PlayCombat *c, bool invincible);

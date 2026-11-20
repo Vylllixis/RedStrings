@@ -917,3 +917,49 @@ UTEST(fighter, the_attacker_damage_scale_multiplies_clean_and_blocked_hits)
     EXPECT_EQ(o.kind, ENG_HITKIND_BLOCKED);
     EXPECT_NEAR(o.dealt, atk->damage * 2.0F * d.params.block_multiplier, 1e-4F);
 }
+
+/* Butin des boss : l'armure du défenseur multiplie les dégâts reçus (0, négatif, NaN : x 1), en
+ * coup net comme sous la garde, et se combine avec l'échelle de l'attaquant. */
+UTEST(fighter, the_defender_armor_scale_reduces_clean_and_blocked_hits)
+{
+    load();
+    const EngAttack *atk = &g_set.attacks[0];
+    const float force[2] = {0.0F, -1.0F};
+    float dealt[4];
+    const float armors[4] = {0.0F, 0.5F, -1.0F, NAN};
+    for (int k = 0; k < 4; k++) {
+        EngFighter a;
+        EngFighter d;
+        eng_fighter_init(&a, NULL);
+        eng_fighter_init(&d, NULL);
+        d.params.armor_scale = armors[k];
+        dealt[k] = eng_combat_apply_hit(&a, &d, atk, ENG_ZONE_TORSO, force).dealt;
+    }
+    ASSERT_GT(dealt[0], 0.0F);
+    EXPECT_NEAR(dealt[1], dealt[0] * 0.5F, 1e-4F);
+    EXPECT_EQ(dealt[2], dealt[0]);
+    EXPECT_EQ(dealt[3], dealt[0]);
+    EngFighter a;
+    EngFighter d;
+    eng_fighter_init(&a, NULL);
+    eng_fighter_init(&d, NULL);
+    a.params.damage_scale = 3.0F; /* ennemi du volcan */
+    d.params.armor_scale = 0.4F;  /* armure du dragon */
+    EXPECT_NEAR(eng_combat_apply_hit(&a, &d, atk, ENG_ZONE_TORSO, force).dealt,
+                atk->damage * 3.0F * 0.4F, 1e-4F);
+    eng_fighter_init(&d, NULL);
+    d.params.armor_scale = 0.5F;
+    EngFighterInput in = idle_in();
+    in.block_pressed = true;
+    in.block_held = true;
+    step(&d, in);
+    in.block_pressed = false;
+    wait_n(&d, 0);
+    for (int i = 0; i < 10 && d.fsm.state != ENG_CS_BLOCK; i++) {
+        step(&d, in);
+    }
+    ASSERT_EQ(d.fsm.state, ENG_CS_BLOCK);
+    eng_fighter_init(&a, NULL);
+    const EngHitOutcome o = eng_combat_apply_hit(&a, &d, atk, ENG_ZONE_TORSO, force);
+    EXPECT_NEAR(o.dealt, atk->damage * 0.5F * d.params.block_multiplier, 1e-4F);
+}

@@ -143,6 +143,32 @@ UTEST(save_game, the_equipment_section_round_trips_and_rejects_incoherent_values
     EXPECT_FALSE(eng_save_decode(g_buf, n, &r, NULL, err, sizeof err));
 }
 
+/* Grande carte : section GEAR (palier de butin, boss vaincus) : absente -> palier 0, aucun boss ;
+ * aller-retour ; palier hors bornes -> refusé. */
+UTEST(save_game, the_gear_section_round_trips_and_rejects_an_unknown_tier)
+{
+    EngSaveGame s = sample();
+    EngSaveGame r;
+    char err[96];
+    size_t n = eng_save_encode(&s, NULL, g_buf, sizeof g_buf);
+    ASSERT_TRUE(eng_save_decode(g_buf, n, &r, NULL, err, sizeof err));
+    EXPECT_FALSE(r.has_gear);
+    EXPECT_EQ(r.gear_tier, 0U);
+    EXPECT_EQ(r.bosses_beaten, 0U);
+    s.has_gear = true;
+    s.gear_tier = 3U;
+    const uint32_t two_bosses = (1U << 2U) | (1U << 8U); /* boss de la plaine et du désert */
+    s.bosses_beaten = two_bosses;
+    n = eng_save_encode(&s, NULL, g_buf, sizeof g_buf);
+    ASSERT_TRUE(eng_save_decode(g_buf, n, &r, NULL, err, sizeof err));
+    EXPECT_TRUE(r.has_gear);
+    EXPECT_EQ(r.gear_tier, 3U);
+    EXPECT_EQ(r.bosses_beaten, two_bosses);
+    s.gear_tier = 9U; /* palier inconnu */
+    n = eng_save_encode(&s, NULL, g_buf, sizeof g_buf);
+    EXPECT_FALSE(eng_save_decode(g_buf, n, &r, NULL, err, sizeof err));
+}
+
 UTEST(save_game, a_version_1_save_is_read_by_version_2_without_loss)
 {
     eng_wstate_init(&g_world);

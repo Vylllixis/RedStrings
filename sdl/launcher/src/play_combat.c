@@ -1,5 +1,7 @@
 #include "play_combat.h"
 
+#include "engine/gear.h"
+
 #include <SDL3/SDL.h>
 #include <math.h>
 #include <stdio.h>
@@ -115,6 +117,11 @@ struct PlayCombat {
     int32_t lock;        /* indice de combattant verrouillé, -1 */
     uint32_t boss_agent; /* M6-09 : indice du boss dans le groupe d'IA */
     /* grande carte : zone chargée (play_combat_load_zone) ; PV, dégâts et taille de ses ennemis */
+    uint32_t gear_tier;    /* butin des boss : palier d'équipement 0 à 4 (engine/gear.h) */
+    uint32_t zones_beaten; /* bit i : boss de la zone i vaincu (ne revient pas) */
+    uint32_t gear_ticks;   /* message « Butin : ... » encore affiché */
+    int32_t zone_index;    /* zone chargée, -1 : aucune */
+    char zone_title[32];   /* zone de boss : nom du boss */
     float zone_hp;
     float zone_damage;
     float zone_size;
@@ -182,7 +189,10 @@ static void apply_progress(PlayCombat *c, bool heal)
     EngFighter *pf = &c->sim.fighters[PLAYER];
     const EngProgressStats st = eng_prog_stats(&c->progress);
     pf->params.max_stamina = st.stamina_max;
-    pf->params.damage_scale = st.damage_scale;
+    /* butin des boss : l'arme multiplie les dégâts, l'armure réduit ceux reçus, l'écu la garde */
+    pf->params.damage_scale = st.damage_scale * eng_gear_damage(c->gear_tier);
+    pf->params.armor_scale = eng_gear_armor(c->gear_tier);
+    pf->params.block_multiplier = eng_gear_block(c->gear_tier);
     pf->vitals.max_hp = st.hp_max;
     if (heal) {
         pf->vitals.hp = st.hp_max;
@@ -396,14 +406,19 @@ static void enemy_look(const PlayCombat *c, uint32_t fighter, AvatarBody *body, 
 static void fit_plans_to_reach(PlayCombat *c, const AvatarLibrary *lib, uint32_t arch,
                                AvatarProp prop, float scale);
 
-bool play_combat_load_zone(PlayCombat *c, const EngMapZone *zone, float cx, float cz)
+bool play_combat_load_zone(PlayCombat *c, const EngMapZone *zone, int32_t index, float cx, float cz)
 {
     if (c == NULL || !c->ready || c->has_boss || !isfinite(cx) || !isfinite(cz)) {
         return false;
     }
     const uint32_t slots = c->sim.count - FIRST_ENEMY;
+    const bool beaten = zone != NULL && zone->kind == ENG_MAPZONE_BOSS &&
+                        play_combat_zone_beaten(c, index); /* un boss vaincu ne revient pas */
     const uint32_t count =
-        zone == NULL ? 0U : (zone->enemy_count < slots ? zone->enemy_count : slots);
+        (zone == NULL || beaten) ? 0U : (zone->enemy_count < slots ? zone->enemy_count : slots);
+    c->zone_index = zone != NULL ? index : -1;
+    (void)snprintf(c->zone_title, sizeof c->zone_title, "%s",
+                   zone != NULL && zone->boss_title != NULL ? zone->boss_title : "");
     eng_aig_init(&c->group, &c->arch, &c->world, &c->nav, PLAYER);
     eng_camp_init(&c->camp);
     c->zone_hp = zone != NULL ? zone->hp : 0.0F;
@@ -411,7 +426,6 @@ bool play_combat_load_zone(PlayCombat *c, const EngMapZone *zone, float cx, floa
     c->zone_size = zone != NULL ? zone->size_scale : 1.0F;
     c->zone_boss = zone != NULL && zone->kind == ENG_MAPZONE_BOSS && count > 0U;
     c->zone_reward = zone != NULL ? zone->reward : 0U;
-    c->zone_reward_pending = false;
     c->zone_ticks = zone != NULL ? 240U : 0U;
     c->roam = true;
     (void)snprintf(c->zone_name, sizeof c->zone_name, "%s", zone != NULL ? zone->name : "");
@@ -479,15 +493,24 @@ bool play_combat_busy(const PlayCombat *c)
     return false;
 }
 
-bool play_combat_take_reward(PlayCombat *c, uint32_t *tier)
+bool play_combat_zone_beaten(const PlayCombat *c, int32_t index)
 {
-    if (c == NULL || !c->ready || !c->zone_reward_pending) {
+    return c != NULL && c->ready && index >= 0 && index < 32 &&
+           (c->zones_beaten & (1U << (uint32_t)index)) != 0U;
+}
+
+uint32_t play_combat_gear(const PlayCombat *c)
+{
+    return c != NULL && c->ready ? c->gear_tier : 0U;
+}
+
+bool play_combat_give_gear(PlayCombat *c, uint32_t tier)
+{
+    if (c == NULL || !c->ready || !eng_gear_give(&c->gear_tier, tier)) {
         return false;
     }
-    c->zone_reward_pending = false;
-    if (tier != NULL) {
-        *tier = c->zone_reward;
-    }
+    apply_progress(c, false);
+    c->gear_ticks = 420U;
     return true;
 }
 
@@ -847,9 +870,18 @@ void play_combat_tick(PlayCombat *c, const EngInputState *input, const float fee
         if (c->zone_boss) { /* grande carte : un boss de zone ne réapparaît pas, il donne son butin
                              */
             if (c->cleared_ticks == 0U) {
-                c->zone_reward_pending = true;
-                c->boss_ticks = 300U;
-                ENG_LOG_INFO("combat : boss de la zone « %s » vaincu", c->zone_name);
+                c->boss_ticks = 240U;
+                if (c->zone_index >= 0) {
+                    c->zones_beaten |= 1U << (uint32_t)c->zone_index;
+                }
+                const bool better = eng_gear_give(&c->gear_tier, c->zone_reward);
+                if (better) {
+                    apply_progress(c, false);
+                    c->gear_ticks = 420U;
+                }
+                ENG_LOG_INFO("combat : %s vaincu (zone « %s ») : butin de palier %u%s",
+                             c->zone_title, c->zone_name, c->zone_reward,
+                             better ? " (équipement amélioré)" : " (déjà mieux équipé)");
             }
             c->cleared_ticks = 1U;
         } else if (++c->cleared_ticks >= CAMP_RESPAWN_TICKS) {
@@ -871,6 +903,9 @@ void play_combat_tick(PlayCombat *c, const EngInputState *input, const float fee
     }
     if (c->zone_ticks > 0U) {
         c->zone_ticks--;
+    }
+    if (c->gear_ticks > 0U) {
+        c->gear_ticks--;
     }
     c->stats.level = c->progress.level;
     c->stats.total_xp = c->progress.total_xp;
@@ -1458,6 +1493,10 @@ void play_combat_reset(PlayCombat *c)
     c->weapon_ticks = 0;
     apply_weapon(c);
     apply_progress(c, true);
+    c->gear_tier = 0; /* grande carte : équipement de départ, tous les boss vivants */
+    c->zones_beaten = 0;
+    c->gear_ticks = 0;
+    apply_progress(c, true);
     c->boss_defeated = false; /* M6-09 */
     c->boss_ticks = 0;
     spawn_boss(c);
@@ -1475,6 +1514,9 @@ void play_combat_snapshot(const PlayCombat *c, EngSaveGame *s)
     s->posture = pf->posture;
     s->has_progress = true;
     s->progress = c->progress;
+    s->has_gear = true; /* grande carte : palier de butin, boss vaincus */
+    s->gear_tier = c->gear_tier;
+    s->bosses_beaten = c->zones_beaten;
     s->has_equipment = true; /* M8-08 */
     s->equipment = c->equip;
     s->has_enemies = true;
@@ -1498,6 +1540,11 @@ void play_combat_restore(PlayCombat *c, const EngSaveGame *s)
     EngFighter *pf = &c->sim.fighters[PLAYER];
     if (s->has_progress && eng_prog_valid(&s->progress)) {
         c->progress = s->progress;
+        apply_progress(c, false);
+    }
+    if (s->has_gear) { /* grande carte */
+        c->gear_tier = eng_gear_clamp(s->gear_tier);
+        c->zones_beaten = s->bosses_beaten;
         apply_progress(c, false);
     }
     if (s->has_equipment && eng_equip_valid(&s->equipment)) { /* M8-08 */
@@ -1578,8 +1625,9 @@ void play_combat_fill_hud(const PlayCombat *c, const PlayMode *play, mat4 view_p
     hud->posture = pf->posture;
     hud->posture_max = pf->params.max_posture;
     hud->level = c->progress.level;
-    (void)snprintf(hud->weapon, sizeof hud->weapon, "%s%s",
-                   eng_weapon_def(c->equip.equipped)->label,
+    (void)snprintf(hud->weapon, sizeof hud->weapon, "%s%s%s%s",
+                   eng_weapon_def(c->equip.equipped)->label, c->gear_tier > 0U ? " " : "",
+                   c->gear_tier > 0U ? eng_gear_tier_name(c->gear_tier) : "",
                    c->invincible ? "  ·  MODE CRÉATIF" : "");
     {
         const uint32_t need = eng_prog_need(c->progress.level);
@@ -1591,7 +1639,8 @@ void play_combat_fill_hud(const PlayCombat *c, const PlayMode *play, mat4 view_p
         const char *name = "Mannequin";
         for (uint32_t i = 0; i < c->group.count; i++) {
             if (c->group.agents[i].fighter == (uint32_t)c->lock) {
-                name = display_name(c->arch.a[c->group.agents[i].arch].name);
+                name = c->zone_boss ? c->zone_title
+                                    : display_name(c->arch.a[c->group.agents[i].arch].name);
             }
         }
         (void)snprintf(hud->target_name, sizeof hud->target_name, "%s", name);
@@ -1608,6 +1657,17 @@ void play_combat_fill_hud(const PlayCombat *c, const PlayMode *play, mat4 view_p
             (void)snprintf(hud->boss_name, sizeof hud->boss_name, "%s", BOSS_NAME);
             hud->boss_hp = c->sim.fighters[BOSS].vitals.hp;
             hud->boss_hp_max = c->sim.fighters[BOSS].vitals.max_hp;
+        }
+    }
+    if (c->zone_boss && c->group.count > 0U) { /* grande carte : barre du boss de la zone */
+        const uint32_t bf = c->group.agents[0].fighter;
+        const EngAiState st = c->group.agents[0].state;
+        if (!c->sim.fighters[bf].vitals.dead &&
+            (st == ENG_AI_CHASE || st == ENG_AI_ENGAGE || c->lock == (int32_t)bf)) {
+            hud->has_boss = true;
+            (void)snprintf(hud->boss_name, sizeof hud->boss_name, "%s", c->zone_title);
+            hud->boss_hp = c->sim.fighters[bf].vitals.hp;
+            hud->boss_hp_max = c->sim.fighters[bf].vitals.max_hp;
         }
     }
     hud->number_count = 0;
@@ -1631,7 +1691,12 @@ void play_combat_fill_hud(const PlayCombat *c, const PlayMode *play, mat4 view_p
         (void)snprintf(hud->message, sizeof hud->message, "%s",
                        "Tu es tombé... renaissance dans un instant");
     } else if (c->boss_ticks > 0U && c->zone_name[0] != '\0') {
-        (void)snprintf(hud->message, sizeof hud->message, "%s", "Boss vaincu !");
+        (void)snprintf(hud->message, sizeof hud->message, "%s vaincu !", c->zone_title);
+    } else if (c->gear_ticks > 0U) {
+        (void)snprintf(hud->message, sizeof hud->message, "Butin : %s, %s, %s",
+                       eng_gear_name(c->gear_tier, ENG_GEAR_WEAPON),
+                       eng_gear_name(c->gear_tier, ENG_GEAR_ARMOR),
+                       eng_gear_name(c->gear_tier, ENG_GEAR_SHIELD));
     } else if (c->boss_ticks > 0U) {
         (void)snprintf(hud->message, sizeof hud->message, "%s vaincu !", BOSS_NAME);
     } else if (c->zone_ticks > 0U) {
@@ -1644,7 +1709,7 @@ void play_combat_fill_hud(const PlayCombat *c, const PlayMode *play, mat4 view_p
     } else if (c->weapon_ticks > 0U) {
         (void)snprintf(hud->message, sizeof hud->message, "Arme : %s",
                        eng_weapon_def(c->equip.equipped)->label);
-    } else if (eng_camp_cleared_range(&c->group, &c->sim, 0U, c->camp.count)) {
+    } else if (!c->zone_boss && eng_camp_cleared_range(&c->group, &c->sim, 0U, c->camp.count)) {
         (void)snprintf(hud->message, sizeof hud->message, "%s", "Camp vaincu !");
     } else {
         hud->message[0] = '\0';
@@ -2122,6 +2187,27 @@ bool play_combat_selftest(bool rig)
           later[1] - low[1]);
     c->sim.fighters[PLAYER].vitals.hp = c->sim.fighters[PLAYER].vitals.max_hp;
     put(&t, 4.0F, 0.3F, 0.0F);
+
+    /* 1 quater. butin des boss : le palier 2 multiplie les dégâts du joueur par 1,8, réduit ceux
+     * qu'il reçoit (x 0,65) et ce que sa garde laisse passer (0,1) ; puis retour au départ */
+    for (int i = 0; i < 60; i++) {
+        step(&t, 0U, 0U, 0.0F, 0.0F);
+    }
+    check(&t, play_combat_give_gear(c, 2U) && play_combat_gear(c) == 2U, "butin : palier 2 donné",
+          (float)play_combat_gear(c));
+    check(&t, !play_combat_give_gear(c, 1U), "butin : un palier plus bas ne remplace pas", 0.0F);
+    dealt = c->dummy.total_damage;
+    for (int i = 0; i < 60; i++) {
+        step(&t, i == 0 ? atk : 0U, 0U, 0.0F, 0.0F);
+    }
+    check(&t, fabsf((c->dummy.total_damage - dealt) - (normal_hit * 1.8F)) < 0.05F,
+          "butin : dégâts du joueur x 1,8 (dégâts d'un coup)", c->dummy.total_damage - dealt);
+    check(&t,
+          fabsf(c->sim.fighters[PLAYER].params.armor_scale - 0.65F) < 1e-6F &&
+              fabsf(c->sim.fighters[PLAYER].params.block_multiplier - 0.1F) < 1e-6F,
+          "butin : armure x 0,65 et garde 0,1", c->sim.fighters[PLAYER].params.armor_scale);
+    c->gear_tier = 0;
+    apply_progress(c, false);
 
     /* 2. verrouillage sur le mannequin (caméra vers -Z) */
     step(&t, 1U << ENG_ACTION_LOCK_ON, 0U, 0.0F, 0.0F);

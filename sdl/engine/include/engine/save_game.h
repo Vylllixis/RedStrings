@@ -59,6 +59,9 @@ typedef struct EngSaveGame {
     EngEquipment equipment;
     uint32_t enemy_count;
     EngSaveEnemy enemies[ENG_SAVE_MAX_ENEMIES];
+    bool has_gear;          /* section GEAR (grande carte) */
+    uint32_t gear_tier;     /* palier d'équipement, 0 à 4 (engine/gear.h) */
+    uint32_t bosses_beaten; /* bit i : boss de la zone i vaincu (engine/map_zones.h) */
 } EngSaveGame;
 
 void eng_save_defaults(EngSaveGame *s);

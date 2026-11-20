@@ -53,6 +53,7 @@ typedef struct EngFighterParams {
     uint32_t hitstun_max;        /* (60) */
     float knockback_per_posture; /* m par point de posture (0,02) */
     float damage_scale;          /* dégâts INFLIGÉS x (progression, M8-08) ; 0 : 1 */
+    float armor_scale;           /* dégâts REÇUS x (armure, butin des boss) ; 0 : 1 */
 } EngFighterParams;
 
 typedef struct EngFighterInput {

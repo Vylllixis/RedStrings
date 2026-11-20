@@ -9,6 +9,7 @@ typedef struct BiomeTier {
     const char *easy_name;
     const char *hard_name;
     const char *boss_name;
+    const char *boss_title;
     float hp_easy;
     float hp_hard;
     float hp_boss;
@@ -17,13 +18,13 @@ typedef struct BiomeTier {
 
 static const BiomeTier TIERS[ENG_BIOME_COUNT] = {
     {"Plaine : avant-poste des soldats", "Plaine : camp des brutes",
-     "Plaine : château du chevalier", 30.0F, 60.0F, 200.0F, 1.0F},
+     "Plaine : château du chevalier", "Chevalier noir", 30.0F, 60.0F, 200.0F, 1.0F},
     {"Montagne : col des éclaireurs", "Montagne : camp des géants des neiges",
-     "Montagne : sommet du seigneur du givre", 55.0F, 110.0F, 360.0F, 1.5F},
+     "Montagne : sommet du seigneur du givre", "Seigneur du givre", 55.0F, 110.0F, 360.0F, 1.5F},
     {"Désert : oasis des pillards", "Désert : ruines des colosses",
-     "Désert : arène du roi des sables", 95.0F, 190.0F, 620.0F, 2.2F},
-    {"Volcan : pentes de cendre", "Volcan : forge des titans", "Volcan : antre du dragon", 150.0F,
-     300.0F, 1000.0F, 3.0F},
+     "Désert : arène du roi des sables", "Roi des sables", 95.0F, 190.0F, 620.0F, 2.2F},
+    {"Volcan : pentes de cendre", "Volcan : forge des titans", "Volcan : antre du dragon",
+     "Dragon de lave", 150.0F, 300.0F, 1000.0F, 3.0F},
 };
 
 /* place de chaque genre de zone dans la bande de son biome (fraction de la longueur) */
@@ -61,7 +62,8 @@ bool eng_mapzones_build(const EngBiomeMap *map, EngMapZone out[ENG_MAPZONE_COUNT
                 z->arch[1] = "brute";
                 z->enemy_count = 2;
                 z->hp = tier->hp_hard;
-                z->size_scale = 2.0F; /* deux fois plus grands */
+                z->size_scale =
+                    1.67F; /* la brute (x 1,2) devient deux fois plus grande qu'un soldat */
             } else {
                 z->name = tier->boss_name;
                 z->arch[0] = "boss";
@@ -69,6 +71,7 @@ bool eng_mapzones_build(const EngBiomeMap *map, EngMapZone out[ENG_MAPZONE_COUNT
                 z->hp = tier->hp_boss;
                 z->size_scale = 1.0F;
                 z->reward = (uint32_t)b + 1U;
+                z->boss_title = tier->boss_title;
             }
         }
     }
