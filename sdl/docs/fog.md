@@ -41,6 +41,11 @@ paramètre de plus.
 ## Dans le moteur
 
 - `EngTerrainGpu.fog` : `eng_terrain_gpu_set_fog(gpu, fog, atmosphere, sky_scale)` à chaque image (le soleil bouge).
+- 20 flottants depuis M8-07 : le 5e float4 porte la direction du **vrai** soleil
+  (`eng_fog_set_sun`). La nuit, la lumière des shaders est la lune (`apply_moonlight`), haute dans
+  le ciel : la couleur du brouillard, calculée avec elle, était celle d'un ciel de jour (terrain
+  blanc-bleu la nuit, B17). Test : `eng_terrain_gpu.at_night_the_fog_takes_the_sky_of_the_real_sun_not_of_the_moon`.
+- Densité par défaut du lanceur : 0,0008 /m (B2 ; le moteur garde 0,003).
   `NULL` ou invalide : brouillard coupé (tout à 0 dans les uniforms ; le shader teste `fog_a.w` et `fog_a.x`).
 - `EngModelDrawOptions.fragment_tail` / `fragment_tail_floats` : flottants ajoutés **après** les uniforms
   d'éclairage dans le bloc de fragment (multiple de 4, au plus 64). `eng_model_gpu_draw_ex` les recopie derrière

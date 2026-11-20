@@ -83,6 +83,7 @@ typedef struct DemoScene {
     float last_sun_color[3];
     float last_sun_visibility;
     float last_sky_intensity; /* M7 : brouillard du monde streamé */
+    float last_true_sun[4]; /* M8-07 : vrai soleil xyz (la lumière peut être la lune) ; w libre */
     float night; /* M8-07 : poids de la nuit [0, 1] (clair de lune), réglé par le lanceur */
     float last_ambient[3];
     /* Brouillard du terrain (M3-06) : actif si le ciel atmosphérique l'est (sa couleur en vient).

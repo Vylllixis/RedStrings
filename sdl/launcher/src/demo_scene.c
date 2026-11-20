@@ -20,6 +20,12 @@
 
 /* Position (x, y, z) en mètres, teinte (r, g, b) et coordonnées de texture (u, v). Une teinte par
  * face : 4 sommets par face, donc 24 sommets, et 2 triangles par face, soit 36 index. */
+/* Uniforms de textured_lit.vert (cubes de la démonstration, M8-07). */
+typedef struct CubeUniforms {
+    float mvp[16];
+    float light[4];
+} CubeUniforms;
+
 typedef struct Vertex {
     float position[3];
     float tint[3];
@@ -755,7 +761,7 @@ bool demo_scene_init(DemoScene *scene, EngRenderer *renderer, EngArena *permanen
 
     EngPipelineDesc pipeline = {
         .name = "cube",
-        .vertex_shader = "textured.vert",
+        .vertex_shader = "textured_lit.vert", /* M8-07 : assombris la nuit */
         .fragment_shader = "textured.frag",
         .vertex_stride = sizeof(Vertex),
         .attribute_count = 3,
@@ -1031,9 +1037,14 @@ void demo_scene_draw(DemoScene *scene, EngRenderer *renderer, EngRenderQueue *qu
 
     /* le ciel d'abord : sans profondeur, tout ce qui suit le recouvre */
     if (scene->has_atmosphere && scene->has_environment) {
-        (void)eng_atmosphere_draw(&scene->atmosphere, queue, scene->atmosphere_pipeline,
-                                  scene->environment.dummy_vertex, view_proj, camera->position,
-                                  sky_sun, sky_intensity);
+        /* M8-07 : étoiles et lune la nuit ; la lune est là où apply_moonlight met sa lumière */
+        EngNightSky night_sky = {.stars = scene->night, .moon = scene->night};
+        night_sky.moon_dir[0] = -sky_sun[0];
+        night_sky.moon_dir[1] = fmaxf(-sky_sun[1], 0.34F);
+        night_sky.moon_dir[2] = -sky_sun[2];
+        (void)eng_atmosphere_draw_ex(&scene->atmosphere, queue, scene->atmosphere_pipeline,
+                                     scene->environment.dummy_vertex, view_proj, camera->position,
+                                     sky_sun, sky_intensity, &night_sky);
     } else if (scene->has_environment) {
         (void)eng_environment_draw_sky(&scene->environment, queue, scene->sky_pipeline, view_proj,
                                        camera->position, sky_intensity);
@@ -1049,6 +1060,7 @@ void demo_scene_draw(DemoScene *scene, EngRenderer *renderer, EngRenderQueue *qu
         if (scene->has_atmosphere) {
             (void)eng_terrain_gpu_set_fog(&scene->terrain, &scene->fog, &scene->atmosphere,
                                           sky_intensity);
+            eng_fog_set_sun(scene->terrain.fog, sky_sun); /* M8-07 : pas la lune */
         }
         if (total > 0 && eng_frustum_from_view_proj(&frustum, view_proj)) {
             drawn = eng_chunks_visible(scene->terrain_bounds, total, &frustum, visible,
@@ -1123,6 +1135,9 @@ void demo_scene_draw(DemoScene *scene, EngRenderer *renderer, EngRenderQueue *qu
     }
     if (scene->world_mode) { /* M7 : le monde streamé remplace sol, cubes et modèle */
         scene->last_sky_intensity = sky_intensity;
+        for (int c = 0; c < 3; c++) {
+            scene->last_true_sun[c] = sky_sun[c];
+        }
         if (scene->model_hook != NULL) {
             scene->model_hook(scene->model_user, queue, view_proj, &light, receiving, false);
         }
@@ -1144,6 +1159,15 @@ void demo_scene_draw(DemoScene *scene, EngRenderer *renderer, EngRenderQueue *qu
         .texture = scene->texture,
         .sampler = scene->sampler,
     };
+    /* M8-07 : les cubes (non éclairés par pixel) suivent la lumière : soleil ou lune visible
+     * (intensité, couleur), plus l'ambiante ; 1 en plein jour (comme avant), ~0,1 la nuit */
+    float cube_light[4] = {1.0F, 1.0F, 1.0F, 1.0F};
+    for (int c = 0; c < 3; c++) {
+        const float sun = light.sun_color[c] * light.sun_intensity;
+        const float sky = light.ambient_color[c] * light.ambient_intensity;
+        const float f = (0.75F * sun) + (0.5F * sky);
+        cube_light[c] = f < 0.0F ? 0.0F : (f > 1.0F ? 1.0F : f);
+    }
     const int props_half = scene->hide_props ? -1 : GRID_HALF; /* -1 : boucle vide */
     for (int gz = -props_half; gz <= props_half; gz++) {
         for (int gx = -props_half; gx <= props_half; gx++) {
@@ -1165,7 +1189,10 @@ void demo_scene_draw(DemoScene *scene, EngRenderer *renderer, EngRenderQueue *qu
                 glm_rotate(model, angle * 0.5F, ENG_AXIS_RIGHT);
             }
             glm_mat4_mul(view_proj, model, mvp);
-            (void)eng_render_draw_uniforms(queue, &cmd, mvp, sizeof mvp);
+            CubeUniforms u;
+            memcpy(u.mvp, mvp, sizeof u.mvp);
+            memcpy(u.light, cube_light, sizeof u.light);
+            (void)eng_render_draw_uniforms(queue, &cmd, &u, sizeof u);
         }
     }
     draw_world(scene, queue, view_proj, &light, receiving, false);

@@ -55,7 +55,13 @@ bool eng_fog_apply(const EngFog *fog, const EngAtmosphere *atmosphere, const flo
  *   [4..7]   rayleigh xyz, mie
  *   [8..11]  night xyz, irradiance
  *   [12..15] mie_g, path_limit, sun_path_limit, sky_scale
+ *   [16..19] vers le VRAI soleil (xyz), w = 1 s'il est donné (eng_fog_set_sun) ; w = 0 : le shader
+ *            prend la direction de la lumière (fausse la nuit, quand c'est la lune qui éclaire)
  * `fog` NULL ou invalide : tout à 0 (brouillard coupé). */
-#define ENG_FOG_UNIFORM_FLOATS 16U
+#define ENG_FOG_UNIFORM_FLOATS 20U
 void eng_fog_pack(const EngFog *fog, const EngAtmosphere *atmosphere, float sky_scale,
                   float out[ENG_FOG_UNIFORM_FLOATS]);
+/* M8-07 : direction du vrai soleil pour la couleur du brouillard (la nuit, la lumière du shader
+ * est celle de la lune : le brouillard prenait la couleur d'un ciel de jour). `sun` NULL, nul ou
+ * non fini : retiré (w = 0). */
+void eng_fog_set_sun(float out[ENG_FOG_UNIFORM_FLOATS], const float sun[3]);

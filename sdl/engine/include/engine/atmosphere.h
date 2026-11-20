@@ -105,3 +105,17 @@ void eng_atmosphere_pipeline_desc(EngPipelineDesc *desc);
 bool eng_atmosphere_draw(const EngAtmosphere *atmosphere, EngRenderQueue *queue,
                          EngPipelineHandle pipeline, EngBufferHandle dummy_vertex, mat4 view_proj,
                          const float camera[3], const float sun[3], float exposure_scale);
+
+/* M8-07 : ciel de nuit. `stars` [0 ; 1] : intensité des étoiles (fixes dans le ciel, plus faibles
+ * près de l'horizon) ; `moon` [0 ; 1] : intensité du disque lunaire, dans la direction
+ * `moon_dir` (normalisée ici). Tout à 0 : exactement le ciel de jour. */
+typedef struct EngNightSky {
+    float stars;
+    float moon;
+    float moon_dir[3];
+} EngNightSky;
+/* Comme eng_atmosphere_draw, plus les étoiles et la lune (`night` NULL : aucune). */
+bool eng_atmosphere_draw_ex(const EngAtmosphere *atmosphere, EngRenderQueue *queue,
+                            EngPipelineHandle pipeline, EngBufferHandle dummy_vertex,
+                            mat4 view_proj, const float camera[3], const float sun[3],
+                            float exposure_scale, const EngNightSky *night);

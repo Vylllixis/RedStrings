@@ -22,6 +22,10 @@ livraisons ; les tags sont posés par Théo après ses tests.
   d'XP au HUD, section PROG dans la sauvegarde.
 - M8 (finition) : police TrueType Noto Sans (OFL, `assets/fonts/`) pour l'interface et le HUD,
   nette en 1080p comme en 2560 x 1600 ; fond sombre derrière l'heure, le niveau et l'aide (B4).
+- M8 (finition) : options graphiques vsync, plein écran, qualité des ombres, distance de vue ;
+  ciel de nuit (étoiles, lune) ; brouillard de nuit corrigé (il prenait un ciel de jour) ; cubes de
+  la démonstration assombris la nuit ; image moins délavée (ambiante 0,5, −0,5 EV, brouillard
+  0,0008 dans le lanceur) ; `--exposure EV` et `--ambient X` pour régler.
 
 ## v0.7 (M7, partiel) — monde ouvert
 - Cellules de 256 m (format RSCL), pool de threads, streaming asynchrone, origine flottante,

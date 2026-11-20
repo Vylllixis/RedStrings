@@ -24,7 +24,7 @@ RTX 5070 Laptop GPU (8 Go, pilote 580.178.04) + Intel UHD (hybride) ; écran int
 | # | Constat | Gravité | Suite |
 |---|---|---|---|
 | B1 | Personnage et ennemis = capsules en fil de fer | majeur | **corrigé** (M4, KayKit) |
-| B2 | Image délavée : ciel et sol presque blancs, brouillard qui écrase tout (toutes les scènes) ; chaîne sRGB vérifiée correcte : c'est le réglage (exposition, brouillard) | majeur (laid) | réglage avec M8-07 (jour/nuit) |
+| B2 | Image délavée : ciel et sol presque blancs, brouillard qui écrase tout (toutes les scènes) ; chaîne sRGB vérifiée correcte : c'est le réglage (exposition, brouillard) | majeur (laid) | **réglé** (lanceur : ambiante 0,5, −0,5 EV, brouillard 0,0008 ; captures avant/après `docs/devlog/img/b2-avant-apres.png`) — à confirmer par Théo (Q8) |
 | B3 | Arène de M4 dessinée en fil de fer : on marche sur des marches et une rampe invisibles | moyen | **corrigé** (volumes éclairés avec ombres) |
 | B4 | HUD : police bitmap fine, petite ; heure presque invisible sur le ciel clair | moyen | **corrigé** (Noto Sans TTF, fond sombre sous l'heure, le niveau et l'aide) |
 | B5 | 26 allocations dans la boucle de frame en partie interactive (dès l'image 1 : menus ImGui, sauvegarde, reprise) ; 28 au plein écran / redimensionnement | moyen (ADR 0003) | à traiter : préchauffage de l'UI, E/S hors image |
@@ -38,6 +38,8 @@ RTX 5070 Laptop GPU (8 Go, pilote 580.178.04) + Intel UHD (hybride) ; écran int
 | B13 | F5 : animations de marche/repos qui continuent et image qui tremble (interpolation) alors que le combat est gelé | mineur | **corrigé** (dt et alpha gelés ; F6 avance d'un tick) |
 | B14 | Deux lanceurs ouverts en même temps : le second recopie `hot/game.1.so` par-dessus la bibliothèque que le premier exécute → plantage du premier (reproduit 3 fois sur 3 : test du monde + lancements simultanés) | majeur (plantage) | **corrigé** (pid dans le nom de la copie ; test `the_hot_copy_name_contains_the_process_id`, mutation détectée ; 3/3 passages sous la même charge) |
 | B15 | `tools/scripts/lint.sh` en échec : `engine/src/audio_device.c` allouait avec `calloc`/`free` de la libc (invisibles du compteur d'allocations, règle M0-12) | mineur | **corrigé** (`SDL_calloc`/`SDL_free`) |
+| B16 | Nuit : les cubes de la démonstration restent blancs (pipeline non éclairé) | mineur (laid) | **corrigé** (`textured_lit.vert` : teinte × lumière) |
+| B17 | Nuit : terrain blanc-bleu, plus clair que le ciel : le brouillard prenait la couleur d'un ciel de jour (direction de la lune au lieu du soleil) | majeur (laid) | **corrigé** (vrai soleil dans les uniforms du brouillard ; test GPU de nuit, mutation détectée) |
 
 Mesures (détail : `perf-materiel.md`) : M1 avec ombres 694 FPS (1080p) / 365 FPS (2560 x 1600) ;
 M3 1 km² complet 215 / 163 FPS, pire 12,3 ms ; combat 688 / 364 FPS ; combat sur terrain avec herbe

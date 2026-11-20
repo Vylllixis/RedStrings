@@ -97,3 +97,25 @@ void eng_fog_pack(const EngFog *fog, const EngAtmosphere *a, float sky_scale,
     out[14] = a->sun_path_limit;
     out[15] = sky_scale;
 }
+
+void eng_fog_set_sun(float out[ENG_FOG_UNIFORM_FLOATS], const float sun[3])
+{
+    if (out == NULL) {
+        return;
+    }
+    out[16] = 0.0F;
+    out[17] = 0.0F;
+    out[18] = 0.0F;
+    out[19] = 0.0F;
+    if (sun == NULL || !isfinite(sun[0]) || !isfinite(sun[1]) || !isfinite(sun[2])) {
+        return;
+    }
+    const float len = sqrtf((sun[0] * sun[0]) + (sun[1] * sun[1]) + (sun[2] * sun[2]));
+    if (!(len > 1e-6F)) {
+        return;
+    }
+    out[16] = sun[0] / len;
+    out[17] = sun[1] / len;
+    out[18] = sun[2] / len;
+    out[19] = 1.0F;
+}

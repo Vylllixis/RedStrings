@@ -9,6 +9,7 @@ ow_add_shaders(shaders
     triangle.frag.hlsl
     cube.vert.hlsl
     textured.vert.hlsl
+    textured_lit.vert.hlsl
     textured.frag.hlsl
     multitex.frag.hlsl
     model.vert.hlsl

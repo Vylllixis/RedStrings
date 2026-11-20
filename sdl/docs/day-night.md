@@ -36,10 +36,12 @@ Module : `engine/daynight.h` (fonctions pures, testées dans `tests/test_daynigh
 - Lumière de l'environnement (IBL) cuite une fois au lancement pour le soleil de départ : la nuit,
   les reflets spéculaires de l'environnement restent ceux du ciel du départ, seulement assombris
   par l'ambiante. Une recuisson pendant le jeu coûterait environ 2,7 s sur SwiftShader.
-- Les cubes texturés de la démonstration (pipeline `textured`, M1) ne sont pas éclairés du tout :
-  ils restent clairs la nuit (et le biais d'exposition les éclaircit). Le terrain, le sol, les
-  modèles PBR et l'eau suivent bien la nuit.
-- Pas d'étoiles ni de lune dessinées dans le ciel ; ciel nocturne = plancher `night` de
-  l'atmosphère, très sombre.
+- ~~Cubes de la démonstration non éclairés~~ : depuis la finition, leur teinte suit la lumière
+  (soleil ou lune visibles, ambiante : `textured_lit.vert`) ; ils s'assombrissent la nuit (B16).
+- ~~Pas d'étoiles ni de lune~~ : étoiles fixes (hachage de la direction, une case sur 400 environ,
+  atténuées près de l'horizon) et disque lunaire (~1°, halo) dans `atmosphere.frag`, d'intensité =
+  poids de nuit (`eng_atmosphere_draw_ex`, `EngNightSky`) ; la lune est là où `apply_moonlight` met
+  sa lumière. Le ciel de jour est inchangé (le test qui compare le shader au calcul CPU passe).
+- Brouillard de nuit corrigé (B17, voir `docs/fog.md`) : il prenait la couleur d'un ciel de jour.
 - Les valeurs (0,05 ; +1,5 EV ; plancher 0,03 ; premier essai à 0,12 / +2,5 EV : nuit trop claire) sont réglées à l'œil sur SwiftShader, jamais sur un
   vrai écran.

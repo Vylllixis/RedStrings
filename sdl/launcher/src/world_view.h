@@ -102,7 +102,7 @@ bool world_view_prime(WorldView *w, const double player_world[3], int32_t radius
 
 /* Brouillard du terrain (couleur du ciel à l'horizon, à l'intensité du ciel dessiné). */
 void world_view_set_fog(WorldView *w, const EngFog *fog, const EngAtmosphere *atmosphere,
-                        float sky_intensity);
+                        float sky_intensity, const float true_sun[3]);
 
 /* Dessin des cellules envoyées et visibles (frustum) : passe principale ou d'ombre. */
 void world_view_draw(WorldView *w, EngRenderQueue *queue, mat4 view_proj, const EngLighting *light,

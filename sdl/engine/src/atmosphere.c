@@ -301,12 +301,22 @@ typedef struct AtmosphereFragmentUniforms {
     float night[4];    /* xyz : plancher nocturne ; w : irradiance E */
     float limits[4];   /* x : radiance du disque ; y : path_limit ; z : sun_path_limit ;
                           w : cos du coeur du disque */
-    float exposure[4]; /* x : échelle d'exposition */
+    float exposure[4]; /* x : échelle d'exposition ; y : étoiles [0 ; 1] ; z : lune [0 ; 1] */
+    float moon[4];     /* xyz : vers la lune (M8-07) */
 } AtmosphereFragmentUniforms;
 
 bool eng_atmosphere_draw(const EngAtmosphere *a, EngRenderQueue *queue, EngPipelineHandle pipeline,
                          EngBufferHandle dummy_vertex, mat4 view_proj, const float camera[3],
                          const float sun_in[3], float exposure_scale)
+{
+    return eng_atmosphere_draw_ex(a, queue, pipeline, dummy_vertex, view_proj, camera, sun_in,
+                                  exposure_scale, NULL);
+}
+
+bool eng_atmosphere_draw_ex(const EngAtmosphere *a, EngRenderQueue *queue,
+                            EngPipelineHandle pipeline, EngBufferHandle dummy_vertex,
+                            mat4 view_proj, const float camera[3], const float sun_in[3],
+                            float exposure_scale, const EngNightSky *night)
 {
     if (!eng_atmosphere_valid(a)) {
         return false;
@@ -333,7 +343,16 @@ bool eng_atmosphere_draw(const EngAtmosphere *a, EngRenderQueue *queue, EngPipel
         .night = {a->night[0], a->night[1], a->night[2], a->irradiance},
         .limits = {a->sun_radiance, a->path_limit, a->sun_path_limit, cosf(radius * 0.8F)},
         .exposure = {exposure_scale >= 0.0F ? exposure_scale : 0.0F, 0.0F, 0.0F, 0.0F},
+        .moon = {0.0F, 1.0F, 0.0F, 0.0F},
     };
+    float moon_dir[3] = {0.0F, 1.0F, 0.0F};
+    if (night != NULL && unit3(night->moon_dir, moon_dir)) {
+        fragment.exposure[1] = isfinite(night->stars) ? clamp01(night->stars) : 0.0F;
+        fragment.exposure[2] = isfinite(night->moon) ? clamp01(night->moon) : 0.0F;
+        fragment.moon[0] = moon_dir[0];
+        fragment.moon[1] = moon_dir[1];
+        fragment.moon[2] = moon_dir[2];
+    }
     const EngDrawCmd cmd = {.pipeline = pipeline, .vertex_buffer = dummy_vertex, .count = 3};
     return eng_render_draw_uniforms2(queue, &cmd, &vertex, sizeof vertex, &fragment,
                                      sizeof fragment);

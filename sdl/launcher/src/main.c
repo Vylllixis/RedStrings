@@ -54,7 +54,8 @@ static void usage(const char *prog)
         "          [--env image.hdr] [--env-samples N] [--frames-in-flight N] [--stress-resize]\n"
         "          [--watch-assets] [--sun-elevation DEG] [--sun-azimuth DEG]\n          "
         "[--day-night HEURE] [--day-length S]\n          "
-        "[--fog-density 1/M] [--rocks N] [--placement] [--placement-seed N] [--grass]\n          "
+        "[--fog-density 1/M] [--exposure EV] [--ambient X] [--rocks N] [--placement]\n          "
+        "[--placement-seed N] [--grass]\n          "
         "[--water] [--water-level M]\n");
     fprintf(stderr, "  --frames N     quitte après N images (tests automatiques)\n");
     fprintf(stderr,
@@ -175,7 +176,7 @@ static void world_model_hook(void *user, EngRenderQueue *queue, mat4 view_proj,
     } else {
         if (hook->scene->has_atmosphere) {
             world_view_set_fog(hook->world, &hook->scene->fog, &hook->scene->atmosphere,
-                               hook->scene->last_sky_intensity);
+                               hook->scene->last_sky_intensity, hook->scene->last_true_sun);
         }
         world_view_draw(hook->world, queue, view_proj, light, shadow);
     }
@@ -298,6 +299,8 @@ int main(int argc, char **argv)
     bool start_new_game = false;
     bool crash_test = false;
     const char *world_bench_report = NULL;
+    float exposure_arg = NAN; /* --exposure EV (B2) ; NAN : défaut */
+    float ambient_arg = NAN;  /* --ambient X : intensité de l'environnement ; NAN : défaut */
     bool world_mode = false;
     int32_t world_seed = 1;
     double world_autopilot = 0.0;
@@ -313,7 +316,7 @@ int main(int argc, char **argv)
                                 .anisotropy = 16.0F,
                                 .sun_elevation = 45.0F,
                                 .sun_azimuth = 30.0F,
-                                .fog_density = -1.0F};
+                                .fog_density = 0.0008F}; /* B2 : 0,003 délavait tout */
     bool use_day_night = false; /* --day-night / --day-length (M8-07) ; la partie l'active aussi */
     double day_night_hour = -1.0;
     double day_length = 0.0;
@@ -431,6 +434,17 @@ int main(int argc, char **argv)
             } else {
                 day_length = value;
             }
+        } else if ((strcmp(argv[i], "--exposure") == 0 || strcmp(argv[i], "--ambient") == 0) &&
+                   i + 1 < argc) {
+            const bool is_exposure = strcmp(argv[i], "--exposure") == 0;
+            char *end = NULL;
+            const float value = strtof(argv[++i], &end);
+            if (*end != '\0' || !isfinite(value) ||
+                (is_exposure ? (value < -8.0F || value > 8.0F) : (value < 0.0F || value > 4.0F))) {
+                usage(argv[0]);
+                return 2;
+            }
+            *(is_exposure ? &exposure_arg : &ambient_arg) = value;
         } else if (strcmp(argv[i], "--fog-density") == 0 && i + 1 < argc) {
             char *end = NULL;
             const float value = strtof(argv[++i], &end);
@@ -800,6 +814,10 @@ int main(int argc, char **argv)
     /* Tonemapping (M1-14) : la scène est en HDR, l'exposition et la courbe se règlent en direct. */
     EngTonemap tonemap;
     eng_tonemap_default(&tonemap);
+    tonemap.exposure_ev = -0.5F; /* B2 : un demi-cran plus sombre (ciel moins blanc) */
+    if (isfinite(exposure_arg)) {
+        tonemap.exposure_ev = exposure_arg;
+    }
     if (use_renderer) {
         tonemap = eng_renderer_tonemap(&renderer);
     }
@@ -943,8 +961,12 @@ int main(int argc, char **argv)
     /* Éclairage du modèle (PBR, M1-15) : le soleil se règle par azimut et hauteur. */
     EngLighting lighting;
     eng_lighting_default(&lighting);
-    lighting.ambient_intensity =
-        1.0F; /* intensité de l'environnement (M1-16) : 1 = le ciel tel quel */
+    /* intensité de l'environnement (M1-16) : 1 = le ciel tel quel ; 0,5 depuis B2 (à 1, l'ambiante
+     * du ciel écrasait le contraste du soleil : image délavée) */
+    lighting.ambient_intensity = 0.5F;
+    if (isfinite(ambient_arg)) {
+        lighting.ambient_intensity = ambient_arg;
+    }
     float sun_azimuth = demo_options.sun_azimuth;
     float sun_elevation = demo_options.sun_elevation;
     /* Cycle jour / nuit (M8-07) : celui de la partie, sinon une horloge locale (--day-night). */
@@ -1045,6 +1067,9 @@ int main(int argc, char **argv)
         eng_memory_begin_frame(&memory);
         ENG_PROF_ZONE(z_events, "events");
         alive = eng_platform_pump(&platform);
+        if (use_flow) {
+            flow.options.fullscreen = platform.fullscreen;
+        }
         if (stress_resize && use_gpu) {
             /* taille différente à chaque image, sans attendre que la précédente soit prise en
              * compte */
@@ -1083,6 +1108,29 @@ int main(int argc, char **argv)
                 if (use_flow && flow.graphics_dirty) { /* M8-06 */
                     tonemap.fxaa = flow.options.fxaa;  /* appliqué au renderer plus bas */
                     tonemap.bloom = flow.options.bloom;
+                    /* finition M8 : vsync, plein écran, qualité des ombres, distance de vue */
+                    const EngPresentMode mode =
+                        flow.options.vsync ? ENG_PRESENT_VSYNC : ENG_PRESENT_IMMEDIATE;
+                    if (use_gpu && gpu.present_mode != mode) {
+                        (void)eng_gpu_set_present_mode(&gpu, mode);
+                        platform.vsync = gpu.present_mode == ENG_PRESENT_VSYNC;
+                    }
+                    if (platform.fullscreen != flow.options.fullscreen) {
+                        eng_platform_toggle_fullscreen(&platform);
+                    }
+                    shadow_radius = (int32_t)flow.options.shadow_quality; /* filtre 0, 1, 2 */
+                    /* plan lointain : x 0,5 / 1 / 1,5 du défaut du mode (1 km ; 3 km terrain) */
+                    const float base_far = demo_options.terrain_path != NULL ? 3000.0F : 1000.0F;
+                    camera.far_z = base_far * (0.5F + (0.5F * (float)flow.options.view_distance));
+                    static const char *const quality[3] = {"bas", "moyen", "haut"};
+                    ENG_LOG_INFO("options graphiques : vsync %s (présentation %s), plein écran %s, "
+                                 "ombres %s, plan lointain %.0f m, FXAA %s, bloom %.0f %%",
+                                 flow.options.vsync ? "oui" : "non",
+                                 gpu.present_mode == ENG_PRESENT_VSYNC ? "vsync" : "immédiate",
+                                 platform.fullscreen ? "oui" : "non",
+                                 quality[flow.options.shadow_quality % 3U], (double)camera.far_z,
+                                 flow.options.fxaa ? "oui" : "non",
+                                 (double)(flow.options.bloom * 100.0F));
                     flow.graphics_dirty = false;
                 }
             } else {

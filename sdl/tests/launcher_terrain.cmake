@@ -49,8 +49,9 @@ if(NOT total EQUAL 4 OR NOT drawn LESS total OR drawn LESS 1)
   message(FATAL_ERROR "launcher_terrain : culling : ${drawn}/${total} chunks dessinés (attendu 1 à 3 sur 4)")
 endif()
 
-# brouillard (M3-06) : par défaut densité 0,0030 ; --fog-density la règle, hors de [0, 1] refusée
-if(NOT text MATCHES "brouillard : densité 0.0030 /m, décroissance 0.0040 /m, opacité max 1.00")
+# brouillard (M3-06) : par défaut densité 0,0008 dans le lanceur (B2 ; 0,0030 délavait l'image) ;
+# --fog-density la règle, hors de [0, 1] refusée
+if(NOT text MATCHES "brouillard : densité 0.0008 /m, décroissance 0.0040 /m, opacité max 1.00")
   message(FATAL_ERROR "launcher_terrain : brouillard par défaut absent du journal : ${text}")
 endif()
 execute_process(COMMAND ${OW_LAUNCHER} --frames 3 --env-samples 16 --terrain "${OW_WORK}/t.hmap"

@@ -322,3 +322,34 @@ UTEST(eng_fog, pack_lays_out_the_sixteen_floats_the_shader_reads)
     eng_fog_pack(&fog, NULL, 1.0F, out);
     EXPECT_EQ(out[3], 0.0F);
 }
+
+/* M8-07 : eng_fog_set_sun normalise la direction du vrai soleil et la marque (w = 1) ; NULL, nulle
+ * ou non finie : retirée (w = 0) ; eng_fog_pack laisse ce bloc à 0. */
+UTEST(fog, the_real_sun_is_normalised_and_flagged_in_the_last_block)
+{
+    EngFog fog;
+    eng_fog_default(&fog);
+    EngAtmosphere a;
+    eng_atmosphere_default(&a);
+    float out[ENG_FOG_UNIFORM_FLOATS];
+    eng_fog_pack(&fog, &a, 1.0F, out);
+    for (int i = 16; i < 20; i++) {
+        EXPECT_EQ(out[i], 0.0F);
+    }
+    const float sun[3] = {0.0F, -2.0F, 0.0F};
+    eng_fog_set_sun(out, sun);
+    EXPECT_NEAR(out[16], 0.0F, 1e-6F);
+    EXPECT_NEAR(out[17], -1.0F, 1e-6F);
+    EXPECT_NEAR(out[18], 0.0F, 1e-6F);
+    EXPECT_EQ(out[19], 1.0F);
+    EXPECT_NEAR(out[0], fog.density, 1e-9F); /* le reste n'est pas touché */
+    const float zero[3] = {0.0F, 0.0F, 0.0F};
+    eng_fog_set_sun(out, zero);
+    EXPECT_EQ(out[19], 0.0F);
+    const float bad[3] = {NAN, 0.0F, 1.0F};
+    eng_fog_set_sun(out, bad);
+    EXPECT_EQ(out[19], 0.0F);
+    eng_fog_set_sun(out, NULL);
+    EXPECT_EQ(out[19], 0.0F);
+    eng_fog_set_sun(NULL, sun); /* sans effet, sans plantage */
+}

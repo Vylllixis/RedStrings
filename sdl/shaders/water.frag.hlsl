@@ -28,6 +28,7 @@ cbuffer Lighting : register(b0, space3)
     float4 fog_rayleigh;
     float4 fog_night;
     float4 fog_sky;
+    float4 fog_sun;         // xyz : vers le vrai soleil ; w : 1 si donné (M8-07), sinon sun_direction
     // Eau (M3-10, eng_water_pack)
     float4 water_horizon; // rgb : ciel à l'horizon ; w : f0
     float4 water_zenith;  // rgb : ciel au zénith ; w : absorption
@@ -77,7 +78,8 @@ float3 apply_fog(float3 lit_color, float3 world_position)
     float3 flat = float3(delta.x, 0.0f, delta.z);
     float flat_length = length(flat);
     flat = flat_length > 1e-12f ? flat / flat_length : float3(1.0f, 0.0f, 0.0f);
-    float3 fog_color = fog_horizon(sun_direction.xyz, flat) * fog_sky.w;
+    float3 fog_sun_dir = fog_sun.w > 0.5f ? fog_sun.xyz : sun_direction.xyz;
+    float3 fog_color = fog_horizon(fog_sun_dir, flat) * fog_sky.w;
     return lerp(lit_color, fog_color, f);
 }
 

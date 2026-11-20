@@ -504,10 +504,11 @@ static void cell_bounds(const WorldView *w, const WorldCellView *v, float min[3]
 }
 
 void world_view_set_fog(WorldView *w, const EngFog *fog, const EngAtmosphere *atmosphere,
-                        float sky_intensity)
+                        float sky_intensity, const float true_sun[3])
 {
     if (w != NULL && w->ready) {
         (void)eng_terrain_gpu_set_fog(&w->shared, fog, atmosphere, sky_intensity);
+        eng_fog_set_sun(w->shared.fog, true_sun); /* M8-07 : la nuit, pas la lune */
     }
 }
 

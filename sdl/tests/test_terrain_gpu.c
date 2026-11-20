@@ -293,6 +293,7 @@ typedef struct SplatScene {
     const EngFog *fog;       /* NULL : pas de brouillard */
     const EngAtmosphere *atmosphere;
     float sky_scale;
+    const float *fog_sun; /* M8-07 : vrai soleil du brouillard ; NULL : celui de la lumière */
 } SplatScene;
 
 /* Fabrique champ, terrain, splatmap, ressources GPU, dessine avec `view_proj` et lit g_pixels. */
@@ -356,6 +357,9 @@ static bool draw_splat(Fixture *t, SplatScene *sc, mat4 view_proj, const EngLigh
     }
     if (sc->fog != NULL) {
         (void)eng_terrain_gpu_set_fog(&gpu, sc->fog, sc->atmosphere, sc->sky_scale);
+        if (sc->fog_sun != NULL) {
+            eng_fog_set_sun(gpu.fog, sc->fog_sun);
+        }
     }
     EngRenderQueue *q = eng_renderer_begin_frame(&t->r);
     sc->accepted = eng_terrain_gpu_draw(&gpu, q, t->terrain_pipeline, view_proj, light, NULL,
@@ -810,8 +814,17 @@ static void fog_ground_point(uint32_t x, uint32_t y, float out[3])
     out[2] = MARGIN + (((float)y + 0.5F) / (float)SIZE * span);
 }
 
+static bool draw_fog_scene_sun(Fixture *t, const EngFog *fog, const EngAtmosphere *atmosphere,
+                               float sky_scale, const float *fog_sun);
+
 static bool draw_fog_scene(Fixture *t, const EngFog *fog, const EngAtmosphere *atmosphere,
                            float sky_scale)
+{
+    return draw_fog_scene_sun(t, fog, atmosphere, sky_scale, NULL);
+}
+
+static bool draw_fog_scene_sun(Fixture *t, const EngFog *fog, const EngAtmosphere *atmosphere,
+                               float sky_scale, const float *fog_sun)
 {
     static Layers layers;
     for (uint32_t i = 0; i < 4; i++) {
@@ -827,7 +840,8 @@ static bool draw_fog_scene(Fixture *t, const EngFog *fog, const EngAtmosphere *a
                      .chunk_cells = 32,
                      .fog = fog,
                      .atmosphere = atmosphere,
-                     .sky_scale = sky_scale};
+                     .sky_scale = sky_scale,
+                     .fog_sun = fog_sun};
     return draw_splat(t, &sc, view_proj, &light);
 }
 
@@ -949,6 +963,50 @@ UTEST(eng_terrain_gpu, a_thick_fog_turns_the_ground_into_the_horizon_sky_colour)
     }
     EXPECT_LE(worst, 3);
     EXPECT_GT(bright, 20); /* ce n'est pas un rendu noir : le ciel de l'horizon est bleu clair */
+    CLOSE_FIXTURE(t);
+}
+
+/* M8-07 : la nuit, la lumière du shader est la LUNE (haute dans le ciel) ; le brouillard doit
+ * prendre la couleur du ciel nocturne du VRAI soleil (sous l'horizon), pas celle d'un ciel de jour.
+ * Brouillard épais : chaque pixel = l'horizon calculé avec le vrai soleil ; plus aucun pixel clair.
+ */
+UTEST(eng_terrain_gpu, at_night_the_fog_takes_the_sky_of_the_real_sun_not_of_the_moon)
+{
+    Fixture t;
+    if (!open_fixture(&t)) {
+        return;
+    }
+    EngAtmosphere atmosphere;
+    eng_atmosphere_default(&atmosphere);
+    EngFog fog;
+    eng_fog_default(&fog);
+    fog.density = 1.0F;
+    fog.height_falloff = 0.0F;
+    const float scale = 0.5F;
+    const float real_sun[3] = {0.0F, -0.5F, 0.8660254F}; /* 30° sous l'horizon */
+    ASSERT_TRUE(draw_fog_scene_sun(&t, &fog, &atmosphere, scale, real_sun));
+    const EngLighting moon = sun_light(); /* la lumière (lune) reste haute : 50° */
+    int worst = 0;
+    int bright = 0;
+    for (uint32_t y = 4; y < SIZE; y += 17) {
+        for (uint32_t x = 4; x < SIZE; x += 17) {
+            float point[3];
+            fog_ground_point(x, y, point);
+            const float to_point[3] = {point[0] - moon.camera_position[0], 0.0F,
+                                       point[2] - moon.camera_position[2]};
+            float horizon[3];
+            ASSERT_TRUE(eng_atmosphere_horizon(&atmosphere, real_sun, to_point, horizon));
+            const size_t i = (((size_t)y * SIZE) + x) * 4U;
+            for (size_t c = 0; c < 3; c++) {
+                const int e = (int)lroundf(fminf(horizon[c] * scale, 1.0F) * 255.0F);
+                const int d = abs(e - (int)g_pixels[i + c]);
+                worst = d > worst ? d : worst;
+            }
+            bright += g_pixels[i + 2] > 40 ? 1 : 0;
+        }
+    }
+    EXPECT_LE(worst, 3);
+    EXPECT_EQ(bright, 0); /* nuit : plus de brouillard bleu clair */
     CLOSE_FIXTURE(t);
 }
 
