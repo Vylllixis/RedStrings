@@ -17,7 +17,8 @@ typedef enum EngAction {
     ENG_ACTION_SPRINT,
     ENG_ACTION_LOCK_ON,
     ENG_ACTION_PAUSE,
-    ENG_ACTION_COUNT, /* au plus 32 : les états sont des masques de bits */
+    ENG_ACTION_SWITCH_WEAPON, /* M8-08 */
+    ENG_ACTION_COUNT,         /* au plus 32 : les états sont des masques de bits */
 } EngAction;
 
 typedef enum EngAxis {

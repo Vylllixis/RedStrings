@@ -163,7 +163,7 @@ UTEST(character_motion, every_attack_swing_peaks_inside_its_active_ticks)
         EXPECT_TRUE(inside);
         checked++;
     }
-    EXPECT_GE(checked, 11U); /* toutes les attaques du joueur et des ennemis */
+    EXPECT_GE(checked, 13U); /* toutes les attaques du joueur (épée, espadon) et des ennemis */
     fx_done(&f);
 }
 

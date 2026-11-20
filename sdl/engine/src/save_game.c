@@ -15,6 +15,7 @@ void eng_save_defaults(EngSaveGame *s)
     }
     memset(s, 0, sizeof *s);
     eng_prog_init(&s->progress);
+    eng_equip_init(&s->equipment); /* EQUI absente : épée et bouclier */
     s->hp = 100.0F;
     s->hp_max = 100.0F;
     s->stamina = 100.0F;
@@ -174,6 +175,13 @@ size_t eng_save_encode(const EngSaveGame *s, const EngWorldState *world, void *o
         w_u32(&w, s->progress.level);
         w_u32(&w, s->progress.xp);
         w_u32(&w, s->progress.total_xp);
+        section_end(&w, at);
+        sections++;
+    }
+    if (s->has_equipment) {
+        at = section_begin(&w, "EQUI");
+        w_u32(&w, s->equipment.owned);
+        w_u32(&w, s->equipment.equipped);
         section_end(&w, at);
         sections++;
     }
@@ -371,6 +379,16 @@ bool eng_save_decode(const void *data, size_t size, EngSaveGame *out, EngWorldSt
             }
             s.progress = pg;
             s.has_progress = true;
+        } else if (memcmp(tag, "EQUI", 4) == 0) {
+            EngEquipment eq;
+            eq.owned = r_u32(&sec);
+            eq.equipped = r_u32(&sec);
+            if (!sec.ok || !eng_equip_valid(&eq)) {
+                r.ok = false;
+                break;
+            }
+            s.equipment = eq;
+            s.has_equipment = true;
         }
         /* section inconnue : ignorée */
     }

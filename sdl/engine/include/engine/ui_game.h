@@ -41,6 +41,7 @@ typedef struct EngHud {
     char hint[128];   /* rappel des commandes, en bas à gauche */
     char clock[8];    /* heure du jour « HH:MM », en haut à droite (vide : rien) */
     uint32_t level;   /* niveau du joueur (0 : rien d'affiché) */
+    char weapon[32];  /* M8-08 : arme en main (vide : rien) */
     float xp_frac;    /* progression dans le niveau, [0, 1] */
     float text_scale;
     bool high_contrast;

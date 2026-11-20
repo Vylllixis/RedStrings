@@ -528,6 +528,7 @@ void play_mode_update_visuals(PlayMode *play, double alpha, float dt)
                            .tick_fraction = (float)alpha};
     if (play->combat != NULL) {
         play_combat_player_drive(play->combat, play->avatars, alpha, &drive);
+        play_combat_player_props(play->combat, &play->avatar.right, &play->avatar.left); /* M8-08 */
     }
     avatar_update(&play->avatar, play->avatars, &drive, dt, feet, play->loco.facing);
     if (play->combat != NULL) {

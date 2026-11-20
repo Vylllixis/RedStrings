@@ -133,7 +133,7 @@ x 1 ; sert à la progression M8-08, docs/progression.md) ; la posture infligée 
   en rouge, contacts en blanc.
 - Audio : `sfx` (6 sons procéduraux), `mixer` (16 voix stéréo, panoramique à puissance constante,
   démarrage différé en échantillons), `combat_audio` (`tick × rate / 60` : synchro exacte au
-  échantillon, prouvée à 48 kHz), `audio_device` (flux SDL3 ; **miniaudio prévu au tracker est
+  échantillon, prouvée à 48 kHz), `audio_device` (flux SDL3 ; décision confirmée par l'ADR 0028 ; ambiance et musique : `ambience` ; **miniaudio prévu au tracker est
   remplacé par SDL3**). `vfx` : 512 particules (xorshift graine), 4 préréglages, traînée d'arme
   24 échantillons, dessin debug.
 

@@ -138,6 +138,8 @@ ow_add_test(vfx test_vfx.c)
 ow_add_test(anim_graph test_anim_graph.c)
 ow_add_test(anim_machine test_anim_machine.c)
 ow_add_test(actor_anim test_actor_anim.c)
+ow_add_test(equipment test_equipment.c)
+ow_add_test(ambience test_ambience.c)
 # M4 : vrais fichiers cuits du chevalier (cible cooked_characters) et données de combat de la source.
 ow_add_test(character_motion test_character_motion.c)
 target_compile_definitions(test_character_motion PRIVATE

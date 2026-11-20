@@ -19,12 +19,15 @@
  * Section facultative TIME (M8-07, sans changer de version : une section inconnue est ignorée) :
  * heure du cycle jour / nuit (f64). Absente : has_time = false.
  * Section facultative PROG (M8-08) : niveau, XP du niveau, XP totale (u32). Absente :
- * has_progress = false ; incohérente (eng_prog_valid) : fichier refusé. */
+ * has_progress = false ; incohérente (eng_prog_valid) : fichier refusé.
+ * Section facultative EQUI (M8-08) : armes possédées (u32, masque) et arme en main (u32). Absente :
+ * has_equipment = false (épée et bouclier) ; incohérente (eng_equip_valid) : fichier refusé. */
 
 #include <stdbool.h>
 #include <stddef.h>
 #include <stdint.h>
 
+#include "engine/equipment.h"
 #include "engine/progression.h"
 #include "engine/world_state.h"
 
@@ -52,6 +55,8 @@ typedef struct EngSaveGame {
     double hour;          /* heure du cycle jour / nuit, [0, 24[ */
     bool has_progress;    /* section PROG présente */
     EngProgress progress; /* niveau et XP du joueur */
+    bool has_equipment;   /* section EQUI présente */
+    EngEquipment equipment;
     uint32_t enemy_count;
     EngSaveEnemy enemies[ENG_SAVE_MAX_ENEMIES];
 } EngSaveGame;

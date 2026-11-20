@@ -34,3 +34,4 @@ Format : Contexte → Options → Décision → Conséquences. Statuts : Propos�
 | [0025](0025-ia-machine-a-etats-donnees-et-jetons.md) | IA : machine à états à données, jetons d'attaque, navigation en grille | Accepté |
 | [0026](0026-personnages-kaykit-animateur-de-combat-et-roulade.md) | Personnages KayKit (CC0), animateur piloté par l'état de combat, roulade procédurale | Accepté |
 | [0027](0027-navigation-sur-le-relief-grille-et-pentes.md) | Navigation sur le relief : la grille garde la main (pentes à 45°, îlots, glissement), pas de Recast | Accepté |
+| [0028](0028-audio-sdl3-et-mixeur-maison-sans-miniaudio.md) | Audio : flux SDL3 et mixeur maison, sans miniaudio ; ambiance et musique synthétisées | Accepté |

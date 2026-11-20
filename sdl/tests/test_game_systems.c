@@ -121,6 +121,28 @@ UTEST(save_game, the_progress_section_round_trips_and_rejects_incoherent_values)
     EXPECT_FALSE(eng_save_decode(g_buf, n, &r, NULL, err, sizeof err));
 }
 
+/* M8-08 : section EQUI : absente -> épée et bouclier ; aller-retour ; incohérente -> refusé. */
+UTEST(save_game, the_equipment_section_round_trips_and_rejects_incoherent_values)
+{
+    EngSaveGame s = sample();
+    EngSaveGame r;
+    char err[96];
+    size_t n = eng_save_encode(&s, NULL, g_buf, sizeof g_buf);
+    ASSERT_TRUE(eng_save_decode(g_buf, n, &r, NULL, err, sizeof err));
+    EXPECT_FALSE(r.has_equipment);
+    EXPECT_EQ(r.equipment.equipped, (uint32_t)ENG_WEAPON_SWORD);
+    s.has_equipment = true;
+    s.equipment = (EngEquipment){.owned = 3U, .equipped = ENG_WEAPON_GREATSWORD};
+    n = eng_save_encode(&s, NULL, g_buf, sizeof g_buf);
+    ASSERT_TRUE(eng_save_decode(g_buf, n, &r, NULL, err, sizeof err));
+    EXPECT_TRUE(r.has_equipment);
+    EXPECT_EQ(r.equipment.owned, 3U);
+    EXPECT_EQ(r.equipment.equipped, (uint32_t)ENG_WEAPON_GREATSWORD);
+    s.equipment = (EngEquipment){.owned = 1U, .equipped = ENG_WEAPON_GREATSWORD}; /* non possédé */
+    n = eng_save_encode(&s, NULL, g_buf, sizeof g_buf);
+    EXPECT_FALSE(eng_save_decode(g_buf, n, &r, NULL, err, sizeof err));
+}
+
 UTEST(save_game, a_version_1_save_is_read_by_version_2_without_loss)
 {
     eng_wstate_init(&g_world);
@@ -294,7 +316,7 @@ UTEST(game_menu, every_action_can_be_remapped_from_the_controls_screen)
     eng_menu_open(&m, ENG_MENU_CONTROLS);
     EngMenuItem items[ENG_MENU_MAX_ITEMS];
     const uint32_t n = eng_menu_items(&m, items, ENG_MENU_MAX_ITEMS);
-    EXPECT_EQ(n, 10U); /* 8 actions + Par défaut + Retour */
+    EXPECT_EQ(n, 11U); /* 9 actions (dont « Changer d'arme », M8-08) + Par défaut + Retour */
     for (int32_t a = 0; a < 8; a++) {
         m.selected = a;
         eng_input_key(&input, 44 /* espace : la touche qui valide */, true);
@@ -332,8 +354,8 @@ UTEST(game_menu, every_action_can_be_remapped_from_the_controls_screen)
     EXPECT_TRUE(o2.invert_y);
     EXPECT_EQ(in2.buttons[ENG_ACTION_PAUSE][0].code, 37);
     EXPECT_EQ(in2.buttons[ENG_ACTION_PAUSE][1].kind, ENG_BIND_NONE);
-    /* « Par défaut » */
-    m.selected = 8;
+    /* « Par défaut » (après les 9 actions) */
+    m.selected = 9;
     EngInputState in = none_in();
     in.pressed = 1U << ENG_ACTION_JUMP;
     EXPECT_EQ(eng_menu_update(&m, &in), ENG_MENU_ACT_REMAPPED);
@@ -416,7 +438,7 @@ UTEST(game_menu, graphics_options_toggle_persist_and_controls_returns_to_its_lin
     m.selected = (int32_t)n - 2;
     EXPECT_EQ(press(&m, ENG_ACTION_JUMP), ENG_MENU_ACT_NONE);
     EXPECT_EQ(m.screen, ENG_MENU_CONTROLS);
-    m.selected = 9; /* Retour */
+    m.selected = 10; /* Retour (9 actions remappables, Par défaut, Retour) */
     EXPECT_EQ(press(&m, ENG_ACTION_JUMP), ENG_MENU_ACT_NONE);
     EXPECT_EQ(m.screen, ENG_MENU_OPTIONS);
     EXPECT_EQ(m.selected, (int32_t)n - 2);

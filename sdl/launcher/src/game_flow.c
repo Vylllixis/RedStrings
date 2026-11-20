@@ -197,7 +197,7 @@ void game_flow_draw(const GameFlow *f, EngUi *ui, const PlayMode *play, const En
         play_combat_fill_hud(play->combat, play, vp, width, height, &hud);
         (void)snprintf(hud.hint, sizeof hud.hint, "%s",
                        "clic : attaque   clic droit : lourde   Ctrl : esquive   E : garde   A/Q : "
-                       "cible   P : pause");
+                       "cible   R : arme   P : pause");
         (void)eng_daynight_format(&f->daynight, hud.clock, sizeof hud.clock);
         eng_ui_draw_hud(ui, &hud, width, height);
     }

@@ -28,6 +28,10 @@ livraisons ; les tags sont posés par Théo après ses tests.
   0,0008 dans le lanceur) ; `--exposure EV` et `--ambient X` pour régler.
 - M8 (finition) : l'éclairage par image suit le soleil : recuit en tâche de fond dès qu'il a bougé de
   2°, envoyé en place (`eng_renderer_update_texture_data`).
+- M8 (finition) : équipement : épée et bouclier, espadon gagné en battant le camp (R pour changer,
+  attaques et arme tenue différentes, section de sauvegarde EQUI, `--weapon greatsword` pour
+  essayer) ; ambiance (vent, oiseaux le jour, grillons la nuit) et musique synthétisées, bouclées
+  sans trou (ADR 0028 : SDL3 + mixeur maison, pas de miniaudio).
 
 ## v0.7 (M7, partiel) — monde ouvert
 - Cellules de 256 m (format RSCL), pool de threads, streaming asynchrone, origine flottante,

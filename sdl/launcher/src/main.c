@@ -8,6 +8,7 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include "engine/equipment.h"
 #include "engine/assert.h"
 #include "engine/clock.h"
 #include "engine/camera.h"
@@ -302,6 +303,7 @@ int main(int argc, char **argv)
     float exposure_arg = NAN; /* --exposure EV (B2) ; NAN : défaut */
     float ambient_arg = NAN;  /* --ambient X : intensité de l'environnement ; NAN : défaut */
     bool world_mode = false;
+    bool weapon_greatsword = false; /* --weapon greatsword (M8-08) */
     int32_t world_seed = 1;
     double world_autopilot = 0.0;
     const char *screenshot_path = NULL;
@@ -366,6 +368,8 @@ int main(int argc, char **argv)
             if (i + 1 < argc && argv[i + 1][0] != '-') {
                 world_bench_km = strtod(argv[++i], NULL);
             }
+        } else if (strcmp(argv[i], "--weapon") == 0 && i + 1 < argc) {
+            weapon_greatsword = strcmp(argv[++i], "greatsword") == 0;
         } else if (strcmp(argv[i], "--world") == 0) {
             world_mode = true;
             play_enabled = true;
@@ -872,6 +876,10 @@ int main(int argc, char **argv)
             if (use_flow && (start_new_game || combat_autoplay)) {
                 game_flow_start_new(&flow, &play);
             }
+            if (weapon_greatsword &&
+                play.combat != NULL) { /* M8-08 : essai de l'espadon (après la nouvelle partie) */
+                (void)play_combat_equip(play.combat, ENG_WEAPON_GREATSWORD, true);
+            }
             if (use_flow && day_night_hour >= 0.0) {
                 (void)eng_daynight_set_hour(&flow.daynight, day_night_hour);
             }
@@ -1184,6 +1192,9 @@ int main(int argc, char **argv)
                         }
                         eng_daynight_sun(daynight, &sun_azimuth, &sun_elevation);
                         scene.night = eng_daynight_night_weight(sun_elevation);
+                        if (use_play && play.combat != NULL) {
+                            play_combat_set_night(play.combat, scene.night); /* M8-01 */
+                        }
                         frame_tonemap.exposure_ev +=
                             eng_daynight_exposure_bias(daynight, sun_elevation);
                         daynight_hour_ui = (float)daynight->hour;

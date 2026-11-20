@@ -55,6 +55,30 @@ attack heavy
  hitbox hand_r 0 0 0.3 0 0 1.6 0.2
 end
 
+# ── espadon du joueur (M8-08) : instants d'impact de b_swing / b_slam, anticipation plus courte ──
+attack gs_light1
+ startup 16
+ active 5
+ recovery 24
+ damage 18
+ posture 16
+ stamina 16
+ hitstop 4
+ anim slash_2h 1.4 0
+ hitbox hand_r 0 0 0.3 0 0 1.8 0.18
+end
+attack gs_heavy
+ startup 26
+ active 6
+ recovery 32
+ damage 40
+ posture 45
+ stamina 30
+ hitstop 8
+ anim chop_2h 1.54 0
+ hitbox hand_r 0 0 0.3 0 0 2.0 0.22
+end
+
 # ── ennemis (anticipation >= 18 ticks = 300 ms, vérifiée au chargement) ──
 attack g_slash
  startup 18

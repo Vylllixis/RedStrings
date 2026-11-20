@@ -98,6 +98,11 @@ void eng_ui_draw_hud(EngUi *ui, const EngHud *hud, int width, int height)
         bar(dl, x0 + text_width(px * 0.75F, buf) + 10.0F * u, y + 5.0F * u, 200.0F * u, 8.0F * u,
             hud->xp_frac, hc ? rgba(0.4F, 0.8F, 1, 1) : rgba(0.35F, 0.6F, 0.95F, 0.9F), hc);
     }
+    if (hud->weapon[0] != '\0') { /* arme en main (M8-08) */
+        y += 22.0F * u;
+        plate(dl, px * 0.7F, x0, y, hud->weapon, hc);
+        text(dl, px * 0.7F, x0, y, rgba(1, 1, 1, 0.95F), hud->weapon, true);
+    }
     /* cible : en haut au centre */
     if (hud->has_target) {
         const float tw = 520.0F * u;

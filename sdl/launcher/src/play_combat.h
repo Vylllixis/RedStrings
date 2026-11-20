@@ -118,6 +118,18 @@ typedef struct PlayCombatStats {
 
 void play_combat_stats(const PlayCombat *c, PlayCombatStats *out);
 
+/* M8-08 : met en main l'arme `weapon` (EngWeaponId) ; `give` : la donne d'abord (option de test
+ * --weapon). false si elle n'est pas possédée. */
+bool play_combat_equip(PlayCombat *c, uint32_t weapon, bool give);
+
+/* M8-01 : poids de la nuit [0 ; 1] pour l'ambiance (oiseaux le jour, grillons la nuit). */
+void play_combat_set_night(PlayCombat *c, float night);
+
+/* M8-08 : objets que le chevalier tient selon l'arme en main (espadon : sans bouclier). */
+void play_combat_player_props(const PlayCombat *c, AvatarProp *right, AvatarProp *left);
+/* M8-08 : arme en main (EngWeaponId) et armes possédées (masque). */
+uint32_t play_combat_weapon(const PlayCombat *c, uint32_t *owned);
+
 /* Autotest sans fenêtre (option --combat-selftest) : nécessite Jolt. Journalise
  * « AUTOTEST COMBAT : OK » ou la première erreur. `rig` (--combat-rig-selftest) : avec les
  * personnages KayKit (partie CPU) : hurtboxes sur les os et lame animée (M5-05, M5-06). */

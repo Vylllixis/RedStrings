@@ -24,7 +24,9 @@ Format « RSSV » : en-tête (signature, version, nombre de sections, FNV-1a), s
 fichier refusé en entier. **Migration** : un fichier v1 (sans posture, PV max, temps de jeu ni
 ennemis) est relu en v2 avec des valeurs par défaut, puis réécrit en v2. Écriture atomique
 (fichier temporaire + renommage). Emplacement : dossier de préférences (`~/.local/share/RedStrings/game/`
-sous Linux) : `savegame.rssv`, `options.txt`.
+sous Linux) : `savegame.rssv`, `options.txt`. Sections facultatives TIME (heure), PROG (niveau),
+EQUI (armes possédées et arme en main, M8-08 ; absente : épée et bouclier ; incohérente : fichier
+refusé).
 
 Contenu sauvegardé : position (double), cap, PV, PV max, endurance, posture, temps de jeu, heure du jour (docs/day-night.md), niveau et XP (docs/progression.md), et pour
 chaque ennemi du camp : vivant, PV, position, cap. **Pas sauvegardé** : le mannequin, les cellules du

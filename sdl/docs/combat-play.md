@@ -40,6 +40,7 @@ build/release/bin/launcher --combat-terrain-selftest raide.hmap   # « AUTOTEST 
 | Esquive (sans direction : pas en arrière) | Ctrl gauche | B |
 | Garde (maintenir) ; parade = presser au bon moment | E | Y |
 | Verrouillage (de nouveau : relâcher) | touche A en AZERTY (Q en QWERTY : même touche physique) | clic du stick droit |
+| Changer d'arme (M8-08, dès qu'on en a deux) | R | croix droite |
 
 Pendant une attaque, une esquive ou une réaction, le personnage ne marche pas (le combat décide).
 Verrouillé, une attaque se tourne automatiquement vers la cible.
@@ -52,6 +53,17 @@ Outils de mise au point (M5-16, M6-10) :
 | F6 | jeu gelé : avance d'UN tick (1/60 s), animations comprises |
 | F1 | panneau de debug ; section « Combat » : tick, état de chaque combattant, attaque en cours et sa phase (anticipation / ACTIF / récupération), PV, posture |
 | clic gauche dans la vue (F1 ouvert) | sélectionne l'ennemi sous le curseur : son état d'IA (perception, chemin, jeton) dans la section « IA », cercle autour de lui |
+
+## Équipement (M8-08)
+
+Deux armes (`engine/equipment.h`) : **épée et bouclier** (départ : enchaînement de 3 coups, lourde
+= estoc) et **espadon** à deux mains (gagné la première fois que le camp est vaincu : « Espadon
+obtenu ! ») : `gs_light1` (anticipation 16 ticks, 18 dégâts) et `gs_heavy` (26 ticks, 40 dégâts),
+animations `slash_2h` / `chop_2h` calées sur les mêmes instants d'impact que celles du brute (test
+de synchronisation). R change d'arme hors attaque, esquive ou réaction ; le chevalier tient alors
+l'espadon sans bouclier, le rig suit la nouvelle lame, le HUD affiche l'arme. Sauvegarde : section
+EQUI (armes possédées, arme en main). Essai sans finir le camp : `launcher --combat --new-game
+--weapon greatsword`.
 
 ## Ce qui est à l'écran
 

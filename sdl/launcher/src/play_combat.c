@@ -5,6 +5,8 @@
 #include <stdio.h>
 #include <string.h>
 
+#include "engine/ambience.h"
+#include "engine/equipment.h"
 #include "engine/ai_camp.h"
 #include "engine/ai_debug.h"
 #include "engine/arena.h"
@@ -47,6 +49,12 @@ static const char DEFAULT_ATTACKS[] =
     "attack heavy\n startup 20\n active 5\n recovery 24\n damage 25\n posture 30\n stamina 25\n"
     " hitstop 6\n anim stab 1.0 0\n "
     " hitbox hand_r 0 0 0.3 0 0 1.6 0.2\nend\n"
+    "attack gs_light1\n startup 16\n active 5\n recovery 24\n damage 18\n posture 16\n stamina 16\n"
+    " hitstop 4\n anim slash_2h 1.4 0\n "
+    " hitbox hand_r 0 0 0.3 0 0 1.8 0.18\nend\n"
+    "attack gs_heavy\n startup 26\n active 6\n recovery 32\n damage 40\n posture 45\n stamina 30\n"
+    " hitstop 8\n anim chop_2h 1.54 0\n "
+    " hitbox hand_r 0 0 0.3 0 0 2.0 0.22\nend\n"
     "attack g_slash\n startup 18\n active 4\n recovery 18\n damage 6\n posture 8\n stamina 5\n"
     " hitstop 3\n cancel_from 6\n next g_slash2\n anim slash_d 1.0 0.075\n "
     " hitbox hand_r 0 0 0.3 0 0 1.5 0.15\nend\n"
@@ -106,6 +114,9 @@ struct PlayCombat {
     bool rig_ready[FIGHTERS]; /* M5-05 / M5-06 : pose au rythme des ticks (ci-dessous) */
     EngProgress progress;     /* M8-08 */
     uint32_t levelup_ticks;   /* message « Niveau N » encore affiché */
+    EngEquipment equip;       /* M8-08 : armes possédées, arme en main */
+    uint32_t weapon_ticks;    /* message « Espadon obtenu » / « Arme : ... » encore affiché */
+    uint32_t weapon_switches; /* changements d'arme depuis le début (journal, autotest) */
     PlayCombatStats stats;
     AvatarLibrary *avatars;  /* M4 : NULL tant que les personnages ne sont pas branchés */
     Avatar avatar[FIGHTERS]; /* le joueur (0) est dans PlayMode */
@@ -121,6 +132,24 @@ struct PlayCombat {
 };
 
 /* applique les statistiques du niveau au joueur ; `heal` : PV et endurance au maximum */
+/* M8-08 : l'arme en main donne au joueur ses attaques (et, pour le rig, la lame à suivre). */
+static void apply_weapon(PlayCombat *c)
+{
+    const EngWeaponDef *w = eng_weapon_def(c->equip.equipped);
+    if (w == NULL) {
+        return;
+    }
+    EngFighter *pf = &c->sim.fighters[PLAYER];
+    EngFighterParams p = pf->params;
+    (void)memset(p.light_name, 0, sizeof p.light_name);
+    (void)memset(p.heavy_name, 0, sizeof p.heavy_name);
+    (void)strncpy(p.light_name, w->light, sizeof p.light_name - 1U);
+    (void)strncpy(p.heavy_name, w->heavy, sizeof p.heavy_name - 1U);
+    (void)eng_fighter_set_params(pf, &p);
+    c->rig_prop[PLAYER] =
+        c->equip.equipped == ENG_WEAPON_GREATSWORD ? AVATAR_GREATSWORD : AVATAR_SWORD;
+}
+
 static void apply_progress(PlayCombat *c, bool heal)
 {
     EngFighter *pf = &c->sim.fighters[PLAYER];
@@ -141,6 +170,11 @@ static void apply_progress(PlayCombat *c, bool heal)
 #define PLAY_NAV_MIN_REGION 64U
 
 static PlayCombat g_combat; /* ~1 Mo : instance unique, hors pile */
+/* M8-01 : ambiance et musique (tampons synthétisés au chargement, ~10 Mo) ; poids de la nuit donné
+ * par le lanceur à chaque image */
+static EngArena g_ambience_arena;
+static EngAmbience g_ambience;
+static float g_night;
 
 /* Fichier de données : d'abord les sources du dépôt (rechargement à chaud pendant le
  * développement), sinon à côté de l'exécutable (version distribuée). */
@@ -212,6 +246,7 @@ PlayCombat *play_combat_create(bool audio, bool arena_obstacles)
     }
     memset(c, 0, sizeof *c);
     eng_prog_init(&c->progress);
+    eng_equip_init(&c->equip); /* M8-08 : épée et bouclier (attaques appliquées plus bas) */
     c->lock = -1;
     c->ai_selected = -1;
     if (!eng_arena_init(&c->scratch, "combat", (size_t)1 << 20)) {
@@ -294,6 +329,9 @@ PlayCombat *play_combat_create(bool audio, bool arena_obstacles)
         c->device = eng_audio_device_open(&c->mixer);
         if (c->device == NULL) {
             ENG_LOG_WARN("combat : périphérique audio indisponible, combat silencieux");
+        } else if (eng_arena_init(&g_ambience_arena, "ambiance", (size_t)16 << 20) &&
+                   eng_ambience_init(&g_ambience, &g_ambience_arena, c->mixer.sample_rate)) {
+            ENG_LOG_INFO("combat : ambiance (vent, oiseaux / grillons) et musique synthétisées");
         }
     }
     c->ready = true;
@@ -309,8 +347,10 @@ void play_combat_destroy(PlayCombat *c)
     if (c == NULL) {
         return;
     }
-    eng_audio_device_close(c->device);
+    eng_audio_device_close(c->device); /* le mixeur ne lit plus les tampons de l'ambiance */
     c->device = NULL;
+    g_ambience.ready = false;
+    eng_arena_shutdown(&g_ambience_arena);
     eng_arena_shutdown(&c->scratch);
     c->ready = false;
 }
@@ -356,6 +396,11 @@ void play_combat_tick(PlayCombat *c, const EngInputState *input, const float fee
     if (c->sim.tick % 30U == 0U) {
         poll_attacks(c, now_seconds);
     }
+    if (c->device != NULL && g_ambience.ready) { /* M8-01 : boucles relancées sans trou */
+        eng_audio_device_lock(c->device);
+        eng_ambience_update(&g_ambience, &c->mixer, g_night, c->mixer.sample_rate / 10U);
+        eng_audio_device_unlock(c->device);
+    }
     EngFighter *pf = &c->sim.fighters[PLAYER];
     /* le joueur : position du personnage physique */
     (void)eng_sim_place(&c->sim, PLAYER, feet[0], feet[2], facing);
@@ -367,6 +412,20 @@ void play_combat_tick(PlayCombat *c, const EngInputState *input, const float fee
         cand[i].pos[0] = c->sim.bodies[i].pos[0];
         cand[i].pos[1] = c->sim.bodies[i].pos[1];
         cand[i].alive = !c->sim.fighters[i].vitals.dead;
+    }
+    if (eng_action_pressed(input, ENG_ACTION_SWITCH_WEAPON)) { /* M8-08 */
+        const EngCombatState ps = c->sim.fighters[PLAYER].fsm.state;
+        if ((ps == ENG_CS_IDLE || ps == ENG_CS_MOVE || ps == ENG_CS_BLOCK) &&
+            (c->equip.owned & (c->equip.owned - 1U)) != 0U) { /* au moins deux armes */
+            (void)eng_equip_next(&c->equip);
+            apply_weapon(c);
+            c->weapon_ticks = 120U;
+            c->weapon_switches++;
+            ENG_LOG_INFO("combat : arme en main : %s", eng_weapon_def(c->equip.equipped)->label);
+        } else {
+            ENG_LOG_DEBUG("combat : changement d'arme refusé (état %s, armes 0x%x)",
+                          eng_combat_state_name(ps), (unsigned)c->equip.owned);
+        }
     }
     if (eng_action_pressed(input, ENG_ACTION_LOCK_ON)) {
         c->lock = c->lock >= 0
@@ -478,6 +537,10 @@ void play_combat_tick(PlayCombat *c, const EngInputState *input, const float fee
         }
     }
     if (eng_camp_cleared(&c->group, &c->sim)) {
+        if (eng_equip_give(&c->equip, ENG_WEAPON_GREATSWORD)) { /* M8-08 : récompense */
+            c->weapon_ticks = 300U;
+            ENG_LOG_INFO("combat : camp vaincu : espadon obtenu (R pour changer d'arme)");
+        }
         if (++c->cleared_ticks >= CAMP_RESPAWN_TICKS) {
             c->cleared_ticks = 0;
             spawn_all(c);
@@ -488,6 +551,9 @@ void play_combat_tick(PlayCombat *c, const EngInputState *input, const float fee
     }
     if (c->levelup_ticks > 0U) {
         c->levelup_ticks--;
+    }
+    if (c->weapon_ticks > 0U) {
+        c->weapon_ticks--;
     }
     c->stats.level = c->progress.level;
     c->stats.total_xp = c->progress.total_xp;
@@ -760,7 +826,8 @@ bool play_combat_attach_avatars(PlayCombat *c, AvatarLibrary *lib, const PlayMod
     for (uint32_t i = 0; i < FIGHTERS; i++) {
         (void)eng_trail_init(&c->trail[i], 10U); /* 10 ticks de rémanence */
     }
-    c->rig_prop[PLAYER] = AVATAR_SWORD; /* le chevalier (PlayMode) */
+    c->rig_prop[PLAYER] = /* le chevalier (PlayMode), arme en main (M8-08) */
+        c->equip.equipped == ENG_WEAPON_GREATSWORD ? AVATAR_GREATSWORD : AVATAR_SWORD;
     c->rig_scale[PLAYER] = 1.0F;
     for (uint32_t i = 0; hurt_ok && i < c->sim.count && i < FIGHTERS; i++) {
         c->rig_ready[i] =
@@ -1032,6 +1099,9 @@ void play_combat_reset(PlayCombat *c)
     memset(c->was_dead, 0, sizeof c->was_dead);
     eng_prog_init(&c->progress); /* nouvelle partie : niveau 1 */
     c->levelup_ticks = 0;
+    eng_equip_init(&c->equip); /* M8-08 : épée et bouclier */
+    c->weapon_ticks = 0;
+    apply_weapon(c);
     apply_progress(c, true);
 }
 
@@ -1047,6 +1117,8 @@ void play_combat_snapshot(const PlayCombat *c, EngSaveGame *s)
     s->posture = pf->posture;
     s->has_progress = true;
     s->progress = c->progress;
+    s->has_equipment = true; /* M8-08 */
+    s->equipment = c->equip;
     s->has_enemies = true;
     s->enemy_count = c->group.count < ENG_SAVE_MAX_ENEMIES ? c->group.count : ENG_SAVE_MAX_ENEMIES;
     for (uint32_t i = 0; i < s->enemy_count; i++) {
@@ -1069,6 +1141,10 @@ void play_combat_restore(PlayCombat *c, const EngSaveGame *s)
     if (s->has_progress && eng_prog_valid(&s->progress)) {
         c->progress = s->progress;
         apply_progress(c, false);
+    }
+    if (s->has_equipment && eng_equip_valid(&s->equipment)) { /* M8-08 */
+        c->equip = s->equipment;
+        apply_weapon(c);
     }
     pf->vitals.max_hp = s->hp_max;
     pf->vitals.hp = s->hp > s->hp_max ? s->hp_max : s->hp;
@@ -1142,6 +1218,7 @@ void play_combat_fill_hud(const PlayCombat *c, const PlayMode *play, mat4 view_p
     hud->posture = pf->posture;
     hud->posture_max = pf->params.max_posture;
     hud->level = c->progress.level;
+    (void)snprintf(hud->weapon, sizeof hud->weapon, "%s", eng_weapon_def(c->equip.equipped)->label);
     {
         const uint32_t need = eng_prog_need(c->progress.level);
         hud->xp_frac = need > 0U ? (float)c->progress.xp / (float)need : 1.0F;
@@ -1183,11 +1260,53 @@ void play_combat_fill_hud(const PlayCombat *c, const PlayMode *play, mat4 view_p
                        "Tu es tombé... renaissance dans un instant");
     } else if (c->levelup_ticks > 0U) {
         (void)snprintf(hud->message, sizeof hud->message, "Niveau %u !", c->progress.level);
+    } else if (c->weapon_ticks > 200U) {
+        (void)snprintf(hud->message, sizeof hud->message, "%s",
+                       "Espadon obtenu ! (R : changer d'arme)");
+    } else if (c->weapon_ticks > 0U) {
+        (void)snprintf(hud->message, sizeof hud->message, "Arme : %s",
+                       eng_weapon_def(c->equip.equipped)->label);
     } else if (eng_camp_cleared(&c->group, &c->sim)) {
         (void)snprintf(hud->message, sizeof hud->message, "%s", "Camp vaincu !");
     } else {
         hud->message[0] = '\0';
     }
+}
+
+bool play_combat_equip(PlayCombat *c, uint32_t weapon, bool give)
+{
+    if (c == NULL || !c->ready) {
+        return false;
+    }
+    if (give) {
+        (void)eng_equip_give(&c->equip, weapon);
+    }
+    if (!eng_equip_select(&c->equip, weapon)) {
+        return false;
+    }
+    apply_weapon(c);
+    return true;
+}
+
+void play_combat_set_night(PlayCombat *c, float night)
+{
+    (void)c;
+    g_night = isfinite(night) ? night : 0.0F;
+}
+
+void play_combat_player_props(const PlayCombat *c, AvatarProp *right, AvatarProp *left)
+{
+    const bool great = c != NULL && c->ready && c->equip.equipped == ENG_WEAPON_GREATSWORD;
+    *right = great ? AVATAR_GREATSWORD : AVATAR_SWORD;
+    *left = great ? AVATAR_PROP_NONE : AVATAR_SHIELD;
+}
+
+uint32_t play_combat_weapon(const PlayCombat *c, uint32_t *owned)
+{
+    if (owned != NULL) {
+        *owned = c != NULL ? c->equip.owned : 0U;
+    }
+    return c != NULL ? c->equip.equipped : 0U;
 }
 
 void play_combat_stats(const PlayCombat *c, PlayCombatStats *out)
@@ -1400,6 +1519,27 @@ bool play_combat_selftest(bool rig)
     check(&t, s.dummy_damage >= 50.0F, "mannequin : dégâts reçus (10 coups légers)",
           s.dummy_damage);
     check(&t, c->dummy.hits_taken >= 5U, "mannequin : coups comptés", (float)c->dummy.hits_taken);
+
+    /* 1 bis. équipement (M8-08) : l'espadon donné, R le met en main ; ses coups touchent ; R remet
+     * l'épée */
+    (void)eng_equip_give(&c->equip, ENG_WEAPON_GREATSWORD);
+    for (int i = 0; i < 60; i++) { /* fin de l'attaque en cours */
+        step(&t, 0U, 0U, 0.0F, 0.0F);
+    }
+    step(&t, 1U << ENG_ACTION_SWITCH_WEAPON, 0U, 0.0F, 0.0F);
+    check(&t, c->equip.equipped == ENG_WEAPON_GREATSWORD, "équipement : R met l'espadon en main",
+          (float)c->equip.equipped);
+    check(&t, strcmp(c->sim.fighters[PLAYER].params.light_name, "gs_light1") == 0,
+          "équipement : attaques de l'espadon", 0.0F);
+    const uint32_t hits_before = c->dummy.hits_taken;
+    for (int i = 0; i < 240; i++) {
+        step(&t, (i % 60) == 0 ? atk : 0U, 0U, 0.0F, 0.0F);
+    }
+    check(&t, c->dummy.hits_taken > hits_before, "équipement : l'espadon touche le mannequin",
+          (float)(c->dummy.hits_taken - hits_before));
+    step(&t, 1U << ENG_ACTION_SWITCH_WEAPON, 0U, 0.0F, 0.0F);
+    check(&t, c->equip.equipped == ENG_WEAPON_SWORD, "équipement : R remet l'épée",
+          (float)c->equip.equipped);
 
     /* 2. verrouillage sur le mannequin (caméra vers -Z) */
     step(&t, 1U << ENG_ACTION_LOCK_ON, 0U, 0.0F, 0.0F);

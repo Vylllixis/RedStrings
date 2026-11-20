@@ -60,4 +60,7 @@ void eng_input_set_default_bindings(EngInput *input)
     (void)eng_input_bind_button(input, ENG_ACTION_PAUSE, ENG_BIND_KEY, SDL_SCANCODE_P);
     (void)eng_input_bind_button(input, ENG_ACTION_PAUSE, ENG_BIND_PAD_BUTTON,
                                 SDL_GAMEPAD_BUTTON_START);
+    (void)eng_input_bind_button(input, ENG_ACTION_SWITCH_WEAPON, ENG_BIND_KEY, SDL_SCANCODE_R);
+    (void)eng_input_bind_button(input, ENG_ACTION_SWITCH_WEAPON, ENG_BIND_PAD_BUTTON,
+                                SDL_GAMEPAD_BUTTON_DPAD_RIGHT);
 }

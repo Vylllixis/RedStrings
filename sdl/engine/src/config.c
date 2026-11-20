@@ -121,10 +121,15 @@ static const NamedCode TRIGGER_NAMES[] = {
 };
 
 static const char *const ACTION_NAMES[ENG_ACTION_COUNT] = {
-    [ENG_ACTION_ATTACK] = "attack",     [ENG_ACTION_HEAVY_ATTACK] = "heavy_attack",
-    [ENG_ACTION_DODGE] = "dodge",       [ENG_ACTION_JUMP] = "jump",
-    [ENG_ACTION_INTERACT] = "interact", [ENG_ACTION_SPRINT] = "sprint",
-    [ENG_ACTION_LOCK_ON] = "lock_on",   [ENG_ACTION_PAUSE] = "pause",
+    [ENG_ACTION_ATTACK] = "attack",
+    [ENG_ACTION_HEAVY_ATTACK] = "heavy_attack",
+    [ENG_ACTION_DODGE] = "dodge",
+    [ENG_ACTION_JUMP] = "jump",
+    [ENG_ACTION_INTERACT] = "interact",
+    [ENG_ACTION_SPRINT] = "sprint",
+    [ENG_ACTION_LOCK_ON] = "lock_on",
+    [ENG_ACTION_PAUSE] = "pause",
+    [ENG_ACTION_SWITCH_WEAPON] = "switch_weapon",
 };
 
 static bool lookup(const NamedCode *table, size_t count, const char *name, int *code)

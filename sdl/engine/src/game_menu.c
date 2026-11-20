@@ -11,8 +11,9 @@
 #define NAV_REPEAT 12U /* ticks (200 ms) entre deux pas quand le stick reste penché */
 
 static const EngAction REMAPPABLE[] = {
-    ENG_ACTION_ATTACK,   ENG_ACTION_HEAVY_ATTACK, ENG_ACTION_DODGE,   ENG_ACTION_JUMP,
-    ENG_ACTION_INTERACT, ENG_ACTION_SPRINT,       ENG_ACTION_LOCK_ON, ENG_ACTION_PAUSE};
+    ENG_ACTION_ATTACK,  ENG_ACTION_HEAVY_ATTACK, ENG_ACTION_DODGE,
+    ENG_ACTION_JUMP,    ENG_ACTION_INTERACT,     ENG_ACTION_SPRINT,
+    ENG_ACTION_LOCK_ON, ENG_ACTION_PAUSE,        ENG_ACTION_SWITCH_WEAPON};
 #define REMAP_COUNT (sizeof REMAPPABLE / sizeof REMAPPABLE[0])
 
 const char *eng_action_label(EngAction a)
@@ -32,6 +33,8 @@ const char *eng_action_label(EngAction a)
         return "Sprint";
     case ENG_ACTION_LOCK_ON:
         return "Verrouillage";
+    case ENG_ACTION_SWITCH_WEAPON:
+        return "Changer d'arme";
     case ENG_ACTION_PAUSE:
         return "Pause";
     default:
