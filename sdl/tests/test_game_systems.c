@@ -359,7 +359,7 @@ UTEST(game_menu, graphics_options_toggle_persist_and_controls_returns_to_its_lin
     eng_menu_open(&m, ENG_MENU_OPTIONS);
     EngMenuItem items[ENG_MENU_MAX_ITEMS];
     const uint32_t n = eng_menu_items(&m, items, ENG_MENU_MAX_ITEMS);
-    ASSERT_EQ(n, (uint32_t)ENG_BUS_COUNT + 9U);
+    ASSERT_EQ(n, (uint32_t)ENG_BUS_COUNT + 13U);
     EXPECT_NE(strstr(items[ENG_BUS_COUNT + 5].label, "FXAA"), NULL);
     EXPECT_NE(strstr(items[ENG_BUS_COUNT + 6].label, "bloom"), NULL);
     m.selected = (int32_t)ENG_BUS_COUNT + 5;
@@ -382,6 +382,36 @@ UTEST(game_menu, graphics_options_toggle_persist_and_controls_returns_to_its_lin
     EXPECT_NEAR(o2.bloom, 0.9F, 1e-3F);
     ASSERT_TRUE(eng_options_load(&o2, NULL, "graphics.bloom = 3\n")); /* hors bornes : ignoré */
     EXPECT_NEAR(o2.bloom, 0.9F, 1e-3F);
+    /* M8 (finition) : vsync, plein écran, qualité des ombres, distance de vue */
+    EXPECT_TRUE(opt.vsync);
+    EXPECT_FALSE(opt.fullscreen);
+    EXPECT_EQ(opt.shadow_quality, 2U);
+    EXPECT_EQ(opt.view_distance, 1U);
+    EXPECT_NE(strstr(items[ENG_BUS_COUNT + 7].label, "verticale"), NULL);
+    EXPECT_NE(strstr(items[ENG_BUS_COUNT + 10].label, "Distance"), NULL);
+    m.selected = (int32_t)ENG_BUS_COUNT + 7;
+    EXPECT_EQ(stick(&m, 1.0F, 0.0F), ENG_MENU_ACT_OPTIONS_CHANGED);
+    EXPECT_FALSE(opt.vsync);
+    m.selected = (int32_t)ENG_BUS_COUNT + 8;
+    (void)stick(&m, 1.0F, 0.0F);
+    EXPECT_TRUE(opt.fullscreen);
+    m.selected = (int32_t)ENG_BUS_COUNT + 9;
+    (void)stick(&m, 1.0F, 0.0F); /* haut -> bas (boucle) */
+    EXPECT_EQ(opt.shadow_quality, 0U);
+    m.selected = (int32_t)ENG_BUS_COUNT + 10;
+    (void)stick(&m, -1.0F, 0.0F); /* moyenne -> proche */
+    EXPECT_EQ(opt.view_distance, 0U);
+    ASSERT_GT(eng_options_save(&opt, &input, text, sizeof text), 50U);
+    EXPECT_NE(strstr(text, "graphics.vsync = 0"), NULL);
+    EXPECT_NE(strstr(text, "graphics.shadows = 0"), NULL);
+    eng_options_default(&o2);
+    ASSERT_TRUE(eng_options_load(&o2, NULL, text));
+    EXPECT_FALSE(o2.vsync);
+    EXPECT_TRUE(o2.fullscreen);
+    EXPECT_EQ(o2.shadow_quality, 0U);
+    EXPECT_EQ(o2.view_distance, 0U);
+    ASSERT_TRUE(eng_options_load(&o2, NULL, "graphics.shadows = 7\n")); /* hors bornes */
+    EXPECT_EQ(o2.shadow_quality, 0U);
     /* Contrôles... puis Retour : la sélection revient sur la ligne Contrôles... */
     m.selected = (int32_t)n - 2;
     EXPECT_EQ(press(&m, ENG_ACTION_JUMP), ENG_MENU_ACT_NONE);

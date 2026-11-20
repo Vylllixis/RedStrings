@@ -47,11 +47,15 @@ typedef struct EngGameOptions {
     bool invert_y;
     float text_scale; /* 0,75 à 2 */
     bool high_contrast;
-    bool fxaa;   /* graphismes (M8-06) */
-    float bloom; /* 0 à 1 */
+    bool fxaa;               /* graphismes (M8-06) */
+    float bloom;             /* 0 à 1 */
+    bool vsync;              /* synchronisation verticale */
+    bool fullscreen;         /* plein écran */
+    uint32_t shadow_quality; /* 0 bas (sans filtre), 1 moyen, 2 haut */
+    uint32_t view_distance;  /* 0 proche, 1 moyenne, 2 loin (monde : 1, 2 ou 3 cellules) */
 } EngGameOptions;
 
-#define ENG_MENU_MAX_ITEMS 16U
+#define ENG_MENU_MAX_ITEMS 20U
 #define ENG_MENU_LABEL 48U
 
 typedef struct EngMenuItem {

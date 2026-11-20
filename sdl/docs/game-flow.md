@@ -9,7 +9,7 @@
 |---|---|
 | Principal | Continuer (grisé sans sauvegarde), Nouvelle partie, Options, Quitter |
 | Pause (P / Start) | Reprendre, Sauvegarder, Options, Menu principal |
-| Options | Volume général, effets, musique, ambiance, interface ; sensibilité ; inverser Y ; taille du texte ; contraste élevé ; anticrénelage (FXAA) ; halo lumineux (bloom) ; Contrôles... ; Retour |
+| Options | Volume général, effets, musique, ambiance, interface ; sensibilité ; inverser Y ; taille du texte ; contraste élevé ; anticrénelage (FXAA) ; halo lumineux (bloom) ; synchronisation verticale ; plein écran ; qualité des ombres (bas : sans filtre, moyen, haut) ; distance de vue (plan lointain x 0,5 / 1 / 1,5) ; Contrôles... ; Retour |
 | Contrôles | une ligne par action (attaque, lourde, esquive, saut, garde, sprint, verrouillage, pause), Par défaut, Retour |
 
 Navigation **sans souris** : haut/bas (ZQSD, stick) choisit, gauche/droite règle une valeur,
@@ -49,3 +49,14 @@ d'ambiance dans le jeu (aucun fichier son) ; seuls les coups utilisent le mixeur
 `launcher --game-selftest` (ctest `launcher.game`) : menu principal, nouvelle partie, marche,
 pause, sauvegarde, menu principal, destruction complète, relance, Continuer : position, temps de
 jeu, PV, endurance et ennemis identiques ; options relues après relance.
+
+## Options graphiques (finition M8)
+
+Clés de `options.txt` : `graphics.fxaa`, `graphics.bloom`, `graphics.vsync`, `graphics.fullscreen`,
+`graphics.shadows` (0, 1, 2), `graphics.view_distance` (0, 1, 2). Pendant le jeu, ces options
+**priment sur `config.ini`** (vsync, plein écran) ; F11 met l'option « Plein écran » à jour. Chaque
+application est journalisée (« options graphiques : vsync non (présentation immédiate), plein écran
+non, ombres bas, plan lointain 1500 m, FXAA oui, bloom 50 % »). Vérifié avec un `options.txt` isolé
+(`XDG_DATA_HOME`) : vsync coupée, ombres basses, plan lointain 1 500 m appliqués au lancement.
+Manquent encore : SSAO, échelle de résolution, bloom en chaîne, FXAA 3.11 / SMAA, coût mesuré par
+effet.

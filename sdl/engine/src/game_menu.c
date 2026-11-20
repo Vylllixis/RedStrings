@@ -54,6 +54,10 @@ void eng_options_default(EngGameOptions *o)
     o->text_scale = 1.0F;
     o->fxaa = true;
     o->bloom = 0.5F;
+    o->vsync = true;
+    o->fullscreen = false;
+    o->shadow_quality = 2U;
+    o->view_distance = 1U;
 }
 
 static bool unit(float v)
@@ -65,7 +69,8 @@ bool eng_options_valid(const EngGameOptions *o)
 {
     if (o == NULL || !unit(o->master) || !isfinite(o->sensitivity) || o->sensitivity <= 0.0F ||
         o->sensitivity > 4.0F || !isfinite(o->text_scale) || o->text_scale < 0.75F ||
-        o->text_scale > 2.0F || !unit(o->bloom)) {
+        o->text_scale > 2.0F || !unit(o->bloom) || o->shadow_quality > 2U ||
+        o->view_distance > 2U) {
         return false;
     }
     for (uint32_t b = 0; b < ENG_BUS_COUNT; b++) {
@@ -105,6 +110,10 @@ size_t eng_options_save(const EngGameOptions *o, const EngInput *input, char *ou
     EMIT("ui.high_contrast = %d\n", o->high_contrast ? 1 : 0);
     EMIT("graphics.fxaa = %d\n", o->fxaa ? 1 : 0);
     EMIT("graphics.bloom = %.3f\n", (double)o->bloom);
+    EMIT("graphics.vsync = %d\n", o->vsync ? 1 : 0);
+    EMIT("graphics.fullscreen = %d\n", o->fullscreen ? 1 : 0);
+    EMIT("graphics.shadows = %u\n", (unsigned)o->shadow_quality);
+    EMIT("graphics.view_distance = %u\n", (unsigned)o->view_distance);
     if (input != NULL) {
         for (uint32_t a = 0; a < ENG_ACTION_COUNT; a++) {
             for (uint32_t k = 0; k < ENG_MAX_BUTTON_BINDINGS; k++) {
@@ -177,6 +186,14 @@ bool eng_options_load(EngGameOptions *o, EngInput *input, const char *text)
             t.fxaa = v != 0.0F;
         } else if (strcmp(key, "graphics.bloom") == 0) {
             t.bloom = v;
+        } else if (strcmp(key, "graphics.vsync") == 0) {
+            t.vsync = v != 0.0F;
+        } else if (strcmp(key, "graphics.fullscreen") == 0) {
+            t.fullscreen = v != 0.0F;
+        } else if (strcmp(key, "graphics.shadows") == 0) {
+            t.shadow_quality = v >= 0.0F && v <= 2.0F ? (uint32_t)v : 99U; /* 99 : refusé */
+        } else if (strcmp(key, "graphics.view_distance") == 0) {
+            t.view_distance = v >= 0.0F && v <= 2.0F ? (uint32_t)v : 99U;
         } else {
             bool found = false;
             for (uint32_t b = 0; b < ENG_BUS_COUNT; b++) {
@@ -319,6 +336,12 @@ uint32_t eng_menu_items(const EngMenu *m, EngMenuItem *out, uint32_t max)
         set_item(&out[n++], "Anticrénelage (FXAA)", o->fxaa ? "oui" : "non", true);
         (void)snprintf(v, sizeof v, "%d %%", (int)lroundf(o->bloom * 100.0F));
         set_item(&out[n++], "Halo lumineux (bloom)", v, true);
+        static const char *const quality[3] = {"bas", "moyen", "haut"};
+        static const char *const distance[3] = {"proche", "moyenne", "loin"};
+        set_item(&out[n++], "Synchronisation verticale", o->vsync ? "oui" : "non", true);
+        set_item(&out[n++], "Plein écran", o->fullscreen ? "oui" : "non", true);
+        set_item(&out[n++], "Qualité des ombres", quality[o->shadow_quality % 3U], true);
+        set_item(&out[n++], "Distance de vue", distance[o->view_distance % 3U], true);
         set_item(&out[n++], "Contrôles...", NULL, m->input != NULL);
         set_item(&out[n++], "Retour", NULL, true);
         break;
@@ -371,6 +394,14 @@ static bool adjust(EngMenu *m, int dir)
         o->fxaa = !o->fxaa;
     } else if (s == (int32_t)ENG_BUS_COUNT + 6) {
         o->bloom = clampf(roundf((o->bloom + step) * 10.0F) / 10.0F, 0.0F, 1.0F);
+    } else if (s == (int32_t)ENG_BUS_COUNT + 7) {
+        o->vsync = !o->vsync;
+    } else if (s == (int32_t)ENG_BUS_COUNT + 8) {
+        o->fullscreen = !o->fullscreen;
+    } else if (s == (int32_t)ENG_BUS_COUNT + 9) {
+        o->shadow_quality = (uint32_t)((int32_t)o->shadow_quality + dir + 3) % 3U;
+    } else if (s == (int32_t)ENG_BUS_COUNT + 10) {
+        o->view_distance = (uint32_t)((int32_t)o->view_distance + dir + 3) % 3U;
     } else {
         return false;
     }
@@ -437,7 +468,10 @@ static EngMenuAction confirm(EngMenu *m, const EngMenuItem *items, uint32_t n)
             return ENG_MENU_ACT_REMAPPED;
         }
         eng_menu_open(m, ENG_MENU_OPTIONS);
-        m->selected = (int32_t)ENG_BUS_COUNT + 7; /* revient sur « Contrôles... » */
+        { /* revient sur « Contrôles... », l'avant-dernière ligne d'Options */
+            EngMenuItem lines[ENG_MENU_MAX_ITEMS];
+            m->selected = (int32_t)eng_menu_items(m, lines, ENG_MENU_MAX_ITEMS) - 2;
+        }
         return ENG_MENU_ACT_NONE;
     default:
         return ENG_MENU_ACT_NONE;
