@@ -735,11 +735,17 @@ int main(int argc, char **argv)
             .depth_buffer = true,
             .hdr = true,
             .max_shadow_commands = 1024,
-            /* personnages skinnés : 41 matrices d'os (~2,8 Kio) par pièce, aussi dans l'ombre */
-            .max_shadow_uniform_bytes = 256U * 1024U};
+            /* personnages skinnés : 41 matrices d'os (~2,8 Kio) par pièce, aussi dans l'ombre ;
+             * B8 : sur un terrain, 4 cascades x 5 personnages x 6 pièces ~ 340 Kio */
+            .max_shadow_uniform_bytes = 1024U * 1024U};
 #ifdef OW_SHADER_SOURCE_DIR
         renderer_desc.source_dir = OW_SHADER_SOURCE_DIR;
 #endif
+        if (combat_enabled) {
+            /* B8 : le joueur apparaît en (4, 4), le camp est vers (-15, -11) : pas d'arbre à
+             * moins de 45 m du centre (ils n'ont pas de collision) */
+            demo_options.placement_clearing_m = 45.0F;
+        }
         use_renderer =
             eng_renderer_init(&renderer, &gpu, &memory.permanent, &memory.frame, &renderer_desc) &&
             demo_scene_init(&scene, &renderer, &memory.permanent, &memory.level, &memory.frame,
@@ -908,6 +914,9 @@ int main(int argc, char **argv)
         scene.world_mode = true;
         (void)demo_scene_use_cascades(&scene, &renderer); /* M7-09 */
         platform.debug_draw = false;
+    } else if (use_renderer && scene.has_terrain) {
+        /* B8 : sur un terrain aussi, les personnages, arbres et rochers projettent leur ombre */
+        (void)demo_scene_use_cascades(&scene, &renderer);
     }
     static AvatarGallery gallery;
     GalleryHook gallery_hook = {&gallery, &avatars};

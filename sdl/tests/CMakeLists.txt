@@ -539,6 +539,23 @@ if(OW_PHYSICS)
   endif()
 endif()
 
+# Combat RENDU sur un terrain (B8) : arbres et rochers KayKit placés (clairière au centre), ombres en
+# cascades (personnages, arbres) ; aucun dessin perdu ni rejeté.
+if(OW_SHADERS_OK)
+  add_test(NAME launcher.combat_terrain_render
+           COMMAND sh -c "\"$1\" heightmap \"$3\" --size 257 --spacing 2 --alt-max 25 --wavelength 500 && \"$2\" --combat-autoplay --terrain \"$3\" --placement --no-audio --frames 60 --env-samples 16"
+                   sh $<TARGET_FILE:assetc> $<TARGET_FILE:launcher> ${CMAKE_CURRENT_BINARY_DIR}/combat_terrain.hmap
+           WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR})
+  set_tests_properties(launcher.combat_terrain_render PROPERTIES
+    ENVIRONMENT "SDL_VIDEODRIVER=offscreen"
+    FAIL_REGULAR_EXPRESSION "ERROR|non détruite|perdu|dessin ignoré"
+    PASS_REGULAR_EXPRESSION "arbres \\(KayKit\\).*ombres : 4 cascades.*renderer : 60 image\\(s\\), 60 passe\\(s\\) d'ombre")
+  if(OW_SOFTWARE_VULKAN_ICD)
+    set_property(TEST launcher.combat_terrain_render APPEND PROPERTY ENVIRONMENT_MODIFICATION
+      "VK_DRIVER_FILES=set:${OW_SOFTWARE_VULKAN_ICD}" "VK_ICD_FILENAMES=set:${OW_SOFTWARE_VULKAN_ICD}")
+  endif()
+endif()
+
 # Monde ouvert RENDU (M7, --world) : cellules streamées envoyées au GPU, corps Jolt par cellule,
 # origine flottante (traversée de 1 km au moins), personnage posé sur le relief à l'arrêt.
 if(OW_PHYSICS AND OW_SHADERS_OK)

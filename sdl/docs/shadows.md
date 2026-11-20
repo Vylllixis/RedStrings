@@ -98,6 +98,13 @@ En mode monde (`launcher --world`), la carte unique est remplacée par 4 cascade
 une boucle dans `model.frag` / `terrain.frag` qui prend la cascade la plus fine contenant le point.
 Détails, test et limites : `docs/world-streaming.md` (section M7-09).
 
+Sur un terrain (`launcher --terrain`, B8), le lanceur active aussi les cascades : personnages, arbres et rochers du
+placement (dessins instanciés, `eng_model_gpu_draw_depth_instanced`) projettent leur ombre sur le terrain, les
+instances et les personnages. Le relief lui-même ne projette pas (pas d'ombre de colline). Avant B8, ce mode n'avait
+aucune ombre. Les uniforms de la passe d'ombre passent à 1 Mio (4 cascades × 5 personnages skinnés) ; test
+`launcher.combat_terrain_render` (aucun dessin perdu). Mesure RTX 5070, 1280 × 720 sans vsync, combat sur le terrain
+de la tranche verticale avec herbe et 5 424 arbres : 1,4 ms par image en moyenne.
+
 ## Lanceur
 
 Le sol (une boîte de 56 m de côté dont le dessus est à y = −0,5, la base des cubes) reçoit les

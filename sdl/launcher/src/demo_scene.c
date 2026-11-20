@@ -371,6 +371,8 @@ static void load_shadow(DemoScene *scene, EngRenderer *renderer, EngArena *perma
     desc.attributes[0] = (EngVertexAttribute){
         .location = 0, .format = ENG_VERTEX_FLOAT3, .offset = offsetof(Vertex, position)};
     scene->cube_shadow_pipeline = eng_renderer_create_pipeline(renderer, &desc);
+    eng_instanced_shadow_pipeline_desc(&desc);
+    scene->instanced_shadow_pipeline = eng_renderer_create_pipeline(renderer, &desc);
     scene->shadow_size = DEMO_SHADOW_SIZE;
     scene->shadow_map = eng_renderer_create_shadow_map(renderer, scene->shadow_size);
     scene->has_shadow = eng_renderer_pipeline_is_valid(renderer, scene->model_shadow_pipeline) &&
@@ -521,8 +523,41 @@ static void load_rocks(DemoScene *scene, EngRenderer *renderer, EngArena *perman
     scene->has_rocks = true;
 }
 
-/* Placement procédural (M3-08) : les rochers suivent la roche de la splatmap, la végétation (le
- * même petit maillage, teinte verte) l'herbe plate. Facultatif comme load_rocks. */
+/* B8 : un modèle glTF du décor (assets/props/nature/, KayKit CC0) sur le GPU. false si le fichier
+ * manque ou est illisible (l'appelant garde son repli). */
+static bool load_nature(EngRenderer *renderer, EngArena *permanent, const char *relative,
+                        float anisotropy, EngModelGpu *out)
+{
+    char path[1024];
+    if (!eng_path_resolve(path, sizeof path, relative)) {
+        return false;
+    }
+    EngArena cpu;
+    EngArena scratch;
+    if (!eng_arena_init(&cpu, "decor", (size_t)4 << 20)) {
+        return false;
+    }
+    if (!eng_arena_init(&scratch, "decor-lecture", (size_t)8 << 20)) {
+        eng_arena_shutdown(&cpu);
+        return false;
+    }
+    EngModel model;
+    const bool loaded = eng_model_load(&cpu, &scratch, path, &model);
+    const bool ok = loaded && eng_model_gpu_create(out, renderer, permanent, &model, anisotropy);
+    if (loaded) {
+        eng_model_free(&model);
+    }
+    eng_arena_shutdown(&scratch);
+    eng_arena_shutdown(&cpu);
+    if (!ok) {
+        ENG_LOG_WARN("décor : %s illisible, repli sur le rocher procédural", relative);
+    }
+    return ok;
+}
+
+/* Placement procédural (M3-08) : les rochers suivent la roche de la splatmap, la végétation l'herbe
+ * plate. B8 : rocher et arbre KayKit (CC0) ; sinon le petit rocher procédural (teinte verte pour la
+ * végétation). Facultatif comme load_rocks. */
 static bool upload_group(EngRenderer *renderer, EngInstance *list, uint32_t count,
                          EngBufferHandle *buffer)
 {
@@ -535,7 +570,7 @@ static bool upload_group(EngRenderer *renderer, EngInstance *list, uint32_t coun
 
 static void load_placement(DemoScene *scene, EngRenderer *renderer, EngArena *permanent,
                            EngArena *level, const EngHeightmap *map, const EngSplatmap *splat,
-                           uint32_t seed, float anisotropy)
+                           uint32_t seed, float clearing, float anisotropy)
 {
     const float half = eng_heightmap_extent(map) * 0.5F;
     EngPipelineDesc pipeline;
@@ -548,6 +583,23 @@ static void load_placement(DemoScene *scene, EngRenderer *renderer, EngArena *pe
     EngPlacementRule veg_rule = eng_placement_vegetation_rule();
     rock_rule.seed = seed;
     veg_rule.seed = seed + 1U;
+    /* B8 : modèles KayKit : un rocher de 0,3 m et un arbre de 1,2 m à l'échelle 1 */
+    const bool kaykit_rock = load_nature(
+        renderer, permanent, "assets/props/nature/rock_single_B.gltf", anisotropy, &scene->rocks);
+    scene->has_tree = load_nature(renderer, permanent, "assets/props/nature/tree_single_A.gltf",
+                                  anisotropy, &scene->tree);
+    if (kaykit_rock) {
+        rock_rule.scale_min = 6.0F; /* 1,8 à 4 m de large */
+        rock_rule.scale_max = 14.0F;
+        rock_rule.sink = 0.1F;
+    }
+    if (scene->has_tree) {
+        veg_rule.cell_meters = 12.0F; /* un arbre par case de 12 m au plus : une forêt claire */
+        veg_rule.scale_min = 4.0F;    /* 5 à 7 m de haut */
+        veg_rule.scale_max = 6.0F;
+        veg_rule.tint_min = 215;
+        veg_rule.sink = 0.02F;
+    }
     EngInstance *rocks = NULL;
     EngInstance *vegetation = NULL;
     uint32_t rock_count = 0;
@@ -555,16 +607,27 @@ static void load_placement(DemoScene *scene, EngRenderer *renderer, EngArena *pe
     bool ok =
         eng_renderer_pipeline_is_valid(renderer, scene->rock_pipeline) &&
         eng_placement_generate(level, map, splat, &rock_rule, -half, -half, &rocks, &rock_count) &&
-        eng_placement_generate(level, map, splat, &veg_rule, -half, -half, &vegetation,
-                               &veg_count) &&
-        eng_rock_build(level, &rock_params, &model) &&
-        eng_model_gpu_create(&scene->rocks, renderer, permanent, &model, anisotropy);
-    if (ok) {
+        eng_placement_generate(level, map, splat, &veg_rule, -half, -half, &vegetation, &veg_count);
+    bool rocks_model = kaykit_rock;
+    if (ok && !kaykit_rock) { /* repli : le petit rocher procédural */
+        ok = eng_rock_build(level, &rock_params, &model) &&
+             eng_model_gpu_create(&scene->rocks, renderer, permanent, &model, anisotropy);
+        rocks_model = ok;
+    }
+    if (ok && clearing > 0.0F) {
+        /* B8 : une clairière au centre (combat : apparition du joueur, camp) ; les arbres et les
+         * rochers n'ont pas de collision, on ne doit pas se battre au milieu d'eux */
+        veg_count = eng_instances_clear_disc(vegetation, veg_count, 0.0F, 0.0F, clearing);
+        rock_count = eng_instances_clear_disc(rocks, rock_count, 0.0F, 0.0F, clearing);
+    }
+    if (ok && !scene->has_tree) { /* repli : la végétation est ce rocher, teinté vert */
         for (uint32_t i = 0; i < veg_count; i++) {
             const uint8_t shade = vegetation[i].tint[0];
             const uint8_t green[4] = {(uint8_t)(shade / 4U), shade, (uint8_t)(shade / 4U), 255};
             memcpy(vegetation[i].tint, green, sizeof green);
         }
+    }
+    if (ok) {
         ok = upload_group(renderer, rocks, rock_count, &scene->rock_instances) &&
              upload_group(renderer, vegetation, veg_count, &scene->veg_instances);
         if (!ok) {
@@ -572,12 +635,18 @@ static void load_placement(DemoScene *scene, EngRenderer *renderer, EngArena *pe
             (void)eng_renderer_destroy_buffer(renderer, scene->veg_instances);
             scene->rock_instances = ENG_BUFFER_NULL;
             scene->veg_instances = ENG_BUFFER_NULL;
-            eng_model_gpu_destroy(&scene->rocks, renderer);
         }
     }
     if (!ok) {
         (void)eng_renderer_destroy_pipeline(renderer, scene->rock_pipeline);
         scene->rock_pipeline = ENG_PIPELINE_NULL;
+        if (rocks_model) {
+            eng_model_gpu_destroy(&scene->rocks, renderer);
+        }
+        if (scene->has_tree) {
+            eng_model_gpu_destroy(&scene->tree, renderer);
+            scene->has_tree = false;
+        }
         ENG_LOG_ERROR("placement : création impossible, le terrain reste affiché");
         return;
     }
@@ -585,10 +654,14 @@ static void load_placement(DemoScene *scene, EngRenderer *renderer, EngArena *pe
     scene->veg_count = veg_count;
     scene->has_rocks = rock_count > 0;
     scene->has_veg = veg_count > 0;
-    ENG_LOG_INFO("placement : %u rochers sur la roche, %u touffes sur l'herbe (graine %u)",
-                 rock_count, veg_count, seed);
+    ENG_LOG_INFO("placement : %u rochers sur la roche, %u %s sur l'herbe (graine %u)", rock_count,
+                 veg_count, scene->has_tree ? "arbres (KayKit)" : "touffes", seed);
     if (!scene->has_rocks && !scene->has_veg) {
         eng_model_gpu_destroy(&scene->rocks, renderer);
+        if (scene->has_tree) {
+            eng_model_gpu_destroy(&scene->tree, renderer);
+            scene->has_tree = false;
+        }
         (void)eng_renderer_destroy_pipeline(renderer, scene->rock_pipeline);
         scene->rock_pipeline = ENG_PIPELINE_NULL;
     }
@@ -712,7 +785,7 @@ static void load_terrain(DemoScene *scene, EngRenderer *renderer, EngArena *perm
             }
             if (options->placement) {
                 load_placement(scene, renderer, permanent, level, &map, &splat,
-                               options->placement_seed, anisotropy);
+                               options->placement_seed, options->placement_clearing_m, anisotropy);
             } else if (options->rock_count > 0) {
                 load_rocks(scene, renderer, permanent, level, &map, options->rock_count,
                            anisotropy);
@@ -736,6 +809,9 @@ static void load_terrain(DemoScene *scene, EngRenderer *renderer, EngArena *perm
     scene->has_terrain = true;
     if (scene->has_environment) {
         (void)eng_terrain_gpu_set_environment(&scene->terrain, renderer, &scene->environment);
+        if (scene->has_tree) {
+            (void)eng_model_gpu_set_environment(&scene->tree, renderer, &scene->environment);
+        }
         if (scene->has_rocks) {
             (void)eng_model_gpu_set_environment(&scene->rocks, renderer, &scene->environment);
         }
@@ -871,6 +947,26 @@ static void view_projection(const EngCamera *camera, float aspect, mat4 out)
     eng_camera_view(camera, view);
     eng_camera_projection(camera, aspect, proj);
     glm_mat4_mul(proj, view, out);
+}
+
+/* B8 : les arbres et rochers instanciés du terrain dans la file d'ombre (un dessin par groupe). */
+static void draw_instanced_casters(const DemoScene *scene, EngRenderQueue *shadow_queue,
+                                   mat4 light_view_proj)
+{
+    if (!scene->has_terrain || scene->world_mode) {
+        return;
+    }
+    if (scene->has_veg) {
+        (void)eng_model_gpu_draw_depth_instanced(scene->has_tree ? &scene->tree : &scene->rocks,
+                                                 shadow_queue, scene->instanced_shadow_pipeline,
+                                                 light_view_proj, scene->veg_instances,
+                                                 scene->veg_count);
+    }
+    if (scene->has_rocks) {
+        (void)eng_model_gpu_draw_depth_instanced(&scene->rocks, shadow_queue,
+                                                 scene->instanced_shadow_pipeline, light_view_proj,
+                                                 scene->rock_instances, scene->rock_count);
+    }
 }
 
 /* Ajoute à la file d'ombre les casters de la scène : le sol, la grille de cubes et le modèle (ou le
@@ -1025,8 +1121,11 @@ void demo_scene_draw(DemoScene *scene, EngRenderer *renderer, EngRenderQueue *qu
     EngModelShadow receiver = {0};
     const EngModelShadow *receiving = NULL;
     EngRenderQueue *shadow_queue = NULL;
-    if (shadow != NULL && scene->has_shadow && scene->world_mode && scene->cascades) {
-        /* M7-09 : 4 cascades autour de la caméra, chacune dans son quart de l'atlas */
+    if (shadow != NULL && scene->has_shadow && (scene->world_mode || scene->has_terrain) &&
+        scene->cascades) {
+        /* M7-09 : 4 cascades autour de la caméra, chacune dans son quart de l'atlas ; B8 : aussi
+         * sur un terrain (--terrain : personnages, arbres et rochers ; le relief ne projette pas)
+         */
         EngCsmView cv = {.fov_y = camera->fov_y,
                          .aspect = aspect,
                          .near_plane = camera->near_z,
@@ -1049,6 +1148,9 @@ void demo_scene_draw(DemoScene *scene, EngRenderer *renderer, EngRenderQueue *qu
                 if (scene->model_hook != NULL) {
                     scene->model_hook(scene->model_user, shadow_queue, scene->csm.maps[k].view_proj,
                                       NULL, NULL, true);
+                }
+                if (eng_renderer_pipeline_is_valid(renderer, scene->instanced_shadow_pipeline)) {
+                    draw_instanced_casters(scene, shadow_queue, scene->csm.maps[k].view_proj);
                 }
                 for (uint32_t i = first; i < shadow_queue->count; i++) {
                     shadow_queue->commands[i].shadow_tile = (uint8_t)(k + 1U);
@@ -1133,11 +1235,11 @@ void demo_scene_draw(DemoScene *scene, EngRenderer *renderer, EngRenderQueue *qu
                                        DEMO_MAX_TERRAIN_CHUNKS);
             if (drawn > 0) {
                 (void)eng_terrain_gpu_draw(&scene->terrain, queue, scene->terrain_pipeline,
-                                           view_proj, &light, NULL, visible, drawn);
+                                           view_proj, &light, receiving, visible, drawn);
             }
         } else {
             (void)eng_terrain_gpu_draw(&scene->terrain, queue, scene->terrain_pipeline, view_proj,
-                                       &light, NULL, NULL, 0);
+                                       &light, receiving, NULL, 0);
             drawn = total;
         }
         scene->terrain_chunks_drawn = drawn;
@@ -1182,8 +1284,9 @@ void demo_scene_draw(DemoScene *scene, EngRenderer *renderer, EngRenderQueue *qu
             glm_mat4_identity(identity);
             const EngModelDrawOptions veg_options = {.instance_buffer = scene->veg_instances,
                                                      .instance_count = scene->veg_count};
-            (void)eng_model_gpu_draw_ex(&scene->rocks, queue, scene->rock_pipeline, identity,
-                                        view_proj, &light, NULL, &veg_options);
+            (void)eng_model_gpu_draw_ex(scene->has_tree ? &scene->tree : &scene->rocks, queue,
+                                        scene->rock_pipeline, identity, view_proj, &light,
+                                        receiving, &veg_options);
         }
         if (scene->has_rocks) {
             /* tous les rochers en UN dessin ; le GPU élimine ce qui est hors champ */
@@ -1192,10 +1295,10 @@ void demo_scene_draw(DemoScene *scene, EngRenderer *renderer, EngRenderQueue *qu
             const EngModelDrawOptions rock_options = {.instance_buffer = scene->rock_instances,
                                                       .instance_count = scene->rock_count};
             (void)eng_model_gpu_draw_ex(&scene->rocks, queue, scene->rock_pipeline, identity,
-                                        view_proj, &light, NULL, &rock_options);
+                                        view_proj, &light, receiving, &rock_options);
         }
         if (scene->model_hook != NULL) {
-            scene->model_hook(scene->model_user, queue, view_proj, &light, NULL, false);
+            scene->model_hook(scene->model_user, queue, view_proj, &light, receiving, false);
         }
         return;
     }
@@ -1404,6 +1507,10 @@ void demo_scene_shutdown(DemoScene *scene, EngRenderer *renderer)
             eng_model_gpu_destroy(&scene->rocks, renderer);
             (void)eng_renderer_destroy_pipeline(renderer, scene->rock_pipeline);
         }
+        if (scene->has_tree) {
+            eng_model_gpu_destroy(&scene->tree, renderer);
+            scene->has_tree = false;
+        }
         eng_terrain_gpu_destroy(&scene->terrain, renderer);
     }
     if (eng_renderer_pipeline_is_valid(renderer, scene->terrain_pipeline)) {
@@ -1418,6 +1525,9 @@ void demo_scene_shutdown(DemoScene *scene, EngRenderer *renderer)
     (void)eng_renderer_destroy_texture(renderer, scene->shadow_map);
     (void)eng_renderer_destroy_pipeline(renderer, scene->cube_shadow_pipeline);
     (void)eng_renderer_destroy_pipeline(renderer, scene->model_shadow_pipeline);
+    if (eng_renderer_pipeline_is_valid(renderer, scene->instanced_shadow_pipeline)) {
+        (void)eng_renderer_destroy_pipeline(renderer, scene->instanced_shadow_pipeline);
+    }
     if (scene->has_environment) {
         eng_environment_destroy(&scene->environment, renderer);
     }

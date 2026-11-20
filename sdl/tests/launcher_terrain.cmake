@@ -88,27 +88,37 @@ foreach(bad 1000001 -5 abc)
   endif()
 endforeach()
 
-# placement procédural (M3-08) : rochers sur la roche, touffes sur l'herbe, deux dessins ; mêmes
-# nombres à chaque lancement (même graine) ; graine invalide refusée
-execute_process(COMMAND ${OW_LAUNCHER} --frames 3 --env-samples 16 --terrain "${OW_WORK}/t.hmap"
+# un terrain doux de 512 m (celui de la tranche verticale, en plus petit) : assez d'herbe plate pour
+# des arbres à une cellule de 12 m
+execute_process(COMMAND ${OW_ASSETC} heightmap "${OW_WORK}/doux.hmap" --size 257 --spacing 2
+                        --alt-max 25 --wavelength 500
+                RESULT_VARIABLE rc OUTPUT_VARIABLE out ERROR_VARIABLE err)
+if(NOT rc EQUAL 0)
+  message(FATAL_ERROR "launcher_terrain : assetc heightmap (doux) échoue (${rc}) : ${out}${err}")
+endif()
+
+# placement procédural (M3-08) : rochers sur la roche, arbres sur l'herbe (B8 : modèles KayKit de
+# assets/props/nature/, clairière au centre), deux dessins ; mêmes nombres à chaque lancement (même
+# graine) ; aucun dessin rejeté par le renderer ; graine invalide refusée
+execute_process(COMMAND ${OW_LAUNCHER} --frames 3 --env-samples 16 --terrain "${OW_WORK}/doux.hmap"
                         --placement --placement-seed 7
                 RESULT_VARIABLE rc OUTPUT_VARIABLE out ERROR_VARIABLE err)
 set(text "${out}${err}")
-if(NOT rc EQUAL 0 OR NOT text MATCHES "placement : ([0-9]+) rochers sur la roche, ([0-9]+) touffes sur l'herbe \\(graine 7\\)")
+if(NOT rc EQUAL 0 OR NOT text MATCHES "placement : ([0-9]+) rochers sur la roche, ([0-9]+) arbres \\(KayKit\\) sur l'herbe \\(graine 7\\)")
   message(FATAL_ERROR "launcher_terrain : --placement non pris en compte (${rc}) : ${text}")
 endif()
 set(first_line "${CMAKE_MATCH_1}/${CMAKE_MATCH_2}")
 if(CMAKE_MATCH_2 EQUAL 0)
   message(FATAL_ERROR "launcher_terrain : --placement n'a placé aucune végétation : ${text}")
 endif()
-if(text MATCHES "ERROR")
-  message(FATAL_ERROR "launcher_terrain : ERREUR dans le journal avec --placement : ${text}")
+if(text MATCHES "ERROR|dessin ignoré|buffer invalide")
+  message(FATAL_ERROR "launcher_terrain : ERREUR ou dessin rejeté avec --placement : ${text}")
 endif()
-execute_process(COMMAND ${OW_LAUNCHER} --frames 1 --env-samples 16 --terrain "${OW_WORK}/t.hmap"
+execute_process(COMMAND ${OW_LAUNCHER} --frames 1 --env-samples 16 --terrain "${OW_WORK}/doux.hmap"
                         --placement --placement-seed 7
                 RESULT_VARIABLE rc OUTPUT_VARIABLE out ERROR_VARIABLE err)
 set(text "${out}${err}")
-string(REGEX MATCH "placement : ([0-9]+) rochers sur la roche, ([0-9]+) touffes" again "${text}")
+string(REGEX MATCH "placement : ([0-9]+) rochers sur la roche, ([0-9]+) arbres" again "${text}")
 if(NOT "${CMAKE_MATCH_1}/${CMAKE_MATCH_2}" STREQUAL "${first_line}")
   message(FATAL_ERROR "launcher_terrain : --placement non déterministe : ${first_line} puis ${CMAKE_MATCH_1}/${CMAKE_MATCH_2}")
 endif()

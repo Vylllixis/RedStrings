@@ -33,3 +33,14 @@ puis les réduit avec `tools/scripts/gltf_extract.py`).
 - Empreintes SHA-256 : Regular `478c558ea716033cd60c03438f628dfa75694dcf6b5f6d505a2f05fd2b4f3823`,
   Bold `1df075a380fc7cb898acf64c1f7b3b4dd780de3caa860178bf929de35817a913`.
 - Utilisation : police par défaut de l'interface et du HUD (M8-03).
+
+## Décor : KayKit Medieval Hexagon Pack 1.0 (CC0)
+
+- Fichiers : `props/nature/tree_single_A`, `tree_single_B`, `rock_single_A`, `rock_single_B`,
+  `rock_single_C` (`.gltf` + `.bin`), texture commune `props/nature/hexagons_medieval.png`, texte
+  de la licence `props/nature/LICENSE.txt`.
+- Auteur : Kay Lousberg (www.kaylousberg.com), dépôt GitHub officiel
+  KayKit-Game-Assets/KayKit-Medieval-Hexagon-Pack-1.0 ; téléchargés par
+  `tools/scripts/kaykit_nature_prepare.sh` (qui vérifie la mention CC0).
+- Licence : Creative Commons Zero (domaine public).
+- Utilisation : arbres et rochers du placement procédural (`--placement`, B8).

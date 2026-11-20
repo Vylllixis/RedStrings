@@ -117,3 +117,25 @@ UTEST(eng_instancing, validity_rejects_non_finite_non_positive_scale_and_non_uni
     bad.rotation[3] = 0.0F; /* quaternion nul */
     EXPECT_FALSE(eng_instance_valid(&bad));
 }
+
+UTEST(eng_instancing, clearing_a_disc_removes_the_instances_inside_and_keeps_the_order)
+{
+    EngInstance list[5];
+    const float xs[5] = {0.0F, 9.9F, 10.0F, 30.0F, -7.0F};
+    const float zs[5] = {0.0F, 0.0F, 0.0F, 30.0F, 7.5F};
+    for (int i = 0; i < 5; i++) {
+        const float position[3] = {xs[i] + 5.0F, 2.0F, zs[i] - 3.0F};
+        const uint8_t tint[4] = {(uint8_t)i, 255, 255, 255};
+        eng_instance_make_yaw(&list[i], position, 1.0F, 0.0F, tint);
+    }
+    /* disque de 10 m autour de (5, -3) : 0 et 1 dedans, 2 sur le bord (gardé), 4 à 10,25 m */
+    const uint32_t kept = eng_instances_clear_disc(list, 5, 5.0F, -3.0F, 10.0F);
+    ASSERT_EQ(3U, kept);
+    EXPECT_EQ(2, list[0].tint[0]);
+    EXPECT_EQ(3, list[1].tint[0]);
+    EXPECT_EQ(4, list[2].tint[0]);
+    EXPECT_EQ(5U, eng_instances_clear_disc(list, 5, 0.0F, 0.0F, 0.0F));
+    EXPECT_EQ(5U, eng_instances_clear_disc(list, 5, 0.0F, 0.0F, NAN));
+    EXPECT_EQ(0U, eng_instances_clear_disc(NULL, 0, 0.0F, 0.0F, 3.0F));
+    EXPECT_EQ(0U, eng_instances_clear_disc(list, 3, 5.0F, -3.0F, 1000.0F));
+}

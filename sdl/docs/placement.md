@@ -9,7 +9,8 @@ seul dessin le rend.
 - `engine/placement.h` : `EngPlacementRule`, `eng_placement_vegetation_rule` / `eng_placement_rock_rule`,
   `eng_placement_rule_valid`, `eng_placement_suitability`, `eng_splatmap_weight_at`, `eng_placement_count`,
   `eng_placement_generate`.
-- Lanceur : `--placement` (et `--placement-seed N`) : rochers sur la roche, touffes vertes sur l'herbe.
+- Lanceur : `--placement` (et `--placement-seed N`) : rochers sur la roche, arbres sur l'herbe (B8, voir
+  « Modèles du lanceur » ci-dessous).
 
 ## Algorithme
 
@@ -59,14 +60,32 @@ trop petite) : `false`, journalisé, `*instances` = NULL, arène restituée. Auc
 La position y est `hauteur du champ − sink × échelle` : l'instance s'enfonce un peu dans le sol et ne flotte pas sur
 une pente. La teinte est un gris tiré dans `[tint_min, 255]`.
 
+## Modèles du lanceur (B8)
+
+Jusqu'à la finition, le lanceur dessinait la végétation avec le petit rocher procédural teinté en vert (196 910
+« touffes » sur le terrain de la tranche verticale). Désormais :
+
+- rochers : `assets/props/nature/rock_single_B.gltf`, arbres : `tree_single_A.gltf` (KayKit Medieval Hexagon Pack,
+  CC0, téléchargés par `tools/scripts/kaykit_nature_prepare.sh`, voir `assets/LICENCES.md`) ;
+- la règle de végétation est adaptée à des arbres : cellule de 12 m (forêt claire), échelle 4 à 6 (5 à 7 m de haut) ;
+  celle des rochers : échelle 6 à 14 (1,8 à 4 m de large) ;
+- en combat (`--combat`), une **clairière** de 45 m de rayon reste vide au centre (apparition du joueur, camp) :
+  `eng_instances_clear_disc` (`engine/instancing.h`) retire les instances du disque en gardant l'ordre ;
+- arbres et rochers **projettent leur ombre** (cascades sur un terrain, voir `docs/shadows.md`) et la reçoivent ;
+- si un fichier manque, le lanceur journalise un avertissement et revient au rocher procédural.
+
+![Avant / après B8 : touffes procédurales, puis arbres KayKit avec ombres](devlog/img/b8-avant-apres.png)
+
 ## Limites
 
 - L'instance est posée à la hauteur du champ, **sans s'aligner sur la normale** : une touffe sur 25° reste verticale
   (voulu pour de la végétation ; pour des rochers l'enfoncement masque l'écart).
 - Pas de distance minimale entre instances de règles différentes : un rocher peut chevaucher une touffe.
 - La pente est évaluée à l'échelle d'un échantillon : un relief plus fin que l'espacement du champ n'est pas vu.
-- Le lanceur réutilise le maillage de rocher (80 triangles) teinté en vert pour la végétation : c'est une
-  démonstration du placement, pas de l'herbe (M3-09).
+- Les arbres et rochers n'ont **pas de collision** (ni Jolt, ni grille de l'IA) : on les traverse. La clairière du
+  combat évite de se battre au milieu d'eux ; ailleurs, c'est visible.
+- Un seul modèle d'arbre et un seul de rocher (le pack en a d'autres : `tree_single_B`, `rock_single_A` / `C` sont
+  téléchargés mais pas encore utilisés).
 - Le débit sur GPU réel n'est pas mesuré ici.
 
 ## Tests
@@ -81,8 +100,12 @@ une pente. La teinte est un gris tiré dans `[tint_min, 255]`.
   réel : aucune touffe sur une pente rocheuse (pente ≤ max + 12°, roche ≤ limite, herbe ≥ minimum) ; bornes des
   règles (inclusives / exclusives) ; échelle, cap et teinte tirés sur toute leur plage ; marge inclusive ; espacement
   de 2 m (pente et poids de splatmap en mètres).
-- `launcher.terrain` : `--placement` journalise les nombres (> 0 touffes), mêmes nombres à chaque lancement, graine
-  invalide refusée.
+- `launcher.terrain` : `--placement` sur un terrain doux de 512 m journalise les nombres (> 0 arbres KayKit), mêmes
+  nombres à chaque lancement, aucun dessin rejeté par le renderer (le bug de la première version : instances
+  d'arbres jamais envoyées), graine invalide refusée.
+- `launcher.combat_terrain_render` : combat en pilote automatique sur ce terrain avec `--placement` : arbres KayKit,
+  4 cascades, 60 passes d'ombre, aucun dessin perdu ni rejeté.
+- `engine.instancing` : `eng_instances_clear_disc` (dedans retirés, bord gardé, ordre conservé, arguments invalides).
 
 ## Mutations (vérification des tests)
 

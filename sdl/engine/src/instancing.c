@@ -24,6 +24,47 @@ void eng_instanced_pipeline_desc(EngPipelineDesc *desc)
         .location = 6, .format = ENG_VERTEX_UBYTE4_NORM, .offset = offsetof(EngInstance, tint)};
 }
 
+void eng_instanced_shadow_pipeline_desc(EngPipelineDesc *desc)
+{
+    eng_model_shadow_pipeline_desc(desc);
+    desc->name = "model-instanced-shadow";
+    desc->vertex_shader = "shadow_instanced.vert";
+    desc->instance_stride = ENG_INSTANCE_STRIDE;
+    desc->instance_attribute_count = 2;
+    desc->instance_attributes[0] = (EngVertexAttribute){
+        .location = 1, .format = ENG_VERTEX_FLOAT4, .offset = offsetof(EngInstance, position)};
+    desc->instance_attributes[1] = (EngVertexAttribute){
+        .location = 2, .format = ENG_VERTEX_FLOAT4, .offset = offsetof(EngInstance, rotation)};
+}
+
+uint32_t eng_model_gpu_draw_depth_instanced(const EngModelGpu *gpu, EngRenderQueue *queue,
+                                            EngPipelineHandle pipeline, mat4 light_view_proj,
+                                            EngBufferHandle instances, uint32_t count)
+{
+    if (gpu->skinned) {
+        ENG_LOG_ERROR("modèle GPU skinné : pas d'ombre instanciée");
+        return 0;
+    }
+    uint32_t accepted = 0;
+    for (uint32_t i = 0; i < gpu->part_count; i++) {
+        const EngModelPart *part = &gpu->parts[i];
+        const EngDrawCmd cmd = {
+            .pipeline = pipeline,
+            .vertex_buffer = gpu->vertices,
+            .index_buffer = gpu->indices,
+            .index_type = ENG_INDEX_U32,
+            .count = part->index_count,
+            .first = part->first_index,
+            .instance_count = count,
+            .instance_buffer = instances,
+        };
+        if (eng_render_draw_uniforms(queue, &cmd, light_view_proj, sizeof(mat4))) {
+            accepted++;
+        }
+    }
+    return accepted;
+}
+
 void eng_instance_make_yaw(EngInstance *instance, const float position[3], float scale, float yaw,
                            const uint8_t tint[4])
 {
@@ -51,6 +92,23 @@ void eng_instance_matrix(const EngInstance *instance, mat4 out)
         }
         out[3][c] = instance->position[c];
     }
+}
+
+uint32_t eng_instances_clear_disc(EngInstance *list, uint32_t count, float x, float z, float radius)
+{
+    if (list == NULL || !isfinite(radius) || radius <= 0.0F) {
+        return count;
+    }
+    const float r2 = radius * radius;
+    uint32_t kept = 0;
+    for (uint32_t i = 0; i < count; i++) {
+        const float dx = list[i].position[0] - x;
+        const float dz = list[i].position[2] - z;
+        if ((dx * dx) + (dz * dz) >= r2) {
+            list[kept++] = list[i];
+        }
+    }
+    return kept;
 }
 
 bool eng_instance_valid(const EngInstance *instance)

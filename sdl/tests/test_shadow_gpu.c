@@ -1,8 +1,10 @@
 #include <SDL3/SDL.h>
 #include <math.h>
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 
+#include "engine/instancing.h"
 #include "engine/model.h"
 #include "engine/model_gpu.h"
 #include "engine/shadow.h"
@@ -35,6 +37,7 @@ typedef struct Scene {
     EngRenderer r;
     EngPipelineHandle pipeline;
     EngPipelineHandle shadow_pipeline;
+    EngPipelineHandle instanced_shadow_pipeline; /* B8 */
     EngTextureHandle map;
     EngTextureHandle atlas; /* M7-09 : 2 x 2 cascades de MAP_SIZE texels */
     EngModelGpu ground;
@@ -86,6 +89,8 @@ static bool open_scene(Scene *s)
     s->pipeline = eng_renderer_create_pipeline(&s->r, &pipeline);
     eng_model_shadow_pipeline_desc(&pipeline);
     s->shadow_pipeline = eng_renderer_create_pipeline(&s->r, &pipeline);
+    eng_instanced_shadow_pipeline_desc(&pipeline);
+    s->instanced_shadow_pipeline = eng_renderer_create_pipeline(&s->r, &pipeline);
     s->map = eng_renderer_create_shadow_map(&s->r, MAP_SIZE);
     s->atlas = eng_renderer_create_shadow_map(&s->r, 2U * MAP_SIZE);
     const float ground_lo[3] = {-10.0F, -0.5F, -10.0F};
@@ -94,6 +99,7 @@ static bool open_scene(Scene *s)
     const float box_hi[3] = {1.0F, 2.0F, 1.0F};
     s->ok = eng_renderer_pipeline_is_valid(&s->r, s->pipeline) &&
             eng_renderer_pipeline_is_valid(&s->r, s->shadow_pipeline) &&
+            eng_renderer_pipeline_is_valid(&s->r, s->instanced_shadow_pipeline) &&
             eng_renderer_texture_is_valid(&s->r, s->map) &&
             eng_renderer_texture_is_valid(&s->r, s->atlas) &&
             make_gpu_box(s, ground_lo, ground_hi, &s->ground) &&
@@ -107,6 +113,7 @@ static uint32_t close_scene(Scene *s)
     eng_model_gpu_destroy(&s->ground, &s->r);
     (void)eng_renderer_destroy_texture(&s->r, s->map);
     (void)eng_renderer_destroy_texture(&s->r, s->atlas);
+    (void)eng_renderer_destroy_pipeline(&s->r, s->instanced_shadow_pipeline);
     (void)eng_renderer_destroy_pipeline(&s->r, s->shadow_pipeline);
     (void)eng_renderer_destroy_pipeline(&s->r, s->pipeline);
     const uint32_t leaks = eng_renderer_shutdown(&s->r);
@@ -128,6 +135,8 @@ typedef struct Shot {
     EngShadowMap map; /* rempli par render_shot */
     float to_sun[3];
     int32_t cascade; /* M7-09 : -1 carte unique ; 0 à 3 : `map` est la cascade k d'un atlas de 4 */
+    bool instanced_box; /* B8 : la boîte projette son ombre en dessin instancié (2 instances) */
+    float box_yaw;      /* B8 : cap de la boîte (rad) ; compare_with_geometry suppose 0 */
 } Shot;
 
 typedef struct ShotContext {
@@ -160,6 +169,14 @@ static void sun_vector(float elevation_deg, float azimuth_deg, float out[3])
     out[2] = cosf(e) * sinf(a);
 }
 
+/* Détruit le buffer d'instances de render_shot s'il existe (B8). */
+static void drop_instances(Scene *s, EngBufferHandle instances)
+{
+    if (eng_renderer_buffer_is_valid(&s->r, instances)) {
+        (void)eng_renderer_destroy_buffer(&s->r, instances);
+    }
+}
+
 /* Dessine la scène ; les pixels sont dans g_pixels. */
 static bool render_shot(Scene *s, Shot *shot)
 {
@@ -183,14 +200,32 @@ static bool render_shot(Scene *s, Shot *shot)
     glm_mat4_identity(identity);
     mat4 box_model;
     glm_translate_make(box_model, (vec3){shot->box_x, 0.0F, 0.0F});
+    glm_rotate(box_model, shot->box_yaw, (vec3){0.0F, 1.0F, 0.0F});
 
-    /* passe d'ombre */
+    /* passe d'ombre ; B8 : la boîte en deux instances, la première hors de la carte (40 m plus
+     * loin), la seconde à sa place : seule la seconde peut faire l'ombre attendue */
     EngRenderQueue *sq = eng_renderer_begin_shadow_queue(&s->r);
-    if (sq == NULL ||
-        eng_model_gpu_draw_depth(&s->ground, sq, s->shadow_pipeline, identity,
-                                 shot->map.view_proj) != 1U ||
-        eng_model_gpu_draw_depth(&s->box, sq, s->shadow_pipeline, box_model, shot->map.view_proj) !=
-            1U) {
+    if (sq == NULL || eng_model_gpu_draw_depth(&s->ground, sq, s->shadow_pipeline, identity,
+                                               shot->map.view_proj) != 1U) {
+        return false;
+    }
+    EngBufferHandle instances = ENG_BUFFER_NULL;
+    bool caster;
+    if (shot->instanced_box) {
+        EngInstance list[2];
+        const float away[3] = {shot->box_x + 40.0F, 0.0F, 0.0F};
+        const float here[3] = {shot->box_x, 0.0F, 0.0F};
+        eng_instance_make_yaw(&list[0], away, 1.0F, shot->box_yaw, NULL);
+        eng_instance_make_yaw(&list[1], here, 1.0F, shot->box_yaw, NULL);
+        instances = eng_instances_upload(&s->r, list, 2);
+        caster = eng_model_gpu_draw_depth_instanced(&s->box, sq, s->instanced_shadow_pipeline,
+                                                    shot->map.view_proj, instances, 2) == 1U;
+    } else {
+        caster = eng_model_gpu_draw_depth(&s->box, sq, s->shadow_pipeline, box_model,
+                                          shot->map.view_proj) == 1U;
+    }
+    if (!caster) {
+        drop_instances(s, instances);
         return false;
     }
     if (shot->cascade >= 0) { /* les projeteurs vont dans le quart de la cascade */
@@ -217,6 +252,7 @@ static bool render_shot(Scene *s, Shot *shot)
         EngShadowMap far_map;
         const float far_center[3] = {500.0F, 0.0F, 500.0F};
         if (!eng_shadow_fit(&far_map, shot->to_sun, far_center, SPHERE_RADIUS, MAP_SIZE)) {
+            drop_instances(s, instances);
             return false;
         }
         shadow.map = s->atlas;
@@ -231,11 +267,14 @@ static bool render_shot(Scene *s, Shot *shot)
                                     used) != 1U ||
         eng_model_gpu_draw_shadowed(&s->box, q, s->pipeline, box_model, view_proj, &light, used) !=
             1U) {
+        drop_instances(s, instances);
         return false;
     }
     ShotContext context = {s, shot};
-    return render_to_pixels_prepared(&s->f, eng_renderer_depth_format(&s->r), shot_prepare,
-                                     shot_draw, &context, SIZE, g_pixels);
+    const bool drawn = render_to_pixels_prepared(&s->f, eng_renderer_depth_format(&s->r),
+                                                 shot_prepare, shot_draw, &context, SIZE, g_pixels);
+    drop_instances(s, instances);
+    return drawn;
 }
 
 /* Monde (x, z) du centre du pixel (px, py) sur le sol. */
@@ -406,6 +445,48 @@ UTEST(shadow_gpu, each_quarter_of_the_cascade_atlas_gives_the_shadow_of_the_sing
                    st.wrong_shadow);
         }
     }
+    EXPECT_EQ(close_scene(&s), 0U);
+}
+
+static int worst_pixel_difference(const uint8_t *a, const uint8_t *b)
+{
+    int worst = 0;
+    for (size_t i = 0; i < (size_t)SIZE * SIZE * 4U; i++) {
+        const int d = abs((int)a[i] - (int)b[i]);
+        worst = d > worst ? d : worst;
+    }
+    return worst;
+}
+
+/* B8 : une ombre projetée en dessin instancié (arbres, rochers) est celle du dessin ordinaire :
+ * même verdict géométrique, mêmes pixels. Deux instances, la première hors de la carte : un dessin
+ * qui ne lirait que la première ne donnerait aucune ombre. */
+UTEST(shadow_gpu, an_instanced_caster_casts_the_shadow_of_the_plain_caster)
+{
+    Scene s;
+    REQUIRE_SCENE(s);
+    static uint8_t plain[SIZE * SIZE * 4];
+    Shot shot = default_shot(40.0F, 37.0F);
+    shot.box_x = 1.5F;
+    ASSERT_TRUE(render_shot(&s, &shot));
+    memcpy(plain, g_pixels, sizeof plain);
+    shot.instanced_box = true;
+    ASSERT_TRUE(render_shot(&s, &shot));
+    const Stats st = compare_with_geometry(&shot);
+    EXPECT_GT(st.certain_lit, 3000U);
+    EXPECT_GT(st.certain_shadow, 100U);
+    EXPECT_EQ(st.wrong_lit, 0U);
+    EXPECT_EQ(st.wrong_shadow, 0U);
+    EXPECT_LE(worst_pixel_difference(plain, g_pixels), 1);
+    /* tournée de 0,6 rad (la boîte carrée n'est pas symétrique pour ce cap) : la rotation de
+     * l'instance est lue, l'ombre est celle du dessin ordinaire de même matrice */
+    shot.instanced_box = false;
+    shot.box_yaw = 0.6F;
+    ASSERT_TRUE(render_shot(&s, &shot));
+    memcpy(plain, g_pixels, sizeof plain);
+    shot.instanced_box = true;
+    ASSERT_TRUE(render_shot(&s, &shot));
+    EXPECT_LE(worst_pixel_difference(plain, g_pixels), 1);
     EXPECT_EQ(close_scene(&s), 0U);
 }
 

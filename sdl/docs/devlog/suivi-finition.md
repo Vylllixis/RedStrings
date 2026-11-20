@@ -32,7 +32,7 @@ RTX 5070 Laptop GPU (8 Go, pilote 580.178.04) + Intel UHD (hybride) ; écran int
 | B5 | 26 allocations dans la boucle de frame en partie interactive (dès l'image 1 : menus ImGui, sauvegarde, reprise) ; 28 au plein écran / redimensionnement | moyen (ADR 0003) | à traiter : préchauffage de l'UI, E/S hors image |
 | B6 | Menus : pas de flèches ni d'Entrée ; Échap quitte le jeu sans confirmation, même en partie | mineur (UX) | M8 (menus) |
 | B7 | Journal « fenêtre ouverte : 2494 x 1531 » en plein écran : taille lue avant la bascule (asynchrone sous X11) ; la swapchain est bien en 2560 x 1600 | mineur | **corrigé** (M0, SDL_SyncWindow) |
-| B8 | M3 : végétation = sphères vertes, rochers = sphères blanches | moyen (laid) | après M4 (assets CC0) |
+| B8 | M3 : végétation = sphères vertes, rochers = sphères blanches | moyen (laid) | **corrigé** (arbres et rochers KayKit CC0, clairière en combat, ombres instanciées ; tests launcher.terrain, launcher.combat_terrain_render, shadow_gpu ; reste : pas de collision des arbres) |
 | B9 | Démarrage ~5 s : création du périphérique Vulkan 2,8 s, IBL recalculée à chaque lancement 2 s | mineur | à voir (cache IBL) |
 | B10 | Pas de manette sur la machine : non testable ici | — | Théo |
 | B11 | Combat : 16 dessins d'ombre perdus par image (file d'ombre de 64 Kio pleine : 41 matrices d'os par pièce skinnée) ; compteur « perdus » du panneau F1 jamais signalé | moyen (ombres manquantes) | **corrigé** (256 Kio, avertissement à l'arrêt, `launcher.combat_render`) |

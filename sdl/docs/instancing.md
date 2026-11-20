@@ -82,8 +82,13 @@ terrain, enfoncés de 15 % de leur échelle, teintes grises variées, **un dessi
 - Pas de culling par instance (le GPU découpe ce qui est hors champ mais le vertex shader tourne pour tous les
   sommets) ; pas de LODs : les rochers lointains coûtent autant que les proches. Un culling par frustum de blocs
   d'instances, ou des LODs, sont les étapes suivantes si la mesure sur GPU réel le demande.
-- Les rochers **ne projettent ni ne reçoivent d'ombre** ici (le pipeline d'ombre n'a pas de variante instanciée) et
-  ne sont **pas brouillardés** (`model.frag` n'a pas le brouillard du terrain, voir docs/fog.md) : lointains, ils
+- Ombres (B8) : `eng_instanced_shadow_pipeline_desc` (vertex shader `shadow_instanced.vert`, instances aux
+  emplacements 1 et 2) et `eng_model_gpu_draw_depth_instanced` mettent un groupe d'instances dans la passe d'ombre ;
+  `--placement` sur un terrain s'en sert (arbres, rochers). Preuve : `shadow_gpu.an_instanced_caster_casts_the_shadow_
+  of_the_plain_caster` (deux instances dont la première hors carte, puis une boîte tournée : mêmes pixels que le
+  dessin ordinaire). Attention : la compilation SPIR-V numérote les entrées dans l'ordre de déclaration, pas selon
+  l'indice de TEXCOORD ; d'où des emplacements contigus. `--rocks N` (démonstration) reste sans ombre. Les rochers ne
+  sont **pas brouillardés** (`model.frag` n'a pas le brouillard du terrain, voir docs/fog.md) : lointains, ils
   tranchent sur le terrain brumeux.
 - Échelle uniforme seulement ; pas de teinte par instance dans le matériau (multiplication de la couleur de base).
 - Placement du lanceur : uniforme et naïf (M3-08 fait le vrai).

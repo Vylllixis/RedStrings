@@ -97,6 +97,7 @@ typedef struct DemoScene {
     uint32_t shadow_size;
     EngPipelineHandle model_shadow_pipeline;
     EngPipelineHandle cube_shadow_pipeline;
+    EngPipelineHandle instanced_shadow_pipeline; /* B8 : arbres et rochers dans la passe d'ombre */
     /* Terrain (--terrain, M3-02) : s'il est chargé, la scène ne dessine que le ciel et lui (voir
      * demo_scene_draw). `terrain_view` : position conseillée de la caméra. */
     EngTerrainGpu terrain;
@@ -112,6 +113,9 @@ typedef struct DemoScene {
      * verte), UN dessin de plus ; les rochers suivent la roche de la splatmap. */
     EngBufferHandle veg_instances;
     uint32_t veg_count;
+    /* B8 : avec --placement, rochers et arbres KayKit (CC0, assets/props/nature/) au lieu du
+     * petit rocher procédural teinté ; repli sur celui-ci si les fichiers manquent. */
+    EngModelGpu tree;
     /* Herbe animée (--grass, M3-09) : un brin, un champ de brins, UN dessin, vent et fondu au
      * vertex shader. */
     EngModelGpu grass_blade;
@@ -159,6 +163,7 @@ typedef struct DemoScene {
     bool has_terrain;
     bool has_shadow;
     bool has_lines;
+    bool has_tree; /* B8 : `tree` chargé */
     DemoDebugHook debug_hook; /* demo_scene_set_debug_hook */
     void *debug_user;
     DemoModelHook model_hook; /* demo_scene_set_model_hook */
@@ -189,6 +194,8 @@ typedef struct DemoOptions {
     bool grass;              /* --grass : champ d'herbe animée sur l'herbe du terrain (M3-09) */
     bool placement;          /* --placement : rochers et végétation placés par règles (M3-08) */
     uint32_t placement_seed; /* --placement-seed : graine des règles (défaut 1) */
+    float placement_clearing_m; /* B8 : rayon (m) laissé sans arbre ni rocher autour du centre
+                                   (combat : aire de jeu et camp) ; 0 : aucun */
     float fog_density; /* --fog-density : densité du brouillard (1/m) ; < 0 : défaut ; 0 : coupé */
     bool watch_assets; /* --watch-assets : recuire et recharger le modèle quand ses sources changent
                         */
