@@ -205,3 +205,24 @@ attack boss_h2
  anim chop_2h 1.33 0
  hitbox hand_r 0 0 0.3 0 0 2.8 0.32
 end
+# Grande carte : le dragon (les capsules d'arme viennent de play_boss.c, pas de `hand_r`).
+attack dragon_claw
+ startup 26
+ active 6
+ recovery 26
+ damage 14
+ posture 22
+ stamina 5
+ hitstop 5
+ hitbox hand_r 0 0 0.3 0 0 2.6 0.3
+end
+attack dragon_bite
+ startup 38
+ active 7
+ recovery 36
+ damage 22
+ posture 35
+ stamina 5
+ hitstop 7
+ hitbox hand_r 0 0 0.3 0 0 2.6 0.3
+end

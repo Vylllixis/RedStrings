@@ -411,7 +411,16 @@ void play_mode_tick(PlayMode *play, const EngInputState *input, float dt)
         play->orbit.want_yaw = play->loco.facing; /* la caméra suit le dos du personnage */
         input = &auto_input;
     }
-    const float pivot[3] = {feet[0], feet[1] + PLAY_PIVOT_HEIGHT, feet[2]};
+    float pivot[3] = {feet[0], feet[1] + PLAY_PIVOT_HEIGHT, feet[2]};
+    /* cinématique du boss : la caméra glisse vers lui (à mi-chemin), puis revient */
+    float focus[2] = {feet[0], feet[2]};
+    const bool cinematic = play->combat != NULL && play_combat_cinematic(play->combat, focus);
+    play->cinematic_blend += ((cinematic ? 1.0F : 0.0F) - play->cinematic_blend) * 0.06F;
+    if (cinematic && play->cinematic_blend > 0.001F) {
+        const float k = 0.5F * play->cinematic_blend;
+        pivot[0] += (focus[0] - feet[0]) * k;
+        pivot[2] += (focus[1] - feet[2]) * k;
+    }
     (void)eng_orbit_camera_update(&play->orbit, input, dt, pivot);
     (void)eng_orbit_camera_collide(&play->orbit, play->world, STATIC_MASK,
                                    ENG_ORBIT_COLLISION_RADIUS, dt);
@@ -604,14 +613,64 @@ static bool load_wall_visuals(PlayMode *play, EngRenderer *renderer, EngArena *a
     return true;
 }
 
+/* Grande carte : une boîte unité par couleur pour le cheval et le dragon (engine/creature.h) ;
+ * ventre, flammes et yeux émissifs (le bloom les fait rayonner). */
+static bool load_creature_visuals(PlayMode *play, EngRenderer *renderer, EngArena *arena,
+                                  const EngEnvironment *env)
+{
+    if (play->creature_ready) {
+        return true;
+    }
+    static const float colors[ENG_CREATURE_COLORS][7] = {
+        /* r, g, b, rugosité, émissif r, g, b */
+        [ENG_CREATURE_BROWN] = {0.33F, 0.2F, 0.11F, 0.8F, 0.0F, 0.0F, 0.0F},
+        [ENG_CREATURE_DARK] = {0.07F, 0.06F, 0.07F, 0.7F, 0.0F, 0.0F, 0.0F},
+        [ENG_CREATURE_RED] = {0.5F, 0.07F, 0.05F, 0.55F, 0.0F, 0.0F, 0.0F},
+        [ENG_CREATURE_ORANGE] = {0.9F, 0.35F, 0.05F, 0.6F, 2.2F, 0.6F, 0.05F},
+        [ENG_CREATURE_BONE] = {0.85F, 0.8F, 0.68F, 0.6F, 0.0F, 0.0F, 0.0F},
+        [ENG_CREATURE_YELLOW] = {1.0F, 0.85F, 0.3F, 0.5F, 4.0F, 2.8F, 0.5F},
+    };
+    const float lo[3] = {-0.5F, -0.5F, -0.5F};
+    const float hi[3] = {0.5F, 0.5F, 0.5F};
+    uint32_t made = 0;
+    for (; made < (uint32_t)ENG_CREATURE_COLORS; made++) {
+        EngModelMaterial mat =
+            arena_material(colors[made][0], colors[made][1], colors[made][2], colors[made][3]);
+        mat.emissive[0] = colors[made][4];
+        mat.emissive[1] = colors[made][5];
+        mat.emissive[2] = colors[made][6];
+        const EngArenaMark mark = eng_arena_mark(arena);
+        EngModel box;
+        if (!eng_model_make_box(arena, lo, hi, &mat, &box) ||
+            !eng_model_gpu_create(&play->creature_models[made], renderer, arena, &box, 0.0F)) {
+            eng_arena_reset_to(arena, mark);
+            break;
+        }
+        if (env != NULL) {
+            (void)eng_model_gpu_set_environment(&play->creature_models[made], renderer, env);
+        }
+    }
+    if (made < (uint32_t)ENG_CREATURE_COLORS) { /* tout ou rien */
+        for (uint32_t i = 0; i < made; i++) {
+            eng_model_gpu_destroy(&play->creature_models[i], renderer);
+        }
+        return false;
+    }
+    play->creature_ready = true;
+    return true;
+}
+
 bool play_mode_load_arena_visuals(PlayMode *play, EngRenderer *renderer, EngArena *arena,
                                   const EngEnvironment *env)
 {
     if (play == NULL || !play->ready || renderer == NULL || arena == NULL) {
         return false;
     }
+    /* cheval et dragon des boss spéciaux : partout (le monde ouvert est branché plus tard) */
+    const bool creatures = load_creature_visuals(play, renderer, arena, env);
     if (play->on_terrain) { /* M6-09 : sur un terrain, seulement les murs de l'arène du boss */
-        return load_wall_visuals(play, renderer, arena, env);
+        const bool walls = load_wall_visuals(play, renderer, arena, env);
+        return creatures || walls;
     }
     const EngModelMaterial stone = arena_material(0.42F, 0.40F, 0.38F, 0.85F);
     const EngModelMaterial wood = arena_material(0.45F, 0.30F, 0.18F, 0.7F);
@@ -657,6 +716,12 @@ void play_mode_unload_visuals(PlayMode *play, EngRenderer *renderer)
     if (play->wall_ready) {
         eng_model_gpu_destroy(&play->wall_model, renderer);
         play->wall_ready = false;
+    }
+    if (play->creature_ready) {
+        for (uint32_t i = 0; i < (uint32_t)ENG_CREATURE_COLORS; i++) {
+            eng_model_gpu_destroy(&play->creature_models[i], renderer);
+        }
+        play->creature_ready = false;
     }
 }
 
@@ -708,7 +773,8 @@ void play_mode_draw_models(const PlayMode *play, EngRenderQueue *queue, mat4 vie
     if (play == NULL || !play->ready || play->avatars == NULL) {
         return;
     }
-    for (uint32_t i = 0; i < play->arena_count; i++) {
+    /* l'arène de démonstration n'existe pas dans le monde ouvert (ground_fn) */
+    for (uint32_t i = 0; play->ground_fn == NULL && i < play->arena_count; i++) {
         mat4 place;
         glm_mat4_copy((vec4 *)play->arena_place[i], place);
         if (shadow_pass) {
@@ -728,6 +794,26 @@ void play_mode_draw_models(const PlayMode *play, EngRenderQueue *queue, mat4 vie
         } else {
             (void)eng_model_gpu_draw_shadowed(&play->wall_model, queue, play->avatars->prop, place,
                                               view_proj, light, shadow);
+        }
+    }
+    if (play->creature_ready && play->combat != NULL) { /* cheval ou dragon du boss spécial */
+        const mat4 *places = NULL;
+        const uint8_t *colors = NULL;
+        const uint32_t n = play_combat_creature(play->combat, &places, &colors);
+        for (uint32_t i = 0; i < n; i++) {
+            if (colors[i] >= (uint8_t)ENG_CREATURE_COLORS) {
+                continue;
+            }
+            const EngModelGpu *model = &play->creature_models[colors[i]];
+            mat4 place;
+            glm_mat4_copy((vec4 *)places[i], place);
+            if (shadow_pass) {
+                (void)eng_model_gpu_draw_depth(model, queue, play->avatars->prop_shadow, place,
+                                               view_proj);
+            } else {
+                (void)eng_model_gpu_draw_shadowed(model, queue, play->avatars->prop, place,
+                                                  view_proj, light, shadow);
+            }
         }
     }
     if (shadow_pass) {

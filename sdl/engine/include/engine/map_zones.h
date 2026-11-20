@@ -13,6 +13,7 @@
 #include <stdint.h>
 
 #include "engine/biome.h"
+#include "engine/boss_special.h"
 
 typedef enum EngMapZoneKind {
     ENG_MAPZONE_FARM_EASY = 0,
@@ -34,10 +35,11 @@ typedef struct EngMapZone {
     double z;
     const char *arch[ENG_MAPZONE_MAX_ENEMIES]; /* archétypes des ennemis (enemies.txt) */
     uint32_t enemy_count;
-    float hp;           /* PV de chaque ennemi de la zone */
-    float damage_scale; /* dégâts infligés x */
-    float size_scale;   /* taille du personnage x */
-    uint32_t reward;    /* boss : palier de butin donné (1 à 4) ; 0 : rien */
+    EngBossKind boss_kind; /* zone de boss : boss spécial (cavalier, dragon) ou ordinaire */
+    float hp;              /* PV de chaque ennemi de la zone */
+    float damage_scale;    /* dégâts infligés x */
+    float size_scale;      /* taille du personnage x */
+    uint32_t reward;       /* boss : palier de butin donné (1 à 4) ; 0 : rien */
 } EngMapZone;
 
 /* Les ENG_MAPZONE_COUNT zones, dans l'ordre du chemin (x croissant). `map` place chaque zone dans

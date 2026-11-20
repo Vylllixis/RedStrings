@@ -72,6 +72,12 @@ bool eng_mapzones_build(const EngBiomeMap *map, EngMapZone out[ENG_MAPZONE_COUNT
                 z->size_scale = 1.0F;
                 z->reward = (uint32_t)b + 1U;
                 z->boss_title = tier->boss_title;
+                if (b == ENG_BIOME_PLAIN) { /* le Chevalier noir arrive à cheval */
+                    z->boss_kind = ENG_BOSSKIND_RIDER;
+                } else if (b == ENG_BIOME_VOLCANO) { /* boss final : le dragon */
+                    z->boss_kind = ENG_BOSSKIND_DRAGON;
+                    z->arch[0] = "dragon";
+                }
             }
         }
     }

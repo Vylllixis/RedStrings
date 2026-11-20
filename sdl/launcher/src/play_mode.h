@@ -2,6 +2,7 @@
 
 #include <stdbool.h>
 
+#include "engine/creature.h"
 #include "engine/arena.h"
 #include "engine/debug_lines.h"
 #include "engine/heightmap.h"
@@ -59,6 +60,8 @@ typedef struct PlayMode {
     mat4 arena_place[PLAY_ARENA_PIECES];
     mat4 wall_place[PLAY_WALL_SEGMENTS]; /* M6-09 : segment de mur sur le relief (boîte unité) */
     EngModelGpu wall_model;
+    EngModelGpu creature_models[ENG_CREATURE_COLORS]; /* boîte unité par couleur (cheval, dragon) */
+    float cinematic_blend; /* caméra : 0 sur le joueur, 1 sur la cinématique */
     uint32_t wall_count;
     float spawn[3];
     uint32_t arena_count;
@@ -67,7 +70,8 @@ typedef struct PlayMode {
     bool ready;
     bool on_terrain;
     bool creative; /* mode créatif (touche « , ») : invincible, vol libre, dégâts inchangés */
-    bool wall_ready; /* `wall_model` créé (play_mode_load_arena_visuals) */
+    bool wall_ready;     /* `wall_model` créé (play_mode_load_arena_visuals) */
+    bool creature_ready; /* `creature_models` créés */
     /* M7 : point de départ (repère local ; suit le recentrage de l'origine) */ /* --terrain :
                                                                                    sol = champ
                                                                                    de hauteurs

@@ -152,9 +152,32 @@ zone a son nom sur la barre de vie (« Chevalier noir », « Seigneur du givre �
 Tests : `engine.gear` (3), `fighter.the_defender_armor_scale...`, `save_game.the_gear_section...`,
 autotest du combat (palier 2 : dégâts x 1,8, armure x 0,65, garde 0,1).
 
-Limites : les boss sont encore le même guerrier squelette avec plus de PV (le chevalier à cheval et
-le dragon viennent ensuite) ; pas de château ni de décor de zone ; les pièces du butin n'ont pas
-de modèle propre (même épée, même bouclier).
+**Boss spéciaux** (`engine/boss_special.h`, `engine/creature.h`, `launcher/src/play_boss.c`) :
+
+- **Chevalier noir** (plaine, zone 2) : il arrive **à cheval** (vitesse x 1,5, rayon 1 m, soulevé
+  de 1,9 m ; barre « Chevalier noir, à cheval »). Le cheval porte les premiers 40 % de ses PV.
+  Cheval mort : **cinématique** de 4 s (bandes noires, la caméra glisse vers lui, le cheval se
+  couche, le chevalier tombe puis se relève ; ni lui ni le joueur n'agissent ni ne prennent de
+  coup, un coup énorme ne traverse pas le cheval), puis combat **à pied** avec les 60 % restants.
+- **Dragon de lave** (volcan, zone 11, boss final, archétype `dragon`) : corps de 5 m, tête à
+  4,4 m, 10 m d'envergure. Ses hurtboxes (ventre, tête, pattes) et ses coups (griffes de 1,5 à 4 m
+  devant lui, morsure jusqu'à 7 m : la tête s'abat) suivent son corps. **Souffle** : dès qu'il voit
+  le joueur entre 4 et 14 m devant lui, la gueule s'ouvre 1,2 s (télégraphe), puis un cône de
+  flammes (24 degrés de chaque côté, jusqu'à 16 m) brûle 1,8 s : une brûlure tous les 12 ticks
+  (8 x les dégâts de la zone, réduite par l'armure et la garde, évitée par l'esquive et le mode
+  créatif), puis 5 s de récupération. Il ne bouge pas pendant le souffle : on s'écarte du cône.
+
+Le cheval et le dragon sont **construits en code, en boîtes** (question Q13) : aucun modèle CC0
+animé utilisable n'a été trouvé et ni Blender ni assimp ne sont installés. Ventre, yeux et flammes
+sont émissifs.
+
+Tests : `engine.boss_special` (3), `engine.creature` (2), `launcher.bosses` (`--boss-selftest`,
+34 mesures : phases du cavalier, cinématique, souffle, corps à corps, butin).
+
+Limites : les boss de la montagne et du désert sont encore le guerrier squelette avec plus de PV ;
+à cheval, les coups du chevalier partent du sol (son épée est dessinée 1,9 m plus haut) ; pas de
+château ni de décor de zone ; les pièces du butin n'ont pas de modèle propre (même épée, même
+bouclier) ; pas de son propre au cheval ni au dragon.
 
 ## Streaming (M7-03) — `world_stream`
 

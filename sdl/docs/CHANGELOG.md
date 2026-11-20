@@ -66,6 +66,10 @@ livraisons ; les tags sont posés par Théo après ses tests.
   montagne enneigée, désert, volcan) : relief et matières par biome, frontières fondues.
 - Grande carte : 12 zones d'ennemis (farm facile, farm dur, boss dans chaque biome), difficulté
   croissante, camp de réveil sans ennemis ; `--at-zone N` pour commencer devant une zone.
+- Grande carte : boss spéciaux : Chevalier noir à cheval (cheval, cinématique de la chute, combat
+  à pied) ; Dragon de lave (griffes, morsure, souffle de flammes) ; cheval et dragon en boîtes
+  (`engine/creature`), logique dans `engine/boss_special` ; `--boss-selftest`. L'arène de
+  démonstration n'est plus dessinée dans le monde ouvert.
 - Grande carte : butin des boss (arme, armure, bouclier : palier 0 à 4), sauvegardé ; nom du boss
   de chaque biome ; `--gear N`.
 - M7 (finition) : un camp d'ennemis dans le monde ouvert (`launcher --world --combat`), ancré dans le

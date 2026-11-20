@@ -123,6 +123,11 @@ void play_combat_player_drive(const PlayCombat *c, const AvatarLibrary *lib, dou
                               EngActorDrive *d);
 /* Anime les combattants autres que le joueur (une fois par image). */
 void play_combat_update_visuals(PlayCombat *c, const struct PlayMode *play, double alpha, float dt);
+/* Grande carte : boîtes du cheval ou du dragon du boss spécial (boîte unité -> monde, couleur
+ * EngCreatureColor), calculées par play_combat_update_visuals. Renvoie leur nombre. */
+uint32_t play_combat_creature(const PlayCombat *c, const mat4 **places, const uint8_t **colors);
+/* La cinématique du cavalier est en cours ; `focus` (peut être NULL) : où il est (x, z). */
+bool play_combat_cinematic(const PlayCombat *c, float focus[2]);
 void play_combat_draw_models(const PlayCombat *c, const AvatarLibrary *lib, EngRenderQueue *queue,
                              mat4 view_proj, const EngLighting *light, const EngModelShadow *shadow,
                              bool shadow_pass);
@@ -170,6 +175,8 @@ uint32_t play_combat_weapon(const PlayCombat *c, uint32_t *owned);
  * « AUTOTEST COMBAT : OK » ou la première erreur. `rig` (--combat-rig-selftest) : avec les
  * personnages KayKit (partie CPU) : hurtboxes sur les os et lame animée (M5-05, M5-06). */
 bool play_combat_selftest(bool rig);
+/* Grande carte : les boss spéciaux (cavalier, dragon) sans fenêtre (--boss-selftest). */
+bool play_combat_bosses_selftest(void);
 
 /* Autotest M6-03 (option --combat-terrain-selftest FICHIER.hmap) : le camp sur un terrain en
  * relief ; le joueur garde près du camp. Vérifie que les ennemis l'atteignent, ne se tiennent

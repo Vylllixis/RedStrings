@@ -120,6 +120,8 @@ static void usage(const char *prog)
             "m/s), sans fenêtre ; --world-bench-report F : rapport écrit dans F\n");
     fprintf(stderr, "  --combat-rig-selftest (développement) le même, avec les personnages "
                     "animés : hurtboxes sur les os, lame en main\n");
+    fprintf(stderr, "  --boss-selftest (développement) autotest des boss spéciaux de la grande "
+                    "carte (cavalier, dragon), sans fenêtre\n");
     fprintf(stderr, "  --combat-selftest (développement) autotest du combat sans fenêtre, "
                     "journalise AUTOTEST COMBAT\n");
     fprintf(stderr, "  --no-mipmaps   démo : texture du cube sans mipmaps (montre l'aliasing)\n");
@@ -406,6 +408,7 @@ int main(int argc, char **argv)
     bool combat_enabled = false;
     bool combat_audio = true;
     bool combat_selftest = false;
+    bool boss_selftest = false; /* --boss-selftest : cavalier et dragon de la grande carte */
     bool combat_selftest_rig = false;
     const char *combat_terrain_selftest_path = NULL;
     bool combat_autoplay = false;
@@ -539,6 +542,8 @@ int main(int argc, char **argv)
             screenshot_frame = strtol(argv[++i], NULL, 10);
         } else if (strcmp(argv[i], "--no-audio") == 0) {
             combat_audio = false;
+        } else if (strcmp(argv[i], "--boss-selftest") == 0) {
+            boss_selftest = true;
         } else if (strcmp(argv[i], "--combat-selftest") == 0) {
             combat_selftest = true;
         } else if (strcmp(argv[i], "--combat-terrain-selftest") == 0 && i + 1 < argc) {
@@ -733,6 +738,11 @@ int main(int argc, char **argv)
         const bool camp_ok = play_combat_terrain_selftest(combat_terrain_selftest_path);
         eng_log_shutdown();
         return camp_ok ? 0 : 1;
+    }
+    if (boss_selftest) { /* grande carte : cavalier et dragon, sans fenêtre */
+        const bool boss_ok = play_combat_bosses_selftest();
+        eng_log_shutdown();
+        return boss_ok ? 0 : 1;
     }
     if (combat_selftest) { /* sans fenêtre ni GPU : personnage, combat et IA scriptés */
         const bool combat_ok = play_combat_selftest(combat_selftest_rig);

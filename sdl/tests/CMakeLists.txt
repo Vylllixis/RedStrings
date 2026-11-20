@@ -26,6 +26,8 @@ ow_add_test(splatmap test_splatmap.c)
 ow_add_test(biome test_biome.c)
 ow_add_test(map_zones test_map_zones.c)
 ow_add_test(gear test_gear.c)
+ow_add_test(creature test_creature.c)
+ow_add_test(boss_special test_boss_special.c)
 ow_add_test(frustum test_frustum.c)
 ow_add_test(atmosphere test_atmosphere.c)
 ow_add_test(fog test_fog.c)
@@ -487,6 +489,13 @@ if(OW_PHYSICS)
   set_tests_properties(launcher.combat PROPERTIES
     ENVIRONMENT "${LAUNCHER_ENV}"
     PASS_REGULAR_EXPRESSION "AUTOTEST COMBAT : OK")
+  # Grande carte : boss spéciaux (cavalier : cheval, cinématique, à pied ; dragon : flammes,
+  # corps à corps), sans fenêtre.
+  add_test(NAME launcher.bosses COMMAND launcher --boss-selftest
+           WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR})
+  set_tests_properties(launcher.bosses PROPERTIES
+    ENVIRONMENT "${LAUNCHER_ENV}"
+    PASS_REGULAR_EXPRESSION "AUTOTEST BOSS : OK")
   # Le même avec les personnages KayKit (M4) : hurtboxes sur les os, lame animée (M5-05, M5-06).
   add_test(NAME launcher.combat_rig COMMAND launcher --combat-rig-selftest
            WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR})

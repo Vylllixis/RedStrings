@@ -1,6 +1,7 @@
 #include "play_combat.h"
 
 #include "engine/gear.h"
+#include "play_boss.h"
 
 #include <SDL3/SDL.h>
 #include <math.h>
@@ -163,6 +164,13 @@ struct PlayCombat {
     EngPose reach_pose;                 /* mesure des portées (play_combat_attach_avatars) */
     EngWeaponTrail trail[FIGHTERS_MAX]; /* M5-20 : traînée de la lame pendant une attaque */
     int32_t ai_selected;                /* M6-10 : agent choisi au clic, -1 */
+    /* grande carte : boss spécial de la zone (cavalier, dragon) et ses boîtes à dessiner */
+    EngBossKind zone_boss_kind;
+    uint32_t creature_count;
+    uint32_t cinematic_ticks; /* message de la cinématique encore affiché */
+    uint8_t creature_color[ENG_CREATURE_MAX_PARTS];
+    PlayBoss boss;
+    mat4 creature_place[ENG_CREATURE_MAX_PARTS];
 };
 
 /* applique les statistiques du niveau au joueur ; `heal` : PV et endurance au maximum */
@@ -357,6 +365,12 @@ static void spawn_all(PlayCombat *c)
             c->sim.radius[f] *= c->zone_size > 0.0F ? c->zone_size : 1.0F;
         }
     }
+    play_boss_clear(&c->boss);
+    c->cinematic_ticks = 0;
+    if (c->zone_boss && c->zone_boss_kind != ENG_BOSSKIND_NONE && c->group.count > 0U) {
+        play_boss_begin(&c->boss, c->zone_boss_kind, c->group.agents[0].fighter, &c->sim,
+                        c->zone_damage);
+    }
 }
 
 void play_combat_shift(PlayCombat *c, float dx, float dz)
@@ -394,6 +408,7 @@ void play_combat_shift(PlayCombat *c, float dx, float dz)
         }
         c->nav.origin[a] += d[a];
     }
+    play_boss_shift(&c->boss, dx, dz);
     for (uint32_t i = 0; i < FIGHTERS_MAX; i++) {
         (void)eng_trail_init(&c->trail[i], 10U); /* pas de traînée à travers le décalage */
     }
@@ -426,13 +441,20 @@ bool play_combat_load_zone(PlayCombat *c, const EngMapZone *zone, int32_t index,
     c->zone_size = zone != NULL ? zone->size_scale : 1.0F;
     c->zone_boss = zone != NULL && zone->kind == ENG_MAPZONE_BOSS && count > 0U;
     c->zone_reward = zone != NULL ? zone->reward : 0U;
+    c->zone_boss_kind = c->zone_boss ? zone->boss_kind : ENG_BOSSKIND_NONE;
+    play_boss_clear(&c->boss);
+    c->creature_count = 0;
     c->zone_ticks = zone != NULL ? 240U : 0U;
     c->roam = true;
     (void)snprintf(c->zone_name, sizeof c->zone_name, "%s", zone != NULL ? zone->name : "");
     const float face = 1.5707963F; /* tournés vers -X : d'où vient le joueur */
     bool ok = true;
     for (uint32_t i = 0; i < count && ok; i++) {
-        const uint32_t arch = eng_arch_find(&c->arch, zone->arch[i]);
+        uint32_t arch = eng_arch_find(&c->arch, zone->arch[i]);
+        if (arch == UINT32_MAX && c->zone_boss) { /* données anciennes : boss ordinaire */
+            arch = eng_arch_find(&c->arch, "boss");
+            c->zone_boss_kind = ENG_BOSSKIND_NONE;
+        }
         const float angle = 6.2831853F * (float)i / (float)count;
         const float ring = count > 1U ? 5.0F : 0.0F;
         const float px = cx + (ring * cosf(angle));
@@ -471,7 +493,9 @@ bool play_combat_load_zone(PlayCombat *c, const EngMapZone *zone, int32_t index,
         c->avatar[f].scale = scale;
         c->rig_prop[f] = c->avatar[f].right;
         c->rig_scale[f] = scale;
-        fit_plans_to_reach(c, c->avatars, fighter_arch(c, f), c->avatar[f].right, scale);
+        if (c->zone_boss_kind != ENG_BOSSKIND_DRAGON) { /* le dragon frappe avec son corps */
+            fit_plans_to_reach(c, c->avatars, fighter_arch(c, f), c->avatar[f].right, scale);
+        }
     }
     c->lock = -1;
     c->cleared_ticks = 0;
@@ -785,9 +809,36 @@ void play_combat_tick(PlayCombat *c, const EngInputState *input, const float fee
     const bool attacking = pf->fsm.state == ENG_CS_ATTACK;
     eng_aig_tick(&c->group, &c->sim, attacking ? 12.0F : (moving ? 8.0F : 0.0F), in);
 
+    /* grande carte : boss spécial : cinématique (tout le monde figé), souffle (dragon figé) */
+    const bool cinematic = play_boss_before_step(&c->boss, &c->sim, in, PLAYER);
     const float before[2] = {c->sim.bodies[PLAYER].pos[0], c->sim.bodies[PLAYER].pos[1]};
     rig_tick(c); /* M5-05 / M5-06 : hurtboxes sur les os, lame en main */
+    play_boss_rig(&c->boss, &c->sim);
     eng_sim_step(&c->sim, in);
+    PlayBossEvent boss_event;
+    const bool boss_engaged =
+        c->zone_boss && c->group.count > 0U &&
+        (c->group.agents[0].state == ENG_AI_CHASE || c->group.agents[0].state == ENG_AI_ENGAGE);
+    play_boss_after_step(&c->boss, &c->sim, PLAYER, boss_engaged, c->invincible, &boss_event);
+    if (boss_event.horse_died) {
+        c->cinematic_ticks = ENG_RIDER_FALL_TICKS;
+        c->lock = -1;
+        ENG_LOG_INFO("combat : le cheval du %s est mort : il tombe, se relève et combat à pied",
+                     c->zone_title);
+    }
+    if (boss_event.burn_dealt > 0.0F) { /* flammes du dragon : comme une touche */
+        const EngSimEvent burn = {.tick = c->sim.tick,
+                                  .attacker = c->boss.fighter,
+                                  .defender = PLAYER,
+                                  .kind = ENG_HITKIND_DAMAGE,
+                                  .zone = ENG_ZONE_TORSO,
+                                  .dealt = boss_event.burn_dealt,
+                                  .killed = pf->vitals.dead,
+                                  .point = {feet[0], feet[1] + 1.0F, feet[2]}};
+        (void)eng_vfx_on_event(&c->particles, &burn);
+        (void)eng_dmgnum_spawn(&c->numbers, &burn);
+        c->stats.player_hits_taken++;
+    }
     /* le mannequin est un poteau : ni recul ni poussée */
     (void)eng_sim_place(&c->sim, DUMMY, DUMMY_X, DUMMY_Z, c->sim.bodies[DUMMY].yaw);
     out->push[0] = c->sim.bodies[PLAYER].pos[0] - before[0];
@@ -799,7 +850,7 @@ void play_combat_tick(PlayCombat *c, const EngInputState *input, const float fee
     }
     const EngCombatState st = pf->fsm.state;
     out->locked = st == ENG_CS_ATTACK || st == ENG_CS_DODGE || st == ENG_CS_HITSTUN ||
-                  st == ENG_CS_STAGGER || st == ENG_CS_DEAD || st == ENG_CS_PARRY;
+                  st == ENG_CS_STAGGER || st == ENG_CS_DEAD || st == ENG_CS_PARRY || cinematic;
 
     /* retours : particules, son, mesures */
     for (uint32_t k = 0; k < c->sim.event_count; k++) {
@@ -906,6 +957,9 @@ void play_combat_tick(PlayCombat *c, const EngInputState *input, const float fee
     }
     if (c->gear_ticks > 0U) {
         c->gear_ticks--;
+    }
+    if (c->cinematic_ticks > 0U) {
+        c->cinematic_ticks--;
     }
     c->stats.level = c->progress.level;
     c->stats.total_xp = c->progress.total_xp;
@@ -1127,7 +1181,7 @@ static void enemy_look(const PlayCombat *c, uint32_t fighter, AvatarBody *body, 
     const uint32_t arch = fighter_arch(c, fighter);
     const char *name = arch < c->arch.count ? c->arch.a[arch].name : "";
     if (strcmp(name, "boss") == 0) { /* M6-09 : guerrier squelette géant à l'espadon */
-        *body = AVATAR_SKELETON_WARRIOR;
+        *body = c->zone_boss_kind == ENG_BOSSKIND_RIDER ? AVATAR_KNIGHT : AVATAR_SKELETON_WARRIOR;
         *right = AVATAR_GREATSWORD;
         *scale = 1.45F;
     } else if (strcmp(name, "brute") == 0) {
@@ -1216,8 +1270,8 @@ static void rig_tick(PlayCombat *c)
     }
     const AvatarLibrary *lib = c->avatars;
     for (uint32_t i = 0; i < c->sim.count && i < FIGHTERS_MAX; i++) {
-        if (!c->rig_ready[i]) {
-            continue;
+        if (!c->rig_ready[i] || play_boss_hides_fighter(&c->boss, i)) {
+            continue; /* le dragon : hurtboxes et armes de play_boss_rig */
         }
         const EngSimBody *b = &c->sim.bodies[i];
         const float dx = b->pos[0] - b->prev_pos[0];
@@ -1311,14 +1365,53 @@ void play_combat_update_visuals(PlayCombat *c, const PlayMode *play, double alph
         const EngSimBody *b = &c->sim.bodies[i];
         const float x = b->prev_pos[0] + ((b->pos[0] - b->prev_pos[0]) * t);
         const float z = b->prev_pos[1] + ((b->pos[1] - b->prev_pos[1]) * t);
-        const float feet[3] = {x, play_mode_ground(play, x, z), z};
+        /* le cavalier est soulevé par sa monture (et ne marche pas dessus) */
+        const float lift = play_boss_rider_lift(&c->boss, i);
+        const float feet[3] = {x, play_mode_ground(play, x, z) + lift, z};
         const float dx = b->pos[0] - b->prev_pos[0];
         const float dz = b->pos[1] - b->prev_pos[1];
-        EngActorDrive d = {.ground_speed = sqrtf((dx * dx) + (dz * dz)) * 60.0F, .grounded = true};
+        EngActorDrive d = {.ground_speed =
+                               lift > 0.0F ? 0.0F : sqrtf((dx * dx) + (dz * dz)) * 60.0F,
+                           .grounded = true};
         fighter_drive(c, i, c->avatars, alpha, &d);
+        if (play_boss_rider_down(&c->boss, i)) { /* cinématique : il tombe, puis se relève */
+            d.state = ENG_CS_DEAD;
+            d.state_ticks = c->boss.rider.ticks - 30U;
+        }
         avatar_update(&c->avatar[i], c->avatars, &d, dt, feet, lerp_angle(b->prev_yaw, b->yaw, t));
         telegraph_glow(c, i, c->avatar[i].glow);
     }
+    /* boîtes du cheval ou du dragon */
+    c->creature_count = 0;
+    float xz[2];
+    float yaw = 0.0F;
+    if (play_boss_anchor(&c->boss, &c->sim, t, xz, &yaw)) {
+        const float feet[3] = {xz[0], play_mode_ground(play, xz[0], xz[1]), xz[1]};
+        c->creature_count = play_boss_boxes(&c->boss, &c->sim, feet, yaw, c->creature_place,
+                                            c->creature_color, ENG_CREATURE_MAX_PARTS);
+    }
+}
+
+uint32_t play_combat_creature(const PlayCombat *c, const mat4 **places, const uint8_t **colors)
+{
+    if (c == NULL || !c->ready || places == NULL || colors == NULL) {
+        return 0U;
+    }
+    *places = c->creature_place;
+    *colors = c->creature_color;
+    return c->creature_count;
+}
+
+bool play_combat_cinematic(const PlayCombat *c, float focus[2])
+{
+    if (c == NULL || !c->ready || !play_boss_cinematic(&c->boss)) {
+        return false;
+    }
+    if (focus != NULL) {
+        focus[0] = c->sim.bodies[c->boss.fighter].pos[0];
+        focus[1] = c->sim.bodies[c->boss.fighter].pos[1];
+    }
+    return true;
 }
 
 void play_combat_draw_models(const PlayCombat *c, const AvatarLibrary *lib, EngRenderQueue *queue,
@@ -1329,7 +1422,7 @@ void play_combat_draw_models(const PlayCombat *c, const AvatarLibrary *lib, EngR
         return;
     }
     for (uint32_t i = DUMMY; i < c->sim.count && i < FIGHTERS_MAX; i++) {
-        if (!c->has_avatar[i] || c->hidden[i]) {
+        if (!c->has_avatar[i] || c->hidden[i] || play_boss_hides_fighter(&c->boss, i)) {
             continue;
         }
         if (shadow_pass) {
@@ -1665,7 +1758,11 @@ void play_combat_fill_hud(const PlayCombat *c, const PlayMode *play, mat4 view_p
         if (!c->sim.fighters[bf].vitals.dead &&
             (st == ENG_AI_CHASE || st == ENG_AI_ENGAGE || c->lock == (int32_t)bf)) {
             hud->has_boss = true;
-            (void)snprintf(hud->boss_name, sizeof hud->boss_name, "%s", c->zone_title);
+            (void)snprintf(hud->boss_name, sizeof hud->boss_name, "%.19s%s", c->zone_title,
+                           c->boss.kind == ENG_BOSSKIND_RIDER &&
+                                   c->boss.rider.phase == ENG_RIDER_MOUNTED
+                               ? ", à cheval"
+                               : "");
             hud->boss_hp = c->sim.fighters[bf].vitals.hp;
             hud->boss_hp_max = c->sim.fighters[bf].vitals.max_hp;
         }
@@ -1687,9 +1784,13 @@ void play_combat_fill_hud(const PlayCombat *c, const PlayMode *play, mat4 view_p
         n->to_player = false;
         hud->number_count++;
     }
+    hud->letterbox = play_boss_cinematic(&c->boss) ? 1.0F : 0.0F;
     if (pf->vitals.dead) {
         (void)snprintf(hud->message, sizeof hud->message, "%s",
                        "Tu es tombé... renaissance dans un instant");
+    } else if (c->cinematic_ticks > 0U) {
+        (void)snprintf(hud->message, sizeof hud->message, "Le cheval s'effondre : le %s se relève",
+                       c->zone_title);
     } else if (c->boss_ticks > 0U && c->zone_name[0] != '\0') {
         (void)snprintf(hud->message, sizeof hud->message, "%s vaincu !", c->zone_title);
     } else if (c->gear_ticks > 0U) {
@@ -1992,6 +2093,209 @@ static bool boss_selftest(CombatTest *t)
     check(t, !c->sim.fighters[PLAYER].vitals.dead, "le joueur renaît", 1.0F);
     check(t, c->sim.fighters[BOSS].vitals.dead, "le boss vaincu ne renaît pas", 1.0F);
     return t->ok;
+}
+
+/* Grande carte : les deux boss spéciaux, sans fenêtre. Le cavalier : à cheval (plus rapide, plus
+ * large, soulevé), cheval mort -> cinématique (PV tenus, personne ne bouge), puis à pied, vaincu ->
+ * butin ; un coup énorme ne traverse pas le cheval. Le dragon : il souffle (brûlures, sauf en mode
+ * créatif), il frappe au corps à corps, l'épée du joueur l'atteint, vaincu -> butin final. */
+static void kill_fighter(PlayCombat *c, uint32_t f)
+{
+    EngFighter *fighter = &c->sim.fighters[f];
+    (void)eng_damage_apply(&fighter->vitals, 1.0e6F, ENG_ZONE_TORSO, fighter->tick + 1000U);
+    (void)eng_fsm_request(&fighter->fsm, ENG_CS_DEAD);
+}
+
+static void rider_selftest(CombatTest *t, const EngMapZone *zone)
+{
+    PlayCombat *c = t->play.combat;
+    put(t, 12.0F, -2.0F, 0.0F);
+    check(t, play_combat_load_zone(c, zone, 2, 12.0F, -12.0F), "cavalier : zone chargée", 1.0F);
+    const uint32_t bf = c->group.agents[0].fighter;
+    const float max_hp = c->sim.fighters[bf].vitals.max_hp;
+    check(t, c->boss.kind == ENG_BOSSKIND_RIDER && c->boss.rider.phase == ENG_RIDER_MOUNTED,
+          "cavalier : à cheval au départ", (float)c->boss.kind);
+    check(t, fabsf(c->sim.speed_scale[bf] - (c->boss.base_speed * ENG_RIDER_SPEED)) < 1e-5F,
+          "cavalier : plus rapide à cheval (x)", c->sim.speed_scale[bf] / c->boss.base_speed);
+    check(t, c->sim.radius[bf] >= 1.0F, "cavalier : plus large à cheval (m)", c->sim.radius[bf]);
+    check(t, play_boss_rider_lift(&c->boss, bf) > 1.5F, "cavalier : soulevé par la monture (m)",
+          play_boss_rider_lift(&c->boss, bf));
+    static mat4 places[ENG_CREATURE_MAX_PARTS];
+    uint8_t colors[ENG_CREATURE_MAX_PARTS];
+    const float origin[3] = {0.0F, 0.0F, 0.0F};
+    check(t, play_boss_boxes(&c->boss, &c->sim, origin, 0.0F, places, colors, 40U) >= 12U,
+          "cavalier : boîtes du cheval", 0.0F);
+    /* le cheval meurt : cinématique */
+    c->sim.fighters[bf].vitals.hp = max_hp * 0.55F;
+    step(t, 0U, 0U, 0.0F, 0.0F);
+    check(t, play_boss_cinematic(&c->boss) && c->cinematic_ticks > 0U,
+          "cavalier : cheval mort, cinématique", (float)c->cinematic_ticks);
+    check(t, fabsf(c->sim.fighters[bf].vitals.hp - (max_hp * 0.6F)) < 0.01F,
+          "cavalier : il lui reste 60 % des PV", c->sim.fighters[bf].vitals.hp);
+    const float boss0[2] = {c->sim.bodies[bf].pos[0], c->sim.bodies[bf].pos[1]};
+    float feet0[3];
+    float feet1[3];
+    (void)eng_character_position(t->play.character, feet0);
+    const float player_hp = c->sim.fighters[PLAYER].vitals.hp;
+    bool down = false;
+    bool swung = false;
+    for (int i = 0; i < 200; i++) { /* le joueur pousse en avant et frappe : rien ne se passe */
+        step(t, (i % 20) == 0 ? (1U << ENG_ACTION_ATTACK) : 0U, 0U, 0.0F, 1.0F);
+        c->sim.fighters[bf].vitals.hp -= 3.0F; /* et un coup qui passerait quand même */
+        down = down || play_boss_rider_down(&c->boss, bf);
+        swung = swung || c->sim.fighters[PLAYER].fsm.state == ENG_CS_ATTACK;
+    }
+    (void)eng_character_position(t->play.character, feet1);
+    check(t, play_boss_cinematic(&c->boss), "cavalier : cinématique encore en cours", 0.0F);
+    check(t,
+          !eng_vitals_hittable(&c->sim.fighters[PLAYER].vitals, c->sim.fighters[PLAYER].tick) &&
+              !eng_vitals_hittable(&c->sim.fighters[bf].vitals, c->sim.fighters[bf].tick),
+          "cavalier : joueur et boss intouchables pendant la cinématique", 0.0F);
+    check(t, down, "cavalier : le chevalier est tombé", down ? 1.0F : 0.0F);
+    check(t, !swung, "cavalier : le joueur ne frappe pas pendant la cinématique",
+          swung ? 1.0F : 0.0F);
+    check(t,
+          hypotf(c->sim.bodies[bf].pos[0] - boss0[0], c->sim.bodies[bf].pos[1] - boss0[1]) < 0.05F,
+          "cavalier : immobile pendant la cinématique (m)",
+          hypotf(c->sim.bodies[bf].pos[0] - boss0[0], c->sim.bodies[bf].pos[1] - boss0[1]));
+    check(t, hypotf(feet1[0] - feet0[0], feet1[2] - feet0[2]) < 0.3F,
+          "cavalier : le joueur est figé (m)", hypotf(feet1[0] - feet0[0], feet1[2] - feet0[2]));
+    check(t, c->sim.fighters[PLAYER].vitals.hp >= player_hp, "cavalier : le joueur ne perd rien",
+          c->sim.fighters[PLAYER].vitals.hp);
+    for (int i = 0; i < 60; i++) {
+        step(t, 0U, 0U, 0.0F, 0.0F);
+    }
+    check(t, c->boss.rider.phase == ENG_RIDER_ON_FOOT && !play_boss_cinematic(&c->boss),
+          "cavalier : à pied après la cinématique", (float)c->boss.rider.phase);
+    check(t, fabsf(c->sim.fighters[bf].vitals.hp - (max_hp * 0.6F)) < 20.0F,
+          "cavalier : PV tenus pendant la cinématique", c->sim.fighters[bf].vitals.hp);
+    check(t,
+          fabsf(c->sim.speed_scale[bf] - c->boss.base_speed) < 1e-5F &&
+              fabsf(c->sim.radius[bf] - c->boss.base_radius) < 1e-5F &&
+              play_boss_rider_lift(&c->boss, bf) == 0.0F,
+          "cavalier : vitesse et carrure à pied", c->sim.radius[bf]);
+    kill_fighter(c, bf);
+    for (int i = 0; i < 5; i++) {
+        step(t, 0U, 0U, 0.0F, 0.0F);
+    }
+    check(t, play_combat_zone_beaten(c, 2) && c->gear_tier == 1U,
+          "cavalier : vaincu, butin de palier 1", (float)c->gear_tier);
+    /* un coup énorme pendant qu'il est à cheval ne tue que le cheval */
+    c->zones_beaten = 0;
+    (void)play_combat_load_zone(c, zone, 2, 12.0F, -12.0F);
+    kill_fighter(c, bf);
+    step(t, 0U, 0U, 0.0F, 0.0F);
+    check(t,
+          !c->sim.fighters[bf].vitals.dead && play_boss_cinematic(&c->boss) &&
+              fabsf(c->sim.fighters[bf].vitals.hp - (max_hp * 0.6F)) < 0.01F,
+          "cavalier : un coup énorme ne traverse pas le cheval", c->sim.fighters[bf].vitals.hp);
+    check(t, !play_combat_zone_beaten(c, 2), "cavalier : pas encore vaincu", 0.0F);
+}
+
+static void dragon_selftest(CombatTest *t, const EngMapZone *zone)
+{
+    PlayCombat *c = t->play.combat;
+    c->zones_beaten = 0;
+    put(t, 12.0F, -2.0F, 0.0F);
+    check(t, play_combat_load_zone(c, zone, 11, 12.0F, -14.0F), "dragon : zone chargée", 1.0F);
+    const uint32_t bf = c->group.agents[0].fighter;
+    EngFighter *pf = &c->sim.fighters[PLAYER];
+    pf->vitals.max_hp = 20000.0F;
+    pf->vitals.hp = 20000.0F;
+    check(t, c->boss.kind == ENG_BOSSKIND_DRAGON && play_boss_hides_fighter(&c->boss, bf),
+          "dragon : boss de la zone du volcan", (float)c->boss.kind);
+    check(t, fabsf(c->sim.radius[bf] - 2.0F) < 1e-5F, "dragon : rayon du corps (m)",
+          c->sim.radius[bf]);
+    static mat4 places[ENG_CREATURE_MAX_PARTS];
+    uint8_t colors[ENG_CREATURE_MAX_PARTS];
+    const float origin[3] = {0.0F, 0.0F, 0.0F};
+    check(t, play_boss_boxes(&c->boss, &c->sim, origin, 0.0F, places, colors, 40U) >= 25U,
+          "dragon : boîtes du corps", 0.0F);
+    /* 1. il voit le joueur à 12 m et souffle : la charge ne brûle pas, le jet brûle */
+    int waited = 0;
+    for (; waited < 600 && c->boss.flame.state != ENG_FLAME_BURN; waited++) {
+        step(t, 0U, 0U, 0.0F, 0.0F);
+    }
+    check(t, c->boss.flame.state == ENG_FLAME_BURN, "dragon : il souffle (ticks d'attente)",
+          (float)waited);
+    check(t, c->boss.burns == 0U, "dragon : la charge ne brûle pas", (float)c->boss.burns);
+    c->invincible = true; /* mode créatif : les flammes ne retirent rien */
+    for (int i = 0; i < 14; i++) {
+        step(t, 0U, 0U, 0.0F, 0.0F);
+    }
+    check(t, c->boss.burns == 0U && pf->vitals.hp >= 20000.0F, "dragon : mode créatif, pas brûlé",
+          pf->vitals.hp);
+    c->invincible = false;
+    const float hp0 = pf->vitals.hp;
+    for (int i = 0; i < 100; i++) {
+        step(t, 0U, 0U, 0.0F, 0.0F);
+    }
+    check(t, c->boss.burns >= 5U, "dragon : brûlures dans le cône", (float)c->boss.burns);
+    check(t,
+          fabsf((hp0 - pf->vitals.hp) - ((float)c->boss.burns * 8.0F * zone->damage_scale *
+                                         eng_gear_armor(c->gear_tier))) < 1.0F,
+          "dragon : PV retirés par les flammes", hp0 - pf->vitals.hp);
+    /* 2. corps à corps : il vient et frappe */
+    bool struck = false;
+    for (int i = 0; i < 1500 && !struck; i++) {
+        step(t, 0U, 0U, 0.0F, 0.0F);
+        for (uint32_t k = 0; k < c->sim.event_count; k++) {
+            const EngSimEvent *e = &c->sim.events[k];
+            struck = struck ||
+                     (e->attacker == bf && e->defender == PLAYER && e->kind == ENG_HITKIND_DAMAGE);
+        }
+    }
+    check(t, struck, "dragon : griffes ou morsure touchent le joueur", struck ? 1.0F : 0.0F);
+    /* 3. l'épée du joueur l'atteint, au contact, devant lui */
+    const EngSimBody *body = &c->sim.bodies[bf];
+    const float dragon_hp = c->sim.fighters[bf].vitals.hp;
+    put(t, body->pos[0] - (2.7F * sinf(body->yaw)), body->pos[1] - (2.7F * cosf(body->yaw)),
+        body->yaw + 3.14159265F);
+    for (int i = 0; i < 240; i++) {
+        step(t, (i % 30) == 0 ? (1U << ENG_ACTION_ATTACK) : 0U, 0U, 0.0F, 0.0F);
+    }
+    check(t, c->sim.fighters[bf].vitals.hp < dragon_hp, "dragon : l'épée du joueur l'atteint (PV)",
+          dragon_hp - c->sim.fighters[bf].vitals.hp);
+    kill_fighter(c, bf);
+    for (int i = 0; i < 5; i++) {
+        step(t, 0U, 0U, 0.0F, 0.0F);
+    }
+    check(t, play_combat_zone_beaten(c, 11) && c->gear_tier == 4U,
+          "dragon : vaincu, butin de palier 4", (float)c->gear_tier);
+    check(t, c->boss.flame.state == ENG_FLAME_IDLE, "dragon : mort, plus de flammes",
+          (float)c->boss.flame.state);
+}
+
+bool play_combat_bosses_selftest(void)
+{
+    static CombatTest t;
+    memset(&t, 0, sizeof t);
+    t.ok = true;
+    if (!play_mode_init(&t.play, NULL, 1.0F, false) || !play_mode_enable_combat(&t.play, false)) {
+        ENG_LOG_ERROR("AUTOTEST BOSS : ÉCHEC (initialisation ; Jolt requis)");
+        play_mode_shutdown(&t.play);
+        return false;
+    }
+    PlayCombat *c = t.play.combat;
+    static EngMapZone zones[ENG_MAPZONE_COUNT];
+    const EngBiomeMap map = eng_biome_map_default();
+    if (!eng_mapzones_build(&map, zones)) {
+        play_mode_shutdown(&t.play);
+        return false;
+    }
+    c->world.count = 0; /* pas de cubes : les zones sont en terrain libre */
+    c->sim.fighters[PLAYER].vitals.max_hp = 20000.0F;
+    c->sim.fighters[PLAYER].vitals.hp = 20000.0F;
+    rider_selftest(&t, &zones[2]);
+    dragon_selftest(&t, &zones[11]);
+    const uint32_t ticks = c->sim.tick;
+    play_mode_shutdown(&t.play);
+    if (t.ok) {
+        ENG_LOG_INFO("AUTOTEST BOSS : OK (%d mesures, %u ticks)", t.checks, ticks);
+    } else {
+        ENG_LOG_ERROR("AUTOTEST BOSS : ÉCHEC");
+    }
+    return t.ok;
 }
 
 bool play_combat_terrain_selftest(const char *heightmap_path)

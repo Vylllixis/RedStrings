@@ -48,6 +48,14 @@ UTEST(eng_map_zones, the_plain_matches_the_requested_hit_counts_and_difficulty_o
     EXPECT_STREQ(z[2].boss_title, "Chevalier noir");
     EXPECT_STREQ(z[11].boss_title, "Dragon de lave");
     EXPECT_TRUE(z[0].boss_title == NULL);
+    /* boss spéciaux : le cavalier en plaine, le dragon au volcan ; les autres ordinaires */
+    EXPECT_EQ(z[2].boss_kind, ENG_BOSSKIND_RIDER);
+    EXPECT_EQ(z[11].boss_kind, ENG_BOSSKIND_DRAGON);
+    EXPECT_STREQ(z[11].arch[0], "dragon");
+    EXPECT_STREQ(z[2].arch[0], "boss");
+    EXPECT_EQ(z[5].boss_kind, ENG_BOSSKIND_NONE);
+    EXPECT_EQ(z[8].boss_kind, ENG_BOSSKIND_NONE);
+    EXPECT_EQ(z[0].boss_kind, ENG_BOSSKIND_NONE);
     EXPECT_STREQ(z[0].arch[0], "grunt");
     EXPECT_STREQ(z[1].arch[0], "brute");
     EXPECT_STREQ(z[2].arch[0], "boss");

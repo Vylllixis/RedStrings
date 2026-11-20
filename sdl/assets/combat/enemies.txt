@@ -54,3 +54,19 @@ archetype boss
  plan pattern 0 2.8 420 2 LLH
  phase 0.5 boss_l2 boss_h2 1.25 0.7
 end
+# Grande carte : le Dragon de lave (boss final, volcan). Ses hurtboxes et ses coups suivent son
+# corps en boîtes (launcher/src/play_boss.c) : griffes de 1,5 à 4 m devant lui, morsure jusqu'à 7 m.
+archetype dragon
+ hp 1000
+ speed 0.55
+ radius 2.0
+ sight 30
+ fov 200
+ hearing 20
+ standoff 8
+ light dragon_claw
+ heavy dragon_bite
+ plan light 0 5.0 90 3 1
+ plan heavy 0 6.5 180 2 1
+ plan pattern 0 5.5 420 2 LLH
+end

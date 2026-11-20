@@ -135,6 +135,14 @@ void eng_ui_draw_hud(EngUi *ui, const EngHud *hud, int width, int height)
         const float npx = px * 1.1F;
         text(dl, npx, n->x - text_width(npx, n->text) * 0.5F, n->y, col, n->text, true);
     }
+    if (hud->letterbox > 0.0F) { /* cinématique : bandes noires */
+        const float band = (float)height * 0.11F * (hud->letterbox > 1.0F ? 1.0F : hud->letterbox);
+        ImDrawList_AddRectFilled(dl, (ImVec2_c){0.0F, 0.0F}, (ImVec2_c){(float)width, band},
+                                 rgba(0, 0, 0, 1), 0.0F, 0);
+        ImDrawList_AddRectFilled(dl, (ImVec2_c){0.0F, (float)height - band},
+                                 (ImVec2_c){(float)width, (float)height}, rgba(0, 0, 0, 1), 0.0F,
+                                 0);
+    }
     if (hud->message[0] != '\0') {
         const float mpx = px * 1.6F;
         text(dl, mpx, ((float)width - text_width(mpx, hud->message)) * 0.5F, (float)height * 0.62F,

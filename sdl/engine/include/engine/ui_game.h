@@ -48,6 +48,7 @@ typedef struct EngHud {
     char weapon[32];  /* M8-08 : arme en main (vide : rien) */
     float xp_frac;    /* progression dans le niveau, [0, 1] */
     float text_scale;
+    float letterbox; /* cinématique : bandes noires en haut et en bas, 0 (aucune) à 1 */
     bool high_contrast;
 } EngHud;
 
