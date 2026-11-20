@@ -66,6 +66,8 @@ livraisons ; les tags sont posés par Théo après ses tests.
   montagne enneigée, désert, volcan) : relief et matières par biome, frontières fondues.
 - Grande carte : 12 zones d'ennemis (farm facile, farm dur, boss dans chaque biome), difficulté
   croissante, camp de réveil sans ennemis ; `--at-zone N` pour commencer devant une zone.
+- Grande carte : sol par biome : sable dans le désert, basalte sombre et coulées de lave dans le
+  volcan (deux couches de texture réutilisées par cellule, shader inchangé).
 - Grande carte : boss spéciaux : Chevalier noir à cheval (cheval, cinématique de la chute, combat
   à pied) ; Dragon de lave (griffes, morsure, souffle de flammes) ; cheval et dragon en boîtes
   (`engine/creature`), logique dans `engine/boss_special` ; `--boss-selftest`. L'arène de

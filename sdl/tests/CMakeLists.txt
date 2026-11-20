@@ -618,8 +618,41 @@ if(OW_PHYSICS AND OW_SHADERS_OK)
     ENVIRONMENT "SDL_VIDEODRIVER=offscreen"
     FAIL_REGULAR_EXPRESSION "ERROR|non détruite|perdu|TROU|a bougé"
     PASS_REGULAR_EXPRESSION "camp de réveil.*zone 0 « .*chargée.*zone 1 « .*chargée.*zone 2 « .*chargée")
+  # Couches de sol par biome : devant la zone 0 (plaine) aucune cellule n'a de sable ni de lave ;
+  # devant la zone 7 (désert) toutes ont le sable, pas encore la lave ; devant la zone 11 (volcan)
+  # toutes ont les deux.
+  add_test(NAME launcher.world_layers_plain COMMAND launcher --world 7 --combat --at-zone 0
+           --no-audio --frames 20 --env-samples 16
+           --screenshot ${CMAKE_CURRENT_BINARY_DIR}/world_layers_plain.ppm 15
+           WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR})
+  set_tests_properties(launcher.world_layers_plain PROPERTIES
+    PASS_REGULAR_EXPRESSION "dominante verte.*couches de biome : 0 cellule\\(s\\) avec sable, 0 avec lave")
+  # ... et devant la zone 7 (désert) le sol dessiné est du sable (dominante chaude, pas verte).
+  add_test(NAME launcher.world_layers_desert COMMAND launcher --world 7 --combat --at-zone 7
+           --no-audio --frames 20 --env-samples 16
+           --screenshot ${CMAKE_CURRENT_BINARY_DIR}/world_layers_desert.ppm 15
+           WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR})
+  set_tests_properties(launcher.world_layers_desert PROPERTIES
+    PASS_REGULAR_EXPRESSION "dominante chaude.*couches de biome : [1-9][0-9]* cellule\\(s\\) avec sable")
+  # devant la zone 3 (montagne, x = 1040) : dans les cellules chargées (jusqu'à 1792 m) le canal de
+  # l'herbe est déjà du sable (inutilisé), celui de la neige reste de la neige
+  add_test(NAME launcher.world_layers_mountain COMMAND launcher --world 7 --combat --at-zone 3
+           --no-audio --frames 20 --env-samples 16 WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR})
+  set_tests_properties(launcher.world_layers_mountain PROPERTIES
+    PASS_REGULAR_EXPRESSION "couches de biome : [1-9][0-9]* cellule\\(s\\) avec sable, 0 avec lave")
+  add_test(NAME launcher.world_layers_volcano COMMAND launcher --world 7 --combat --at-zone 11
+           --no-audio --frames 20 --env-samples 16 WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR})
+  set_tests_properties(launcher.world_layers_volcano PROPERTIES
+    PASS_REGULAR_EXPRESSION "couches de biome : ([1-9][0-9]*) cellule\\(s\\) avec sable, [1-9][0-9]* avec lave")
+  foreach(t launcher.world_layers_plain launcher.world_layers_desert launcher.world_layers_mountain
+          launcher.world_layers_volcano)
+    set_property(TEST ${t} PROPERTY ENVIRONMENT "SDL_VIDEODRIVER=offscreen")
+    set_property(TEST ${t} PROPERTY FAIL_REGULAR_EXPRESSION "ERROR|non détruite|perdu|TROU")
+  endforeach()
   if(OW_SOFTWARE_VULKAN_ICD)
-    foreach(t launcher.world_combat launcher.world_combat_shift)
+    foreach(t launcher.world_combat launcher.world_combat_shift launcher.world_layers_plain
+            launcher.world_layers_desert launcher.world_layers_mountain
+            launcher.world_layers_volcano)
       set_property(TEST ${t} APPEND PROPERTY ENVIRONMENT_MODIFICATION
         "VK_DRIVER_FILES=set:${OW_SOFTWARE_VULKAN_ICD}" "VK_ICD_FILENAMES=set:${OW_SOFTWARE_VULKAN_ICD}")
     endforeach()

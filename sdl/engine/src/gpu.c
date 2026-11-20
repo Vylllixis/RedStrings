@@ -708,6 +708,29 @@ static void capture(EngGpu *gpu)
         (void)fclose(f);
         gpu->captured = true;
         ENG_LOG_INFO("capture : %s (%ux%u)", gpu->capture_path, (unsigned)w, (unsigned)h);
+        /* couleur moyenne du sol à gauche du centre (x de 1/8 à 3/8, y de 60 % à 85 %) : les
+         * tests y lisent la matière du sol (herbe verte, sable chaud) sans ouvrir l'image */
+        uint64_t sum[3] = {0, 0, 0};
+        uint64_t count = 0;
+        for (uint32_t y = (h * 60U) / 100U; y < (h * 85U) / 100U; y++) {
+            for (uint32_t x = w / 8U; x < (w * 3U) / 8U; x++) {
+                const size_t i = ((size_t)y * w) + x;
+                sum[0] += px[(i * 4U) + (bgra ? 2U : 0U)];
+                sum[1] += px[(i * 4U) + 1U];
+                sum[2] += px[(i * 4U) + (bgra ? 0U : 2U)];
+                count++;
+            }
+        }
+        if (count > 0U) {
+            const uint32_t r = (uint32_t)(sum[0] / count);
+            const uint32_t g = (uint32_t)(sum[1] / count);
+            const uint32_t b = (uint32_t)(sum[2] / count);
+            const char *tone = (g > r && g > b)
+                                   ? "verte"
+                                   : ((r >= g && (r * 5U) > (b * 6U)) ? "chaude" : "neutre");
+            ENG_LOG_INFO("capture : sol à gauche : rouge %u, vert %u, bleu %u, dominante %s", r, g,
+                         b, tone);
+        }
     } else {
         ENG_LOG_ERROR("capture : écriture de %s impossible", gpu->capture_path);
     }

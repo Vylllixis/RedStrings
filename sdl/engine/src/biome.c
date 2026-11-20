@@ -97,20 +97,90 @@ float eng_biome_altitude_scale(const float weights[ENG_BIOME_COUNT])
     return scale;
 }
 
+float eng_biome_shade(const float weights[ENG_BIOME_COUNT])
+{
+    /* plaine, montagne, désert : pleine lumière ; volcan : basalte, deux fois plus sombre */
+    static const float shade[ENG_BIOME_COUNT] = {1.0F, 1.0F, 1.0F, 0.45F};
+    if (weights == NULL) {
+        return 1.0F;
+    }
+    float out = 0.0F;
+    float total = 0.0F;
+    for (int k = 0; k < ENG_BIOME_COUNT; k++) {
+        const float w = isfinite(weights[k]) && weights[k] > 0.0F ? weights[k] : 0.0F;
+        out += w * shade[k];
+        total += w;
+    }
+    return total > 1e-6F ? out / total : 1.0F;
+}
+
+void eng_biome_cell_layers(const EngBiomeMap *map, double x_min, bool *sand, bool *lava)
+{
+    if (sand != NULL) {
+        *sand = false;
+    }
+    if (lava != NULL) {
+        *lava = false;
+    }
+    if (map == NULL || !map->enabled || !isfinite(x_min)) {
+        return;
+    }
+    /* au-delà de la frontière + ondulation + demi-fondu, le biome de gauche ne pèse plus rien */
+    const double reach = (double)map->wobble_m + (0.5 * (double)map->blend_m);
+    if (sand != NULL) { /* plus de plaine : le canal de l'herbe devient du sable */
+        *sand = x_min >= (double)map->start_x + (double)map->band_m + reach;
+    }
+    if (lava != NULL) { /* plus de montagne : le canal de la neige devient de la lave */
+        *lava = x_min >= (double)map->start_x + (2.0 * (double)map->band_m) + reach;
+    }
+}
+
+/* part de lave pour un écart `d` à la ligne médiane d'une coulée */
+static float lava_band(double f)
+{
+    const float d = (float)fabs(f);
+    if (d <= ENG_BIOME_LAVA_CORE) {
+        return 1.0F;
+    }
+    return d >= ENG_BIOME_LAVA_EDGE
+               ? 0.0F
+               : (ENG_BIOME_LAVA_EDGE - d) / (ENG_BIOME_LAVA_EDGE - ENG_BIOME_LAVA_CORE);
+}
+
+float eng_biome_lava_river(double x, double z)
+{
+    if (!isfinite(x) || !isfinite(z)) {
+        return 0.0F;
+    }
+    /* deux familles de lignes sinueuses (nord-sud tous les 116 m, est-ouest tous les 129 m). Chaque
+     * coulée est là où UN sinus s'annule : sa pente y est maximale, donc la largeur constante
+     * (pas de lac là où deux sinus s'annuleraient ensemble). */
+    const float ns = lava_band(sin((x / 37.0) + (1.7 * sin(z / 53.0))));
+    const float ew = lava_band(sin((z / 41.0) + (1.3 * sin(x / 67.0))));
+    return ns > ew ? ns : ew;
+}
+
 void eng_biome_splat(const float weights[ENG_BIOME_COUNT], const float base[ENG_SPLAT_LAYERS],
-                     float out[ENG_SPLAT_LAYERS])
+                     float river, float out[ENG_SPLAT_LAYERS])
 {
     const float grass = base[ENG_SPLAT_GRASS];
     const float rock = base[ENG_SPLAT_ROCK];
     const float dirt = base[ENG_SPLAT_DIRT];
     const float snow = base[ENG_SPLAT_SNOW];
     const float total = grass + rock + dirt + snow;
-    /* une règle par biome : [herbe, roche, terre, neige], chacune de somme `total` */
+    const float rest = total - rock;
+    /* volcan : la coulée de lave remplace le sol meuble (pas la roche des pentes) */
+    const float lava =
+        isfinite(river) ? (river < 0.0F ? 0.0F : (river > 1.0F ? 1.0F : river)) : 0.0F;
+    /* une règle par biome : [herbe OU sable, roche, terre, neige OU lave], de somme `total`. Le
+     * canal 0 est du sable et le canal 3 de la lave dans les cellules qu'indique
+     * eng_biome_cell_layers. */
     const float rules[ENG_BIOME_COUNT][ENG_SPLAT_LAYERS] = {
         {grass + snow, rock, dirt, 0.0F},        /* plaine : jamais de neige */
         {0.0F, rock, 0.0F, grass + dirt + snow}, /* montagne : neige */
-        {0.0F, rock, grass + dirt + snow, 0.0F}, /* désert : sable (terre) */
-        {0.0F, rock + (0.8F * (total - rock)), 0.2F * (total - rock), 0.0F}, /* volcan */
+        {rest, rock, 0.0F, 0.0F},                /* désert : sable, roche sur les pentes */
+        {0.0F, rock + (0.8F * rest * (1.0F - lava)), 0.2F * rest * (1.0F - lava),
+         rest * lava}, /* volcan : basalte, cendre, lave */
     };
     for (uint32_t l = 0; l < ENG_SPLAT_LAYERS; l++) {
         out[l] = 0.0F;

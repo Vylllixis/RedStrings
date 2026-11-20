@@ -130,6 +130,19 @@ mis à l'échelle par la zone :
 
 ![Zones : brute géante, boss de la plaine, de la montagne, du volcan](devlog/img/zones.png)
 
+**Sol par biome** (`eng_biome_splat`, `eng_biome_cell_layers`, `eng_biome_shade`,
+`eng_biome_lava_river`) : le shader du terrain n'a que quatre couches de texture ; le désert et le
+volcan en réutilisent deux, sans changer le shader. Dans une cellule où la plaine n'arrive plus
+(bord ouest >= 950 m), le canal de l'herbe porte une texture de **sable** ; là où la montagne
+n'arrive plus (>= 1750 m), le canal de la neige porte une texture de **lave**. Les deux textures
+sont recolorées au lancement depuis les couches générées de terre et de roche
+(`make_biome_layers`). Le volcan est en **basalte sombre** (poids des couches x 0,45 : le shader
+ne les normalise pas) avec des **coulées de lave** de 5 à 6 m de large, sur deux familles de lignes
+sinueuses (environ un dixième du sol), jamais sur la roche des pentes. Tests : `engine.biome` (9),
+`launcher.world_layers_plain`, `_desert`, `_mountain`, `_volcano` (cellules avec sable ou lave ; couleur
+moyenne du sol lue dans la capture : verte en plaine, chaude dans le désert). Limite : la lave est une couleur
+(elle ne brille pas la nuit et ne blesse pas).
+
 **Butin des boss** (`engine/gear.h`) : chaque boss de zone donne une arme, une armure et un
 bouclier, sous la forme d'un palier d'équipement de 0 (départ) à 4 :
 

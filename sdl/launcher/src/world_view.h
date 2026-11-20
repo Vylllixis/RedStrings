@@ -42,6 +42,8 @@ typedef struct WorldCellView {
     EngModelGpu model;
     EngTextureHandle splat;
     EngBody body;
+    bool sand;    /* grande carte : le canal de l'herbe est du sable (engine/biome.h) */
+    bool lava;    /* ... et celui de la neige de la lave */
     uint32_t lod; /* M7-05 : niveau dessiné (0 : le plus fin) */
     float height_min;
     float height_max;
@@ -58,6 +60,8 @@ typedef struct WorldView {
     EngRenderer *renderer;
     EngTerrainGpu shared;       /* couches, sampler et brouillard communs à toutes les cellules */
     EngPipelineHandle pipeline; /* terrain (model.vert + terrain.frag) */
+    EngTextureHandle sand;      /* grande carte : couches de sable et de lave (désert, volcan) */
+    EngTextureHandle lava;
     EngPipelineHandle shadow_pipeline; /* profondeur des modèles statiques */
     EngArena shared_arena;
     EngArena scratch; /* construction d'une cellule (restituée à chaque fois) */
@@ -75,7 +79,9 @@ typedef struct WorldView {
     double frame_update_ms; /* dernière mise à jour : durée de world_view_update */
     uint32_t cells_drawn;   /* dernière image, après élimination par le frustum */
     uint32_t lod_drawn[WORLD_VIEW_LOD_LEVELS]; /* dernière image : cellules par niveau */
-    uint32_t triangles_drawn;                  /* dernière image, passe principale */
+    uint32_t sand_drawn;      /* dernière image : cellules dessinées avec la couche de sable */
+    uint32_t lava_drawn;      /* ... et avec la couche de lave */
+    uint32_t triangles_drawn; /* dernière image, passe principale */
     /* temps des images après le chargement initial (critère M7 n° 1 : aucune > 25 ms) */
     uint32_t frame_hist[WORLD_VIEW_HIST_MS + 1U];
     uint32_t frames;

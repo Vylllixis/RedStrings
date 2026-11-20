@@ -11,6 +11,7 @@
 #include "engine/mesh_lod.h"
 #include "engine/noise.h"
 #include "engine/splatmap.h"
+#include "engine/terrain_texture.h"
 #include "engine/terrain.h"
 
 #define CELL_ARENA_BYTES ((size_t)64 << 10)
@@ -151,6 +152,63 @@ static EngBody add_body(WorldView *w, const EngHeightmap *map, EngCellCoord c)
 
 /* Grande carte : les matières de la splatmap d'une cellule transformées par le biome de chaque
  * texel (neige en montagne, sable au désert, roche au volcan), fondues aux frontières. */
+/* Grande carte : les couches de sable et de lave, recolorées depuis les couches générées de terre
+ * et de roche (même grain) : sable = terre en ocre clair ; lave = roche dont les parties sombres
+ * deviennent la croûte et les claires la lave vive. */
+static bool make_biome_layers(WorldView *w)
+{
+    const uint32_t size = ENG_TERRAIN_LAYER_TEXTURE_SIZE;
+    const size_t count = (size_t)size * size;
+    const EngArenaMark mark = eng_arena_mark(&w->scratch);
+    uint8_t *src = eng_arena_alloc_array(&w->scratch, 4U, count, 4U);
+    uint8_t *dst = eng_arena_alloc_array(&w->scratch, 4U, count, 4U);
+    bool ok = src != NULL && dst != NULL;
+    for (int pass = 0; ok && pass < 2; pass++) {
+        eng_terrain_layer_pixels(pass == 0 ? ENG_SPLAT_DIRT : ENG_SPLAT_ROCK, size, src);
+        double sum = 0.0;
+        for (size_t i = 0; i < count; i++) {
+            sum += (0.3 * src[i * 4U]) + (0.59 * src[(i * 4U) + 1U]) + (0.11 * src[(i * 4U) + 2U]);
+        }
+        const float mean = (float)(sum / (double)count) + 1.0F;
+        for (size_t i = 0; i < count; i++) {
+            const float y = (0.3F * (float)src[i * 4U]) + (0.59F * (float)src[(i * 4U) + 1U]) +
+                            (0.11F * (float)src[(i * 4U) + 2U]);
+            float k = y / mean; /* grain : 1 en moyenne */
+            float rgb[3];
+            if (pass == 0) { /* sable */
+                k = k < 0.75F ? 0.75F : (k > 1.2F ? 1.2F : k);
+                rgb[0] = 214.0F * k;
+                rgb[1] = 178.0F * k;
+                rgb[2] = 112.0F * k;
+            } else { /* lave : croûte sombre sous 0,9, lave vive au-dessus */
+                const float t = k < 0.9F ? 0.0F : (k > 1.1F ? 1.0F : (k - 0.9F) * 5.0F);
+                rgb[0] = 70.0F + (185.0F * t);
+                rgb[1] = 18.0F + (122.0F * t);
+                rgb[2] = 8.0F + (16.0F * t);
+            }
+            for (int c = 0; c < 3; c++) {
+                dst[(i * 4U) + (size_t)c] = (uint8_t)(rgb[c] > 255.0F ? 255.0F : rgb[c]);
+            }
+            dst[(i * 4U) + 3U] = 255U;
+        }
+        const EngTextureDesc desc = {.name = pass == 0 ? "monde-sable" : "monde-lave",
+                                     .width = size,
+                                     .height = size,
+                                     .format = ENG_TEXTURE_RGBA8_SRGB,
+                                     .pixels = dst,
+                                     .mip_levels = 0};
+        const EngTextureHandle tex = eng_renderer_create_texture(w->renderer, &desc);
+        ok = eng_renderer_texture_is_valid(w->renderer, tex);
+        if (pass == 0) {
+            w->sand = tex;
+        } else {
+            w->lava = tex;
+        }
+    }
+    eng_arena_reset_to(&w->scratch, mark);
+    return ok;
+}
+
 static void biome_materials(const WorldView *w, EngCellCoord c, EngSplatmap *splat)
 {
     const double ox = (double)c.x * ENG_CELL_SIZE;
@@ -162,12 +220,20 @@ static void biome_materials(const WorldView *w, EngCellCoord c, EngSplatmap *spl
             for (uint32_t l = 0; l < ENG_SPLAT_LAYERS; l++) {
                 base[l] = (float)px[l] / 255.0F;
             }
+            const double wx = ox + ((double)x * ENG_CELL_SPACING);
+            const double wz = oz + ((double)z * ENG_CELL_SPACING);
             float weights[ENG_BIOME_COUNT];
-            eng_biome_weights(&w->gen.biomes, ox + ((double)x * ENG_CELL_SPACING),
-                              oz + ((double)z * ENG_CELL_SPACING), weights);
+            eng_biome_weights(&w->gen.biomes, wx, wz, weights);
+            const float river =
+                weights[ENG_BIOME_VOLCANO] > 0.0F ? eng_biome_lava_river(wx, wz) : 0.0F;
             float mixed[ENG_SPLAT_LAYERS];
-            eng_biome_splat(weights, base, mixed);
+            eng_biome_splat(weights, base, river, mixed);
             eng_splat_quantize(mixed, px);
+            /* volcan : basalte sombre (le shader somme les couches sans les normaliser) */
+            const float shade = eng_biome_shade(weights); /* pas la lave (canal 3) */
+            for (uint32_t l = 0; shade < 0.999F && l < ENG_SPLAT_SNOW; l++) {
+                px[l] = (uint8_t)(((float)px[l] * shade) + 0.5F);
+            }
         }
     }
 }
@@ -296,6 +362,8 @@ static bool upload(WorldView *w, WorldCellView *v)
         v->height_min = cell->height_min;
         v->height_max = cell->height_max;
         v->uploaded = true;
+        eng_biome_cell_layers(&w->gen.biomes, (double)v->coord.x * ENG_CELL_SIZE, &v->sand,
+                              &v->lava);
         w->uploaded_cells++;
         w->uploads_done++;
     } else {
@@ -351,6 +419,7 @@ bool world_view_init(WorldView *w, int32_t seed, EngRenderer *renderer, EngPhysi
                                     &gp);
     }
     eng_arena_reset_to(&w->scratch, mark);
+    ok = ok && make_biome_layers(w); /* grande carte : sable et lave */
     if (ok && env != NULL) {
         (void)eng_terrain_gpu_set_environment(&w->shared, renderer, env);
     }
@@ -391,6 +460,12 @@ void world_view_shutdown(WorldView *w)
         eng_stream_shutdown(&w->stream); /* appelle on_unload pour chaque cellule */
         eng_jobs_shutdown(&w->jobs);
         eng_terrain_gpu_destroy(&w->shared, w->renderer);
+    }
+    if (w->renderer != NULL) {
+        (void)eng_renderer_destroy_texture(w->renderer, w->sand);
+        (void)eng_renderer_destroy_texture(w->renderer, w->lava);
+        w->sand = ENG_TEXTURE_NULL;
+        w->lava = ENG_TEXTURE_NULL;
     }
     if (w->renderer != NULL) {
         if (eng_renderer_pipeline_is_valid(w->renderer, w->pipeline)) {
@@ -550,6 +625,8 @@ void world_view_draw(WorldView *w, EngRenderQueue *queue, mat4 view_proj, const 
     for (uint32_t l = 0; l < WORLD_VIEW_LOD_LEVELS; l++) {
         w->lod_drawn[l] = 0;
     }
+    w->sand_drawn = 0;
+    w->lava_drawn = 0;
     for (uint32_t i = 0; i < ENG_STREAM_SLOTS; i++) {
         WorldCellView *v = &w->cells[i];
         if (!v->uploaded) {
@@ -570,10 +647,14 @@ void world_view_draw(WorldView *w, EngRenderQueue *queue, mat4 view_proj, const 
         v->lod = eng_mesh_lod_select(v->lod, sqrtf((dx * dx) + (dz * dz)), LOD_DISTANCES,
                                      WORLD_VIEW_LOD_LEVELS, LOD_HYSTERESIS);
         w->lod_drawn[v->lod]++;
+        w->sand_drawn += v->sand ? 1U : 0U;
+        w->lava_drawn += v->lava ? 1U : 0U;
         w->triangles_drawn += v->model.parts[v->lod].index_count / 3U;
         const uint32_t part = v->lod;
-        const EngTextureHandle textures[5] = {v->splat, w->shared.layers[0], w->shared.layers[1],
-                                              w->shared.layers[2], w->shared.layers[3]};
+        /* désert et volcan : le sable prend le canal de l'herbe, la lave celui de la neige */
+        const EngTextureHandle textures[5] = {v->splat, v->sand ? w->sand : w->shared.layers[0],
+                                              w->shared.layers[1], w->shared.layers[2],
+                                              v->lava ? w->lava : w->shared.layers[3]};
         const EngModelDrawOptions options = {
             .textures = textures,
             .sampler = w->shared.sampler,
@@ -670,8 +751,9 @@ void world_view_log_summary(const WorldView *w, double travelled_m)
                  w->worst_stage_ms[2], w->worst_stage_ms[3]);
     ENG_LOG_INFO(
         "MONDE : dernière image : %u cellule(s) dessinée(s) (niveaux de détail %u / %u / %u), "
-        "%u triangles",
-        w->cells_drawn, w->lod_drawn[0], w->lod_drawn[1], w->lod_drawn[2], w->triangles_drawn);
+        "%u triangles ; couches de biome : %u cellule(s) avec sable, %u avec lave",
+        w->cells_drawn, w->lod_drawn[0], w->lod_drawn[1], w->lod_drawn[2], w->triangles_drawn,
+        w->sand_drawn, w->lava_drawn);
 }
 
 bool world_view_height(const WorldView *w, float x, float z, float *out)
