@@ -29,6 +29,18 @@ bool eng_ui_init(EngUi *ui, struct SDL_Window *window, struct SDL_GPUDevice *dev
     return true;
 }
 
+bool eng_ui_set_font(EngUi *ui, const char *ttf_path, float size_px)
+{
+    if (ui == NULL || !ui->ready || ttf_path == NULL) {
+        return false;
+    }
+    if (!ow_ui_set_font(ttf_path, size_px)) {
+        return false;
+    }
+    ENG_LOG_INFO("UI : police %s (%.0f px par défaut)", ttf_path, (double)size_px);
+    return true;
+}
+
 void eng_ui_shutdown(EngUi *ui)
 {
     if (!ui->ready) {
@@ -476,6 +488,14 @@ bool eng_ui_init(EngUi *ui, struct SDL_Window *window, struct SDL_GPUDevice *dev
     (void)color_format;
     memset(ui, 0, sizeof *ui);
     ENG_LOG_INFO("interface de debug absente de ce build (OW_UI=OFF)");
+    return false;
+}
+
+bool eng_ui_set_font(EngUi *ui, const char *ttf_path, float size_px)
+{
+    (void)ui;
+    (void)ttf_path;
+    (void)size_px;
     return false;
 }
 

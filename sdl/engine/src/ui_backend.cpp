@@ -32,6 +32,24 @@ void ui_free(void *ptr, void *)
 
 } // namespace
 
+/* M8-03 : police TrueType par défaut. ImGui 1.92+ (atlas dynamique) rastérise chaque glyphe à
+ * la taille demandée : le texte du HUD reste net en 1080p comme en 4K. */
+extern "C" bool ow_ui_set_font(const char *ttf_path, float size_px)
+{
+    if (!g_ready || ttf_path == nullptr || !(size_px >= 6.0F && size_px <= 128.0F)) {
+        return false;
+    }
+    ImGuiIO &io = ImGui::GetIO();
+    ImFont *font = io.Fonts->AddFontFromFileTTF(ttf_path, size_px);
+    if (font == nullptr) {
+        ENG_LOG_WARN("UI : police illisible : %s (police intégrée gardée)", ttf_path);
+        return false;
+    }
+    io.FontDefault = font;
+    ImGui::GetStyle().FontSizeBase = size_px;
+    return true;
+}
+
 extern "C" bool ow_ui_create(void *window, void *device, uint32_t color_format)
 {
     if (g_ready) {

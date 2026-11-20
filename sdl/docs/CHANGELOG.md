@@ -20,6 +20,8 @@ livraisons ; les tags sont posés par Théo après ses tests.
   HUD et dans la sauvegarde (section TIME) ; `--day-night HEURE`, `--day-length S`.
 - Progression : XP par ennemi vaincu, niveaux 1 à 20 (PV, endurance, dégâts), « Niv. N » et barre
   d'XP au HUD, section PROG dans la sauvegarde.
+- M8 (finition) : police TrueType Noto Sans (OFL, `assets/fonts/`) pour l'interface et le HUD,
+  nette en 1080p comme en 2560 x 1600 ; fond sombre derrière l'heure, le niveau et l'aide (B4).
 
 ## v0.7 (M7, partiel) — monde ouvert
 - Cellules de 256 m (format RSCL), pool de threads, streaming asynchrone, origine flottante,
@@ -29,7 +31,8 @@ livraisons ; les tags sont posés par Théo après ses tests.
   au GPU par la file d'uploads, sans couture d'éclairage aux frontières, un corps Jolt par cellule,
   origine flottante appliquée au personnage, à la caméra et aux corps ; ombres en cascade dans les
   shaders (atlas 2 x 2, passe d'ombre par tuiles) ; mesures de traversée sur le RTX 5070 (6 km à
-  100 m/s sans image > 25 ms) ; tests `launcher.world_render`, `launcher.world_ground`.
+  100 m/s sans image > 25 ms) ; tests `launcher.world_render`, `launcher.world_ground`. LOD du
+  terrain au rendu : 3 niveaux par cellule et des jupes contre les fentes (M7-05).
 
 ## Raccords
 - Combat jouable dans le lanceur (`--combat`), sur l'arène ou sur le terrain procédural

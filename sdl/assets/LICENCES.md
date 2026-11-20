@@ -21,3 +21,15 @@ Le crédit n'est pas obligatoire ; il figure tout de même dans les crédits du 
 
 Pour régénérer les fichiers réduits : `tools/scripts/kaykit_prepare.sh` (télécharge les packs,
 puis les réduit avec `tools/scripts/gltf_extract.py`).
+
+## Police : Noto Sans (SIL Open Font License 1.1)
+
+- Fichiers : `fonts/NotoSans-Regular.ttf`, `fonts/NotoSans-Bold.ttf` (texte de la licence :
+  `fonts/OFL.txt`).
+- Auteurs : The Noto Project Authors (https://github.com/notofonts/latin-greek-cyrillic),
+  copyright 2022.
+- Licence : SIL OFL 1.1 : utilisation, modification et redistribution libres, y compris dans un
+  jeu vendu ; la police ne peut pas être vendue seule ; le texte de la licence l'accompagne.
+- Empreintes SHA-256 : Regular `478c558ea716033cd60c03438f628dfa75694dcf6b5f6d505a2f05fd2b4f3823`,
+  Bold `1df075a380fc7cb898acf64c1f7b3b4dd780de3caa860178bf929de35817a913`.
+- Utilisation : police par défaut de l'interface et du HUD (M8-03).

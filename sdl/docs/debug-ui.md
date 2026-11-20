@@ -115,7 +115,7 @@ image :  scène → debug draw → eng_ui_begin_frame / eng_ui_draw_panel / eng_
   l'œil sur une vraie fenêtre.
 - Panneau et souris capturée (F2 pendant que le panneau est affiché) : les clics au-dessus du
   panneau restent consommés par l'interface.
-- Police ImGui par défaut (ProggyClean, taille 13 px), pas de mise à l'échelle HiDPI de la police.
+- Police : Noto Sans (TrueType, OFL, `assets/fonts/`) chargée par `eng_ui_set_font` à 17 px ; l'atlas dynamique d'ImGui la rastérise à chaque taille demandée (HUD, menus) sans flou. Si le fichier manque, ProggyClean (13 px) reste en place.
 - Pas de graphique du temps GPU, pas de panneau par système (physique, IA… : M3+).
 - Dessins de la **dernière** image : le panneau est construit avant `end_frame` de l'image courante.
 

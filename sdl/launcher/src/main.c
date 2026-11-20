@@ -739,6 +739,11 @@ int main(int argc, char **argv)
     if (use_renderer && eng_ui_available()) {
         use_ui = eng_ui_init(&ui, platform.window, gpu.device, eng_gpu_swapchain_format(&gpu));
         if (use_ui) {
+            char font_path[1024];
+            if (eng_path_resolve(font_path, sizeof font_path,
+                                 "assets/fonts/NotoSans-Regular.ttf")) { /* M8-03 (OFL) */
+                (void)eng_ui_set_font(&ui, font_path, 17.0F);
+            }
             platform.event_hook = eng_ui_event_hook;
             platform.event_hook_user = &ui;
             eng_renderer_set_overlay(&renderer, eng_ui_overlay_prepare, eng_ui_overlay_draw, &ui);

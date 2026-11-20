@@ -17,7 +17,7 @@ Tests : `test_game_systems` (8), `launcher.game` (« AUTOTEST PARTIE : OK »). D
 |---|---|
 | M8-01 Mixeur et son 3D | Partiel : bus + spatialisation prouvés ; pas de miniaudio (SDL3), pas de musique ni d'ambiance, rien d'écouté |
 | M8-02 Musique dynamique | À faire (optionnel) |
-| M8-03 Interface | Partiel : HUD visible (capture) ; police bitmap agrandie, pas stb_truetype |
+| M8-03 Interface | Fait : police TrueType Noto Sans (OFL) via l'atlas dynamique d'ImGui (stb_truetype), nette à toutes les tailles ; fond sombre sous l'heure, le niveau et l'aide ; captures 1080p et 2560 x 1600 (`docs/devlog/img/m8-hud-police-1080p-2560.png`) |
 | M8-04 Menus | Prouvé (navigation sans souris testée, rendu vu en capture) |
 | M8-05 Sauvegarde | Prouvé (v1 relue en v2, corruption refusée, écriture atomique) |
 | M8-06 Post-process | Partiel : FXAA simplifié + bloom une passe, prouvés par test GPU et réglables au menu ; pas de SSAO, coût non mesuré sur vrai GPU |

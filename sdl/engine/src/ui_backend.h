@@ -15,6 +15,7 @@ extern "C" {
  * les entrées sont données à la main. `device` : SDL_GPUDevice* ; `color_format` :
  * SDL_GPUTextureFormat de la cible où l'interface est dessinée. false (journalisé) en cas d'échec ;
  * tout est alors libéré. */
+bool ow_ui_set_font(const char *ttf_path, float size_px);
 bool ow_ui_create(void *window, void *device, uint32_t color_format);
 void ow_ui_destroy(void);
 

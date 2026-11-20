@@ -26,7 +26,7 @@ RTX 5070 Laptop GPU (8 Go, pilote 580.178.04) + Intel UHD (hybride) ; écran int
 | B1 | Personnage et ennemis = capsules en fil de fer | majeur | **corrigé** (M4, KayKit) |
 | B2 | Image délavée : ciel et sol presque blancs, brouillard qui écrase tout (toutes les scènes) ; chaîne sRGB vérifiée correcte : c'est le réglage (exposition, brouillard) | majeur (laid) | réglage avec M8-07 (jour/nuit) |
 | B3 | Arène de M4 dessinée en fil de fer : on marche sur des marches et une rampe invisibles | moyen | **corrigé** (volumes éclairés avec ombres) |
-| B4 | HUD : police bitmap fine, petite ; heure presque invisible sur le ciel clair | moyen | M8-03 (stb_truetype, ombre/fond) |
+| B4 | HUD : police bitmap fine, petite ; heure presque invisible sur le ciel clair | moyen | **corrigé** (Noto Sans TTF, fond sombre sous l'heure, le niveau et l'aide) |
 | B5 | 26 allocations dans la boucle de frame en partie interactive (dès l'image 1 : menus ImGui, sauvegarde, reprise) ; 28 au plein écran / redimensionnement | moyen (ADR 0003) | à traiter : préchauffage de l'UI, E/S hors image |
 | B6 | Menus : pas de flèches ni d'Entrée ; Échap quitte le jeu sans confirmation, même en partie | mineur (UX) | M8 (menus) |
 | B7 | Journal « fenêtre ouverte : 2494 x 1531 » en plein écran : taille lue avant la bascule (asynchrone sous X11) ; la swapchain est bien en 2560 x 1600 | mineur | **corrigé** (M0, SDL_SyncWindow) |
@@ -37,6 +37,7 @@ RTX 5070 Laptop GPU (8 Go, pilote 580.178.04) + Intel UHD (hybride) ; écran int
 | B12 | F1 + clic : sélection d'un ennemi ratée si appui et relâche tombent dans la même image (état du bouton lu au lieu de l'événement) | mineur | **corrigé** (événement d'appui) |
 | B13 | F5 : animations de marche/repos qui continuent et image qui tremble (interpolation) alors que le combat est gelé | mineur | **corrigé** (dt et alpha gelés ; F6 avance d'un tick) |
 | B14 | Deux lanceurs ouverts en même temps : le second recopie `hot/game.1.so` par-dessus la bibliothèque que le premier exécute → plantage du premier (reproduit 3 fois sur 3 : test du monde + lancements simultanés) | majeur (plantage) | **corrigé** (pid dans le nom de la copie ; test `the_hot_copy_name_contains_the_process_id`, mutation détectée ; 3/3 passages sous la même charge) |
+| B15 | `tools/scripts/lint.sh` en échec : `engine/src/audio_device.c` allouait avec `calloc`/`free` de la libc (invisibles du compteur d'allocations, règle M0-12) | mineur | **corrigé** (`SDL_calloc`/`SDL_free`) |
 
 Mesures (détail : `perf-materiel.md`) : M1 avec ombres 694 FPS (1080p) / 365 FPS (2560 x 1600) ;
 M3 1 km² complet 215 / 163 FPS, pire 12,3 ms ; combat 688 / 364 FPS ; combat sur terrain avec herbe

@@ -39,6 +39,17 @@ static float text_width(float px, const char *s)
     return size.x;
 }
 
+/* Fond sombre arrondi derrière un texte (B4 : l'heure et l'aide étaient illisibles sur un ciel
+ * clair, même avec l'ombre portée) ; plus opaque en contraste élevé. */
+static void plate(ImDrawList *dl, float px, float x, float y, const char *s, bool contrast)
+{
+    const float pad = px * 0.35F;
+    const float w = text_width(px, s);
+    ImDrawList_AddRectFilled(dl, (ImVec2_c){x - pad, y - (pad * 0.4F)},
+                             (ImVec2_c){x + w + pad, y + (px * 1.15F) + (pad * 0.4F)},
+                             rgba(0, 0, 0, contrast ? 0.85F : 0.45F), pad, 0);
+}
+
 static void bar(ImDrawList *dl, float x, float y, float w, float h, float frac, ImU32 fill,
                 bool contrast)
 {
@@ -82,6 +93,7 @@ void eng_ui_draw_hud(EngUi *ui, const EngHud *hud, int width, int height)
     if (hud->level > 0U) { /* niveau et expérience (M8-08) */
         y += 16.0F * u;
         (void)snprintf(buf, sizeof buf, "Niv. %u", (unsigned)hud->level);
+        plate(dl, px * 0.75F, x0, y, buf, hc);
         text(dl, px * 0.75F, x0, y, rgba(1, 1, 1, 1), buf, true);
         bar(dl, x0 + text_width(px * 0.75F, buf) + 10.0F * u, y + 5.0F * u, 200.0F * u, 8.0F * u,
             hud->xp_frac, hc ? rgba(0.4F, 0.8F, 1, 1) : rgba(0.35F, 0.6F, 0.95F, 0.9F), hc);
@@ -112,12 +124,14 @@ void eng_ui_draw_hud(EngUi *ui, const EngHud *hud, int width, int height)
              rgba(1, 1, 1, 1), hud->message, true);
     }
     if (hud->clock[0] != '\0') {
-        text(dl, px, (float)width - text_width(px, hud->clock) - 24.0F * u, 20.0F * u,
-             rgba(1, 1, 1, hc ? 1.0F : 0.85F), hud->clock, true);
+        const float cx = (float)width - text_width(px, hud->clock) - 24.0F * u;
+        plate(dl, px, cx, 20.0F * u, hud->clock, hc);
+        text(dl, px, cx, 20.0F * u, rgba(1, 1, 1, 1), hud->clock, true);
     }
     if (hud->hint[0] != '\0') {
-        text(dl, px * 0.7F, 24.0F * u, (float)height - 40.0F * u, rgba(1, 1, 1, hc ? 1.0F : 0.75F),
-             hud->hint, true);
+        const float hy = (float)height - 40.0F * u;
+        plate(dl, px * 0.7F, 24.0F * u, hy, hud->hint, hc);
+        text(dl, px * 0.7F, 24.0F * u, hy, rgba(1, 1, 1, hc ? 1.0F : 0.9F), hud->hint, true);
     }
 }
 

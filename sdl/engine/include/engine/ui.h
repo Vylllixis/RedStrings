@@ -108,6 +108,11 @@ bool eng_ui_init(EngUi *ui, struct SDL_Window *window, struct SDL_GPUDevice *dev
                  uint32_t color_format);
 void eng_ui_shutdown(EngUi *ui); /* sans effet si déjà arrêtée */
 
+/* M8-03 : police TrueType (.ttf) de toute l'interface et du HUD, à `size_px` pixels par défaut
+ * (6 à 128) ; le HUD l'utilise à d'autres tailles sans flou (atlas dynamique). false (journalisé) :
+ * fichier illisible ou interface pas prête ; la police intégrée reste alors en place. */
+bool eng_ui_set_font(EngUi *ui, const char *ttf_path, float size_px);
+
 void eng_ui_set_visible(EngUi *ui, bool visible);
 
 /* Commence l'image d'interface. false (rien à faire ni à terminer) si l'interface n'est pas prête,
