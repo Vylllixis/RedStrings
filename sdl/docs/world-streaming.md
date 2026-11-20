@@ -143,6 +143,28 @@ sinueuses (environ un dixième du sol), jamais sur la roche des pentes. Tests : 
 moyenne du sol lue dans la capture : verte en plaine, chaude dans le désert). Limite : la lave est une couleur
 (elle ne brille pas la nuit et ne blesse pas).
 
+**Décor des zones** (`engine/zone_decor.h`, `launcher/src/play_decor.c`) : des boîtes posées sur
+le relief, construites en code. Le décor de la zone la plus proche (300 m) et celui du camp de
+réveil sont posés ; les boîtes solides sont des corps physiques (joueur, caméra) et des obstacles
+des ennemis (vue, chemin, collision) ; elles suivent le recentrage de l'origine.
+
+| Zone | Décor |
+|---|---|
+| Boss de la plaine | le **château** : cour de 44 m, murs de 5 m, tours d'angle, porte à l'ouest (entrée) et à l'est (sortie vers la montagne), donjon au nord-est, bannières |
+| Boss de la montagne | cercle de 10 piliers de glace, autel |
+| Boss du désert | arène en ruine : 12 colonnes de grès, 4 pans de mur |
+| Boss du volcan | 8 pics de basalte, 4 brasiers |
+| Farm facile | campement : 3 tentes, un feu |
+| Farm dur | palissade en arc, grand feu |
+| Camp de réveil | tente, couchage, feu, caisses |
+
+L'aire de combat reste dégagée (12 m autour d'un boss, 6 m autour d'un camp) et le chemin d'ouest
+en est libre. `--at-zone N` démarre 34 m avant un boss (hors de son décor), 20 m avant une zone de
+farm. Tests : `engine.zone_decor` (3), `launcher.bosses` (10 mesures de décor : le mur arrête le
+joueur, suit l'origine, se retire), `launcher.world_decor`. Limites : pas d'arbres ni de rochers
+dans le monde ouvert ; le décor apparaît d'un coup à 300 m ; pas de toit en pente ni de porte qui
+s'ouvre.
+
 **Butin des boss** (`engine/gear.h`) : chaque boss de zone donne une arme, une armure et un
 bouclier, sous la forme d'un palier d'équipement de 0 (départ) à 4 :
 
@@ -188,9 +210,9 @@ Tests : `engine.boss_special` (3), `engine.creature` (2), `launcher.bosses` (`--
 34 mesures : phases du cavalier, cinématique, souffle, corps à corps, butin).
 
 Limites : les boss de la montagne et du désert sont encore le guerrier squelette avec plus de PV ;
-à cheval, les coups du chevalier partent du sol (son épée est dessinée 1,9 m plus haut) ; pas de
-château ni de décor de zone ; les pièces du butin n'ont pas de modèle propre (même épée, même
-bouclier) ; pas de son propre au cheval ni au dragon.
+à cheval, les coups du chevalier partent du sol (son épée est dessinée 1,9 m plus haut) ; les
+pièces du butin n'ont pas de modèle propre (même épée, même bouclier) ; pas de son propre au cheval
+ni au dragon.
 
 ## Streaming (M7-03) — `world_stream`
 

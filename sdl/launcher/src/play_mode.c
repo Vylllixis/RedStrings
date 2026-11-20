@@ -198,6 +198,7 @@ void play_mode_origin_shift(PlayMode *play, const float shift[3])
     if (play->combat != NULL) {
         play_combat_shift(play->combat, shift[0], shift[2]);
     }
+    play_decor_shift(play, shift);
 }
 
 static bool init_common(PlayMode *play, EngTweaks *tweaks, float camera_sensitivity, bool invert_y,
@@ -613,14 +614,46 @@ static bool load_wall_visuals(PlayMode *play, EngRenderer *renderer, EngArena *a
     return true;
 }
 
+bool play_mode_box_models(EngRenderer *renderer, EngArena *arena, const EngEnvironment *env,
+                          const float (*table)[7], uint32_t count, EngModelGpu *models)
+{
+    if (renderer == NULL || arena == NULL || table == NULL || models == NULL) {
+        return false;
+    }
+    const float lo[3] = {-0.5F, -0.5F, -0.5F};
+    const float hi[3] = {0.5F, 0.5F, 0.5F};
+    uint32_t made = 0;
+    for (; made < count; made++) {
+        EngModelMaterial mat =
+            arena_material(table[made][0], table[made][1], table[made][2], table[made][3]);
+        mat.emissive[0] = table[made][4];
+        mat.emissive[1] = table[made][5];
+        mat.emissive[2] = table[made][6];
+        const EngArenaMark mark = eng_arena_mark(arena);
+        EngModel box;
+        if (!eng_model_make_box(arena, lo, hi, &mat, &box) ||
+            !eng_model_gpu_create(&models[made], renderer, arena, &box, 0.0F)) {
+            eng_arena_reset_to(arena, mark);
+            break;
+        }
+        if (env != NULL) {
+            (void)eng_model_gpu_set_environment(&models[made], renderer, env);
+        }
+    }
+    if (made < count) { /* tout ou rien */
+        for (uint32_t i = 0; i < made; i++) {
+            eng_model_gpu_destroy(&models[i], renderer);
+        }
+        return false;
+    }
+    return true;
+}
+
 /* Grande carte : une boîte unité par couleur pour le cheval et le dragon (engine/creature.h) ;
  * ventre, flammes et yeux émissifs (le bloom les fait rayonner). */
 static bool load_creature_visuals(PlayMode *play, EngRenderer *renderer, EngArena *arena,
                                   const EngEnvironment *env)
 {
-    if (play->creature_ready) {
-        return true;
-    }
     static const float colors[ENG_CREATURE_COLORS][7] = {
         /* r, g, b, rugosité, émissif r, g, b */
         [ENG_CREATURE_BROWN] = {0.33F, 0.2F, 0.11F, 0.8F, 0.0F, 0.0F, 0.0F},
@@ -630,34 +663,11 @@ static bool load_creature_visuals(PlayMode *play, EngRenderer *renderer, EngAren
         [ENG_CREATURE_BONE] = {0.85F, 0.8F, 0.68F, 0.6F, 0.0F, 0.0F, 0.0F},
         [ENG_CREATURE_YELLOW] = {1.0F, 0.85F, 0.3F, 0.5F, 4.0F, 2.8F, 0.5F},
     };
-    const float lo[3] = {-0.5F, -0.5F, -0.5F};
-    const float hi[3] = {0.5F, 0.5F, 0.5F};
-    uint32_t made = 0;
-    for (; made < (uint32_t)ENG_CREATURE_COLORS; made++) {
-        EngModelMaterial mat =
-            arena_material(colors[made][0], colors[made][1], colors[made][2], colors[made][3]);
-        mat.emissive[0] = colors[made][4];
-        mat.emissive[1] = colors[made][5];
-        mat.emissive[2] = colors[made][6];
-        const EngArenaMark mark = eng_arena_mark(arena);
-        EngModel box;
-        if (!eng_model_make_box(arena, lo, hi, &mat, &box) ||
-            !eng_model_gpu_create(&play->creature_models[made], renderer, arena, &box, 0.0F)) {
-            eng_arena_reset_to(arena, mark);
-            break;
-        }
-        if (env != NULL) {
-            (void)eng_model_gpu_set_environment(&play->creature_models[made], renderer, env);
-        }
+    if (!play->creature_ready) {
+        play->creature_ready = play_mode_box_models(
+            renderer, arena, env, colors, (uint32_t)ENG_CREATURE_COLORS, play->creature_models);
     }
-    if (made < (uint32_t)ENG_CREATURE_COLORS) { /* tout ou rien */
-        for (uint32_t i = 0; i < made; i++) {
-            eng_model_gpu_destroy(&play->creature_models[i], renderer);
-        }
-        return false;
-    }
-    play->creature_ready = true;
-    return true;
+    return play->creature_ready;
 }
 
 bool play_mode_load_arena_visuals(PlayMode *play, EngRenderer *renderer, EngArena *arena,
@@ -668,6 +678,7 @@ bool play_mode_load_arena_visuals(PlayMode *play, EngRenderer *renderer, EngAren
     }
     /* cheval et dragon des boss spéciaux : partout (le monde ouvert est branché plus tard) */
     const bool creatures = load_creature_visuals(play, renderer, arena, env);
+    (void)play_decor_load_visuals(play, renderer, arena, env); /* château, camps */
     if (play->on_terrain) { /* M6-09 : sur un terrain, seulement les murs de l'arène du boss */
         const bool walls = load_wall_visuals(play, renderer, arena, env);
         return creatures || walls;
@@ -723,6 +734,7 @@ void play_mode_unload_visuals(PlayMode *play, EngRenderer *renderer)
         }
         play->creature_ready = false;
     }
+    play_decor_unload_visuals(play, renderer);
 }
 
 /* ── Personnages animés (M4) ── */
@@ -796,6 +808,7 @@ void play_mode_draw_models(const PlayMode *play, EngRenderQueue *queue, mat4 vie
                                               view_proj, light, shadow);
         }
     }
+    play_decor_draw(play, queue, view_proj, light, shadow, shadow_pass); /* château, camps */
     if (play->creature_ready && play->combat != NULL) { /* cheval ou dragon du boss spécial */
         const mat4 *places = NULL;
         const uint8_t *colors = NULL;

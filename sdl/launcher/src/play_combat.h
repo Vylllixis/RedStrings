@@ -58,6 +58,10 @@ bool play_combat_load_zone(PlayCombat *c, const EngMapZone *zone, int32_t index,
                            float cz);
 /* Un ennemi vivant poursuit ou combat le joueur ? (ne pas changer de zone à ce moment) */
 bool play_combat_busy(const PlayCombat *c);
+/* Grande carte : les boîtes solides du décor (centre x, z, demi-côtés x, z ; repère local)
+ * REMPLACENT les obstacles des ennemis (vue, collision ; le chemin est recalculé au prochain
+ * play_combat_load_zone). À appeler avant de charger la zone. */
+void play_combat_set_obstacles(PlayCombat *c, float (*boxes)[4], uint32_t count);
 /* Le boss de la zone `index` a-t-il été vaincu ? (il ne revient pas ; enregistré dans la
  * sauvegarde, section GEAR) */
 bool play_combat_zone_beaten(const PlayCombat *c, int32_t index);

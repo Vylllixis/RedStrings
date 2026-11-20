@@ -283,6 +283,56 @@ static void check_camp_anchor(const WorldView *world, const PlayMode *play, bool
     }
 }
 
+/* Grande carte : le décor (château, piliers, campements) de la zone la plus proche à moins de
+ * 300 m, et celui du camp de réveil à moins de 300 m du point de départ. Reposé quand la zone la
+ * plus proche change ; réessayé tant que le relief n'est pas chargé sous toutes les boîtes. Avant
+ * update_zone : les murs sont des obstacles pour les ennemis de la zone. */
+static void update_decor(const WorldView *world, PlayMode *play, const float feet[3])
+{
+    static EngMapZone zones[ENG_MAPZONE_COUNT];
+    static EngDecorBox boxes[ENG_DECOR_MAX];
+    static bool built;
+    static bool complete;
+    static bool camp_shown;
+    static int32_t shown = -2; /* zone dont le décor est posé ; -1 : aucune ; -2 : rien encore */
+    if (!built) {
+        built = eng_mapzones_build(&world->gen.biomes, zones);
+        if (!built) {
+            return;
+        }
+    }
+    double pw[3];
+    eng_origin_to_world(&world->origin, feet, pw);
+    const int32_t near = eng_mapzones_nearest(zones, pw[0], pw[2], 300.0);
+    const bool camp = hypotf(feet[0] - play->spawn[0], feet[2] - play->spawn[2]) < 300.0F;
+    if (complete && near == shown && camp == camp_shown) {
+        return;
+    }
+    play_mode_clear_decor(play);
+    uint32_t wanted = 0;
+    uint32_t placed = 0;
+    if (camp) {
+        const uint32_t n = eng_camp_decor(boxes, ENG_DECOR_MAX);
+        wanted += n;
+        placed += play_mode_add_decor(play, boxes, n, play->spawn[0], play->spawn[2]);
+    }
+    if (near >= 0) {
+        const double centre[3] = {zones[near].x, 0.0, zones[near].z};
+        float local[3];
+        eng_origin_to_local(&world->origin, centre, local);
+        const uint32_t n = eng_zone_decor(&zones[near], boxes, ENG_DECOR_MAX);
+        wanted += n;
+        placed += play_mode_add_decor(play, boxes, n, local[0], local[2]);
+    }
+    shown = near;
+    camp_shown = camp;
+    complete = placed == wanted;
+    if (complete && wanted > 0U) {
+        ENG_LOG_INFO("monde : décor posé : %u boîte(s) (zone %d%s)", placed, (int)near,
+                     camp ? ", camp de réveil" : "");
+    }
+}
+
 /* Grande carte : la zone d'ennemis la plus proche du joueur (110 m) remplace la zone chargée, sauf
  * en plein combat (à moins que le joueur soit déjà à plus de 150 m de l'ancienne). Au départ : le
  * camp de réveil, sans ennemis. Un boss vaincu ne revient pas. Renvoie true si la zone a changé. */
@@ -372,6 +422,7 @@ static double world_frame(WorldView *world, PlayMode *play, EngCamera *camera,
             camera_prev->position[a] += shift[a];
         }
     }
+    update_decor(world, play, feet);
     const bool zone_changed = update_zone(world, play, feet);
     check_camp_anchor(world, play, shifted, zone_changed);
     for (int a = 0; a < 3; a++) {
@@ -510,7 +561,9 @@ int main(int argc, char **argv)
                         (unsigned)ENG_MAPZONE_COUNT - 1U);
                 return 2;
             }
-            world_start[0] = zones[at_zone].x - 20.0; /* 20 m avant la zone, sur le chemin */
+            /* avant la zone, sur le chemin : 20 m, ou 34 m devant un boss (hors de son décor) */
+            world_start[0] =
+                zones[at_zone].x - (zones[at_zone].kind == ENG_MAPZONE_BOSS ? 34.0 : 20.0);
             world_start[1] = zones[at_zone].z;
         } else if (strcmp(argv[i], "--post-bench") == 0 && i + 1 < argc) {
             char *end = NULL;
@@ -893,6 +946,9 @@ int main(int argc, char **argv)
             .depth_buffer = true,
             .hdr = true,
             .max_shadow_commands = 1024,
+            /* deux samplers par modèle GPU : 25 cellules du monde, personnages, armes, et les
+             * boîtes des créatures (6) et du décor (8) de la grande carte : 128 ne suffit plus */
+            .max_samplers = 256,
             /* personnages skinnés : 41 matrices d'os (~2,8 Kio) par pièce, aussi dans l'ombre ;
              * B8 : sur un terrain, 4 cascades x 5 personnages x 6 pièces ~ 340 Kio */
             .max_shadow_uniform_bytes = 1024U * 1024U};

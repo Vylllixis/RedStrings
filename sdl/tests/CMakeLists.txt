@@ -28,6 +28,7 @@ ow_add_test(map_zones test_map_zones.c)
 ow_add_test(gear test_gear.c)
 ow_add_test(creature test_creature.c)
 ow_add_test(boss_special test_boss_special.c)
+ow_add_test(zone_decor test_zone_decor.c)
 ow_add_test(frustum test_frustum.c)
 ow_add_test(atmosphere test_atmosphere.c)
 ow_add_test(fog test_fog.c)
@@ -618,6 +619,13 @@ if(OW_PHYSICS AND OW_SHADERS_OK)
     ENVIRONMENT "SDL_VIDEODRIVER=offscreen"
     FAIL_REGULAR_EXPRESSION "ERROR|non détruite|perdu|TROU|a bougé"
     PASS_REGULAR_EXPRESSION "camp de réveil.*zone 0 « .*chargée.*zone 1 « .*chargée.*zone 2 « .*chargée")
+  # Décor des zones : devant la zone 2, le château et le camp de réveil sont posés sur le relief.
+  add_test(NAME launcher.world_decor COMMAND launcher --world 7 --combat --at-zone 2
+           --no-audio --frames 20 --env-samples 16 WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR})
+  set_tests_properties(launcher.world_decor PROPERTIES
+    ENVIRONMENT "SDL_VIDEODRIVER=offscreen"
+    FAIL_REGULAR_EXPRESSION "ERROR|WARN  play_decor|non détruite|perdu|TROU"
+    PASS_REGULAR_EXPRESSION "décor posé : 60 boîte\\(s\\) \\(zone 2, camp de réveil\\)")
   # Couches de sol par biome : devant la zone 0 (plaine) aucune cellule n'a de sable ni de lave ;
   # devant la zone 7 (désert) toutes ont le sable, pas encore la lave ; devant la zone 11 (volcan)
   # toutes ont les deux.
@@ -650,7 +658,8 @@ if(OW_PHYSICS AND OW_SHADERS_OK)
     set_property(TEST ${t} PROPERTY FAIL_REGULAR_EXPRESSION "ERROR|non détruite|perdu|TROU")
   endforeach()
   if(OW_SOFTWARE_VULKAN_ICD)
-    foreach(t launcher.world_combat launcher.world_combat_shift launcher.world_layers_plain
+    foreach(t launcher.world_combat launcher.world_combat_shift launcher.world_decor
+            launcher.world_layers_plain
             launcher.world_layers_desert launcher.world_layers_mountain
             launcher.world_layers_volcano)
       set_property(TEST ${t} APPEND PROPERTY ENVIRONMENT_MODIFICATION

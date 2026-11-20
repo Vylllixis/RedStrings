@@ -502,6 +502,24 @@ bool play_combat_load_zone(PlayCombat *c, const EngMapZone *zone, int32_t index,
     return ok;
 }
 
+void play_combat_set_obstacles(PlayCombat *c, float (*boxes)[4], uint32_t count)
+{
+    if (c == NULL || !c->ready) {
+        return;
+    }
+    eng_aiw_init(&c->world);
+    uint32_t refused = 0;
+    for (uint32_t i = 0; boxes != NULL && i < count; i++) {
+        refused += eng_aiw_add_box(&c->world, boxes[i][0], boxes[i][1], boxes[i][2], boxes[i][3])
+                       ? 0U
+                       : 1U;
+    }
+    if (refused > 0U) {
+        ENG_LOG_WARN("combat : %u obstacle(s) du décor refusé(s) (au plus %u)", refused,
+                     (unsigned)ENG_AI_MAX_OBSTACLES);
+    }
+}
+
 bool play_combat_busy(const PlayCombat *c)
 {
     if (c == NULL || !c->ready) {
@@ -2266,6 +2284,55 @@ static void dragon_selftest(CombatTest *t, const EngMapZone *zone)
           (float)c->boss.flame.state);
 }
 
+/* Grande carte : le décor dans le mode jouable : une boîte solide arrête le joueur et devient un
+ * obstacle des ennemis ; elle suit le recentrage de l'origine ; retirée, elle ne bloque plus. */
+static float walk_east(CombatTest *t, int ticks)
+{
+    for (int i = 0; i < ticks; i++) {
+        step(t, 0U, 0U, 0.0F, 1.0F);
+    }
+    float feet[3] = {0.0F, 0.0F, 0.0F};
+    (void)eng_character_position(t->play.character, feet);
+    return feet[0];
+}
+
+static void decor_selftest(CombatTest *t)
+{
+    PlayMode *p = &t->play;
+    PlayCombat *c = p->combat;
+    (void)play_combat_load_zone(c, NULL, -1, 0.0F, 0.0F); /* plus d'ennemis */
+    const float east = -1.5707963F;                       /* lacet qui regarde +X */
+    put(t, 3.0F, 4.0F, east);
+    check(t, walk_east(t, 120) > 6.5F, "décor : sans décor, le chemin est libre (x)", 0.0F);
+    const EngDecorBox boxes[2] = {
+        {.x = 0.0F, .z = 0.0F, .half = {0.5F, 1.0F, 3.0F}, .solid = true},
+        {.x = -2.0F, .z = 1.0F, .half = {0.3F, 0.3F, 0.3F}, .lift = 0.1F, .yaw = 0.5F},
+    };
+    put(t, 3.0F, 4.0F, east);
+    check(t, play_mode_add_decor(p, boxes, 2U, 6.0F, 4.0F) == 2U && p->decor_count == 2U,
+          "décor : deux boîtes posées", (float)p->decor_count);
+    check(t,
+          c->world.count == 1U && c->world.obs[0].box && fabsf(c->world.obs[0].c[0] - 6.0F) < 1e-4F,
+          "décor : la boîte solide est un obstacle des ennemis", (float)c->world.count);
+    check(t,
+          fabsf(p->decor_center[0][1] - (PLAY_GROUND_TOP + 0.75F)) < 1e-4F &&
+              fabsf(p->decor_half[0][1] - 1.25F) < 1e-4F,
+          "décor : enfoncée de 0,5 m dans le sol (centre y)", p->decor_center[0][1]);
+    check(t, fabsf(p->decor_center[1][1] - (PLAY_GROUND_TOP + 0.4F)) < 1e-4F,
+          "décor : la boîte de décor suit le sol (centre y)", p->decor_center[1][1]);
+    const float stopped = walk_east(t, 120);
+    check(t, stopped < 5.6F, "décor : le mur arrête le joueur (x)", stopped);
+    const float shift[3] = {0.0F, 0.0F, 10.0F}; /* recentrage : le mur part 10 m plus loin */
+    play_decor_shift(p, shift);
+    check(t, fabsf(p->decor_center[0][2] - 14.0F) < 1e-4F, "décor : décalé avec l'origine (z)",
+          p->decor_center[0][2]);
+    check(t, walk_east(t, 120) > 6.5F, "décor : le corps physique a suivi (x)", 0.0F);
+    play_mode_clear_decor(p);
+    check(t, p->decor_count == 0U && c->world.count == 0U, "décor : retiré", (float)p->decor_count);
+    put(t, 3.0F, 14.0F, east);
+    check(t, walk_east(t, 120) > 6.5F, "décor : retiré, il ne bloque plus (x)", 0.0F);
+}
+
 bool play_combat_bosses_selftest(void)
 {
     static CombatTest t;
@@ -2288,6 +2355,7 @@ bool play_combat_bosses_selftest(void)
     c->sim.fighters[PLAYER].vitals.hp = 20000.0F;
     rider_selftest(&t, &zones[2]);
     dragon_selftest(&t, &zones[11]);
+    decor_selftest(&t);
     const uint32_t ticks = c->sim.tick;
     play_mode_shutdown(&t.play);
     if (t.ok) {

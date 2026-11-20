@@ -3,6 +3,7 @@
 #include <stdbool.h>
 
 #include "engine/creature.h"
+#include "engine/zone_decor.h"
 #include "engine/arena.h"
 #include "engine/debug_lines.h"
 #include "engine/heightmap.h"
@@ -34,6 +35,7 @@
 #define PLAY_GROUND_TOP (-0.5F) /* dessus du sol de la démonstration (demo_scene.c) */
 #define PLAY_PIVOT_HEIGHT 1.5F  /* m au-dessus des pieds : le haut du dos */
 #define PLAY_ARENA_PIECES 6U
+#define PLAY_DECOR_MAX (ENG_DECOR_MAX + 16U) /* décor d'une zone + camp de réveil */
 #define PLAY_WALL_SEGMENTS 48U /* M6-09 : segments des murs de l'arène du boss (terrain) */
 
 typedef struct PlayMode {
@@ -61,6 +63,17 @@ typedef struct PlayMode {
     mat4 wall_place[PLAY_WALL_SEGMENTS]; /* M6-09 : segment de mur sur le relief (boîte unité) */
     EngModelGpu wall_model;
     EngModelGpu creature_models[ENG_CREATURE_COLORS]; /* boîte unité par couleur (cheval, dragon) */
+    /* grande carte : décor des zones (château, camps), posé sur le relief (play_decor.c) */
+    mat4 decor_place[PLAY_DECOR_MAX];
+    float decor_center[PLAY_DECOR_MAX][3];
+    float decor_half[PLAY_DECOR_MAX][3];
+    float decor_yaw[PLAY_DECOR_MAX];
+    EngBody decor_body[PLAY_DECOR_MAX];
+    EngModelGpu decor_models[ENG_DECOR_COLORS];
+    uint32_t decor_count;
+    uint8_t decor_color[PLAY_DECOR_MAX];
+    bool decor_solid[PLAY_DECOR_MAX];
+    bool decor_ready;      /* `decor_models` créés */
     float cinematic_blend; /* caméra : 0 sur le joueur, 1 sur la cinématique */
     uint32_t wall_count;
     float spawn[3];
@@ -108,6 +121,24 @@ void play_mode_shift(PlayMode *play, const float shift[3]);
 
 /* Hauteur du sol au point (x, z) : relief en mode terrain, PLAY_GROUND_TOP sinon. */
 float play_mode_ground(const PlayMode *play, float x, float z);
+
+/* Grande carte : décor des zones (engine/zone_decor.h). `boxes` sont relatives à (cx, cz), en
+ * repère local ; chacune est posée sur le relief ; les solides bloquent le joueur, la caméra et les
+ * ennemis. Renvoie le nombre de boîtes posées : moins que `count` si le relief n'est pas encore
+ * chargé sous certaines (réessayer plus tard, après play_mode_clear_decor). */
+uint32_t play_mode_add_decor(PlayMode *play, const EngDecorBox *boxes, uint32_t count, float cx,
+                             float cz);
+void play_mode_clear_decor(PlayMode *play);
+/* Internes au mode jouable (play_decor.c) : modèles, recentrage de l'origine, dessin. */
+bool play_decor_load_visuals(PlayMode *play, EngRenderer *renderer, EngArena *arena,
+                             const EngEnvironment *env);
+void play_decor_unload_visuals(PlayMode *play, EngRenderer *renderer);
+void play_decor_shift(PlayMode *play, const float shift[3]);
+void play_decor_draw(const PlayMode *play, EngRenderQueue *queue, mat4 view_proj,
+                     const EngLighting *light, const EngModelShadow *shadow, bool shadow_pass);
+/* Une boîte unité par ligne de `table` (r, g, b, rugosité, émissif r, g, b). Tout ou rien. */
+bool play_mode_box_models(EngRenderer *renderer, EngArena *arena, const EngEnvironment *env,
+                          const float (*table)[7], uint32_t count, EngModelGpu *models);
 
 /* Point de départ d'une nouvelle partie : pieds posés sur le sol en (PLAY_SPAWN_X, PLAY_SPAWN_Z),
  * lacet de départ (regard vers +X). Aucun paramètre ne peut être NULL. */

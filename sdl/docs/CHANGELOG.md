@@ -66,6 +66,10 @@ livraisons ; les tags sont posés par Théo après ses tests.
   montagne enneigée, désert, volcan) : relief et matières par biome, frontières fondues.
 - Grande carte : 12 zones d'ennemis (farm facile, farm dur, boss dans chaque biome), difficulté
   croissante, camp de réveil sans ennemis ; `--at-zone N` pour commencer devant une zone.
+- Grande carte : décor des zones en boîtes posées sur le relief (`engine/zone_decor`) : château
+  du chevalier (murs, tours, deux portes, donjon), piliers de glace, ruines du désert, pics et
+  brasiers du volcan, campements, camp de réveil ; solides pour le joueur et les ennemis.
+  Renderer du lanceur : 256 samplers.
 - Grande carte : sol par biome : sable dans le désert, basalte sombre et coulées de lave dans le
   volcan (deux couches de texture réutilisées par cellule, shader inchangé).
 - Grande carte : boss spéciaux : Chevalier noir à cheval (cheval, cinématique de la chute, combat
