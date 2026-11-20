@@ -52,6 +52,22 @@ static uint64_t cell_key(const EngWorldGen *g, EngCellCoord c, uint32_t i)
                mix((uint64_t)(uint32_t)g->seed + ((uint64_t)i << 20)));
 }
 
+float eng_world_gen_height(const EngWorldGen *gen, double x, double z)
+{
+    if (gen == NULL) {
+        return 0.0F;
+    }
+    float h = 0.0F;
+    eng_noise_row_2d(&gen->noise, (float)x, ENG_CELL_SPACING, (float)z, 1U, &h);
+    h *= gen->altitude;
+    if (gen->biomes.enabled) {
+        float w[ENG_BIOME_COUNT];
+        eng_biome_weights(&gen->biomes, x, z, w);
+        h *= eng_biome_altitude_scale(w);
+    }
+    return h;
+}
+
 bool eng_cell_generate(const EngWorldGen *gen, EngCellCoord c, EngCellData *out)
 {
     if (gen == NULL || out == NULL || !(gen->altitude >= 0.0F) || gen->noise.octaves == 0U ||
@@ -71,7 +87,13 @@ bool eng_cell_generate(const EngWorldGen *gen, EngCellCoord c, EngCellData *out)
         eng_noise_row_2d(&gen->noise, (float)ox, ENG_CELL_SPACING,
                          (float)(oz + (double)z * ENG_CELL_SPACING), ENG_CELL_RES, row);
         for (uint32_t x = 0; x < ENG_CELL_RES; x++) {
-            const float h = row[x] * gen->altitude;
+            float h = row[x] * gen->altitude;
+            if (gen->biomes.enabled) { /* grande carte : relief à l'échelle du biome */
+                float w[ENG_BIOME_COUNT];
+                eng_biome_weights(&gen->biomes, ox + ((double)x * ENG_CELL_SPACING),
+                                  oz + ((double)z * ENG_CELL_SPACING), w);
+                h *= eng_biome_altitude_scale(w);
+            }
             out->heights[(size_t)z * ENG_CELL_RES + x] = h;
             out->height_min = h < out->height_min ? h : out->height_min;
             out->height_max = h > out->height_max ? h : out->height_max;
@@ -88,6 +110,14 @@ bool eng_cell_generate(const EngWorldGen *gen, EngCellCoord c, EngCellData *out)
         o->yaw = unit(mix(h ^ 0x51ULL)) * 6.2831853F;
         o->scale = o->kind == ENG_CELL_ROCK ? 0.6F + unit(mix(h ^ 0x77ULL)) * 1.4F : 0.4F;
         o->y = eng_cell_height(out, o->pos[0], o->pos[1]);
+        if (gen->biomes.enabled && o->kind == ENG_CELL_TREE) {
+            /* grande carte : des arbres en plaine seulement (ni neige, ni désert, ni volcan) */
+            float w[ENG_BIOME_COUNT];
+            eng_biome_weights(&gen->biomes, ox + (double)o->pos[0], oz + (double)o->pos[1], w);
+            if (w[ENG_BIOME_PLAIN] < 0.5F) {
+                n--;
+            }
+        }
     }
     if (gen->camp_every > 0U && (cell_key(gen, c, 999U) % gen->camp_every) == 0U) {
         EngCellObject *o = &out->objects[n++];

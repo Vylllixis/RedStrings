@@ -75,6 +75,32 @@ Pool de threads SDL, file FIFO bornée (1024), compteurs atomiques C11, dépenda
 compteur ». Le thread qui attend exécute des jobs. Vérifié sous ThreadSanitizer :
 `tools/scripts/tsan-jobs.sh` (jobs + streaming ; « TSAN JOBS : OK »).
 
+## Biomes de la grande carte — `biome`
+
+Demande de Théo (2026-11-20) : une carte « façon Zelda » où quatre biomes s'enchaînent depuis le camp
+de réveil. `engine/biome.h` : bandes de 800 m le long de +X (plaine, montagne enneigée, désert,
+volcan ; la plaine couvre aussi tout ce qui est derrière le départ, le volcan tout ce qui est
+au-delà), frontière ondulée (± 70 m selon z) et fondue sur 160 m. Fonction pure de la position
+monde : pas de couture entre cellules.
+
+- **Relief** : l'altitude du générateur est multipliée par l'échelle du biome (plaine 0,45, montagne
+  1,8, désert 0,35, volcan 1,2), fondue aux frontières (`eng_world_gen_height`, la même valeur dans
+  les cellules, la physique et les normales de bord).
+- **Matières** : la splatmap de chaque cellule est transformée texel par texel (`eng_biome_splat`) :
+  jamais de neige en plaine, neige en montagne, terre (sable) au désert, roche au volcan.
+- **Arbres** : en plaine seulement.
+- `EngWorldGen.biomes` est désactivé par défaut (le monde d'avant, au bit près : les tests de hash
+  ne changent pas) ; le lanceur l'active dans `--world`.
+- Tests : `engine.biome` (6 : biome pur au centre de chaque bande, somme 1, fondu monotone,
+  ondulation, carte désactivée ou invalide, échelle, matières) ; `world_cell.biomes_keep_seams...`
+  (bords de cellules voisines égaux au bit près à cheval sur une frontière, sommets = hauteur du
+  générateur, arbres en plaine seulement ; mutation détectée).
+
+![Les quatre biomes : plaine, montagne enneigée, désert, volcan](devlog/img/biomes.png)
+
+Limites : le désert et le volcan n'ont pas encore leur teinte (sable brun, roche grise) ni de lave ;
+pas de décor propre à chaque biome.
+
 ## Streaming (M7-03) — `world_stream`
 
 Carré de (2r+1)² cellules autour du joueur (r = 2 : 25 cellules, 1,3 km de côté). Chaque image :

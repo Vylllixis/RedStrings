@@ -350,3 +350,54 @@ UTEST(world_state, thousands_of_cells_fit_and_collisions_are_resolved)
         EXPECT_TRUE(eng_wstate_object_removed(&g_state, c, (uint32_t)(i % 64)));
     }
 }
+
+/* Grande carte : avec les biomes, deux cellules voisines se raccordent encore exactement, chaque
+ * sommet vaut la hauteur du générateur, le relief de la montagne est plus haut que celui de la
+ * plaine, et il n'y a d'arbres qu'en plaine. Sans biomes, la hauteur du générateur est le bruit
+ * seul (monde d'avant). */
+UTEST(world_cell, biomes_keep_seams_exact_scale_the_relief_and_keep_trees_in_the_plain)
+{
+    EngWorldGen gen = eng_world_gen_default(7);
+    gen.biomes = eng_biome_map_default();
+    static EngCellData a;
+    static EngCellData b;
+    /* cellules (3, 0) et (4, 0) : x de 768 à 1280, à cheval sur la frontière plaine / montagne */
+    ASSERT_TRUE(eng_cell_generate(&gen, (EngCellCoord){3, 0}, &a));
+    ASSERT_TRUE(eng_cell_generate(&gen, (EngCellCoord){4, 0}, &b));
+    for (uint32_t z = 0; z < ENG_CELL_RES; z++) {
+        const float right = a.heights[((size_t)z * ENG_CELL_RES) + (ENG_CELL_RES - 1U)];
+        const float left = b.heights[(size_t)z * ENG_CELL_RES];
+        EXPECT_EQ(right, left); /* au bit près */
+    }
+    for (uint32_t i = 0; i < 5U; i++) { /* quelques sommets : la hauteur du générateur */
+        const uint32_t x = 7U + (i * 11U);
+        const uint32_t z = 3U + (i * 13U);
+        const float h =
+            eng_world_gen_height(&gen, (4.0 * 256.0) + ((double)x * 4.0), (double)z * 4.0);
+        EXPECT_NEAR(b.heights[((size_t)z * ENG_CELL_RES) + x], h, 1e-3F);
+    }
+    static EngCellData plain;
+    static EngCellData snow;
+    static EngCellData desert;
+    ASSERT_TRUE(eng_cell_generate(&gen, (EngCellCoord){1, 0}, &plain));  /* x 256 à 512 */
+    ASSERT_TRUE(eng_cell_generate(&gen, (EngCellCoord){4, 2}, &snow));   /* x 1024 à 1280 */
+    ASSERT_TRUE(eng_cell_generate(&gen, (EngCellCoord){7, 0}, &desert)); /* x 1792 à 2048 */
+    uint32_t trees[3] = {0, 0, 0};
+    const EngCellData *cells[3] = {&plain, &snow, &desert};
+    for (int c = 0; c < 3; c++) {
+        for (uint32_t i = 0; i < cells[c]->object_count; i++) {
+            trees[c] += cells[c]->objects[i].kind == ENG_CELL_TREE ? 1U : 0U;
+        }
+    }
+    EXPECT_EQ(trees[0], gen.trees_per_cell);
+    EXPECT_EQ(trees[1], 0U);
+    EXPECT_EQ(trees[2], 0U);
+    /* même point de bruit : la montagne (x 1,8) est 4 fois plus haute que la plaine (x 0,45) */
+    EngWorldGen flat = gen;
+    flat.biomes.enabled = false;
+    const float raw = eng_world_gen_height(&flat, 1200.0, 300.0);
+    EXPECT_NEAR(eng_world_gen_height(&gen, 1200.0, 300.0), raw * 1.8F, 1e-3F);
+    const float raw_plain = eng_world_gen_height(&flat, 400.0, 300.0);
+    EXPECT_NEAR(eng_world_gen_height(&gen, 400.0, 300.0), raw_plain * 0.45F, 1e-3F);
+    EXPECT_NEAR(eng_world_gen_height(NULL, 0.0, 0.0), 0.0F, 0.0F);
+}

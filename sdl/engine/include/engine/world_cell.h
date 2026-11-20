@@ -16,6 +16,7 @@
 #include <stddef.h>
 #include <stdint.h>
 
+#include "engine/biome.h"
 #include "engine/noise.h"
 
 #define ENG_CELL_SIZE 256.0
@@ -59,6 +60,7 @@ typedef struct EngWorldGen {
     uint32_t rocks_per_cell;
     uint32_t trees_per_cell;
     uint32_t camp_every; /* un camp toutes les `camp_every` cellules environ (0 : aucun) */
+    EngBiomeMap biomes; /* grande carte : relief et arbres selon le biome ; désactivée par défaut */
 } EngWorldGen;
 
 EngWorldGen eng_world_gen_default(int32_t seed);
@@ -68,6 +70,10 @@ bool eng_cell_equal(EngCellCoord a, EngCellCoord b);
 
 /* Génère la cellule ; false si un argument est invalide. Thread-safe (aucun état global). */
 bool eng_cell_generate(const EngWorldGen *gen, EngCellCoord c, EngCellData *out);
+
+/* Hauteur du générateur au point monde (x, z), sans cellule : le bruit multiplié par l'altitude
+ * et par l'échelle du biome. C'est la valeur que eng_cell_generate écrit aux sommets. */
+float eng_world_gen_height(const EngWorldGen *gen, double x, double z);
 
 /* Hauteur interpolée (bilinéaire) au point local (lx, lz) ∈ [0 ; 256]. */
 float eng_cell_height(const EngCellData *cell, float lx, float lz);

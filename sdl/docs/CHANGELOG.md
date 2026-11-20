@@ -62,6 +62,8 @@ livraisons ; les tags sont posés par Théo après ses tests.
 - Combat jouable dans le lanceur (`--combat`), sur l'arène ou sur le terrain procédural
   (`--terrain`), démonstration automatique (`--combat-autoplay`), capture d'écran.
 
+- Grande carte (demande du 2026-11-20) : quatre biomes en bandes dans le monde ouvert (plaine,
+  montagne enneigée, désert, volcan) : relief et matières par biome, frontières fondues.
 - M7 (finition) : un camp d'ennemis dans le monde ouvert (`launcher --world --combat`), ancré dans le
   monde à travers les recentrages de l'origine flottante.
 

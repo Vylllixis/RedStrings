@@ -149,13 +149,34 @@ static EngBody add_body(WorldView *w, const EngHeightmap *map, EngCellCoord c)
     return body;
 }
 
+/* Grande carte : les matières de la splatmap d'une cellule transformées par le biome de chaque
+ * texel (neige en montagne, sable au désert, roche au volcan), fondues aux frontières. */
+static void biome_materials(const WorldView *w, EngCellCoord c, EngSplatmap *splat)
+{
+    const double ox = (double)c.x * ENG_CELL_SIZE;
+    const double oz = (double)c.z * ENG_CELL_SIZE;
+    for (uint32_t z = 0; z < ENG_CELL_RES; z++) {
+        for (uint32_t x = 0; x < ENG_CELL_RES; x++) {
+            uint8_t *px = &splat->pixels[(((size_t)z * ENG_CELL_RES) + x) * ENG_SPLAT_LAYERS];
+            float base[ENG_SPLAT_LAYERS];
+            for (uint32_t l = 0; l < ENG_SPLAT_LAYERS; l++) {
+                base[l] = (float)px[l] / 255.0F;
+            }
+            float weights[ENG_BIOME_COUNT];
+            eng_biome_weights(&w->gen.biomes, ox + ((double)x * ENG_CELL_SPACING),
+                              oz + ((double)z * ENG_CELL_SPACING), weights);
+            float mixed[ENG_SPLAT_LAYERS];
+            eng_biome_splat(weights, base, mixed);
+            eng_splat_quantize(mixed, px);
+        }
+    }
+}
+
 /* Hauteur du monde au point (x, z) : le même bruit que la génération des cellules (world_cell.c),
  * évalué directement : connu même si la cellule de ce point n'est pas chargée. */
 static float gen_height(const WorldView *w, double x, double z)
 {
-    float h = 0.0F;
-    eng_noise_row_2d(&w->gen.noise, (float)x, ENG_CELL_SPACING, (float)z, 1U, &h);
-    return h * w->gen.altitude;
+    return eng_world_gen_height(&w->gen, x, z); /* bruit, altitude et échelle du biome */
 }
 
 /* Normales des sommets du BORD recalculées par différences centrées À TRAVERS la frontière, avec
@@ -242,6 +263,9 @@ static bool upload(WorldView *w, WorldCellView *v)
     }
     t = stage(w, 0, t);
     ok = ok && eng_splatmap_generate(&w->scratch, &map, &sp, &splat);
+    if (ok && w->gen.biomes.enabled) {
+        biome_materials(w, v->coord, &splat); /* grande carte : matières du biome */
+    }
     t = stage(w, 1, t);
     EngModel lod_model;
     ok = ok &&
@@ -293,6 +317,7 @@ bool world_view_init(WorldView *w, int32_t seed, EngRenderer *renderer, EngPhysi
     w->renderer = renderer;
     w->physics = physics;
     w->gen = eng_world_gen_default(seed);
+    w->gen.biomes = eng_biome_map_default(); /* grande carte : plaine, montagne, désert, volcan */
     eng_origin_init(&w->origin, WORLD_VIEW_REBASE_M);
     eng_upq_init(&w->uploads, WORLD_VIEW_UPLOAD_BUDGET);
     if (!eng_arena_init(&w->scratch, "monde-cellule", SCRATCH_BYTES) ||
