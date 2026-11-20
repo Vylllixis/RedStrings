@@ -59,7 +59,8 @@ rapport de crash éventuel : `build/release/bin/logs/crash-*.txt`.
 
 ## Limites connues (pas des bugs à signaler)
 
-- Les arbres et rochers **n'ont pas de collision** : on les traverse (la clairière évite d'y combattre).
+- La collision des arbres est une capsule autour du tronc : la tête peut frôler les branches basses des
+  plus grands arbres ; on glisse autour d'un tronc pris de biais.
 - Un seul modèle d'arbre et un seul de rocher ; le relief ne projette pas d'ombre.
 - Pas de boss (M6-09), pas de quête (M8-09), pas d'inventaire d'objets.
 

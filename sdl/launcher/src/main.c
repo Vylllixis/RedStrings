@@ -873,6 +873,22 @@ int main(int argc, char **argv)
                        : play_mode_init(&play, &tweaks, config.camera_sensitivity,
                                         config.camera_invert_y)) {
             use_play = true;
+            /* B8 : les troncs et rochers du placement arrêtent le joueur et la caméra */
+            const DemoObstacle *obstacles = NULL;
+            const uint32_t obstacle_total =
+                world_mode ? 0U : demo_scene_obstacles(&scene, &obstacles);
+            uint32_t obstacle_added = 0;
+            while (obstacle_added < obstacle_total && /* monde plein : un seul avertissement */
+                   play_mode_add_obstacle(&play, obstacles[obstacle_added].base,
+                                          obstacles[obstacle_added].radius,
+                                          obstacles[obstacle_added].height)) {
+                obstacle_added++;
+            }
+            if (obstacle_total > 0) {
+                play_mode_obstacles_done(&play);
+                ENG_LOG_INFO("mode jouable : %u/%u obstacle(s) du décor (troncs, rochers)",
+                             obstacle_added, obstacle_total);
+            }
             if (combat_enabled && !play_mode_enable_combat(&play, combat_audio)) {
                 ENG_LOG_WARN("combat indisponible : mode jouable sans combat");
             }

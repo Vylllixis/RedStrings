@@ -101,6 +101,14 @@ void play_mode_spawn_point(const PlayMode *play, float feet[3], float *yaw);
  * plus que le combat ne sont touchés (à l'appelant). */
 void play_mode_teleport(PlayMode *play, const float feet[3], float yaw);
 
+/* B8 : un obstacle statique du décor (tronc, rocher) : une capsule verticale de `radius` dont le
+ * bas est à `base` et le haut à `base` + `height` (une sphère au sommet si `height` < 2 x
+ * `radius`). Le joueur et la caméra butent dessus. Après un ajout en masse, appeler
+ * play_mode_obstacles_done. Paramètres invalides ou monde plein : false. */
+bool play_mode_add_obstacle(PlayMode *play, const float base[3], float radius, float height);
+/* B8 : fin d'un ajout en masse d'obstacles (réorganise la broadphase de Jolt). */
+void play_mode_obstacles_done(PlayMode *play);
+
 /* Active le combat (--combat) : mannequin, camp de 3 ennemis, verrouillage (voir play_combat.h).
  * `audio` : ouvre le son. false (journalisé) si les données de combat sont invalides. */
 bool play_mode_enable_combat(PlayMode *play, bool audio);

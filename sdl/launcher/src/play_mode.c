@@ -6,6 +6,7 @@
 #include "engine/log.h"
 
 #define STATIC_MASK (1U << ENG_LAYER_STATIC)
+#define PLAY_OBSTACLE_MIN_HALF 0.01F /* m : demi-cylindre minimal d'une capsule d'obstacle (B8) */
 #define GROUND_HALF 28.0F
 #define GRID_HALF 3
 #define GRID_SPACING 8.0F
@@ -102,6 +103,30 @@ static bool build_terrain(PlayMode *play, const char *path)
     const bool ok = eng_physics_add_static_shape(play->world, shape, &pose) != ENG_BODY_INVALID;
     eng_physics_shape_destroy(shape);
     return ok;
+}
+
+bool play_mode_add_obstacle(PlayMode *play, const float base[3], float radius, float height)
+{
+    if (play == NULL || play->world == NULL || base == NULL || !isfinite(base[0]) ||
+        !isfinite(base[1]) || !isfinite(base[2]) || !(radius > 0.0F) || !(height > 0.0F) ||
+        !isfinite(radius) || !isfinite(height)) {
+        return false;
+    }
+    float half = (0.5F * height) - radius; /* demi-cylindre entre les deux demi-sphères */
+    float center[3] = {base[0], base[1] + (0.5F * height), base[2]};
+    if (half < PLAY_OBSTACLE_MIN_HALF) { /* plus large que haut : une sphère, le haut à `height` */
+        half = PLAY_OBSTACLE_MIN_HALF;
+        center[1] = base[1] + height - radius - half;
+    }
+    return eng_physics_add_capsule(play->world, half, radius, center, ENG_LAYER_STATIC) !=
+           ENG_BODY_INVALID;
+}
+
+void play_mode_obstacles_done(PlayMode *play)
+{
+    if (play != NULL) {
+        eng_physics_optimize(play->world);
+    }
 }
 
 float play_mode_ground(const PlayMode *play, float x, float z)
@@ -827,6 +852,34 @@ bool play_mode_terrain_selftest(const char *heightmap_path)
     const float under = play_mode_ground(&t.play, cam.position[0], cam.position[2]);
     check(&t, cam.position[1] > under, "caméra au-dessus du sol (m)", cam.position[1] - under);
     (void)moved;
+    /* B8 : un tronc de 0,6 m de rayon à 3 m devant le joueur, qui marche droit dessus pendant 3 s :
+     * il bute ou le contourne (le personnage glisse sur la capsule), mais ne le traverse jamais :
+     * ses pieds restent à plus de rayon du tronc + rayon du personnage (0,3 m) de l'axe */
+    feet_of(&t, feet);
+    float forward[3];
+    eng_orbit_camera_flat_forward(&t.play.orbit, forward);
+    const float trunk_r = 0.6F;
+    const float trunk[2] = {feet[0] + (3.0F * forward[0]), feet[2] + (3.0F * forward[2])};
+    const float base[3] = {trunk[0], play_mode_ground(&t.play, trunk[0], trunk[1]) - 0.2F,
+                           trunk[1]};
+    check(&t, play_mode_add_obstacle(&t.play, base, trunk_r, 6.0F), "tronc ajouté", 1.0F);
+    play_mode_obstacles_done(&t.play);
+    check(&t, !play_mode_add_obstacle(&t.play, base, -1.0F, 6.0F), "rayon négatif refusé", 0.0F);
+    check(&t, !play_mode_add_obstacle(&t.play, base, 0.5F, NAN), "hauteur non finie refusée", 0.0F);
+    const Drive ahead = {0.0F, 1.0F, false, false, 0};
+    float closest = 1e9F;
+    float reached = 0.0F; /* avancée maximale vers le tronc, le long de `forward` */
+    const float start2[2] = {feet[0], feet[2]};
+    for (int i = 0; i < 180; i++) {
+        run_ticks(&t, &ahead, 1);
+        feet_of(&t, feet);
+        closest = fminf(closest, hypotf(feet[0] - trunk[0], feet[2] - trunk[1]));
+        reached = fmaxf(reached, ((feet[0] - start2[0]) * forward[0]) +
+                                     ((feet[2] - start2[1]) * forward[2]));
+    }
+    check(&t, reached > 2.0F, "avance jusqu'au tronc (m, le long de la marche)", reached);
+    check(&t, closest > trunk_r + 0.25F, "ne traverse pas le tronc (plus près de l'axe, m)",
+          closest);
     ENG_LOG_INFO("AUTOTEST TERRAIN : %s (%d vérifications)", t.ok ? "OK" : "ÉCHEC", t.checks);
     play_mode_shutdown(&t.play);
     return t.ok;

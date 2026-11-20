@@ -53,6 +53,14 @@ typedef void (*DemoModelHook)(void *user, EngRenderQueue *queue, mat4 view_proj,
                               const EngLighting *light, const EngModelShadow *shadow,
                               bool shadow_pass);
 
+/* B8 : un obstacle du décor pour la physique du joueur (tronc, rocher) : pied au sol (m, monde),
+ * rayon et hauteur (m) d'une capsule verticale qui l'englobe à peu près. */
+typedef struct DemoObstacle {
+    float base[3];
+    float radius;
+    float height;
+} DemoObstacle;
+
 typedef struct DemoScene {
     EngCsm csm; /* M7-09 : cascades de l'image (mode monde) ; en tête : alignement des mat4 */
     EngBufferHandle vertices;
@@ -94,7 +102,6 @@ typedef struct DemoScene {
      * scène est dessinée sans ombre. */
     EngModelGpu ground;
     EngTextureHandle shadow_map;
-    uint32_t shadow_size;
     EngPipelineHandle model_shadow_pipeline;
     EngPipelineHandle cube_shadow_pipeline;
     EngPipelineHandle instanced_shadow_pipeline; /* B8 : arbres et rochers dans la passe d'ombre */
@@ -103,6 +110,7 @@ typedef struct DemoScene {
     EngTerrainGpu terrain;
     EngPipelineHandle terrain_pipeline;
     float terrain_view[3];
+    uint32_t shadow_size; /* côté de la carte d'ombre (texels) ; ici : comble l'alignement */
     /* Rochers instanciés (--rocks N, M3-07) : un maillage de rocher, N instances posées au hasard
      * sur le terrain (placement procédural réel : M3-08), UN dessin par image. */
     EngModelGpu rocks;
@@ -163,15 +171,17 @@ typedef struct DemoScene {
     bool has_terrain;
     bool has_shadow;
     bool has_lines;
-    bool has_tree; /* B8 : `tree` chargé */
+    bool has_tree;            /* B8 : `tree` chargé */
     DemoDebugHook debug_hook; /* demo_scene_set_debug_hook */
     void *debug_user;
     DemoModelHook model_hook; /* demo_scene_set_model_hook */
     void *model_user;
-    float shadow_focus[3]; /* M7 : centre de la carte d'ombre en mode monde (le joueur) */
-    bool hide_props;       /* sol seul : ni cubes ni modèle central (galerie des personnages) */
-    bool world_mode;       /* M7 : monde streamé (crochet de modèles) : ni sol ni cubes */
-    bool cascades;         /* M7-09 : ombres en cascade (demo_scene_use_cascades) */
+    DemoObstacle *obstacles; /* B8 : dans l'arène permanente ; NULL sans --placement */
+    float shadow_focus[3];   /* M7 : centre de la carte d'ombre en mode monde (le joueur) */
+    uint32_t obstacle_count; /* B8 : `obstacles` (arbres puis rochers KayKit du placement) */
+    bool hide_props;         /* sol seul : ni cubes ni modèle central (galerie des personnages) */
+    bool world_mode;         /* M7 : monde streamé (crochet de modèles) : ni sol ni cubes */
+    bool cascades;           /* M7-09 : ombres en cascade (demo_scene_use_cascades) */
     bool has_cook;
     bool world_models_full_warned;
 } DemoScene;
@@ -274,3 +284,8 @@ bool demo_scene_entity_bounds(void *scene, EngEntity entity, float min[3], float
  */
 void demo_scene_update(DemoScene *scene, double now_seconds);
 void demo_scene_shutdown(DemoScene *scene, EngRenderer *renderer);
+
+/* B8 : les obstacles du placement (troncs, rochers KayKit) à donner à la physique du joueur ;
+ * `*out` reste valable jusqu'à demo_scene_shutdown. 0 (et `*out` NULL) sans --placement ou avec les
+ * modèles de repli. */
+uint32_t demo_scene_obstacles(const DemoScene *scene, const DemoObstacle **out);

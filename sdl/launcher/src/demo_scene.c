@@ -555,6 +555,56 @@ static bool load_nature(EngRenderer *renderer, EngArena *permanent, const char *
     return ok;
 }
 
+/* B8 : obstacles en fractions de l'échelle d'instance (modèles KayKit : tronc de rayon 0,09 sous un
+ * feuillage de rayon 0,30 dès 0,2 de haut, arbre de 1,1 ; rocher de rayon 0,16 et de 0,135 de
+ * haut). Le tronc est élargi à 0,12 : la tête du joueur (1,8 m) ne traverse pas les branches basses
+ * des petits arbres. */
+#define TREE_OBSTACLE_RADIUS 0.12F
+#define TREE_OBSTACLE_HEIGHT 1.1F
+#define ROCK_OBSTACLE_RADIUS 0.13F
+#define ROCK_OBSTACLE_HEIGHT 0.14F
+
+static uint32_t add_obstacles(DemoObstacle *out, const EngInstance *list, uint32_t count,
+                              float radius, float height)
+{
+    for (uint32_t i = 0; i < count; i++) {
+        for (int c = 0; c < 3; c++) {
+            out[i].base[c] = list[i].position[c];
+        }
+        out[i].radius = radius * list[i].scale;
+        out[i].height = height * list[i].scale;
+    }
+    return count;
+}
+
+/* B8 : garde les obstacles (arbres KayKit, puis rochers KayKit) dans l'arène permanente. */
+static void record_obstacles(DemoScene *scene, EngArena *permanent, const EngInstance *trees,
+                             uint32_t tree_count, const EngInstance *rocks, uint32_t rock_count)
+{
+    const uint32_t total = tree_count + rock_count;
+    scene->obstacle_count = 0;
+    scene->obstacles = total > 0 ? ENG_ARENA_NEW_ARRAY(permanent, DemoObstacle, total) : NULL;
+    if (scene->obstacles == NULL) {
+        if (total > 0) {
+            ENG_LOG_WARN("placement : %u obstacles sans place, le décor reste traversable", total);
+        }
+        return;
+    }
+    uint32_t n = add_obstacles(scene->obstacles, trees, tree_count, TREE_OBSTACLE_RADIUS,
+                               TREE_OBSTACLE_HEIGHT);
+    n += add_obstacles(scene->obstacles + n, rocks, rock_count, ROCK_OBSTACLE_RADIUS,
+                       ROCK_OBSTACLE_HEIGHT);
+    scene->obstacle_count = n;
+}
+
+uint32_t demo_scene_obstacles(const DemoScene *scene, const DemoObstacle **out)
+{
+    if (out != NULL) {
+        *out = scene != NULL ? scene->obstacles : NULL;
+    }
+    return scene != NULL && out != NULL ? scene->obstacle_count : 0U;
+}
+
 /* Placement procédural (M3-08) : les rochers suivent la roche de la splatmap, la végétation l'herbe
  * plate. B8 : rocher et arbre KayKit (CC0) ; sinon le petit rocher procédural (teinte verte pour la
  * végétation). Facultatif comme load_rocks. */
@@ -654,6 +704,10 @@ static void load_placement(DemoScene *scene, EngRenderer *renderer, EngArena *pe
     scene->veg_count = veg_count;
     scene->has_rocks = rock_count > 0;
     scene->has_veg = veg_count > 0;
+    /* B8 : les modèles KayKit ont une collision (capsules du mode jouable) ; pas les modèles de
+     * repli */
+    record_obstacles(scene, permanent, vegetation, scene->has_tree ? veg_count : 0U, rocks,
+                     kaykit_rock ? rock_count : 0U);
     ENG_LOG_INFO("placement : %u rochers sur la roche, %u %s sur l'herbe (graine %u)", rock_count,
                  veg_count, scene->has_tree ? "arbres (KayKit)" : "touffes", seed);
     if (!scene->has_rocks && !scene->has_veg) {

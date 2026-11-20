@@ -132,6 +132,11 @@ bool eng_physics_body_is_active(const EngPhysics *world, EngBody body);
 
 uint32_t eng_physics_body_count(const EngPhysics *world);
 
+/* Réorganise la broadphase après l'ajout de beaucoup de corps statiques (B8 : des milliers de
+ * troncs) : les requêtes (personnage, caméra, rayons) restent rapides. Coûteux : une fois après le
+ * chargement, pas à chaque image. NULL ou sans Jolt : sans effet. */
+void eng_physics_optimize(EngPhysics *world);
+
 /* ── Collisions du monde (M4-03) ── */
 
 struct EngHeightmap;

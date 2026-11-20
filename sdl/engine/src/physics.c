@@ -239,6 +239,10 @@ uint32_t eng_physics_body_count(const EngPhysics *world)
     (void)world;
     return 0;
 }
+void eng_physics_optimize(EngPhysics *world)
+{
+    (void)world;
+}
 uint32_t eng_physics_debug_draw(const EngPhysics *world, EngDebugLines *lines,
                                 const EngPhysicsDebugDraw *options)
 {
@@ -1205,6 +1209,13 @@ bool eng_physics_body_is_active(const EngPhysics *world, EngBody body)
 uint32_t eng_physics_body_count(const EngPhysics *world)
 {
     return world != NULL ? JPH_PhysicsSystem_GetNumBodies(world->system) : 0U;
+}
+
+void eng_physics_optimize(EngPhysics *world)
+{
+    if (world != NULL) {
+        JPH_PhysicsSystem_OptimizeBroadPhase(world->system);
+    }
 }
 
 /* ── Debug draw ── */

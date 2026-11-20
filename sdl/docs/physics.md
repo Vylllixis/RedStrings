@@ -27,6 +27,7 @@ les en-têtes du moteur ni dans les tests :
 | `eng_physics_remove_body` | retrait ; l'identifiant devient invalide (les appels suivants sont sans effet) |
 | `eng_physics_body_position / rotation / velocity / set_body_velocity / is_active` | lecture / écriture ; `false` et sortie inchangée si le corps est inconnu |
 | `eng_physics_body_count` | nombre de corps |
+| `eng_physics_optimize` | réorganise la broadphase après un ajout en masse de corps statiques (B8 : les troncs) |
 | `eng_physics_body_layer` | couche d'un corps (`ENG_LAYER_COUNT` si inconnu) |
 | `eng_physics_move_kinematic` | déplace un capteur vers une cible en `dt` secondes (vitesse = écart / dt) |
 | `eng_physics_overlaps` | corps en chevauchement avec un corps, filtrés par la matrice |

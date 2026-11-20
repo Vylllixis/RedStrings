@@ -35,6 +35,7 @@ livraisons ; les tags sont posés par Théo après ses tests.
 - Finition (B8) : arbres et rochers KayKit (CC0) au lieu des sphères vertes et blanches du placement ;
   forêt claire, clairière au centre en combat ; ombres en cascade aussi sur un terrain (personnages,
   arbres et rochers instanciés : `shadow_instanced.vert`) ; avant, ce mode n'avait aucune ombre.
+  Les arbres et rochers arrêtent le joueur et la caméra (une capsule Jolt par instance).
 
 ## v0.7 (M7, partiel) — monde ouvert
 - Cellules de 256 m (format RSCL), pool de threads, streaming asynchrone, origine flottante,

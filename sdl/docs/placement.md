@@ -72,6 +72,12 @@ Jusqu'à la finition, le lanceur dessinait la végétation avec le petit rocher 
 - en combat (`--combat`), une **clairière** de 45 m de rayon reste vide au centre (apparition du joueur, camp) :
   `eng_instances_clear_disc` (`engine/instancing.h`) retire les instances du disque en gardant l'ordre ;
 - arbres et rochers **projettent leur ombre** (cascades sur un terrain, voir `docs/shadows.md`) et la reçoivent ;
+- arbres et rochers **arrêtent le joueur et la caméra** : `demo_scene_obstacles` donne une capsule verticale par
+  instance (tronc élargi à 0,12 × l'échelle pour que la tête ne traverse pas les branches basses, hauteur 1,1 ×
+  l'échelle ; rocher : sphère de 0,13 × l'échelle au sommet de la roche), le lanceur les ajoute à Jolt
+  (`play_mode_add_obstacle`, puis `eng_physics_optimize`) : 5 424 capsules sur le terrain de la tranche, coût non
+  mesurable (1,1 ms par image avant comme après). Le joueur glisse autour d'un tronc s'il ne le prend pas de face.
+  La grille de l'IA (± 30 m) est entièrement dans la clairière : les ennemis ne rencontrent pas d'arbre ;
 - si un fichier manque, le lanceur journalise un avertissement et revient au rocher procédural.
 
 ![Avant / après B8 : touffes procédurales, puis arbres KayKit avec ombres](devlog/img/b8-avant-apres.png)
@@ -82,8 +88,9 @@ Jusqu'à la finition, le lanceur dessinait la végétation avec le petit rocher 
   (voulu pour de la végétation ; pour des rochers l'enfoncement masque l'écart).
 - Pas de distance minimale entre instances de règles différentes : un rocher peut chevaucher une touffe.
 - La pente est évaluée à l'échelle d'un échantillon : un relief plus fin que l'espacement du champ n'est pas vu.
-- Les arbres et rochers n'ont **pas de collision** (ni Jolt, ni grille de l'IA) : on les traverse. La clairière du
-  combat évite de se battre au milieu d'eux ; ailleurs, c'est visible.
+- Collision approchée par une capsule par arbre ou rocher : le feuillage haut n'arrête rien (on ne peut pas y
+  monter de toute façon) ; les modèles de repli (rocher procédural) n'ont pas de collision. Au-delà de la limite de
+  corps de Jolt (10 240), les obstacles restants sont ignorés (un avertissement).
 - Un seul modèle d'arbre et un seul de rocher (le pack en a d'autres : `tree_single_B`, `rock_single_A` / `C` sont
   téléchargés mais pas encore utilisés).
 - Le débit sur GPU réel n'est pas mesuré ici.
@@ -105,6 +112,8 @@ Jusqu'à la finition, le lanceur dessinait la végétation avec le petit rocher 
   d'arbres jamais envoyées), graine invalide refusée.
 - `launcher.combat_terrain_render` : combat en pilote automatique sur ce terrain avec `--placement` : arbres KayKit,
   4 cascades, 60 passes d'ombre, aucun dessin perdu ni rejeté.
+- `launcher.play_terrain` : un tronc de 0,6 m à 3 m devant le joueur qui marche dessus 3 s : il ne s'approche jamais
+  à moins de 0,85 m de l'axe (mesuré 0,92 ; 0,44 sans la capsule, mutation détectée) ; paramètres invalides refusés.
 - `engine.instancing` : `eng_instances_clear_disc` (dedans retirés, bord gardé, ordre conservé, arguments invalides).
 
 ## Mutations (vérification des tests)
