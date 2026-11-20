@@ -38,7 +38,18 @@ typedef struct PlayCombatStep {
 /* `audio` : ouvre le périphérique audio (sinon silencieux). `arena_obstacles` : les ennemis
  * contournent les cubes et murs de l'arène de M4 (false sur le terrain : pas d'obstacle).
  * Instance unique (stockage statique). */
-PlayCombat *play_combat_create(bool audio, bool arena_obstacles);
+/* `boss_arena` : avec l'arène murée et le boss (M6-09 ; terrain, pas le monde ouvert). */
+PlayCombat *play_combat_create(bool audio, bool arena_obstacles, bool boss_arena);
+
+/* M7 : décale TOUTE la simulation de (dx, dz) dans le plan (combattants, postes, rondes, chemins,
+ * mémoire des ennemis, grille de navigation) : pour poser le camp ailleurs qu'à l'origine, et
+ * pour suivre le recentrage de l'origine flottante du monde. */
+void play_combat_shift(PlayCombat *c, float dx, float dz);
+/* M7 : position (x, z) du poste du premier ennemi du camp ; false sans camp. */
+bool play_combat_camp_center(const PlayCombat *c, float out[2]);
+/* Mode créatif : le joueur ne perd plus de PV (remis au maximum avant chaque pas de simulation) ;
+ * ses attaques et leurs dégâts ne changent pas. */
+void play_combat_set_invincible(PlayCombat *c, bool invincible);
 void play_combat_destroy(PlayCombat *c);
 
 /* M6-09 : murs de l'arène du boss (terrain seulement), en boîtes au sol : centre x, z et

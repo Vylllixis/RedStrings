@@ -139,8 +139,24 @@ Fenêtre de navigation de 64 m autour du joueur, obstacles tirés des cellules p
 quand le joueur s'éloigne de 16 m ou que des cellules arrivent. Un ennemi suit le joueur sur
 225 m, à travers 2 frontières de cellule et 2 recentrages d'origine, sans jamais décrocher de plus
 de 6 m ni entrer dans un obstacle. Jolt est découpé par cellule dans le monde rendu (un champ de
-hauteurs par cellule, ajouté et retiré avec elle). La navigation de l'IA par cellule n'est pas
-encore branchée au monde rendu (pas d'ennemis dans `--world`).
+hauteurs par cellule, ajouté et retiré avec elle).
+
+**Ennemis dans le monde rendu (finition M7)** : `launcher --world [GRAINE] --combat` (ou
+`--combat-autoplay`) pose le camp de 3 squelettes et le mannequin près du départ (camp ancré en
+(112, 112) du monde, à 24 m), avec le HUD, les menus et le combat complet ; pas de boss ni d'arène
+dans le monde. La simulation de combat vit dans le repère local : `play_combat_shift` décale
+combattants, postes, rondes, chemins, mémoire des ennemis et grille de navigation ; elle sert à
+poser le camp au départ et, à chaque recentrage de l'origine flottante, à le garder à sa place
+dans le monde (`play_mode_origin_shift`). Le lanceur le contrôle à chaque recentrage (« le camp
+reste en place », ERREUR s'il a bougé de plus de 5 cm). La grille de navigation du camp reste la
+fenêtre fixe de 60 m du mode combat, pentes prises sur le relief chargé au lancement : elle n'est
+pas (encore) la fenêtre mobile de `ai_area`.
+
+![Le camp dans le monde ouvert : un soldat squelette verrouillé](devlog/img/m7-camp-dans-le-monde.png)
+
+Limites : un seul camp, fixe ; loin du camp ses cellules sont déchargées (les ennemis ne sont plus
+dessinés à leur hauteur, ils attendent) ; la sauvegarde note des positions locales : elle n'est
+fiable dans le monde que tant que l'origine n'a pas été recentrée.
 
 ## Persistance (M7-12) — `world_state`
 

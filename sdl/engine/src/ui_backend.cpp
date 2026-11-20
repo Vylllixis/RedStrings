@@ -7,6 +7,7 @@
 #include <SDL3/SDL.h>
 
 #include "imgui.h"
+#include "imgui_internal.h" // B5 : réserver la file d'événements d'entrée à la création
 #include "imgui_impl_sdl3.h"
 #include "imgui_impl_sdlgpu3.h"
 
@@ -62,6 +63,10 @@ extern "C" bool ow_ui_create(void *window, void *device, uint32_t color_format)
     }
     ImGui::SetAllocatorFunctions(ui_alloc, ui_free, nullptr);
     ImGui::CreateContext();
+    // B5 : la file des événements d'entrée grandissait au premier appui (une allocation pendant
+    // une image) : réservée ici, hors de la boucle
+    ImGui::GetCurrentContext()->InputEventsQueue.reserve(256);
+    ImGui::GetCurrentContext()->InputEventsTrail.reserve(256);
     ImGuiIO &io = ImGui::GetIO();
     io.IniFilename = nullptr; // pas de imgui.ini : la disposition est décidée par le code
     io.LogFilename = nullptr;

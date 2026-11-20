@@ -120,6 +120,7 @@ struct PlayCombat {
     bool has_boss;       /* M6-09 : arène et boss (terrain seulement) */
     bool boss_defeated;  /* tué : ne renaît plus (déduit de la sauvegarde au chargement) */
     bool boss_reachable; /* l'entrée mène au boss sur ce relief (play_combat_set_relief) */
+    bool invincible; /* mode créatif : le joueur ne perd pas de PV (ses dégâts sont inchangés) */
     bool was_dead[FIGHTERS_MAX];
     bool has_avatar[FIGHTERS_MAX];
     bool rig_ready[FIGHTERS_MAX]; /* M5-05 / M5-06 : pose au rythme des ticks (ci-dessous) */
@@ -328,7 +329,66 @@ static void spawn_all(PlayCombat *c)
     }
 }
 
-PlayCombat *play_combat_create(bool audio, bool arena_obstacles)
+void play_combat_shift(PlayCombat *c, float dx, float dz)
+{
+    if (c == NULL || !c->ready || !isfinite(dx) || !isfinite(dz)) {
+        return;
+    }
+    const float d[2] = {dx, dz};
+    for (int a = 0; a < 2; a++) {
+        for (uint32_t i = 0; i < c->sim.count; i++) {
+            c->sim.bodies[i].pos[a] += d[a];
+            c->sim.bodies[i].prev_pos[a] += d[a];
+        }
+        for (uint32_t i = 0; i < c->group.count; i++) {
+            EngAiAgent *ag = &c->group.agents[i];
+            ag->home[a] += d[a];
+            ag->goal[a] += d[a];
+            ag->ring[a] += d[a];
+            ag->perc.last_known[a] += d[a];
+            for (uint32_t k = 0; k < ENG_AI_PATROL_MAX; k++) {
+                ag->patrol[k][a] += d[a];
+            }
+            for (uint32_t k = 0; k < ENG_AI_PATH_MAX; k++) {
+                ag->path[k][a] += d[a];
+            }
+        }
+        for (uint32_t i = 0; i < c->camp.count; i++) {
+            c->camp.m[i].pos[a] += d[a];
+            for (uint32_t k = 0; k < ENG_AI_PATROL_MAX; k++) {
+                c->camp.m[i].patrol[k][a] += d[a];
+            }
+        }
+        for (uint32_t i = 0; i < c->world.count; i++) {
+            c->world.obs[i].c[a] += d[a];
+        }
+        c->nav.origin[a] += d[a];
+    }
+    for (uint32_t i = 0; i < FIGHTERS_MAX; i++) {
+        (void)eng_trail_init(&c->trail[i], 10U); /* pas de traînée à travers le décalage */
+    }
+    eng_particles_init(&c->particles, 12345U);
+    eng_dmgnum_init(&c->numbers);
+}
+
+void play_combat_set_invincible(PlayCombat *c, bool invincible)
+{
+    if (c != NULL && c->ready) {
+        c->invincible = invincible;
+    }
+}
+
+bool play_combat_camp_center(const PlayCombat *c, float out[2])
+{
+    if (c == NULL || !c->ready || c->camp.count == 0U || out == NULL) {
+        return false;
+    }
+    out[0] = c->camp.m[0].pos[0];
+    out[1] = c->camp.m[0].pos[1];
+    return true;
+}
+
+PlayCombat *play_combat_create(bool audio, bool arena_obstacles, bool boss_arena)
 {
     PlayCombat *c = &g_combat;
     if (c->ready) {
@@ -382,7 +442,8 @@ PlayCombat *play_combat_create(bool audio, bool arena_obstacles)
         eng_aiw_init(&c->world);
     }
     /* M6-09 : sur un terrain, l'arène murée du boss (s'il est décrit dans enemies.txt) */
-    const uint32_t boss_arch = arena_obstacles ? UINT32_MAX : eng_arch_find(&c->arch, "boss");
+    const uint32_t boss_arch =
+        (arena_obstacles || !boss_arena) ? UINT32_MAX : eng_arch_find(&c->arch, "boss");
     if (boss_arch != UINT32_MAX) {
         float walls[BOSS_WALLS][4];
         const uint32_t n = boss_wall_boxes(walls);
@@ -513,6 +574,9 @@ void play_combat_tick(PlayCombat *c, const EngInputState *input, const float fee
         eng_audio_device_unlock(c->device);
     }
     EngFighter *pf = &c->sim.fighters[PLAYER];
+    if (c->invincible && !pf->vitals.dead) { /* mode créatif : PV pleins avant chaque pas */
+        pf->vitals.hp = pf->vitals.max_hp;
+    }
     /* le joueur : position du personnage physique */
     (void)eng_sim_place(&c->sim, PLAYER, feet[0], feet[2], facing);
     const float player_xz[2] = {feet[0], feet[2]};
@@ -1366,7 +1430,9 @@ void play_combat_fill_hud(const PlayCombat *c, const PlayMode *play, mat4 view_p
     hud->posture = pf->posture;
     hud->posture_max = pf->params.max_posture;
     hud->level = c->progress.level;
-    (void)snprintf(hud->weapon, sizeof hud->weapon, "%s", eng_weapon_def(c->equip.equipped)->label);
+    (void)snprintf(hud->weapon, sizeof hud->weapon, "%s%s",
+                   eng_weapon_def(c->equip.equipped)->label,
+                   c->invincible ? "  ·  MODE CRÉATIF" : "");
     {
         const uint32_t need = eng_prog_need(c->progress.level);
         hud->xp_frac = need > 0U ? (float)c->progress.xp / (float)need : 1.0F;
@@ -1852,6 +1918,55 @@ bool play_combat_selftest(bool rig)
     step(&t, 1U << ENG_ACTION_SWITCH_WEAPON, 0U, 0.0F, 0.0F);
     check(&t, c->equip.equipped == ENG_WEAPON_SWORD, "équipement : R remet l'épée",
           (float)c->equip.equipped);
+
+    /* 1 ter. mode créatif (touche « , ») : invincible, vol libre, dégâts du joueur inchangés */
+    for (int i = 0; i < 60; i++) {
+        step(&t, 0U, 0U, 0.0F, 0.0F);
+    }
+    float dealt = c->dummy.total_damage;
+    for (int i = 0; i < 60; i++) {
+        step(&t, i == 0 ? atk : 0U, 0U, 0.0F, 0.0F);
+    }
+    const float normal_hit = c->dummy.total_damage - dealt;
+    step(&t, 1U << ENG_ACTION_CREATIVE, 0U, 0.0F, 0.0F);
+    check(&t, t.play.creative, "créatif : la touche l'active", t.play.creative ? 1.0F : 0.0F);
+    dealt = c->dummy.total_damage;
+    for (int i = 0; i < 60; i++) {
+        step(&t, i == 0 ? atk : 0U, 0U, 0.0F, 0.0F);
+    }
+    const float creative_hit = c->dummy.total_damage - dealt;
+    check(&t, normal_hit > 0.0F && fabsf(creative_hit - normal_hit) < 0.01F,
+          "créatif : mêmes dégâts qu'en mode normal (dégâts d'un coup)", creative_hit);
+    c->sim.fighters[PLAYER].vitals.hp = 1.0F; /* presque mort : le mode créatif remet les PV */
+    step(&t, 0U, 0U, 0.0F, 0.0F);
+    check(&t,
+          fabsf(c->sim.fighters[PLAYER].vitals.hp - c->sim.fighters[PLAYER].vitals.max_hp) < 0.01F,
+          "créatif : invincible (PV remis au maximum)", c->sim.fighters[PLAYER].vitals.hp);
+    float low[3];
+    float high[3];
+    float later[3];
+    (void)eng_character_position(t.play.character, low);
+    for (int i = 0; i < 60; i++) { /* Espace tenue : monte */
+        step(&t, 0U, 1U << ENG_ACTION_JUMP, 0.0F, 0.0F);
+    }
+    (void)eng_character_position(t.play.character, high);
+    check(&t, high[1] - low[1] > 8.0F, "créatif : Espace fait monter (m en 1 s)", high[1] - low[1]);
+    for (int i = 0; i < 60; i++) { /* rien : reste en l'air */
+        step(&t, 0U, 0U, 0.0F, 0.0F);
+    }
+    (void)eng_character_position(t.play.character, later);
+    check(&t, fabsf(later[1] - high[1]) < 0.05F, "créatif : ne retombe pas (écart en 1 s, m)",
+          later[1] - high[1]);
+    step(&t, 1U << ENG_ACTION_CREATIVE, 0U, 0.0F, 0.0F);
+    check(&t, !t.play.creative, "créatif : la touche le coupe", t.play.creative ? 1.0F : 0.0F);
+    for (int i = 0; i < 180; i++) {
+        step(&t, 0U, 0U, 0.0F, 0.0F);
+    }
+    (void)eng_character_position(t.play.character, later);
+    check(&t, later[1] < low[1] + 0.2F, "créatif coupé : retombe au sol (m au-dessus du départ)",
+          later[1] - low[1]);
+    c->sim.fighters[PLAYER].vitals.hp = c->sim.fighters[PLAYER].vitals.max_hp;
+    put(&t, 4.0F, 0.3F, 0.0F);
 
     /* 2. verrouillage sur le mannequin (caméra vers -Z) */
     step(&t, 1U << ENG_ACTION_LOCK_ON, 0U, 0.0F, 0.0F);

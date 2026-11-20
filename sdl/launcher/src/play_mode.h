@@ -60,12 +60,20 @@ typedef struct PlayMode {
     mat4 wall_place[PLAY_WALL_SEGMENTS]; /* M6-09 : segment de mur sur le relief (boîte unité) */
     EngModelGpu wall_model;
     uint32_t wall_count;
-    bool wall_ready; /* `wall_model` créé (play_mode_load_arena_visuals) */
+    float spawn[3];
     uint32_t arena_count;
     Avatar avatar; /* le chevalier du joueur */
     bool sprinting;
     bool ready;
-    bool on_terrain; /* --terrain : sol = champ de hauteurs (collision Jolt) au lieu de l'arène */
+    bool on_terrain;
+    bool creative; /* mode créatif (touche « , ») : invincible, vol libre, dégâts inchangés */
+    bool wall_ready; /* `wall_model` créé (play_mode_load_arena_visuals) */
+    /* M7 : point de départ (repère local ; suit le recentrage de l'origine) */ /* --terrain :
+                                                                                   sol = champ
+                                                                                   de hauteurs
+                                                                                   (collision
+                                                                                   Jolt) au lieu
+                                                                                   de l'arène */
     bool autoplay;   /* --combat-autoplay : le pilote automatique joue */
     bool show_debug; /* F3 : capsules, boîtes et flèche en plus des modèles */
     /* M7 : sol donné par le monde streamé (play_mode_init_world) ; NULL : arène ou terrain */
@@ -105,6 +113,10 @@ void play_mode_spawn_point(const PlayMode *play, float feet[3], float *yaw);
  * Les réglages (vitesses, sensibilité, inversion de la caméra) sont conservés ; l'endurance non
  * plus que le combat ne sont touchés (à l'appelant). */
 void play_mode_teleport(PlayMode *play, const float feet[3], float yaw);
+
+/* M7 : l'origine flottante du monde est recentrée de `shift` : le personnage, la caméra, le point
+ * de départ et le combat (camp, ennemis, grille) sont décalés ensemble. */
+void play_mode_origin_shift(PlayMode *play, const float shift[3]);
 
 /* B8 : un obstacle statique du décor (tronc, rocher) : une capsule verticale de `radius` dont le
  * bas est à `base` et le haut à `base` + `height` (une sphère au sommet si `height` < 2 x

@@ -7,6 +7,8 @@
 
 #define STATIC_MASK (1U << ENG_LAYER_STATIC)
 #define PLAY_OBSTACLE_MIN_HALF 0.01F /* m : demi-cylindre minimal d'une capsule d'obstacle (B8) */
+#define PLAY_CREATIVE_SPEED 3.0F     /* mode créatif : vitesse horizontale x 3 */
+#define PLAY_CREATIVE_CLIMB 12.0F    /* m/s : montée (Espace) et vol dans l'axe du regard */
 #define GROUND_HALF 28.0F
 #define GRID_HALF 3
 #define GRID_SPACING 8.0F
@@ -184,6 +186,20 @@ void play_mode_shift(PlayMode *play, const float shift[3])
     (void)eng_character_teleport(play->character, feet);
 }
 
+void play_mode_origin_shift(PlayMode *play, const float shift[3])
+{
+    if (play == NULL || !play->ready || shift == NULL) {
+        return;
+    }
+    play_mode_shift(play, shift);
+    for (int a = 0; a < 3; a++) {
+        play->spawn[a] += shift[a];
+    }
+    if (play->combat != NULL) {
+        play_combat_shift(play->combat, shift[0], shift[2]);
+    }
+}
+
 static bool init_common(PlayMode *play, EngTweaks *tweaks, float camera_sensitivity, bool invert_y,
                         const char *terrain_path, const float *spawn)
 {
@@ -206,6 +222,9 @@ static bool init_common(PlayMode *play, EngTweaks *tweaks, float camera_sensitiv
     }
     const float sx = spawn != NULL ? spawn[0] : PLAY_SPAWN_X;
     const float sz = spawn != NULL ? spawn[2] : PLAY_SPAWN_Z;
+    play->spawn[0] = sx; /* M7 : le départ d'une nouvelle partie */
+    play->spawn[1] = 0.0F;
+    play->spawn[2] = sz;
     const float spawn_y = spawn != NULL ? spawn[1] : play_mode_ground(play, sx, sz);
     const EngCharacterDesc desc = {.position = {sx, spawn_y + 0.05F, sz},
                                    .max_slope_deg = PLAY_MAX_SLOPE_DEG};
@@ -250,9 +269,9 @@ void play_mode_spawn_point(const PlayMode *play, float feet[3], float *yaw)
     if (play == NULL || feet == NULL || yaw == NULL) {
         return;
     }
-    feet[0] = PLAY_SPAWN_X;
-    feet[1] = play_mode_ground(play, PLAY_SPAWN_X, PLAY_SPAWN_Z) + 0.05F;
-    feet[2] = PLAY_SPAWN_Z;
+    feet[0] = play->spawn[0];
+    feet[1] = play_mode_ground(play, play->spawn[0], play->spawn[2]) + 0.05F;
+    feet[2] = play->spawn[2];
     *yaw = PLAY_START_YAW;
 }
 
@@ -358,7 +377,15 @@ bool play_mode_enable_combat(PlayMode *play, bool audio)
     if (play == NULL || !play->ready || play->combat != NULL) {
         return false;
     }
-    play->combat = play_combat_create(audio, !play->on_terrain);
+    const bool open_world = play->ground_fn != NULL; /* M7 : monde streamé */
+    play->combat = play_combat_create(audio, !play->on_terrain && !open_world, play->on_terrain);
+    if (play->combat != NULL && open_world) {
+        /* M7 : le camp et le mannequin posés autour du départ du monde (le point (4, 4) de leur
+         * disposition sur le départ), puis la navigation sur le relief chargé */
+        play_combat_shift(play->combat, play->spawn[0] - PLAY_SPAWN_X,
+                          play->spawn[2] - PLAY_SPAWN_Z);
+        (void)play_combat_set_relief(play->combat, relief_height, play, PLAY_MAX_SLOPE_DEG);
+    }
     if (play->combat != NULL && play->on_terrain) {
         /* M6-03 : les ennemis vont partout où le personnage peut aller, et pas ailleurs : même
          * pente limite que le personnage Jolt */
@@ -418,6 +445,16 @@ void play_mode_tick(PlayMode *play, const EngInputState *input, float dt)
     }
     (void)eng_character_set_gravity_scale(play->character, 1.0F, play->gravity_fall);
 
+    if (eng_action_pressed(input, ENG_ACTION_CREATIVE)) { /* touche « , » */
+        play->creative = !play->creative;
+        if (play->combat != NULL) {
+            play_combat_set_invincible(play->combat, play->creative);
+        }
+        ENG_LOG_INFO("mode créatif : %s", play->creative
+                                              ? "activé (invincible, vol : Espace monte, avancer "
+                                                "suit le regard ; dégâts inchangés)"
+                                              : "désactivé");
+    }
     float velocity[3];
     eng_locomotion_velocity(&play->loco, velocity);
     if (play->combat != NULL) {
@@ -435,6 +472,25 @@ void play_mode_tick(PlayMode *play, const EngInputState *input, float dt)
         }
         velocity[0] += step.push[0] / dt; /* esquive, recul, séparation : vitesse de ce pas */
         velocity[2] += step.push[1] / dt;
+    }
+    if (play->creative) {
+        /* vol libre : le personnage est déplacé sans gravité ni collision (jamais sous le sol) ;
+         * avancer suit le regard (monte ou descend avec lui), Espace monte */
+        const float forward = isfinite(move.y) ? move.y : 0.0F;
+        const float climb = (eng_action_held(input, ENG_ACTION_JUMP) ? PLAY_CREATIVE_CLIMB : 0.0F) +
+                            (forward * sinf(play->orbit.pitch) * PLAY_CREATIVE_CLIMB);
+        float fly[3];
+        (void)eng_character_position(play->character, fly);
+        fly[0] += velocity[0] * PLAY_CREATIVE_SPEED * dt;
+        fly[1] += climb * dt;
+        fly[2] += velocity[2] * PLAY_CREATIVE_SPEED * dt;
+        const float floor_y = play_mode_ground(play, fly[0], fly[2]) + 0.05F;
+        if (fly[1] < floor_y) {
+            fly[1] = floor_y;
+        }
+        (void)eng_character_teleport(play->character, fly);
+        (void)eng_physics_step(play->world, dt);
+        return;
     }
     (void)eng_physics_step(play->world, dt);
     (void)eng_character_update(play->character, dt, velocity);

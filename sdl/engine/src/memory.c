@@ -14,21 +14,53 @@ static SDL_free_func g_orig_free;
 static SDL_AtomicU32 g_alloc_count;
 static bool g_tracking;
 
+/* Piège de développement (B5) : avec la variable d'environnement ENG_ALLOC_TRAP, chaque allocation
+ * faite PENDANT une image écrit sa pile d'appels sur stderr (les 24 premières), pour trouver d'où
+ * elle vient. Linux seulement ; sans effet ailleurs. */
+static SDL_AtomicInt g_frame_open;
+static SDL_AtomicInt g_trap_left;
+
+#ifdef __linux__
+#include <execinfo.h>
+#include <unistd.h>
+static void trap_allocation(void)
+{
+    if (SDL_GetAtomicInt(&g_frame_open) == 0 || SDL_GetAtomicInt(&g_trap_left) <= 0) {
+        return;
+    }
+    if (SDL_AddAtomicInt(&g_trap_left, -1) <= 0) {
+        return;
+    }
+    void *frames[24];
+    const int n = backtrace(frames, 24);
+    static const char header[] = "--- allocation pendant une image (ENG_ALLOC_TRAP) ---\n";
+    (void)!write(STDERR_FILENO, header, sizeof header - 1U);
+    backtrace_symbols_fd(frames, n, STDERR_FILENO); /* sans allocation */
+}
+#else
+static void trap_allocation(void)
+{
+}
+#endif
+
 static void *SDLCALL track_malloc(size_t size)
 {
     SDL_AddAtomicU32(&g_alloc_count, 1);
+    trap_allocation();
     return g_orig_malloc(size);
 }
 
 static void *SDLCALL track_calloc(size_t count, size_t size)
 {
     SDL_AddAtomicU32(&g_alloc_count, 1);
+    trap_allocation();
     return g_orig_calloc(count, size);
 }
 
 static void *SDLCALL track_realloc(void *pointer, size_t size)
 {
     SDL_AddAtomicU32(&g_alloc_count, 1);
+    trap_allocation();
     return g_orig_realloc(pointer, size);
 }
 
@@ -48,6 +80,9 @@ void eng_mem_track_install(void)
         return;
     }
     g_tracking = true;
+    if (SDL_getenv("ENG_ALLOC_TRAP") != NULL) {
+        SDL_SetAtomicInt(&g_trap_left, 24);
+    }
 }
 
 uint32_t eng_mem_alloc_count(void)
@@ -82,11 +117,13 @@ void eng_memory_begin_frame(EngMemory *memory)
     eng_arena_reset(&memory->frame);
     memory->allocs_at_frame_begin = eng_mem_alloc_count();
     memory->in_frame = true;
+    SDL_SetAtomicInt(&g_frame_open, 1);
 }
 
 void eng_memory_end_frame(EngMemory *memory)
 {
     ENG_ASSERT_MSG(memory->in_frame, "eng_memory_end_frame appelé sans begin_frame");
+    SDL_SetAtomicInt(&g_frame_open, 0);
     uint32_t allocations = eng_mem_alloc_count() - memory->allocs_at_frame_begin;
     if (allocations != 0) {
         memory->frame_alloc_total += allocations;

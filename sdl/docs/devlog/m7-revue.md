@@ -27,7 +27,7 @@ Tests : `test_jobs` (4), `test_world_stream` (11), `test_world_ai` (3), `test_wo
 | M7-08 Culling GPU | À faire (important, non indispensable) |
 | M7-09 Ombres en cascade | Fait : atlas 2 x 2 dans les shaders, passe d'ombre par tuiles ; mode monde |
 | M7-10 Origine flottante | Fait : aussi dans le monde rendu (personnage, caméra, corps Jolt) |
-| M7-11 Physique/navmesh par cellule | Partiel : Jolt découpé par cellule (champ de hauteurs ajouté/retiré, `launcher.world_ground`) ; navigation de l'IA prouvée à travers les cellules mais pas d'ennemis dans le monde rendu |
+| M7-11 Physique/navmesh par cellule | Partiel : Jolt découpé par cellule (champ de hauteurs ajouté/retiré, `launcher.world_ground`) ; navigation de l'IA prouvée à travers les cellules ; **finition** : un camp d'ennemis dans le monde rendu (`--world --combat`), décalé avec l'origine flottante (`launcher.world_combat`, `launcher.world_combat_shift`, mutation détectée) ; sa grille reste la fenêtre fixe du mode combat |
 | M7-12 Persistance | Prouvé |
 | M7-13 Outil d'édition | À faire (important) |
 | M7-14 Budgets | Prouvé (doc + benchmark en une commande + ctest) ; config de référence à fixer par toi |

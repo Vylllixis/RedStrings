@@ -231,6 +231,39 @@ static bool start_world(WorldView *world, PlayMode *play, EngTweaks *tweaks, flo
     return true;
 }
 
+/* M7 : le camp de combat garde sa place dans le MONDE à travers les recentrages de l'origine
+ * flottante (sa position locale est décalée avec elle). Journalise l'ancrage, le premier
+ * recentrage, et une ERREUR si le camp a bougé. */
+static void check_camp_anchor(const WorldView *world, const PlayMode *play, bool shifted)
+{
+    static bool known;
+    static double anchor[3];
+    static uint32_t shifts;
+    float c[2];
+    if (play->combat == NULL || !play_combat_camp_center(play->combat, c)) {
+        return;
+    }
+    const float local[3] = {c[0], 0.0F, c[1]};
+    double w[3];
+    eng_origin_to_world(&world->origin, local, w);
+    if (!known) {
+        memcpy(anchor, w, sizeof anchor);
+        known = true;
+        ENG_LOG_INFO("monde : camp de combat ancré en (%.1f, %.1f) du monde", w[0], w[2]);
+        return;
+    }
+    if (!shifted) {
+        return;
+    }
+    shifts++;
+    const double gap = hypot(w[0] - anchor[0], w[2] - anchor[2]);
+    if (gap > 0.05) {
+        ENG_LOG_ERROR("monde : le camp a bougé de %.2f m au recentrage n° %u", gap, shifts);
+    } else if (shifts == 1U) {
+        ENG_LOG_INFO("monde : origine recentrée, le camp reste en place (écart %.3f m)", gap);
+    }
+}
+
 /* Une image du monde : pilote automatique éventuel, streaming, recentrage de l'origine. Renvoie
  * les mètres parcourus par le pilote automatique. */
 static double world_frame(WorldView *world, PlayMode *play, EngCamera *camera,
@@ -258,14 +291,16 @@ static double world_frame(WorldView *world, PlayMode *play, EngCamera *camera,
     double player_world[3];
     eng_origin_to_world(&world->origin, feet, player_world);
     float shift[3];
-    if (world_view_update(world, player_world, shift)) {
-        play_mode_shift(play, shift);
+    const bool shifted = world_view_update(world, player_world, shift);
+    if (shifted) {
+        play_mode_origin_shift(play, shift); /* M7 : personnage, départ et combat ensemble */
         for (int a = 0; a < 3; a++) {
             feet[a] += shift[a];
             camera->position[a] += shift[a];
             camera_prev->position[a] += shift[a];
         }
     }
+    check_camp_anchor(world, play, shifted);
     for (int a = 0; a < 3; a++) {
         scene->shadow_focus[a] = feet[a];
     }
@@ -1512,6 +1547,13 @@ int main(int argc, char **argv)
                 } else {
                     ENG_LOG_ERROR("MONDE : TROU sous le joueur (%.2f m du sol)", (double)gap);
                 }
+            }
+            if (use_play && play.combat != NULL) { /* M7 : le camp dans le monde */
+                PlayCombatStats cs;
+                play_combat_stats(play.combat, &cs);
+                ENG_LOG_INFO("monde : combat : %u ennemi(s) engagé(s) au plus, %u coup(s) reçu(s), "
+                             "%u ennemi(s) vaincu(s)",
+                             cs.enemies_engaged, cs.player_hits_taken, cs.enemy_kills);
             }
             demo_scene_set_model_hook(&scene, NULL, NULL);
             world_view_shutdown(&world); /* avant le monde physique : retire ses corps */

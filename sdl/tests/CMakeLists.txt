@@ -531,7 +531,7 @@ if(OW_PHYSICS)
            --env-samples 16 WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR})
   set_tests_properties(launcher.combat_render PROPERTIES
     ENVIRONMENT "SDL_VIDEODRIVER=offscreen"
-    FAIL_REGULAR_EXPRESSION "ERROR|non détruite|perdu"
+    FAIL_REGULAR_EXPRESSION "ERROR|non détruite|perdu|allocation\\(s\\) pendant l'image"
     PASS_REGULAR_EXPRESSION "renderer : 60 image\\(s\\), 60 passe\\(s\\) d'ombre")
   if(OW_SOFTWARE_VULKAN_ICD)
     set_property(TEST launcher.combat_render APPEND PROPERTY ENVIRONMENT_MODIFICATION
@@ -548,7 +548,7 @@ if(OW_SHADERS_OK)
            WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR})
   set_tests_properties(launcher.combat_terrain_render PROPERTIES
     ENVIRONMENT "SDL_VIDEODRIVER=offscreen"
-    FAIL_REGULAR_EXPRESSION "ERROR|non détruite|perdu|dessin ignoré|inaccessible"
+    FAIL_REGULAR_EXPRESSION "ERROR|non détruite|perdu|dessin ignoré|inaccessible|allocation\\(s\\) pendant l'image"
     PASS_REGULAR_EXPRESSION "arbres \\(KayKit\\).*ombres : 4 cascades.*renderer : 60 image\\(s\\), 60 passe\\(s\\) d'ombre")
   if(OW_SOFTWARE_VULKAN_ICD)
     set_property(TEST launcher.combat_terrain_render APPEND PROPERTY ENVIRONMENT_MODIFICATION
@@ -586,6 +586,31 @@ if(OW_SHADERS_OK)
   if(OW_SOFTWARE_VULKAN_ICD)
     set_property(TEST launcher.options_fullscreen APPEND PROPERTY ENVIRONMENT_MODIFICATION
       "VK_DRIVER_FILES=set:${OW_SOFTWARE_VULKAN_ICD}" "VK_ICD_FILENAMES=set:${OW_SOFTWARE_VULKAN_ICD}")
+  endif()
+endif()
+
+# M7 : un camp d'ennemis dans le monde ouvert. (1) le pilote de combat rejoint le camp posé près
+# du départ : des ennemis s'engagent ; (2) traversée à 200 m/s : l'origine est recentrée et le camp
+# reste à sa place dans le monde.
+if(OW_PHYSICS AND OW_SHADERS_OK)
+  add_test(NAME launcher.world_combat COMMAND launcher --world 7 --combat-autoplay --no-audio
+           --frames 500 --env-samples 16 WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR})
+  set_tests_properties(launcher.world_combat PROPERTIES
+    ENVIRONMENT "SDL_VIDEODRIVER=offscreen"
+    FAIL_REGULAR_EXPRESSION "ERROR|non détruite|perdu|TROU"
+    PASS_REGULAR_EXPRESSION "camp de combat ancré.*monde : combat : [1-9][0-9]* ennemi\\(s\\) engagé")
+  add_test(NAME launcher.world_combat_shift COMMAND launcher --world 7 --combat-autoplay
+           --world-autopilot 200 --no-audio --frames 240 --env-samples 16
+           WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR})
+  set_tests_properties(launcher.world_combat_shift PROPERTIES
+    ENVIRONMENT "SDL_VIDEODRIVER=offscreen"
+    FAIL_REGULAR_EXPRESSION "ERROR|non détruite|perdu|TROU|a bougé"
+    PASS_REGULAR_EXPRESSION "origine recentrée, le camp reste en place")
+  if(OW_SOFTWARE_VULKAN_ICD)
+    foreach(t launcher.world_combat launcher.world_combat_shift)
+      set_property(TEST ${t} APPEND PROPERTY ENVIRONMENT_MODIFICATION
+        "VK_DRIVER_FILES=set:${OW_SOFTWARE_VULKAN_ICD}" "VK_ICD_FILENAMES=set:${OW_SOFTWARE_VULKAN_ICD}")
+    endforeach()
   endif()
 endif()
 

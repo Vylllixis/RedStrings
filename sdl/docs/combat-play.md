@@ -80,6 +80,16 @@ Outils de mise au point (M5-16, M6-10) :
 | F1 | panneau de debug ; section « Combat » : tick, état de chaque combattant, attaque en cours et sa phase (anticipation / ACTIF / récupération), PV, posture |
 | clic gauche dans la vue (F1 ouvert) | sélectionne l'ennemi sous le curseur : son état d'IA (perception, chemin, jeton) dans la section « IA », cercle autour de lui |
 
+## Mode créatif (touche « , »)
+
+La touche qui écrit « , » dans la disposition du clavier (action `creative`, modifiable dans
+`config.ini`) bascule le mode créatif : le joueur est **invincible** (ses PV sont remis au maximum
+avant chaque pas de simulation), il **vole** (sans gravité ni collision, jamais sous le sol : Espace
+monte à 12 m/s, avancer suit le regard, vitesse horizontale x 3) et ses **dégâts ne changent pas**
+(mêmes attaques, mêmes valeurs). « MODE CRÉATIF » s'affiche à côté du nom de l'arme. La simulation
+de combat est dans le plan : en vol au-dessus d'un ennemi, les coups portent encore. L'autotest du
+combat le vérifie (activation, même dégât par coup, PV remis, montée, pas de chute, retour au sol).
+
 ## Équipement (M8-08)
 
 Deux armes (`engine/equipment.h`) : **épée et bouclier** (départ : enchaînement de 3 coups, lourde

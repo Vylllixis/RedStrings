@@ -41,6 +41,9 @@ livraisons ; les tags sont posés par Théo après ses tests.
 - Finition (M8-06) : échelle de résolution (50 à 100 %, agrandissement bilinéaire, menu) ; mesure du
   coût de chaque effet (`--post-bench N`) ; FXAA moins coûteux avec le bloom (voisins sans halo).
 - Finition (B19) : le plein écran enregistré dans les options est appliqué au lancement.
+- Mode créatif (touche « , ») : invincible, vol libre, dégâts inchangés.
+- Finition (B5) : piège `ENG_ALLOC_TRAP=1` (pile d'appels des allocations faites pendant une image) ;
+  aucune allocation récurrente en jeu ; file d'événements d'ImGui réservée à l'avance.
 - Finition (B18) : la capture d'écran (`--screenshot`) passe par une texture à nous : plus d'erreur
   de validation Vulkan en Debug.
 
@@ -58,6 +61,9 @@ livraisons ; les tags sont posés par Théo après ses tests.
 ## Raccords
 - Combat jouable dans le lanceur (`--combat`), sur l'arène ou sur le terrain procédural
   (`--terrain`), démonstration automatique (`--combat-autoplay`), capture d'écran.
+
+- M7 (finition) : un camp d'ennemis dans le monde ouvert (`launcher --world --combat`), ancré dans le
+  monde à travers les recentrages de l'origine flottante.
 
 ## v0.6 (M6) — ennemis et IA
 - Perception, navigation (grille + A*), comportements, jetons d'attaque (2 au plus), archétypes en
