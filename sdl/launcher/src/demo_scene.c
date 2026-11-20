@@ -1169,6 +1169,11 @@ void demo_scene_draw(DemoScene *scene, EngRenderer *renderer, EngRenderQueue *qu
     apply_moonlight(&light, scene->night);
     mat4 view_proj;
     view_projection(camera, aspect, view_proj);
+    { /* M8-06 : la projection pour le SSAO de la passe de résolution */
+        mat4 projection;
+        eng_camera_projection(camera, aspect, projection);
+        eng_renderer_set_projection(renderer, projection);
+    }
 
     /* ombre : la caméra du soleil, la file d'ombre, et ce que reçoivent le sol et le modèle ; sans
      * ombre, la carte est retirée du renderer et aucune passe d'ombre n'est ouverte */

@@ -43,6 +43,8 @@
 #include "skeleton_view.h"
 #include "avatar_gallery.h"
 
+#define LAUNCHER_SSAO 0.6F /* force du SSAO quand il est activé (finition M8-06) */
+
 ENG_LSAN_DEFAULT_SUPPRESSIONS();
 
 static void usage(const char *prog)
@@ -837,7 +839,8 @@ int main(int argc, char **argv)
     if (use_renderer) {
         tonemap = eng_renderer_tonemap(&renderer);
     }
-    tonemap.fxaa = true; /* post-process (M8-06) ; le menu Options le règle ensuite */
+    tonemap.fxaa = true;          /* post-process (M8-06) ; le menu Options le règle ensuite */
+    tonemap.ssao = LAUNCHER_SSAO; /* finition M8-06 : occlusion ambiante */
     tonemap.bloom = 0.5F;
     int32_t tonemap_operator = (int32_t)tonemap.op;
     (void)eng_tweaks_add_int(&tweaks, "tonemap : 0 aucun, 1 ACES, 2 AgX", &tonemap_operator, 0,
@@ -845,6 +848,8 @@ int main(int argc, char **argv)
     (void)eng_tweaks_add_float(&tweaks, "exposition (EV)", &tonemap.exposure_ev,
                                ENG_EXPOSURE_EV_MIN, ENG_EXPOSURE_EV_MAX);
     (void)eng_tweaks_add_bool(&tweaks, "anticrénelage FXAA", &tonemap.fxaa);
+    (void)eng_tweaks_add_float(&tweaks, "SSAO : force", &tonemap.ssao, 0.0F, 1.0F);
+    (void)eng_tweaks_add_float(&tweaks, "SSAO : rayon (m)", &tonemap.ssao_radius, 0.1F, 4.0F);
     (void)eng_tweaks_add_float(&tweaks, "bloom", &tonemap.bloom, 0.0F, 2.0F);
     (void)eng_tweaks_add_float(&tweaks, "fond rouge", &clear_color[0], 0.0F, 1.0F);
     (void)eng_tweaks_add_float(&tweaks, "fond vert", &clear_color[1], 0.0F, 1.0F);
@@ -1154,6 +1159,7 @@ int main(int argc, char **argv)
                 if (use_flow && flow.graphics_dirty) { /* M8-06 */
                     tonemap.fxaa = flow.options.fxaa;  /* appliqué au renderer plus bas */
                     tonemap.bloom = flow.options.bloom;
+                    tonemap.ssao = flow.options.ssao ? LAUNCHER_SSAO : 0.0F;
                     /* finition M8 : vsync, plein écran, qualité des ombres, distance de vue */
                     const EngPresentMode mode =
                         flow.options.vsync ? ENG_PRESENT_VSYNC : ENG_PRESENT_IMMEDIATE;
@@ -1170,13 +1176,15 @@ int main(int argc, char **argv)
                     camera.far_z = base_far * (0.5F + (0.5F * (float)flow.options.view_distance));
                     static const char *const quality[3] = {"bas", "moyen", "haut"};
                     ENG_LOG_INFO("options graphiques : vsync %s (présentation %s), plein écran %s, "
-                                 "ombres %s, plan lointain %.0f m, FXAA %s, bloom %.0f %%",
+                                 "ombres %s, plan lointain %.0f m, FXAA %s, bloom %.0f %%, "
+                                 "SSAO %s",
                                  flow.options.vsync ? "oui" : "non",
                                  gpu.present_mode == ENG_PRESENT_VSYNC ? "vsync" : "immédiate",
                                  platform.fullscreen ? "oui" : "non",
                                  quality[flow.options.shadow_quality % 3U], (double)camera.far_z,
                                  flow.options.fxaa ? "oui" : "non",
-                                 (double)(flow.options.bloom * 100.0F));
+                                 (double)(flow.options.bloom * 100.0F),
+                                 flow.options.ssao ? "oui" : "non");
                     flow.graphics_dirty = false;
                 }
             } else {

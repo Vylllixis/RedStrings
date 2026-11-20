@@ -2,13 +2,17 @@
 // que eng_tonemap_apply (engine/tonemap.c), que les tests comparent pixel à pixel
 // (docs/tonemapping.md).
 Texture2D<float4> hdr : register(t0, space2);
+Texture2D<float4> depth_tex : register(t1, space2); // M8-06 (SSAO) : profondeur 0 à 1 dans .r
 SamplerState hdr_sampler : register(s0, space2);
+SamplerState depth_sampler : register(s1, space2);
 
 cbuffer Tonemap : register(b0, space3)
 {
     float4 params; // x : multiplicateur d'exposition (2^EV) ; y : opérateur (0 aucun, 1 ACES,
                    // 2 AgX) ; z : 1 = encoder en sRGB, 0 = la cible le fait (format _SRGB)
-    float4 post;   // x : 1 = FXAA (M8-06) ; y : force du bloom (0 : coupé) ; zw : inutilisés
+    float4 post;   // x : 1 = FXAA (M8-06) ; y : force du bloom (0 : coupé) ; z : force du SSAO
+                   // (0 : coupé) ; w : rayon du SSAO (m)
+    float4 proj;   // SSAO : P00, P11, A, B de la projection ; distance z = B / (d + A)
 };
 
 float3 aces(float3 x)
@@ -119,6 +123,71 @@ float3 ldr_bilinear(float2 px, int2 size)
     return lerp(lerp(a, b, f.x), lerp(c, d, f.x), f.y);
 }
 
+// ── SSAO (finition M8-06) : occlusion ambiante en une passe, depuis la profondeur ──
+// Position dans le repère de la caméra (x droite, y haut, z distance > 0) du texel p de profondeur.
+float3 view_pos(int2 p, int2 size)
+{
+    p = clamp(p, int2(0, 0), size - int2(1, 1));
+    float2 uv = (float2(p) + 0.5f) / float2(size);
+    float d = depth_tex.SampleLevel(depth_sampler, uv, 0.0f).r;
+    float z = proj.w / (d + proj.z);
+    float2 ndc = float2(uv.x * 2.0f - 1.0f, 1.0f - uv.y * 2.0f);
+    return float3(ndc.x * z / proj.x, ndc.y * z / proj.y, z);
+}
+
+// Occlusion brute [0, 1] d'un pixel : 12 prises sur un disque tourné par pixel (bruit à gradient
+// entrelacé), rayon fixe en mètres projeté à l'écran ; une prise occulte selon l'angle entre la
+// normale (reconstruite par les voisins les plus proches en profondeur) et la direction vers elle,
+// atténuée au-delà du rayon. Le ciel (profondeur 1) vaut 0. Sans retour anticipé : ssao_at en prend
+// les dérivées.
+float ssao_raw(int2 p, int2 size, float3 c)
+{
+    float3 dxa = view_pos(p + int2(1, 0), size) - c;
+    float3 dxb = c - view_pos(p - int2(1, 0), size);
+    float3 dya = view_pos(p + int2(0, 1), size) - c;
+    float3 dyb = c - view_pos(p - int2(0, 1), size);
+    float3 dx = abs(dxa.z) < abs(dxb.z) ? dxa : dxb;
+    float3 dy = abs(dya.z) < abs(dyb.z) ? dya : dyb;
+    float3 n = normalize(cross(dx, dy));
+    n = dot(n, c) > 0.0f ? -n : n; // tournée vers la caméra (à l'origine)
+    float radius = post.w;
+    float radius_px = clamp(radius * proj.x * 0.5f * (float)size.x / c.z, 2.0f, 48.0f);
+    float noise = frac(52.9829189f * frac(dot(float2(p), float2(0.06711056f, 0.00583715f))));
+    float occlusion = 0.0f;
+    [unroll] for (int k = 0; k < 12; k++) {
+        float a = ((float)k + noise) * 2.39996323f; // angle d'or
+        float r = sqrt(((float)k + 0.5f) / 12.0f) * radius_px;
+        int2 q = p + int2(round(float2(cos(a), sin(a)) * r));
+        float3 v = view_pos(q, size) - c;
+        float len = length(v);
+        float cosine = dot(v, n) / max(len, 1e-4f);
+        occlusion += max(cosine - 0.15f, 0.0f) * saturate(1.0f - len / (2.0f * radius));
+    }
+    return saturate(occlusion * (3.0f / 12.0f));
+}
+
+// Facteur de lumière [1 - force, 1] : l'occlusion brute moyennée sur le carré de 2 x 2 pixels par
+// les dérivées fines (quatre rotations différentes : 48 prises, sans passe de flou). Le ciel n'est
+// jamais assombri.
+float ssao_at(int2 p)
+{
+    uint w;
+    uint h;
+    depth_tex.GetDimensions(w, h);
+    int2 size = int2((int)w, (int)h);
+    float2 uv = (float2(clamp(p, int2(0, 0), size - int2(1, 1))) + 0.5f) / float2(size);
+    bool sky = depth_tex.SampleLevel(depth_sampler, uv, 0.0f).r >= 0.99999f;
+    float3 c = view_pos(p, size);
+    float o = sky ? 0.0f : ssao_raw(p, size, c);
+    float sx = (p.x & 1) == 0 ? 1.0f : -1.0f;
+    float sy = (p.y & 1) == 0 ? 1.0f : -1.0f;
+    float ox = o + sx * ddx_fine(o);   // voisin horizontal du carré
+    float oy = o + sy * ddy_fine(o);   // voisin vertical
+    float oxy = ox + sy * ddy_fine(ox); // voisin en diagonale
+    float mean = 0.25f * (o + ox + oy + oxy);
+    return sky ? 1.0f : 1.0f - post.z * mean;
+}
+
 float luma(float3 c)
 {
     return dot(c, float3(0.299f, 0.587f, 0.114f));
@@ -156,6 +225,9 @@ float4 main(float2 uv : TEXCOORD0) : SV_Target0
             float lb = luma(b);
             color = (lb < lmin || lb > lmax) ? a : b;
         }
+    }
+    if (post.z > 0.0f) {
+        color *= ssao_at(p); // sur l'image tonemappée : simple et une seule fois par pixel
     }
     if (params.z > 0.5f) {
         color = srgb_encode(color);

@@ -57,6 +57,7 @@ typedef struct EngGpu {
     uint32_t depth_width;                 /* taille de depth_texture */
     uint32_t depth_height;
     uint32_t depth_format; /* SDL_GPUTextureFormat retenu ; 0 : profondeur désactivée */
+    bool depth_sampleable; /* la profondeur se lit aussi en texture (SSAO, M8-06) */
     bool hdr_enabled;      /* la scène est dessinée en HDR puis résolue (M1-14) */
     struct SDL_GPUTexture *hdr_texture; /* cible couleur HDR de la passe principale (si activée) */
     uint32_t hdr_width;                 /* taille de hdr_texture */
@@ -140,12 +141,17 @@ bool eng_gpu_enable_depth(EngGpu *gpu);
 uint32_t eng_gpu_depth_format(const EngGpu *gpu);
 
 /* Réglages de la cible de profondeur d'une passe : effacée à 1,0 (le plus loin) au début, non
- * conservée à la fin. Partagés par la passe swapchain et par les tests hors écran, pour que les
- * tests de pixels vérifient les vrais réglages. */
+ * conservée à la fin (la passe de la swapchain la conserve si elle est échantillonnable et le HDR
+ * actif : le SSAO de la résolution la relit, M8-06). Partagés par la passe swapchain et par les
+ * tests hors écran, pour que les tests de pixels vérifient les vrais réglages. */
 // NOLINTNEXTLINE(readability-identifier-naming): type SDL
 struct SDL_GPUDepthStencilTargetInfo;
 void eng_gpu_fill_depth_target(struct SDL_GPUTexture *texture,
                                struct SDL_GPUDepthStencilTargetInfo *out);
+/* Profondeur de la passe de la swapchain : comme eng_gpu_fill_depth_target sur `depth_texture`,
+ * mais CONSERVÉE si elle est échantillonnable et le HDR actif (le SSAO de la résolution la relit,
+ * M8-06 ; non conservée, son contenu serait indéfini). */
+void eng_gpu_fill_scene_depth_target(const EngGpu *gpu, struct SDL_GPUDepthStencilTargetInfo *out);
 
 /* Passe « overlay » (M1-12 : interface de debug) : une seconde passe sur la MÊME image, qui
  * CONSERVE ce que la première a dessiné (chargement de la couleur au lieu d'un effacement) et n'a

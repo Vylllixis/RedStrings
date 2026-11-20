@@ -56,6 +56,7 @@ void eng_options_default(EngGameOptions *o)
     o->sensitivity = 1.0F;
     o->text_scale = 1.0F;
     o->fxaa = true;
+    o->ssao = true;
     o->bloom = 0.5F;
     o->vsync = true;
     o->fullscreen = false;
@@ -114,6 +115,7 @@ size_t eng_options_save(const EngGameOptions *o, const EngInput *input, char *ou
     EMIT("graphics.fxaa = %d\n", o->fxaa ? 1 : 0);
     EMIT("graphics.bloom = %.3f\n", (double)o->bloom);
     EMIT("graphics.vsync = %d\n", o->vsync ? 1 : 0);
+    EMIT("graphics.ssao = %d\n", o->ssao ? 1 : 0);
     EMIT("graphics.fullscreen = %d\n", o->fullscreen ? 1 : 0);
     EMIT("graphics.shadows = %u\n", (unsigned)o->shadow_quality);
     EMIT("graphics.view_distance = %u\n", (unsigned)o->view_distance);
@@ -189,6 +191,8 @@ bool eng_options_load(EngGameOptions *o, EngInput *input, const char *text)
             t.fxaa = v != 0.0F;
         } else if (strcmp(key, "graphics.bloom") == 0) {
             t.bloom = v;
+        } else if (strcmp(key, "graphics.ssao") == 0) {
+            t.ssao = v != 0.0F;
         } else if (strcmp(key, "graphics.vsync") == 0) {
             t.vsync = v != 0.0F;
         } else if (strcmp(key, "graphics.fullscreen") == 0) {
@@ -345,6 +349,7 @@ uint32_t eng_menu_items(const EngMenu *m, EngMenuItem *out, uint32_t max)
         set_item(&out[n++], "Plein écran", o->fullscreen ? "oui" : "non", true);
         set_item(&out[n++], "Qualité des ombres", quality[o->shadow_quality % 3U], true);
         set_item(&out[n++], "Distance de vue", distance[o->view_distance % 3U], true);
+        set_item(&out[n++], "Occlusion ambiante (SSAO)", o->ssao ? "oui" : "non", true);
         set_item(&out[n++], "Contrôles...", NULL, m->input != NULL);
         set_item(&out[n++], "Retour", NULL, true);
         break;
@@ -405,6 +410,8 @@ static bool adjust(EngMenu *m, int dir)
         o->shadow_quality = (uint32_t)((int32_t)o->shadow_quality + dir + 3) % 3U;
     } else if (s == (int32_t)ENG_BUS_COUNT + 10) {
         o->view_distance = (uint32_t)((int32_t)o->view_distance + dir + 3) % 3U;
+    } else if (s == (int32_t)ENG_BUS_COUNT + 11) {
+        o->ssao = !o->ssao;
     } else {
         return false;
     }

@@ -36,6 +36,8 @@ livraisons ; les tags sont posés par Théo après ses tests.
   forêt claire, clairière au centre en combat ; ombres en cascade aussi sur un terrain (personnages,
   arbres et rochers instanciés : `shadow_instanced.vert`) ; avant, ce mode n'avait aucune ombre.
   Les arbres et rochers arrêtent le joueur et la caméra (une capsule Jolt par instance).
+- Finition (M8-06) : SSAO dans la passe de résolution (profondeur conservée et relue, 12 prises,
+  moyenne 2 x 2 par les dérivées) ; option « Occlusion ambiante (SSAO) » au menu.
 
 ## v0.7 (M7, partiel) — monde ouvert
 - Cellules de 256 m (format RSCL), pool de threads, streaming asynchrone, origine flottante,

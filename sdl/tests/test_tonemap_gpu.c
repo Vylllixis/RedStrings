@@ -1,5 +1,6 @@
 #include <SDL3/SDL.h>
 #include <math.h>
+#include <stdio.h>
 #include <string.h>
 
 #include "engine/lighting.h"
@@ -193,6 +194,52 @@ static SDL_GPUTexture *upload_hdr(SDL_GPUDevice *device, uint32_t w, uint32_t h,
     return texture;
 }
 
+/* Finition M8-06 (SSAO) : texture R32F de w x h flottants (profondeurs 0 à 1, ligne du haut en
+ * premier), lisible comme texture. NULL si une étape échoue. */
+static SDL_GPUTexture *upload_r32f(SDL_GPUDevice *device, uint32_t w, uint32_t h, const float *v)
+{
+    SDL_GPUTextureCreateInfo info;
+    SDL_zero(info);
+    info.type = SDL_GPU_TEXTURETYPE_2D;
+    info.format = SDL_GPU_TEXTUREFORMAT_R32_FLOAT;
+    info.usage = SDL_GPU_TEXTUREUSAGE_SAMPLER;
+    info.width = w;
+    info.height = h;
+    info.layer_count_or_depth = 1;
+    info.num_levels = 1;
+    SDL_GPUTexture *texture = SDL_CreateGPUTexture(device, &info);
+    const uint32_t bytes = w * h * (uint32_t)sizeof(float);
+    const SDL_GPUTransferBufferCreateInfo buffer_info = {
+        .usage = SDL_GPU_TRANSFERBUFFERUSAGE_UPLOAD, .size = bytes};
+    SDL_GPUTransferBuffer *buffer = SDL_CreateGPUTransferBuffer(device, &buffer_info);
+    bool ok = false;
+    if (texture != NULL && buffer != NULL) {
+        float *mapped = (float *)SDL_MapGPUTransferBuffer(device, buffer, false);
+        if (mapped != NULL) {
+            memcpy(mapped, v, bytes);
+            SDL_UnmapGPUTransferBuffer(device, buffer);
+            SDL_GPUCommandBuffer *commands = SDL_AcquireGPUCommandBuffer(device);
+            SDL_GPUCopyPass *copy = SDL_BeginGPUCopyPass(commands);
+            const SDL_GPUTextureTransferInfo source = {
+                .transfer_buffer = buffer, .pixels_per_row = w, .rows_per_layer = h};
+            const SDL_GPUTextureRegion region = {.texture = texture, .w = w, .h = h, .d = 1};
+            SDL_UploadToGPUTexture(copy, &source, &region, false);
+            SDL_EndGPUCopyPass(copy);
+            SDL_GPUFence *fence = SDL_SubmitGPUCommandBufferAndAcquireFence(commands);
+            if (fence != NULL) {
+                ok = SDL_WaitForGPUFences(device, true, &fence, 1);
+                SDL_ReleaseGPUFence(device, fence);
+            }
+        }
+    }
+    SDL_ReleaseGPUTransferBuffer(device, buffer);
+    if (!ok && texture != NULL) {
+        SDL_ReleaseGPUTexture(device, texture);
+        texture = NULL;
+    }
+    return texture;
+}
+
 /* Fait lire `hdr` par la vraie résolution du renderer (les vrais réglages de passe :
  * eng_gpu_fill_resolve_target) dans une cible 8 bits de `format`, et copie les pixels dans `rgba`.
  * `scene` (peut être NULL) est appelée avant dans le même tampon de commandes, pour dessiner la
@@ -265,7 +312,17 @@ static bool resolve_to_pixels(TonemapTest *t, SDL_GPUTexture *hdr, uint32_t form
 /* Comme resolve_to_pixels, mais dans une cible RGBA 32 bits FLOTTANTS (le renderer doit avoir été
  * ouvert avec FORMAT_F32) : la valeur écrite par le shader, sans arrondi 8 bits ni écrêtage à 1,0.
  * Le shader encode en sRGB (la cible n'est pas _SRGB). `rgba` : SIZE * SIZE * 4 flottants. */
+static bool resolve_to_floats_depth(TonemapTest *t, SDL_GPUTexture *hdr, SDL_GPUTexture *depth,
+                                    float *rgba);
+
 static bool resolve_to_floats(TonemapTest *t, SDL_GPUTexture *hdr, float *rgba)
+{
+    return resolve_to_floats_depth(t, hdr, NULL, rgba);
+}
+
+/* Comme resolve_to_floats, avec une profondeur explicite pour le SSAO (NULL : sans). */
+static bool resolve_to_floats_depth(TonemapTest *t, SDL_GPUTexture *hdr, SDL_GPUTexture *depth,
+                                    float *rgba)
 {
     SDL_GPUDevice *device = t->f.gpu.device;
     SDL_GPUTextureCreateInfo info;
@@ -288,7 +345,7 @@ static bool resolve_to_floats(TonemapTest *t, SDL_GPUTexture *hdr, float *rgba)
         SDL_GPUColorTargetInfo color;
         eng_gpu_fill_resolve_target(target, &color);
         SDL_GPURenderPass *pass = SDL_BeginGPURenderPass(commands, &color, 1, NULL);
-        const bool drawn = eng_renderer_resolve_hdr(&t->r, commands, pass, hdr);
+        const bool drawn = eng_renderer_resolve_hdr_depth(&t->r, commands, pass, hdr, depth);
         SDL_EndGPURenderPass(pass);
         SDL_GPUCopyPass *copy = SDL_BeginGPUCopyPass(commands);
         const SDL_GPUTextureRegion region = {.texture = target, .w = SIZE, .h = SIZE, .d = 1};
@@ -1133,6 +1190,92 @@ UTEST(eng_tonemap_gpu, fxaa_softens_a_staircase_edge_and_bloom_spreads_a_bright_
     EXPECT_GT(g_pixels[((size_t)32 * SIZE + 35) * 4U], 100U); /* halo à 3 pixels */
     EXPECT_GT(g_pixels[((size_t)32 * SIZE + 40) * 4U], 20U);  /* et à 8 pixels, plus faible */
     EXPECT_TRUE(pixel_is(g_pixels, SIZE, 5, 5, 0, 0, 0, 0));  /* loin : noir */
+    SDL_ReleaseGPUTexture(t.f.gpu.device, hdr);
+    CLOSE_TONEMAP(t);
+}
+
+/* Finition M8-06 : SSAO. Scène synthétique vue d'une caméra à 60° (profondeur calculée ici) : un
+ * sol à y = -1 et un mur à 6 m forment un coin (vers la ligne 41), le haut de l'image est du ciel
+ * (profondeur 1), la couleur est uniforme. Le coin s'assombrit ; le sol proche, le haut du mur
+ * (loin du sol) et le ciel ne changent pas ; sans projection valable, rien ne change. */
+static float g_ssao_off[SIZE * SIZE * 4];
+static float g_depth[SIZE * SIZE];
+
+static float band_mean(const float *a, const float *b, uint32_t row0, uint32_t row1)
+{
+    double sum = 0.0;
+    for (uint32_t y = row0; y <= row1; y++) {
+        for (uint32_t x = 0; x < SIZE; x++) {
+            const size_t i = (((size_t)y * SIZE) + x) * 4U;
+            sum += (double)(a[i] - b[i]);
+        }
+    }
+    return (float)(sum / (double)((row1 - row0 + 1U) * SIZE));
+}
+
+UTEST(eng_tonemap_gpu, ssao_darkens_a_crease_and_leaves_flat_ground_wall_and_sky_alone)
+{
+    TonemapTest t;
+    if (!open_tonemap(&t, FORMAT_F32)) {
+        EXPECT_FALSE(render_gpu_required());
+        return;
+    }
+    mat4 proj;
+    eng_perspective(glm_rad(60.0F), 1.0F, 0.1F, 100.0F, proj);
+    const float a = proj[2][2];
+    const float b = proj[3][2];
+    for (uint32_t y = 0; y < SIZE; y++) {
+        for (uint32_t x = 0; x < SIZE; x++) {
+            const float ny = 1.0F - ((((float)y + 0.5F) / (float)SIZE) * 2.0F);
+            const float dy = ny / proj[1][1]; /* rayon (x/P00, ny/P11, 1) : z = t, x sans effet */
+            float z = 6.0F;                   /* le mur */
+            if (dy < 0.0F && -1.0F / dy < z) {
+                z = -1.0F / dy; /* le sol, plus près */
+            }
+            g_depth[((size_t)y * SIZE) + x] = y < 12U ? 1.0F : (b / z) - a;
+        }
+    }
+    static float flat[SIZE * SIZE * 4];
+    for (size_t i = 0; i < (size_t)SIZE * SIZE * 4U; i++) {
+        flat[i] = (i % 4U) == 3U ? 1.0F : 0.5F;
+    }
+    SDL_GPUTexture *hdr = upload_hdr(t.f.gpu.device, SIZE, SIZE, flat);
+    SDL_GPUTexture *depth = upload_r32f(t.f.gpu.device, SIZE, SIZE, g_depth);
+    ASSERT_TRUE(hdr != NULL && depth != NULL);
+    EngTonemap setting;
+    eng_tonemap_default(&setting);
+    setting.op = ENG_TONEMAP_NONE;
+    eng_renderer_set_tonemap(&t.r, &setting);
+    eng_renderer_set_projection(&t.r, proj);
+    ASSERT_TRUE(resolve_to_floats_depth(&t, hdr, depth, g_ssao_off)); /* force 0 : coupé */
+    setting.ssao = 1.0F;
+    setting.ssao_radius = 0.75F;
+    eng_renderer_set_tonemap(&t.r, &setting);
+    ASSERT_TRUE(resolve_to_floats_depth(&t, hdr, depth, g_floats));
+    const float crease = band_mean(g_ssao_off, g_floats, 38U, 44U);
+    const float ground = band_mean(g_ssao_off, g_floats, 56U, 63U);
+    const float wall = band_mean(g_ssao_off, g_floats, 14U, 26U);
+    const float sky = band_mean(g_ssao_off, g_floats, 0U, 11U);
+    printf("SSAO : assombrissement moyen coin %.4f, sol %.4f, mur %.4f, ciel %.4f\n",
+           (double)crease, (double)ground, (double)wall, (double)sky);
+    EXPECT_GT(crease, 0.03F);
+    EXPECT_LT(fabsf(ground), 0.004F);
+    EXPECT_LT(fabsf(wall), 0.004F);
+    EXPECT_NEAR(sky, 0.0F, 1e-6F);
+    float worst_sky = 0.0F;
+    for (uint32_t i = 0; i < 12U * SIZE * 4U; i++) {
+        worst_sky = fmaxf(worst_sky, fabsf(g_floats[i] - g_ssao_off[i]));
+    }
+    EXPECT_NEAR(worst_sky, 0.0F, 1e-6F);
+    /* sans profondeur, ou sans projection valable : aucun SSAO */
+    ASSERT_TRUE(resolve_to_floats_depth(&t, hdr, NULL, g_floats));
+    EXPECT_NEAR(band_mean(g_ssao_off, g_floats, 38U, 44U), 0.0F, 1e-6F);
+    mat4 identity;
+    glm_mat4_identity(identity);
+    eng_renderer_set_projection(&t.r, identity); /* pas une perspective : refusée */
+    ASSERT_TRUE(resolve_to_floats_depth(&t, hdr, depth, g_floats));
+    EXPECT_NEAR(band_mean(g_ssao_off, g_floats, 38U, 44U), 0.0F, 1e-6F);
+    SDL_ReleaseGPUTexture(t.f.gpu.device, depth);
     SDL_ReleaseGPUTexture(t.f.gpu.device, hdr);
     CLOSE_TONEMAP(t);
 }

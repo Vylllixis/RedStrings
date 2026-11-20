@@ -381,7 +381,7 @@ UTEST(game_menu, graphics_options_toggle_persist_and_controls_returns_to_its_lin
     eng_menu_open(&m, ENG_MENU_OPTIONS);
     EngMenuItem items[ENG_MENU_MAX_ITEMS];
     const uint32_t n = eng_menu_items(&m, items, ENG_MENU_MAX_ITEMS);
-    ASSERT_EQ(n, (uint32_t)ENG_BUS_COUNT + 13U);
+    ASSERT_EQ(n, (uint32_t)ENG_BUS_COUNT + 14U);
     EXPECT_NE(strstr(items[ENG_BUS_COUNT + 5].label, "FXAA"), NULL);
     EXPECT_NE(strstr(items[ENG_BUS_COUNT + 6].label, "bloom"), NULL);
     m.selected = (int32_t)ENG_BUS_COUNT + 5;
@@ -423,6 +423,18 @@ UTEST(game_menu, graphics_options_toggle_persist_and_controls_returns_to_its_lin
     m.selected = (int32_t)ENG_BUS_COUNT + 10;
     (void)stick(&m, -1.0F, 0.0F); /* moyenne -> proche */
     EXPECT_EQ(opt.view_distance, 0U);
+    /* finition M8-06 : SSAO, activé par défaut, enregistré et relu */
+    EXPECT_TRUE(opt.ssao);
+    EXPECT_NE(strstr(items[ENG_BUS_COUNT + 11].label, "SSAO"), NULL);
+    m.selected = (int32_t)ENG_BUS_COUNT + 11;
+    EXPECT_EQ(stick(&m, 1.0F, 0.0F), ENG_MENU_ACT_OPTIONS_CHANGED);
+    EXPECT_FALSE(opt.ssao);
+    ASSERT_GT(eng_options_save(&opt, &input, text, sizeof text), 50U);
+    EXPECT_NE(strstr(text, "graphics.ssao = 0"), NULL);
+    eng_options_default(&o2);
+    EXPECT_TRUE(o2.ssao);
+    ASSERT_TRUE(eng_options_load(&o2, NULL, text));
+    EXPECT_FALSE(o2.ssao);
     ASSERT_GT(eng_options_save(&opt, &input, text, sizeof text), 50U);
     EXPECT_NE(strstr(text, "graphics.vsync = 0"), NULL);
     EXPECT_NE(strstr(text, "graphics.shadows = 0"), NULL);

@@ -14,7 +14,10 @@
 
 static EngTonemap make(EngTonemapOperator op, float ev)
 {
-    EngTonemap t = {.op = op, .exposure_ev = ev};
+    EngTonemap t;
+    eng_tonemap_default(&t); /* post-process coupé, rayon du SSAO par défaut */
+    t.op = op;
+    t.exposure_ev = ev;
     return t;
 }
 
@@ -262,4 +265,35 @@ UTEST(eng_srgb, decode_inverts_encode)
     }
     EXPECT_NEAR(eng_srgb_decode(0.5F), 0.214041F, 1e-5F); /* valeur connue */
     EXPECT_NEAR(eng_srgb_decode(0.02F), 0.02F / 12.92F, EPS);
+}
+
+/* Finition M8-06 : SSAO coupé par défaut, force bornée à [0, 1], rayon à [0,1 ; 4] m. */
+UTEST(eng_tonemap, ssao_is_off_by_default_and_its_settings_are_bounded)
+{
+    EngTonemap t;
+    eng_tonemap_default(&t);
+    EXPECT_NEAR(t.ssao, 0.0F, 0.0F);
+    EXPECT_NEAR(t.ssao_radius, 0.75F, 0.0F);
+    EXPECT_TRUE(eng_tonemap_sanitize(&t));
+    t.ssao = 1.0F;
+    t.ssao_radius = 4.0F; /* bornes valides */
+    EXPECT_TRUE(eng_tonemap_sanitize(&t));
+    t.ssao = 1.5F;
+    EXPECT_FALSE(eng_tonemap_sanitize(&t));
+    EXPECT_NEAR(t.ssao, 1.0F, 0.0F);
+    t.ssao = -0.2F;
+    EXPECT_FALSE(eng_tonemap_sanitize(&t));
+    EXPECT_NEAR(t.ssao, 0.0F, 0.0F);
+    t.ssao = NAN;
+    EXPECT_FALSE(eng_tonemap_sanitize(&t));
+    EXPECT_NEAR(t.ssao, 0.0F, 0.0F);
+    t.ssao_radius = 0.01F;
+    EXPECT_FALSE(eng_tonemap_sanitize(&t));
+    EXPECT_NEAR(t.ssao_radius, 0.1F, 0.0F);
+    t.ssao_radius = 9.0F;
+    EXPECT_FALSE(eng_tonemap_sanitize(&t));
+    EXPECT_NEAR(t.ssao_radius, 4.0F, 0.0F);
+    t.ssao_radius = INFINITY;
+    EXPECT_FALSE(eng_tonemap_sanitize(&t));
+    EXPECT_NEAR(t.ssao_radius, 0.75F, 0.0F);
 }

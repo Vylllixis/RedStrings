@@ -468,6 +468,8 @@ typedef struct EngRenderer {
     uint32_t scene_format;    /* format de cible par défaut des pipelines (HDR ou swapchain) */
     bool hdr;                 /* HDR en service (désactivé si la mise en place a échoué) */
     EngTonemap tonemap;       /* réglages de la résolution HDR */
+    float ssao_projection[4]; /* M8-06 : P00, P11, A = P22, B = P32 (z = B / (d + A)) */
+    bool ssao_projection_ok;  /* eng_renderer_set_projection a donné une matrice valable */
     EngPipelineHandle tonemap_pipeline;
     struct SDL_GPUSampler *hdr_sampler;
     uint32_t resolve_format; /* format de la cible de la résolution */
@@ -605,6 +607,17 @@ EngTonemap eng_renderer_tonemap(const EngRenderer *r);
  * qu'appelle eng_renderer_end_frame via EngGpu ; les tests l'appellent à la main sur une texture).
  * `pass` doit avoir une cible du format de résolution et AUCUNE profondeur. false si le HDR n'est
  * pas en service ou si un paramètre est nul. */
+/* SSAO (M8-06) : la projection de l'image (celle de la caméra), pour reconstruire les positions
+ * depuis la profondeur. À donner à chaque image avant la résolution ; sans elle, pas de SSAO.
+ * Projection perspective attendue (profondeur 0 à 1) ; une matrice dégénérée est ignorée. */
+void eng_renderer_set_projection(EngRenderer *r, float projection[4][4]);
+
+/* Comme eng_renderer_resolve_hdr, avec une texture de profondeur explicite (tests ; flottants
+ * de 0 à 1, la profondeur de la passe principale en jeu). `depth` NULL : pas de SSAO. */
+bool eng_renderer_resolve_hdr_depth(EngRenderer *r, struct SDL_GPUCommandBuffer *commands,
+                                    struct SDL_GPURenderPass *pass, struct SDL_GPUTexture *hdr,
+                                    struct SDL_GPUTexture *depth);
+
 bool eng_renderer_resolve_hdr(EngRenderer *r, struct SDL_GPUCommandBuffer *commands,
                               struct SDL_GPURenderPass *pass, struct SDL_GPUTexture *hdr);
 

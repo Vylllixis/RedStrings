@@ -281,6 +281,28 @@ UTEST(eng_gpu, the_depth_target_is_cleared_to_the_far_plane_and_not_kept)
     EXPECT_EQ((int)info.store_op, (int)SDL_GPU_STOREOP_DONT_CARE);
 }
 
+/* M8-06 : la profondeur de la scène est conservée quand la résolution la relit (SSAO), et
+ * seulement alors (sinon sa lecture donnerait un contenu indéfini, vu en jeu : du bruit). */
+UTEST(eng_gpu, the_scene_depth_is_kept_only_when_the_resolve_samples_it)
+{
+    EngGpu gpu;
+    SDL_zero(gpu);
+    SDL_GPUDepthStencilTargetInfo info;
+    eng_gpu_fill_scene_depth_target(&gpu, &info);
+    EXPECT_EQ((int)info.store_op, (int)SDL_GPU_STOREOP_DONT_CARE);
+    gpu.depth_sampleable = true;
+    eng_gpu_fill_scene_depth_target(&gpu, &info);
+    EXPECT_EQ((int)info.store_op, (int)SDL_GPU_STOREOP_DONT_CARE); /* pas de HDR : pas de SSAO */
+    gpu.hdr_enabled = true;
+    eng_gpu_fill_scene_depth_target(&gpu, &info);
+    EXPECT_EQ((int)info.store_op, (int)SDL_GPU_STOREOP_STORE);
+    EXPECT_EQ(info.clear_depth, 1.0F);
+    EXPECT_EQ((int)info.load_op, (int)SDL_GPU_LOADOP_CLEAR);
+    gpu.depth_sampleable = false;
+    eng_gpu_fill_scene_depth_target(&gpu, &info);
+    EXPECT_EQ((int)info.store_op, (int)SDL_GPU_STOREOP_DONT_CARE);
+}
+
 /* ── Passe overlay (M1-12) ── */
 
 UTEST(eng_gpu, the_overlay_target_keeps_the_scene_instead_of_clearing_it)

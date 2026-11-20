@@ -38,6 +38,11 @@ typedef struct EngTonemap {
      * référence CPU (eng_tonemap_apply) ne les reproduit pas. */
     bool fxaa;   /* anticrénelage FXAA « simple » sur l'image tonemappée */
     float bloom; /* force du halo autour des valeurs > 1 (0 : coupé, au plus 2) */
+    /* SSAO (finition M8-06) : occlusion ambiante calculée depuis la profondeur, dans la même passe.
+     * Il faut la profondeur échantillonnable et la projection de l'image
+     * (eng_renderer_set_projection). */
+    float ssao;        /* force [0, 1] (0 : coupé) */
+    float ssao_radius; /* rayon de recherche en mètres, [0,1 ; 4] */
 } EngTonemap;
 
 /* ACES, 0 EV. */

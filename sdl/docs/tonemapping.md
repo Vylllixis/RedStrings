@@ -81,6 +81,30 @@ ajouter de texture intermédiaire :
   dans `options.txt` (`graphics.fxaa`, `graphics.bloom`).
 - Coût : 16 lectures (bloom) + 9 à 13 lectures (FXAA) par pixel en plus. Non mesuré sur un vrai GPU.
 
+## SSAO (finition M8-06)
+
+Occlusion ambiante calculée **dans la même passe** de résolution, depuis la profondeur de la passe
+principale :
+
+- la profondeur est créée **échantillonnable** si le format le permet (`EngGpu.depth_sampleable`) et
+  **conservée** à la fin de la passe principale quand le HDR est actif
+  (`eng_gpu_fill_scene_depth_target` ; non conservée, elle donnait du bruit à la relecture : le défaut
+  a été vu en jeu et corrigé avant le commit) ;
+- la scène donne la projection de l'image à chaque image (`eng_renderer_set_projection`) : la distance
+  se retrouve par z = B / (d + A) ;
+- par pixel : normale reconstruite par les voisins les plus proches en profondeur, 12 prises sur un
+  disque (angle d'or, tourné par un bruit à gradient entrelacé), rayon en mètres projeté à l'écran
+  (2 à 48 pixels), occultation selon l'angle à la normale (seuil 0,15) atténuée au-delà de deux
+  rayons ; puis moyenne sur le carré de 2 x 2 pixels par les dérivées fines (quatre rotations : 48
+  prises sans passe de flou) ; le ciel n'est jamais assombri ;
+- le facteur multiplie l'image **tonemappée** (une fois par pixel, après le FXAA) : simplification,
+  il assombrit aussi la lumière directe ;
+- réglages : `EngTonemap.ssao` (force 0 à 1, coupé par défaut) et `ssao_radius` (0,1 à 4 m, 0,75) ;
+  le lanceur l'active (0,6) ; menu **Options** « Occlusion ambiante (SSAO) », `graphics.ssao` dans
+  `options.txt` ; curseurs dans le panneau F1.
+
+![SSAO coupé (à gauche) et actif : pied du mur, herbe, personnages](devlog/img/m8-ssao-avant-apres.png)
+
 ## Vérification
 
 - `tests/test_tonemap.c` (CPU) : valeurs ACES, NONE et sRGB **calculées à la main** ; AgX comparé à
@@ -95,7 +119,12 @@ ajouter de texture intermédiaire :
   un bord en escalier noir/blanc est adouci par le FXAA (pixels intermédiaires apparus, rien sans
   FXAA) ; un point à 8,0 sur fond noir éclaire ses voisins à 3 et 8 pixels avec bloom et pas sans.
 - `tests/test_gpu.c` : ordre résolution → overlay, une seule résolution par image, redimensionnement,
-  désactivation.
+  désactivation ; la profondeur de la scène n'est conservée que si la résolution la relit (mutation
+  détectée).
+- `tests/test_tonemap_gpu.c`, `ssao_darkens_a_crease_and_leaves_flat_ground_wall_and_sky_alone` :
+  profondeur synthétique (caméra à 60°, sol, mur à 6 m, ciel) : le coin s'assombrit (0,044 en moyenne
+  sur la bande), le sol proche, le haut du mur et le ciel ne changent pas (0,000) ; rien sans
+  profondeur ni avec une projection qui n'est pas une perspective. `tests/test_tonemap.c` : bornes.
 
 ## Limites connues
 
@@ -105,7 +134,11 @@ ajouter de texture intermédiaire :
 - Bloom approché en une passe (16 lectures, rayon fixe en pixels) : pas de chaîne de flous
   sous-échantillonnés, donc halo court et pas de flou large sur les très grandes sources.
 - FXAA simplifié (pas la version 3.11 complète avec recherche des extrémités du bord) : adoucit les
-  escaliers mais moins bien qu'un FXAA complet ou un TAA ; pas de SSAO.
+  escaliers mais moins bien qu'un FXAA complet ou un TAA.
+- SSAO en une passe : pas de flou bilatéral (seulement la moyenne 2 x 2), appliqué à l'image
+  tonemappée (il assombrit aussi le soleil direct), halos autour des objets fins de premier plan
+  (herbe devant un mur) ; profondeur standard (pas inversée) : au-delà de quelques centaines de
+  mètres la précision baisse. Coût mesuré : voir `docs/devlog/m8-revue.md`.
 - Pas de dithering : une dégradé très lent peut montrer des bandes en 8 bits.
 - AgX sans « look » ; ACES par canal (pas la chaîne complète AP1/RRT/ODT).
 - Un `EngRenderer` HDR consomme une texture RGBA16F supplémentaire (8 octets par pixel, soit 16 Mio

@@ -278,6 +278,10 @@ bool eng_gpu_enable_depth(EngGpu *gpu)
         if (SDL_GPUTextureSupportsFormat(gpu->device, candidates[i], SDL_GPU_TEXTURETYPE_2D,
                                          SDL_GPU_TEXTUREUSAGE_DEPTH_STENCIL_TARGET)) {
             gpu->depth_format = (uint32_t)candidates[i];
+            /* M8-06 (SSAO) : la passe de résolution relit la profondeur si le format le permet */
+            gpu->depth_sampleable = SDL_GPUTextureSupportsFormat(
+                gpu->device, candidates[i], SDL_GPU_TEXTURETYPE_2D,
+                SDL_GPU_TEXTUREUSAGE_DEPTH_STENCIL_TARGET | SDL_GPU_TEXTUREUSAGE_SAMPLER);
             return true;
         }
     }
@@ -307,6 +311,9 @@ static bool ensure_depth(EngGpu *gpu, uint32_t width, uint32_t height)
     info.type = SDL_GPU_TEXTURETYPE_2D;
     info.format = (SDL_GPUTextureFormat)gpu->depth_format;
     info.usage = SDL_GPU_TEXTUREUSAGE_DEPTH_STENCIL_TARGET;
+    if (gpu->depth_sampleable) {
+        info.usage |= SDL_GPU_TEXTUREUSAGE_SAMPLER;
+    }
     info.width = width;
     info.height = height;
     info.layer_count_or_depth = 1;
@@ -475,6 +482,14 @@ void eng_gpu_fill_depth_target(struct SDL_GPUTexture *texture, SDL_GPUDepthStenc
     out->stencil_store_op = SDL_GPU_STOREOP_DONT_CARE;
 }
 
+void eng_gpu_fill_scene_depth_target(const EngGpu *gpu, SDL_GPUDepthStencilTargetInfo *out)
+{
+    eng_gpu_fill_depth_target(gpu->depth_texture, out);
+    if (gpu->depth_sampleable && gpu->hdr_enabled) {
+        out->store_op = SDL_GPU_STOREOP_STORE; /* M8-06 : la résolution la relit (SSAO) */
+    }
+}
+
 static bool open_pass(EngGpu *gpu, SDL_GPURenderPass **out)
 {
     SDL_GPUColorTargetInfo target = {
@@ -485,7 +500,7 @@ static bool open_pass(EngGpu *gpu, SDL_GPURenderPass **out)
         .store_op = SDL_GPU_STOREOP_STORE,
     };
     SDL_GPUDepthStencilTargetInfo depth;
-    eng_gpu_fill_depth_target(gpu->depth_texture, &depth);
+    eng_gpu_fill_scene_depth_target(gpu, &depth);
     eng_gpu_debug_push(gpu->command_buffer, ENG_GPU_PASS_SCENE);
     *out = SDL_BeginGPURenderPass(gpu->command_buffer, &target, 1,
                                   gpu->depth_texture != NULL ? &depth : NULL);

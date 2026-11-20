@@ -1,6 +1,7 @@
 #include "engine/renderer.h"
 
 #include <SDL3/SDL.h>
+#include <math.h>
 #include <string.h>
 
 #include "engine/gpu_debug.h"
@@ -1260,10 +1261,38 @@ EngTonemap eng_renderer_tonemap(const EngRenderer *r)
     return t;
 }
 
+void eng_renderer_set_projection(EngRenderer *r, float projection[4][4])
+{
+    if (r == NULL) {
+        return;
+    }
+    const float p00 = projection[0][0];
+    const float p11 = projection[1][1];
+    const float a = projection[2][2];
+    const float b = projection[3][2];
+    r->ssao_projection_ok = isfinite(p00) && isfinite(p11) && isfinite(a) && isfinite(b) &&
+                            p00 > 0.0F && p11 > 0.0F && b < 0.0F && projection[2][3] < 0.0F;
+    r->ssao_projection[0] = p00;
+    r->ssao_projection[1] = p11;
+    r->ssao_projection[2] = a;
+    r->ssao_projection[3] = b;
+}
+
 bool eng_renderer_resolve_hdr(EngRenderer *r, SDL_GPUCommandBuffer *commands,
                               SDL_GPURenderPass *pass, SDL_GPUTexture *hdr)
 {
-    if (!r->ready || !r->hdr || commands == NULL || pass == NULL || hdr == NULL) {
+    SDL_GPUTexture *depth = NULL;
+    if (r != NULL && r->gpu != NULL && r->gpu->depth_sampleable) {
+        depth = r->gpu->depth_texture;
+    }
+    return eng_renderer_resolve_hdr_depth(r, commands, pass, hdr, depth);
+}
+
+bool eng_renderer_resolve_hdr_depth(EngRenderer *r, SDL_GPUCommandBuffer *commands,
+                                    SDL_GPURenderPass *pass, SDL_GPUTexture *hdr,
+                                    SDL_GPUTexture *depth)
+{
+    if (r == NULL || !r->ready || !r->hdr || commands == NULL || pass == NULL || hdr == NULL) {
         return false;
     }
     const Pipeline *pipeline =
@@ -1272,16 +1301,25 @@ bool eng_renderer_resolve_hdr(EngRenderer *r, SDL_GPUCommandBuffer *commands,
         return false;
     }
     SDL_BindGPUGraphicsPipeline(pass, pipeline->gpu);
-    const SDL_GPUTextureSamplerBinding binding = {.texture = hdr, .sampler = r->hdr_sampler};
-    SDL_BindGPUFragmentSamplers(pass, 0, &binding, 1);
-    const float params[8] = {eng_tonemap_exposure_scale(&r->tonemap),
-                             (float)r->tonemap.op,
-                             format_is_srgb(r->resolve_format) ? 0.0F : 1.0F,
-                             0.0F,
-                             r->tonemap.fxaa ? 1.0F : 0.0F,
-                             r->tonemap.bloom,
-                             0.0F,
-                             0.0F};
+    /* M8-06 : SSAO seulement avec une profondeur et une projection ; sinon la texture HDR tient la
+     * place de la profondeur (jamais lue : force nulle) */
+    const bool ssao = r->tonemap.ssao > 0.0F && depth != NULL && r->ssao_projection_ok;
+    const SDL_GPUTextureSamplerBinding bindings[2] = {
+        {.texture = hdr, .sampler = r->hdr_sampler},
+        {.texture = ssao ? depth : hdr, .sampler = r->hdr_sampler}};
+    SDL_BindGPUFragmentSamplers(pass, 0, bindings, 2);
+    const float params[12] = {eng_tonemap_exposure_scale(&r->tonemap),
+                              (float)r->tonemap.op,
+                              format_is_srgb(r->resolve_format) ? 0.0F : 1.0F,
+                              0.0F,
+                              r->tonemap.fxaa ? 1.0F : 0.0F,
+                              r->tonemap.bloom,
+                              ssao ? r->tonemap.ssao : 0.0F,
+                              r->tonemap.ssao_radius,
+                              r->ssao_projection[0],
+                              r->ssao_projection[1],
+                              r->ssao_projection[2],
+                              r->ssao_projection[3]};
     SDL_PushGPUFragmentUniformData(commands, 0, params, sizeof params);
     SDL_DrawGPUPrimitives(pass, 3, 1, 0, 0); /* un triangle plein écran, sans buffer */
     r->stats.resolve_draws++;

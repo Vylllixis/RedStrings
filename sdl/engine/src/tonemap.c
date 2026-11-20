@@ -10,6 +10,8 @@ void eng_tonemap_default(EngTonemap *t)
     t->exposure_ev = 0.0F;
     t->fxaa = false;
     t->bloom = 0.0F;
+    t->ssao = 0.0F;
+    t->ssao_radius = 0.75F;
 }
 
 bool eng_tonemap_sanitize(EngTonemap *t)
@@ -34,6 +36,20 @@ bool eng_tonemap_sanitize(EngTonemap *t)
         clean = false;
     } else if (t->bloom > 2.0F) {
         t->bloom = 2.0F;
+        clean = false;
+    }
+    if (!isfinite(t->ssao) || t->ssao < 0.0F) {
+        t->ssao = 0.0F;
+        clean = false;
+    } else if (t->ssao > 1.0F) {
+        t->ssao = 1.0F;
+        clean = false;
+    }
+    if (!isfinite(t->ssao_radius)) {
+        t->ssao_radius = 0.75F;
+        clean = false;
+    } else if (t->ssao_radius < 0.1F || t->ssao_radius > 4.0F) {
+        t->ssao_radius = t->ssao_radius < 0.1F ? 0.1F : 4.0F;
         clean = false;
     }
     return clean;
