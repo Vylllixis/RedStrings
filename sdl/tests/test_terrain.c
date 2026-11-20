@@ -602,3 +602,49 @@ UTEST(eng_terrain, a_square_kilometre_is_built_from_256_chunks_with_no_gap_and_n
     EXPECT_TRUE(every_cell_twice);
     eng_arena_shutdown(&arena);
 }
+
+/* M7-05 : niveaux de détail d'une cellule carrée (17 x 17, une partie de 16 cellules). Pour chaque
+ * niveau l : (16 / 2^l)² quads + une jupe de 4 x (16 / 2^l) arêtes double face ; le niveau l ne
+ * touche que des sommets de grille multiples de 2^l (ou de jupe) ; la jupe est sous le bord. */
+UTEST(eng_terrain, lod_levels_skip_vertices_and_a_skirt_hangs_under_the_border)
+{
+    Fixture f;
+    ASSERT_TRUE(
+        open_fixture(&f, 17U, 2.0F, fill_paraboloid, &(EngTerrainParams){.chunk_cells = 16}));
+    EngModel lod;
+    ASSERT_TRUE(eng_terrain_build_lod(&f.arena, &f.terrain.model, 17U, 3U, 5.0F, &lod));
+    ASSERT_EQ(lod.part_count, 3U);
+    EXPECT_EQ(lod.vertex_count, (17U * 17U) + 64U);
+    for (uint32_t l = 0; l < 3U; l++) {
+        const uint32_t q = 16U >> l;
+        const uint32_t step = 1U << l;
+        EXPECT_EQ(lod.parts[l].index_count, (q * q * 6U) + (4U * q * 12U));
+        EXPECT_EQ(lod.parts[l].material, f.terrain.model.parts[0].material);
+        uint32_t skirt = 0;
+        for (uint32_t i = 0; i < lod.parts[l].index_count; i++) {
+            const uint32_t v = lod.indices[lod.parts[l].first_index + i];
+            ASSERT_LT(v, lod.vertex_count);
+            if (v >= 17U * 17U) {
+                skirt++;
+                continue;
+            }
+            EXPECT_EQ((v % 17U) % step, 0U); /* x multiple de 2^l */
+            EXPECT_EQ((v / 17U) % step, 0U); /* z multiple de 2^l */
+        }
+        EXPECT_EQ(skirt,
+                  4U * q * 6U); /* 4 triangles de jupe par arête, 1,5 sommet de jupe chacun */
+    }
+    /* la jupe : copie abaissée de 5 m des sommets du bord (coin (0, 0) en tête) */
+    EXPECT_NEAR(lod.vertices[(size_t)17U * 17U].position[1],
+                f.terrain.model.vertices[0].position[1] - 5.0F, 1e-4F);
+    EXPECT_NEAR(lod.vertices[(size_t)17U * 17U].position[0],
+                f.terrain.model.vertices[0].position[0], 1e-6F);
+    EXPECT_NEAR(lod.bounds_min[1], f.terrain.model.bounds_min[1] - 5.0F, 1e-4F);
+    /* arguments refusés : trop de niveaux, taille qui ne correspond pas, 0 niveau, jupe négative */
+    EXPECT_FALSE(eng_terrain_build_lod(&f.arena, &f.terrain.model, 17U, 5U, 5.0F, &lod));
+    EXPECT_FALSE(eng_terrain_build_lod(&f.arena, &f.terrain.model, 16U, 2U, 5.0F, &lod));
+    EXPECT_FALSE(eng_terrain_build_lod(&f.arena, &f.terrain.model, 17U, 0U, 5.0F, &lod));
+    EXPECT_FALSE(eng_terrain_build_lod(&f.arena, &f.terrain.model, 17U, 2U, -1.0F, &lod));
+    EXPECT_FALSE(eng_terrain_build_lod(NULL, &f.terrain.model, 17U, 2U, 5.0F, &lod));
+    close_fixture(&f);
+}

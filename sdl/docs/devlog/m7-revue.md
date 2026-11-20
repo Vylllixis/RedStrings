@@ -21,7 +21,7 @@ Tests : `test_jobs` (4), `test_world_stream` (11), `test_world_ai` (3), `test_wo
 | M7-02 Jobs | Prouvé (TSan propre) |
 | M7-03 Streaming | Prouvé côté CPU (lecture de fichier en job au lieu de l'E/S asynchrone SDL3 : écart) |
 | M7-04 Uploads étalés | Fait : branché au rendu du monde (une cellule par image, plus proches d'abord) ; `launcher.world_render` |
-| M7-05 LOD terrain | Partiel : sélection CDLOD prouvée, pas de rendu |
+| M7-05 LOD terrain | Fait (écart) : 3 niveaux discrets par cellule + jupes au rendu (`eng_terrain_build_lod`, test + mutation) ; la sélection CDLOD (prouvée) n'est pas utilisée, pas de morph |
 | M7-06 LOD meshes | Partiel : simplification + hystérésis prouvées ; pas de meshoptimizer, pas dans le cooker |
 | M7-07 Imposteurs | À faire (optionnel) |
 | M7-08 Culling GPU | À faire (important, non indispensable) |

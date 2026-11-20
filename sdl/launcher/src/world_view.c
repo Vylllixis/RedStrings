@@ -8,6 +8,7 @@
 #include "engine/frustum.h"
 #include "engine/heightmap.h"
 #include "engine/log.h"
+#include "engine/mesh_lod.h"
 #include "engine/noise.h"
 #include "engine/splatmap.h"
 #include "engine/terrain.h"
@@ -201,6 +202,12 @@ static uint32_t fix_edge_normals(const WorldView *w, EngCellCoord c, EngModel *m
     return fixed;
 }
 
+/* M7-05 : distances (m, caméra -> centre de cellule) au-delà desquelles on passe au niveau
+ * suivant ; hystérésis de 10 % (pas de clignotement sur un seuil). */
+static const float LOD_DISTANCES[WORLD_VIEW_LOD_LEVELS - 1U] = {360.0F, 720.0F};
+#define LOD_HYSTERESIS 0.1F
+#define SKIRT_DEPTH 6.0F /* m : jupe sous le bord, cache les fissures entre niveaux */
+
 /* Mesure d'une étape de l'envoi d'une cellule : garde le pire temps, renvoie le nouvel instant. */
 static uint64_t stage(WorldView *w, int k, uint64_t since)
 {
@@ -236,7 +243,12 @@ static bool upload(WorldView *w, WorldCellView *v)
     t = stage(w, 0, t);
     ok = ok && eng_splatmap_generate(&w->scratch, &map, &sp, &splat);
     t = stage(w, 1, t);
-    ok = ok && eng_model_gpu_create(&v->model, w->renderer, &v->arena, &terrain.model, 8.0F);
+    EngModel lod_model;
+    ok = ok &&
+         eng_terrain_build_lod(&w->scratch, &terrain.model, ENG_CELL_RES, WORLD_VIEW_LOD_LEVELS,
+                               SKIRT_DEPTH, &lod_model) &&
+         eng_model_gpu_create(&v->model, w->renderer, &v->arena, &lod_model, 8.0F);
+    v->lod = WORLD_VIEW_LOD_LEVELS - 1U; /* choisi au premier dessin */
     if (ok) {
         const EngTextureDesc desc = {.name = "monde-splat",
                                      .width = ENG_CELL_RES,
@@ -508,8 +520,12 @@ void world_view_draw(WorldView *w, EngRenderQueue *queue, mat4 view_proj, const 
     EngFrustum frustum;
     const bool cull = eng_frustum_from_view_proj(&frustum, view_proj);
     w->cells_drawn = 0;
+    w->triangles_drawn = 0;
+    for (uint32_t l = 0; l < WORLD_VIEW_LOD_LEVELS; l++) {
+        w->lod_drawn[l] = 0;
+    }
     for (uint32_t i = 0; i < ENG_STREAM_SLOTS; i++) {
-        const WorldCellView *v = &w->cells[i];
+        WorldCellView *v = &w->cells[i];
         if (!v->uploaded) {
             continue;
         }
@@ -520,6 +536,16 @@ void world_view_draw(WorldView *w, EngRenderQueue *queue, mat4 view_proj, const 
             continue;
         }
         w->cells_drawn++;
+        /* M7-05 : niveau selon la distance caméra -> centre de la cellule */
+        const float cx = (bmin[0] + bmax[0]) * 0.5F;
+        const float cz = (bmin[2] + bmax[2]) * 0.5F;
+        const float dx = cx - (light != NULL ? light->camera_position[0] : 0.0F);
+        const float dz = cz - (light != NULL ? light->camera_position[2] : 0.0F);
+        v->lod = eng_mesh_lod_select(v->lod, sqrtf((dx * dx) + (dz * dz)), LOD_DISTANCES,
+                                     WORLD_VIEW_LOD_LEVELS, LOD_HYSTERESIS);
+        w->lod_drawn[v->lod]++;
+        w->triangles_drawn += v->model.parts[v->lod].index_count / 3U;
+        const uint32_t part = v->lod;
         const EngTextureHandle textures[5] = {v->splat, w->shared.layers[0], w->shared.layers[1],
                                               w->shared.layers[2], w->shared.layers[3]};
         const EngModelDrawOptions options = {
@@ -527,7 +553,9 @@ void world_view_draw(WorldView *w, EngRenderQueue *queue, mat4 view_proj, const 
             .sampler = w->shared.sampler,
             .user = {w->shared.tile_meters, w->shared.sharpness, 0.0F},
             .fragment_tail = w->shared.fog,
-            .fragment_tail_floats = ENG_FOG_UNIFORM_FLOATS};
+            .fragment_tail_floats = ENG_FOG_UNIFORM_FLOATS,
+            .parts = &part,
+            .part_count = 1U};
         mat4 model;
         cell_matrix(w, v, model);
         (void)eng_model_gpu_draw_ex(&v->model, queue, w->pipeline, model, view_proj, light, shadow,
@@ -545,8 +573,17 @@ void world_view_draw_depth(const WorldView *w, EngRenderQueue *queue, mat4 light
         if (v->uploaded) {
             mat4 model;
             cell_matrix(w, v, model);
-            (void)eng_model_gpu_draw_depth(&v->model, queue, w->shadow_pipeline, model,
-                                           light_view_proj);
+            /* M7-05 : le niveau choisi par le dernier dessin principal (une seule partie) */
+            mat4 mvp;
+            glm_mat4_mul(light_view_proj, model, mvp);
+            const EngModelPart *part = &v->model.parts[v->lod];
+            const EngDrawCmd cmd = {.pipeline = w->shadow_pipeline,
+                                    .vertex_buffer = v->model.vertices,
+                                    .index_buffer = v->model.indices,
+                                    .index_type = ENG_INDEX_U32,
+                                    .count = part->index_count,
+                                    .first = part->first_index};
+            (void)eng_render_draw_uniforms(queue, &cmd, mvp, sizeof(mat4));
         }
     }
 }
@@ -605,6 +642,10 @@ void world_view_log_summary(const WorldView *w, double travelled_m)
                  (unsigned)w->origin.rebases, (unsigned)w->stream.peak_slots,
                  (unsigned long long)w->stream.refused, w->worst_stage_ms[0], w->worst_stage_ms[1],
                  w->worst_stage_ms[2], w->worst_stage_ms[3]);
+    ENG_LOG_INFO(
+        "MONDE : dernière image : %u cellule(s) dessinée(s) (niveaux de détail %u / %u / %u), "
+        "%u triangles",
+        w->cells_drawn, w->lod_drawn[0], w->lod_drawn[1], w->lod_drawn[2], w->triangles_drawn);
 }
 
 bool world_view_height(const WorldView *w, float x, float z, float *out)

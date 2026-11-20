@@ -40,7 +40,7 @@ Mesures (RTX 5070 Laptop, Release, 2026-11-19 ; détail dans `docs/devlog/perf-m
 | 3,1 km à 100 m/s, sans vsync, 1080p, 4 cascades | 19 969 | 1,57 ms | < 5 ms | 15,9 ms (un envoi) | 0 |
 
 Limites : pas encore d'objets (rochers, arbres, camps des cellules) ni d'ennemis dans le monde ;
-pas de LOD de terrain au rendu (25 cellules à pleine résolution, 205 000 triangles) ; un envoi de
+LOD discret par cellule (section M7-05) ; un envoi de
 cellule coûte ~1 ms en régime, mais jusqu'à 15 ms parfois (création des ressources GPU), sur le
 thread principal ; recréer les 25 corps Jolt au recentrage (au lieu de les déplacer).
 
@@ -94,8 +94,16 @@ cellule est envoyée au GPU quand la file la donne.
 ## LOD du terrain (M7-05) — `terrain_lod`
 
 Sélection CDLOD sur quadtree (8 km : 166 nœuds, 0,25 % des triangles de la pleine résolution à
-1 m) ; couverture exacte ; voisins à au plus un niveau d'écart ; facteur de morph. **Pas de shader
-de morph ni de rendu** : à faire.
+1 m) ; couverture exacte ; voisins à au plus un niveau d'écart ; facteur de morph. Cette sélection
+n'est pas utilisée au rendu. **Au rendu (finition)**, chaque cellule du monde a 3 niveaux discrets
+(`eng_terrain_build_lod` : un échantillon sur 1, 2 ou 4, soit des quads de 4, 8 et 16 m) dans un même
+tampon d'index, choisis par la distance caméra → centre de cellule (360 m et 720 m, hystérésis de
+10 % via `eng_mesh_lod_select`) ; une **jupe** de 6 m sous le bord de chaque niveau bouche les
+fentes entre deux cellules de niveaux différents (jonctions en T) ; la passe d'ombre dessine le même
+niveau. Mesure : 13 cellules dessinées → 56 320 triangles au lieu de 106 496 à pleine résolution.
+Test : `eng_terrain.lod_levels_skip_vertices_and_a_skirt_hangs_under_the_border` (mutation « pas
+ignoré » détectée). **Écart** : pas de morph CDLOD (le passage d'un niveau à l'autre se fait d'un
+coup, à plus de 360 m dans le brouillard) ; une cellule entière change de niveau.
 
 ## LOD des meshes (M7-06) — `mesh_lod`
 

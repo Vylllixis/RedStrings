@@ -32,6 +32,7 @@
 #define WORLD_VIEW_UPLOAD_BUDGET (64U * 1024U) /* octets par image : docs/perf-budgets.md */
 #define WORLD_VIEW_REBASE_M 512.0              /* recentrage de l'origine au-delà (m) */
 #define WORLD_VIEW_HIST_MS 100U                /* histogramme des images, par milliseconde */
+#define WORLD_VIEW_LOD_LEVELS 3U /* M7-05 : pas de 1, 2 et 4 échantillons (4, 8 et 16 m) */
 
 typedef struct WorldCellView {
     bool used;     /* cellule prête dans le streaming */
@@ -41,6 +42,7 @@ typedef struct WorldCellView {
     EngModelGpu model;
     EngTextureHandle splat;
     EngBody body;
+    uint32_t lod; /* M7-05 : niveau dessiné (0 : le plus fin) */
     float height_min;
     float height_max;
 } WorldCellView;
@@ -72,6 +74,8 @@ typedef struct WorldView {
     bool frame_rebased;     /* dernière mise à jour : origine recentrée */
     double frame_update_ms; /* dernière mise à jour : durée de world_view_update */
     uint32_t cells_drawn;   /* dernière image, après élimination par le frustum */
+    uint32_t lod_drawn[WORLD_VIEW_LOD_LEVELS]; /* dernière image : cellules par niveau */
+    uint32_t triangles_drawn;                  /* dernière image, passe principale */
     /* temps des images après le chargement initial (critère M7 n° 1 : aucune > 25 ms) */
     uint32_t frame_hist[WORLD_VIEW_HIST_MS + 1U];
     uint32_t frames;

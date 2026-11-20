@@ -264,3 +264,132 @@ bool eng_terrain_build(EngArena *arena, const EngHeightmap *map, const EngTerrai
     out->chunk_cells = cells;
     return true;
 }
+
+/* ── M7-05 : niveaux de détail d'une cellule carrée ── */
+
+/* Indice, dans la jupe, du sommet de bord (x, z) : le tour de la cellule, sens trigonométrique vu
+ * d'en haut à partir du coin (0, 0) ; 4 x n sommets (n = côté - 1). */
+static uint32_t perimeter_index(uint32_t n, uint32_t x, uint32_t z)
+{
+    if (z == 0U) {
+        return x; /* bord z = 0 (coin (n, 0) compris) */
+    }
+    if (x == n) {
+        return n + z; /* bord x = n */
+    }
+    if (z == n) {
+        return (2U * n) + (n - x); /* bord z = n */
+    }
+    return (3U * n) + (n - z); /* bord x = 0 */
+}
+
+static uint32_t *push_tri(uint32_t *o, uint32_t a, uint32_t b, uint32_t c)
+{
+    o[0] = a;
+    o[1] = b;
+    o[2] = c;
+    return o + 3;
+}
+
+bool eng_terrain_build_lod(EngArena *arena, const EngModel *grid, uint32_t size, uint32_t levels,
+                           float skirt_depth, EngModel *out)
+{
+    if (arena == NULL || grid == NULL || out == NULL || size < 3U || levels == 0U ||
+        levels > ENG_TERRAIN_LOD_MAX_LEVELS || !isfinite(skirt_depth) || skirt_depth < 0.0F ||
+        grid->vertex_count != size * size || grid->part_count == 0U ||
+        ((size - 1U) % (1U << (levels - 1U))) != 0U) {
+        return false;
+    }
+    const uint32_t res = size;
+    const uint32_t n = res - 1U;
+    const uint32_t ring = 4U * n;
+    const uint32_t material = grid->parts[0].material;
+    uint32_t index_total = 0;
+    for (uint32_t l = 0; l < levels; l++) {
+        const uint32_t q = n >> l;                    /* quads par côté */
+        index_total += (q * q * 6U) + (4U * q * 12U); /* surface + jupe double face */
+    }
+    const EngArenaMark mark = eng_arena_mark(arena);
+    EngModelVertex *v =
+        ENG_ARENA_NEW_ARRAY(arena, EngModelVertex, (size_t)grid->vertex_count + ring);
+    uint32_t *idx = ENG_ARENA_NEW_ARRAY(arena, uint32_t, index_total);
+    EngModelPart *parts = ENG_ARENA_NEW_ARRAY(arena, EngModelPart, levels);
+    if (v == NULL || idx == NULL || parts == NULL) {
+        eng_arena_reset_to(arena, mark);
+        return false;
+    }
+    memcpy(v, grid->vertices, sizeof(EngModelVertex) * grid->vertex_count);
+    for (uint32_t z = 0; z < res; z++) { /* sommets abaissés de la jupe */
+        for (uint32_t x = 0; x < res; x++) {
+            if (x != 0U && z != 0U && x != n && z != n) {
+                continue;
+            }
+            EngModelVertex *sv = &v[grid->vertex_count + perimeter_index(n, x, z)];
+            *sv = grid->vertices[(z * res) + x];
+            sv->position[1] -= skirt_depth;
+        }
+    }
+    uint32_t *o = idx;
+    for (uint32_t l = 0; l < levels; l++) {
+        const uint32_t step = 1U << l;
+        const uint32_t q = n >> l;
+        parts[l].first_index = (uint32_t)(o - idx);
+        parts[l].material = material;
+        for (uint32_t z = 0; z < q; z++) {
+            for (uint32_t x = 0; x < q; x++) {
+                const uint32_t a = (z * step * res) + (x * step);
+                const uint32_t b = a + step;
+                const uint32_t c = a + (step * res);
+                const uint32_t d = c + step;
+                if (((x + z) & 1U) == 0U) {
+                    o = push_tri(o, a, c, d);
+                    o = push_tri(o, a, d, b);
+                } else {
+                    o = push_tri(o, a, c, b);
+                    o = push_tri(o, b, c, d);
+                }
+            }
+        }
+        /* jupe : chaque arête du bord (pas `step`) et sa copie abaissée, deux faces */
+        for (uint32_t k = 0; k < 4U * q; k++) {
+            const uint32_t p0 = k * step;
+            const uint32_t p1 = ((k + 1U) * step) % ring;
+            uint32_t g[2] = {0, 0};
+            for (int e = 0; e < 2; e++) { /* périmètre -> sommet de la grille */
+                const uint32_t p = e == 0 ? p0 : p1;
+                uint32_t x = 0;
+                uint32_t z = 0;
+                if (p < n) {
+                    x = p;
+                } else if (p < 2U * n) {
+                    x = n;
+                    z = p - n;
+                } else if (p < 3U * n) {
+                    x = n - (p - (2U * n));
+                    z = n;
+                } else {
+                    z = n - (p - (3U * n));
+                }
+                g[e] = (z * res) + x;
+            }
+            const uint32_t g0 = g[0];
+            const uint32_t g1 = g[1];
+            const uint32_t s0 = grid->vertex_count + p0;
+            const uint32_t s1 = grid->vertex_count + p1;
+            o = push_tri(o, g0, s0, g1);
+            o = push_tri(o, g1, s0, s1);
+            o = push_tri(o, g0, g1, s0);
+            o = push_tri(o, g1, s1, s0);
+        }
+        parts[l].index_count = (uint32_t)(o - idx) - parts[l].first_index;
+    }
+    *out = *grid;
+    out->vertices = v;
+    out->vertex_count = grid->vertex_count + ring;
+    out->indices = idx;
+    out->index_count = (uint32_t)(o - idx);
+    out->parts = parts;
+    out->part_count = levels;
+    out->bounds_min[1] -= skirt_depth;
+    return out->index_count == index_total;
+}

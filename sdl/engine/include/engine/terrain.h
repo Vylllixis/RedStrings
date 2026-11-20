@@ -71,4 +71,17 @@ bool eng_terrain_build(EngArena *arena, const EngHeightmap *map, const EngTerrai
                        EngTerrain *out);
 
 /* Indice du chunk (cx, cz) ; UINT32_MAX hors de la grille de chunks. */
+/* M7-05 : niveaux de détail d'un terrain CARRÉ (une cellule du monde streamé). `grid` : le modèle
+ * d'eng_terrain_build pour un champ de `size` x `size` (une partie). Résultat (dans `arena`) : les
+ * mêmes sommets + 4 x (size - 1) sommets de JUPE (ceux du bord, abaissés de `skirt_depth` m), et
+ * `levels` parties (une par niveau, toutes dans le même tampon d'index) : le niveau l relie un
+ * échantillon sur 2^l (même diagonale en damier, anti-horaires vus d'en haut), suivi de sa jupe
+ * (triangles des deux faces) : entre deux cellules de niveaux différents, les sommets de bord ne
+ * coïncident plus et la jupe bouche la fente. `size - 1` doit être divisible par 2^(levels-1) ;
+ * 1 <= levels <= ENG_TERRAIN_LOD_MAX_LEVELS. false (arena restituée) si invalide ou mémoire
+ * insuffisante. */
+#define ENG_TERRAIN_LOD_MAX_LEVELS 4U
+bool eng_terrain_build_lod(EngArena *arena, const EngModel *grid, uint32_t size, uint32_t levels,
+                           float skirt_depth, EngModel *out);
+
 uint32_t eng_terrain_chunk_index(const EngTerrain *terrain, uint32_t cx, uint32_t cz);
