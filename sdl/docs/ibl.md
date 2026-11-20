@@ -132,3 +132,10 @@ le HDR réel.
 - Pas d'harmoniques sphériques : l'irradiance est un cube 32 × 32.
 - Le calcul prend plusieurs secondes en debug (ASan) ; il n'est pas mis en cache sur disque.
 - Les données HDR du ciel d'un `.hdr` sont lues par stb_image (RGBE uniquement).
+
+## Recuisson pendant le jeu (M8-07)
+
+`EngEnvironmentBake` : tampons alloués une fois (`eng_environment_bake_init`, mêmes tailles que
+l'environnement), cuisson CPU sans renderer (`eng_environment_bake_run`, sur un thread de travail),
+envoi en place (`eng_environment_bake_upload` → `eng_renderer_update_texture_data`). La scène du
+lanceur recuit dès que le soleil a bougé de 2° (`docs/day-night.md`).

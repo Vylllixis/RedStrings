@@ -26,6 +26,8 @@ livraisons ; les tags sont posés par Théo après ses tests.
   ciel de nuit (étoiles, lune) ; brouillard de nuit corrigé (il prenait un ciel de jour) ; cubes de
   la démonstration assombris la nuit ; image moins délavée (ambiante 0,5, −0,5 EV, brouillard
   0,0008 dans le lanceur) ; `--exposure EV` et `--ambient X` pour régler.
+- M8 (finition) : l'éclairage par image suit le soleil : recuit en tâche de fond dès qu'il a bougé de
+  2°, envoyé en place (`eng_renderer_update_texture_data`).
 
 ## v0.7 (M7, partiel) — monde ouvert
 - Cellules de 256 m (format RSCL), pool de threads, streaming asynchrone, origine flottante,

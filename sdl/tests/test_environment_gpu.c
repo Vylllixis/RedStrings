@@ -195,6 +195,65 @@ UTEST(eng_environment_gpu, the_procedural_sky_has_the_zenith_above_and_the_groun
     EXPECT_EQ(close_fixture(&t), (uint32_t)0);
 }
 
+/* M8-07 : l'environnement créé pour le ciel A, recuit pour le ciel B (cuisson CPU puis envoi EN
+ * PLACE : mêmes handles), se dessine pixel pour pixel comme un environnement créé pour B ; une mise
+ * à jour de taille différente est refusée. */
+UTEST(eng_environment_gpu, a_rebaked_environment_equals_one_created_for_the_new_sky)
+{
+    Fixture t;
+    if (!open_fixture(&t)) {
+        EXPECT_FALSE(render_gpu_required());
+        return;
+    }
+    EngSkyDesc sky_a = {.zenith = {0.0F, 0.0F, 0.9F},
+                        .horizon = {0.5F, 0.5F, 0.5F},
+                        .ground = {0.6F, 0.2F, 0.0F},
+                        .sun_direction = {0, 1, 0},
+                        .sun_angular_radius_deg = 1.0F};
+    EngSkyDesc sky_b = sky_a;
+    sky_b.zenith[0] = 0.8F;
+    sky_b.zenith[2] = 0.1F;
+    sky_b.ground[0] = 0.1F;
+    sky_b.ground[1] = 0.5F;
+    EngEnvironmentDesc desc = {
+        .sky = &sky_a, .sky_size = 32, .irradiance_size = 8, .prefiltered_size = 32, .samples = 16};
+    EngEnvironment env;
+    ASSERT_TRUE(eng_environment_create(&env, &t.r, &desc));
+    const EngTextureHandle sky_handle = env.sky;
+    EngEnvironmentBake bake;
+    ASSERT_TRUE(eng_environment_bake_init(&bake, &desc));
+    bake.sky_desc = sky_b;
+    eng_environment_bake_run(&bake);
+    ASSERT_TRUE(eng_environment_bake_upload(&env, &t.r, &bake));
+    EXPECT_EQ(env.sky.handle.index, sky_handle.handle.index); /* en place */
+    const float forward[3] = {0, 0, -1};
+    const float up[3] = {0, 1, 0};
+    ASSERT_TRUE(draw_sky(&t, &env, forward, up, 1.0F));
+    static uint8_t rebaked[SIZE * SIZE * 4];
+    memcpy(rebaked, g_pixels, sizeof rebaked);
+    desc.sky = &sky_b;
+    EngEnvironment direct;
+    ASSERT_TRUE(eng_environment_create(&direct, &t.r, &desc));
+    ASSERT_TRUE(draw_sky(&t, &direct, forward, up, 1.0F));
+    EXPECT_EQ(memcmp(rebaked, g_pixels, sizeof rebaked), 0);
+    const uint8_t *bottom = g_pixels + ((((size_t)(SIZE - 3U) * SIZE) + (SIZE / 2)) * 4);
+    EXPECT_EQ((int)bottom[1], 128); /* sol vert du ciel B (0,5) */
+    /* taille différente : refusé */
+    uint16_t small[6U * 4U * 4U] = {0};
+    const EngTextureDataDesc wrong = {.name = "mauvaise taille",
+                                      .width = 2,
+                                      .height = 2,
+                                      .layers = 6,
+                                      .mip_levels = 1,
+                                      .format = ENG_TEXTURE_RGBA16F,
+                                      .data = small};
+    EXPECT_FALSE(eng_renderer_update_texture_data(&t.r, env.sky, &wrong));
+    eng_environment_bake_free(&bake);
+    eng_environment_destroy(&direct, &t.r);
+    eng_environment_destroy(&env, &t.r);
+    EXPECT_EQ(close_fixture(&t), (uint32_t)0);
+}
+
 UTEST(eng_environment_gpu, invalid_descriptions_are_refused_without_leaking)
 {
     Fixture t;

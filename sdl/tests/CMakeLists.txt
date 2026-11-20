@@ -511,6 +511,18 @@ if(OW_PHYSICS)
     set_property(TEST launcher.avatar_gallery APPEND PROPERTY ENVIRONMENT_MODIFICATION
       "VK_DRIVER_FILES=set:${OW_SOFTWARE_VULKAN_ICD}" "VK_ICD_FILENAMES=set:${OW_SOFTWARE_VULKAN_ICD}")
   endif()
+  # M8-07 : l'éclairage par image est recuit pendant le jeu quand le soleil bouge (journée de 30 s :
+  # le soleil avance de 12° par seconde) ; au moins une recuisson envoyée.
+  add_test(NAME launcher.ibl_rebake COMMAND launcher --combat-autoplay --no-audio --day-length 30
+           --frames 400 --env-samples 16 WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR})
+  set_tests_properties(launcher.ibl_rebake PROPERTIES
+    ENVIRONMENT "SDL_VIDEODRIVER=offscreen"
+    FAIL_REGULAR_EXPRESSION "ERROR|non détruite|perdu"
+    PASS_REGULAR_EXPRESSION "éclairage par image : [1-9][0-9]* recuisson")
+  if(OW_SOFTWARE_VULKAN_ICD)
+    set_property(TEST launcher.ibl_rebake APPEND PROPERTY ENVIRONMENT_MODIFICATION
+      "VK_DRIVER_FILES=set:${OW_SOFTWARE_VULKAN_ICD}" "VK_ICD_FILENAMES=set:${OW_SOFTWARE_VULKAN_ICD}")
+  endif()
   # Combat rendu sur le GPU (M4/M5) : arène en volumes, 5 personnages skinnés avec leurs ombres ;
   # aucun dessin ne doit être perdu (B11 : la file d'ombre en perdait 16 par image).
   add_test(NAME launcher.combat_render COMMAND launcher --combat-autoplay --no-audio --frames 60

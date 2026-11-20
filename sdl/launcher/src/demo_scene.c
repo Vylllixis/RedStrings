@@ -1,3 +1,4 @@
+#include <SDL3/SDL_timer.h>
 #include "demo_scene.h"
 
 #include <math.h>
@@ -5,6 +6,7 @@
 #include <stdio.h>
 #include <string.h>
 
+#include "engine/jobs.h"
 #include "engine/files.h"
 #include "engine/image.h"
 #include "engine/instancing.h"
@@ -25,6 +27,28 @@ typedef struct CubeUniforms {
     float mvp[16];
     float light[4];
 } CubeUniforms;
+
+/* M8-07 : recuisson de l'éclairage par image quand le soleil a bougé de plus de 2° : cuisson CPU
+ * dans un job (1 thread), envoi en place sur le thread principal quand elle est finie. Une seule
+ * scène existe : état statique (les tampons de cuisson, ~8 Mo, sont alloués au chargement). */
+typedef struct IblRebake {
+    bool ready;
+    bool baking;
+    EngEnvironmentBake bake;
+    EngJobs jobs;
+    EngJobCounter done;
+    float baked_sun[3];
+    uint32_t count;
+    double worst_upload_ms;
+} IblRebake;
+static IblRebake g_ibl;
+
+#define IBL_REBAKE_COS 0.99939F /* cos 2° */
+
+static void ibl_job(void *user)
+{
+    eng_environment_bake_run((EngEnvironmentBake *)user);
+}
 
 typedef struct Vertex {
     float position[3];
@@ -414,6 +438,17 @@ static void load_environment(DemoScene *scene, EngRenderer *renderer, const Demo
     }
     scene->has_environment = eng_environment_create(&scene->environment, renderer, &env);
     eng_environment_free_hdr(hdr);
+    /* M8-07 : ciel atmosphérique seulement (une image HDR ne bouge pas) */
+    if (scene->has_environment && scene->has_atmosphere && env.equirect_rgb == NULL &&
+        eng_environment_bake_init(&g_ibl.bake, &env) && eng_jobs_init(&g_ibl.jobs, 1U)) {
+        g_ibl.ready = true;
+        g_ibl.baking = false;
+        g_ibl.count = 0;
+        eng_job_counter_set(&g_ibl.done, 0);
+        for (int c = 0; c < 3; c++) {
+            g_ibl.baked_sun[c] = light.sun_direction[c];
+        }
+    }
     if (!scene->has_environment) {
         if (eng_renderer_pipeline_is_valid(renderer, scene->atmosphere_pipeline)) {
             (void)eng_renderer_destroy_pipeline(renderer, scene->atmosphere_pipeline);
@@ -1035,6 +1070,37 @@ void demo_scene_draw(DemoScene *scene, EngRenderer *renderer, EngRenderQueue *qu
     }
     eng_renderer_set_shadow_map(renderer, receiving != NULL ? scene->shadow_map : ENG_TEXTURE_NULL);
 
+    /* M8-07 : recuisson de l'éclairage par image si le soleil a bougé */
+    if (g_ibl.ready && scene->has_atmosphere) {
+        if (g_ibl.baking) {
+            if (eng_jobs_finished(&g_ibl.done)) {
+                const uint64_t t0 = SDL_GetPerformanceCounter();
+                (void)eng_environment_bake_upload(&scene->environment, renderer, &g_ibl.bake);
+                const double ms = (double)(SDL_GetPerformanceCounter() - t0) * 1000.0 /
+                                  (double)SDL_GetPerformanceFrequency();
+                g_ibl.worst_upload_ms = ms > g_ibl.worst_upload_ms ? ms : g_ibl.worst_upload_ms;
+                g_ibl.baking = false;
+                g_ibl.count++;
+                ENG_LOG_DEBUG("éclairage par image : recuisson %u envoyée (%.0f ms de cuisson, "
+                              "envoi %.2f ms)",
+                              g_ibl.count, g_ibl.bake.last_ms, ms);
+            }
+        } else if ((sky_sun[0] * g_ibl.baked_sun[0]) + (sky_sun[1] * g_ibl.baked_sun[1]) +
+                       (sky_sun[2] * g_ibl.baked_sun[2]) <
+                   IBL_REBAKE_COS) {
+            if (eng_atmosphere_to_sky_desc(&scene->atmosphere, sky_sun, &g_ibl.bake.sky_desc)) {
+                for (int c = 0; c < 3; c++) {
+                    g_ibl.baked_sun[c] = sky_sun[c];
+                }
+                /* eng_jobs_submit compte lui-même le job dans `done` (0 -> 1) */
+                g_ibl.baking =
+                    eng_jobs_submit(&g_ibl.jobs, ibl_job, &g_ibl.bake, NULL, &g_ibl.done);
+                ENG_LOG_DEBUG("éclairage par image : cuisson lancée (soleil y = %.2f)",
+                              (double)sky_sun[1]);
+            }
+        }
+    }
+
     /* le ciel d'abord : sans profondeur, tout ce qui suit le recouvre */
     if (scene->has_atmosphere && scene->has_environment) {
         /* M8-07 : étoiles et lune la nuit ; la lune est là où apply_moonlight met sa lumière */
@@ -1279,6 +1345,14 @@ void demo_scene_set_model_hook(DemoScene *scene, DemoModelHook hook, void *user)
 
 void demo_scene_shutdown(DemoScene *scene, EngRenderer *renderer)
 {
+    if (g_ibl.ready) {
+        eng_jobs_shutdown(&g_ibl.jobs); /* attend la cuisson en cours */
+        ENG_LOG_INFO("éclairage par image : %u recuisson(s) (dernière %.0f ms en tâche de fond, "
+                     "envoi au pire %.2f ms)",
+                     g_ibl.count, g_ibl.bake.last_ms, g_ibl.worst_upload_ms);
+        eng_environment_bake_free(&g_ibl.bake);
+        g_ibl.ready = false;
+    }
     if (scene->has_lines) {
         eng_debug_lines_gpu_destroy(&scene->lines_gpu, renderer);
     }

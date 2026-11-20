@@ -45,6 +45,34 @@ typedef struct EngEnvironmentDesc {
     uint32_t samples;
 } EngEnvironmentDesc;
 
+/* M8-07 : RECUISSON pendant le jeu, en deux temps, pour suivre le soleil sans figer l'image :
+ *   1. eng_environment_bake_run (CPU seul, aucun appel au renderer : sur un thread de travail)
+ *      calcule ciel, irradiance et préfiltré pour `sky_desc` dans des tampons alloués UNE fois ;
+ *   2. eng_environment_bake_upload (thread principal) remplace le contenu des textures de `env`
+ *      EN PLACE (mêmes handles : les modèles qui l'utilisent n'ont rien à refaire).
+ * Les tailles sont celles d'`env` (même description qu'à eng_environment_create). */
+typedef struct EngEnvironmentBake {
+    uint32_t sky_size;
+    uint32_t sky_levels;
+    uint32_t irr_size;
+    uint32_t pre_size;
+    uint32_t pre_levels;
+    uint32_t samples;
+    float *sky;
+    float *irr;
+    float *pre;
+    uint16_t *sky_half;
+    uint16_t *irr_half;
+    uint16_t *pre_half;
+    EngSkyDesc sky_desc; /* entrée de la prochaine cuisson */
+    double last_ms;      /* durée de la dernière cuisson (mesure) */
+} EngEnvironmentBake;
+bool eng_environment_bake_init(EngEnvironmentBake *bake, const EngEnvironmentDesc *sizes);
+void eng_environment_bake_free(EngEnvironmentBake *bake);
+void eng_environment_bake_run(EngEnvironmentBake *bake);
+bool eng_environment_bake_upload(EngEnvironment *env, EngRenderer *r,
+                                 const EngEnvironmentBake *bake);
+
 /* Charge une image équirectangulaire Radiance (.hdr, RGBE) en floats RGB (3 par texel, première
  * ligne = haut) à passer dans EngEnvironmentDesc.equirect_rgb. Libérer avec
  * eng_environment_free_hdr. false (journalisé) si le fichier manque ou n'est pas lisible. */

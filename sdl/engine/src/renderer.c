@@ -627,7 +627,7 @@ EngTextureHandle eng_renderer_create_texture(EngRenderer *r, const EngTextureDes
 static bool upload_texture_data(SDL_GPUDevice *device, SDL_GPUTexture *texture,
                                 SDL_GPUTransferBuffer *transfer, uint32_t width, uint32_t height,
                                 uint32_t layers, uint32_t levels, EngTextureFormat format,
-                                const char *name)
+                                const char *name, bool cycle)
 {
     const bool blocks = is_block_compressed(format);
     SDL_GPUCommandBuffer *commands = SDL_AcquireGPUCommandBuffer(device);
@@ -650,7 +650,10 @@ static bool upload_texture_data(SDL_GPUDevice *device, SDL_GPUTexture *texture,
                 .rows_per_layer = blocks ? (h + 3U) & ~3U : h};
             const SDL_GPUTextureRegion destination = {
                 .texture = texture, .mip_level = level, .layer = layer, .w = w, .h = h, .d = 1};
-            SDL_UploadToGPUTexture(copy, &source, &destination, false);
+            /* cycle : si la texture sert encore à une image en vol, SDL en prend une copie
+             * neuve ; l'image en vol garde l'ancien contenu (mise à jour, M8-07) */
+            SDL_UploadToGPUTexture(copy, &source, &destination,
+                                   cycle && level == 0U && layer == 0U);
             offset += (uint32_t)level_bytes(format, w, h);
         }
     }
@@ -729,7 +732,7 @@ EngTextureHandle eng_renderer_create_texture_data(EngRenderer *r, const EngTextu
         memcpy(mapped, desc->data, total);
         SDL_UnmapGPUTransferBuffer(device, transfer);
         ok = upload_texture_data(device, gpu_texture, transfer, desc->width, desc->height,
-                                 desc->layers, desc->mip_levels, desc->format, name);
+                                 desc->layers, desc->mip_levels, desc->format, name, false);
     }
     if (transfer != NULL) {
         SDL_ReleaseGPUTransferBuffer(device, transfer);
@@ -748,6 +751,50 @@ EngTextureHandle eng_renderer_create_texture_data(EngRenderer *r, const EngTextu
     texture->layers = desc->layers;
     texture->format = desc->format;
     return (EngTextureHandle){handle};
+}
+
+bool eng_renderer_update_texture_data(EngRenderer *r, EngTextureHandle handle,
+                                      const EngTextureDataDesc *desc)
+{
+    Texture *texture = r->ready ? (Texture *)eng_pool_get(&r->textures, handle.handle) : NULL;
+    if (texture == NULL || desc == NULL || desc->data == NULL || desc->width != texture->width ||
+        desc->height != texture->height || desc->layers != texture->layers ||
+        desc->mip_levels != texture->mip_levels || desc->format != texture->format ||
+        is_block_compressed(desc->format)) {
+        ENG_LOG_ERROR("renderer : mise à jour de texture refusée (« %s » : taille, couches, "
+                      "niveaux ou format différents)",
+                      desc != NULL && desc->name != NULL ? desc->name : "?");
+        return false;
+    }
+    size_t total = 0;
+    for (uint32_t level = 0; level < desc->mip_levels; level++) {
+        uint32_t w = 0;
+        uint32_t h = 0;
+        eng_image_mip_size(desc->width, desc->height, level, &w, &h);
+        total += level_bytes(desc->format, w, h);
+    }
+    total *= desc->layers;
+    SDL_GPUDevice *device = r->gpu->device;
+    const SDL_GPUTransferBufferCreateInfo transfer_info = {
+        .usage = SDL_GPU_TRANSFERBUFFERUSAGE_UPLOAD, .size = (Uint32)total};
+    SDL_GPUTransferBuffer *transfer = SDL_CreateGPUTransferBuffer(device, &transfer_info);
+    uint8_t *mapped =
+        transfer != NULL ? (uint8_t *)SDL_MapGPUTransferBuffer(device, transfer, false) : NULL;
+    bool ok = false;
+    if (mapped != NULL) {
+        memcpy(mapped, desc->data, total);
+        SDL_UnmapGPUTransferBuffer(device, transfer);
+        ok = upload_texture_data(device, texture->gpu, transfer, desc->width, desc->height,
+                                 desc->layers, desc->mip_levels, desc->format,
+                                 desc->name != NULL ? desc->name : "?", true);
+    }
+    if (transfer != NULL) {
+        SDL_ReleaseGPUTransferBuffer(device, transfer);
+    }
+    if (!ok) {
+        ENG_LOG_ERROR("renderer : mise à jour de texture impossible : %s", SDL_GetError());
+    }
+    return ok;
 }
 
 uint32_t eng_renderer_texture_layers(const EngRenderer *r, EngTextureHandle handle)

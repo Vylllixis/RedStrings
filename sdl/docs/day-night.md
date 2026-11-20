@@ -33,9 +33,14 @@ Module : `engine/daynight.h` (fonctions pures, testées dans `tests/test_daynigh
 
 ## Limites
 
-- Lumière de l'environnement (IBL) cuite une fois au lancement pour le soleil de départ : la nuit,
-  les reflets spéculaires de l'environnement restent ceux du ciel du départ, seulement assombris
-  par l'ambiante. Une recuisson pendant le jeu coûterait environ 2,7 s sur SwiftShader.
+- ~~IBL cuite une fois au lancement~~ : depuis la finition, l'éclairage par image est **recuit
+  pendant le jeu** dès que le soleil a bougé de plus de 2° (toutes les ~7 s avec la journée de
+  20 min) : cuisson CPU dans un job (1,9 s sur l'i7-13650HX, 512 échantillons), puis envoi EN PLACE
+  des trois cubes sur le thread principal (2,4 à 3 ms ; mêmes handles, aucun modèle à rebrancher).
+  Ciel atmosphérique seulement (une image HDR ne bouge pas). Tests :
+  `eng_environment_gpu.a_rebaked_environment_equals_one_created_for_the_new_sky` (pixel pour
+  pixel), `launcher.ibl_rebake` (mutation du compteur de job détectée). Limite : pendant la cuisson
+  (1,9 s), l'éclairage garde le soleil d'avant.
 - ~~Cubes de la démonstration non éclairés~~ : depuis la finition, leur teinte suit la lumière
   (soleil ou lune visibles, ambiante : `textured_lit.vert`) ; ils s'assombrissent la nuit (B16).
 - ~~Pas d'étoiles ni de lune~~ : étoiles fixes (hachage de la direction, une case sur 400 environ,

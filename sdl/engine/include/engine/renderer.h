@@ -523,6 +523,13 @@ EngTextureHandle eng_renderer_create_texture(EngRenderer *r, const EngTextureDes
 EngTextureHandle eng_renderer_create_texture_data(EngRenderer *r, const EngTextureDataDesc *desc);
 /* Nombre de couches : 1 (2D) ou 6 (cube) ; 0 si le handle est invalide. */
 uint32_t eng_renderer_texture_layers(const EngRenderer *r, EngTextureHandle handle);
+
+/* M8-07 : remplace le contenu d'une texture créée par eng_renderer_create_texture_data (mêmes
+ * taille, couches, niveaux et format ; pas de BC7). Le handle ne change pas : tout ce qui
+ * l'utilise voit le nouveau contenu dès l'image suivante ; une image déjà en vol garde l'ancien
+ * (SDL fait « tourner » la texture). false (journalisé) si la description diffère. */
+bool eng_renderer_update_texture_data(EngRenderer *r, EngTextureHandle handle,
+                                      const EngTextureDataDesc *desc);
 bool eng_renderer_destroy_texture(EngRenderer *r, EngTextureHandle handle);
 
 /* ── Ombre (M1-17, docs/shadows.md) ── */

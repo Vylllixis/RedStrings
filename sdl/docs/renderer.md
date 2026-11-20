@@ -86,6 +86,9 @@ eng_render_draw_uniforms2(q, &cmd, NULL, 0, &light_block, sizeof light_block); /
 - `eng_renderer_run_shadow_pass(r, commandes, carte, file)` ouvre une passe (profondeur effacée à 1,
   rien d'autre), exécute la file, la ferme ; `0` et aucune passe si `carte` n'est pas une carte
   d'ombre (`stats.shadow_passes` compte les passes ouvertes).
+- `eng_renderer_update_texture_data` (M8-07) : remplace le contenu d'une texture créée avec des
+  données (mêmes taille, couches, niveaux, format ; pas de BC7) ; le handle ne change pas ; SDL
+  « fait tourner » la texture si une image en vol l'utilise encore.
 - File d'ombre du renderer : `EngRendererDesc.max_shadow_commands` (0 : aucune ; `max_shadow_uniform_bytes`,
   64 Kio par défaut), `eng_renderer_begin_shadow_queue` la vide et la rend, `eng_renderer_set_shadow_map`
   désigne la carte que `eng_renderer_end_frame` rend avant la passe de l'image. Carte nulle : pas de

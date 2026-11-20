@@ -255,3 +255,118 @@ bool eng_environment_draw_sky(const EngEnvironment *env, EngRenderQueue *queue,
     return eng_render_draw_uniforms2(queue, &cmd, &vertex, sizeof vertex, fragment,
                                      sizeof fragment);
 }
+
+/* ── M8-07 : recuisson ── */
+
+static uint32_t prefiltered_levels_for(uint32_t pre_size)
+{
+    uint32_t levels = 1; /* même règle qu'eng_environment_create */
+    while ((pre_size >> levels) >= 16U && levels < 7U) {
+        levels++;
+    }
+    return levels;
+}
+
+bool eng_environment_bake_init(EngEnvironmentBake *b, const EngEnvironmentDesc *sizes)
+{
+    if (b == NULL) {
+        return false;
+    }
+    *b = (EngEnvironmentBake){0};
+    const EngEnvironmentDesc none = {0};
+    const EngEnvironmentDesc *d = sizes != NULL ? sizes : &none;
+    b->sky_size = d->sky_size != 0 ? d->sky_size : ENG_ENVIRONMENT_DEFAULT_SKY_SIZE;
+    b->irr_size =
+        d->irradiance_size != 0 ? d->irradiance_size : ENG_ENVIRONMENT_DEFAULT_IRRADIANCE_SIZE;
+    b->pre_size =
+        d->prefiltered_size != 0 ? d->prefiltered_size : ENG_ENVIRONMENT_DEFAULT_PREFILTERED_SIZE;
+    b->samples = d->samples != 0 ? d->samples : ENG_ENVIRONMENT_DEFAULT_SAMPLES;
+    if (!is_pow2(b->sky_size) || !is_pow2(b->irr_size) || !is_pow2(b->pre_size) ||
+        b->pre_size > b->sky_size || b->sky_size > 1024U) {
+        return false;
+    }
+    b->sky_levels = eng_ibl_full_levels(b->sky_size);
+    b->pre_levels = prefiltered_levels_for(b->pre_size);
+    const size_t sky_f = eng_ibl_cube_floats(b->sky_size, b->sky_levels);
+    const size_t irr_f = eng_ibl_cube_floats(b->irr_size, 1U);
+    const size_t pre_f = eng_ibl_cube_floats(b->pre_size, b->pre_levels);
+    b->sky = (float *)SDL_calloc(sky_f, sizeof(float));
+    b->irr = (float *)SDL_calloc(irr_f, sizeof(float));
+    b->pre = (float *)SDL_calloc(pre_f, sizeof(float));
+    b->sky_half = (uint16_t *)SDL_calloc(sky_f / 3U * 4U, sizeof(uint16_t));
+    b->irr_half = (uint16_t *)SDL_calloc(irr_f / 3U * 4U, sizeof(uint16_t));
+    b->pre_half = (uint16_t *)SDL_calloc(pre_f / 3U * 4U, sizeof(uint16_t));
+    eng_ibl_sky_default(&b->sky_desc);
+    if (b->sky == NULL || b->irr == NULL || b->pre == NULL || b->sky_half == NULL ||
+        b->irr_half == NULL || b->pre_half == NULL) {
+        eng_environment_bake_free(b);
+        return false;
+    }
+    return true;
+}
+
+void eng_environment_bake_free(EngEnvironmentBake *b)
+{
+    if (b == NULL) {
+        return;
+    }
+    SDL_free(b->sky);
+    SDL_free(b->irr);
+    SDL_free(b->pre);
+    SDL_free(b->sky_half);
+    SDL_free(b->irr_half);
+    SDL_free(b->pre_half);
+    *b = (EngEnvironmentBake){0};
+}
+
+void eng_environment_bake_run(EngEnvironmentBake *b)
+{
+    if (b == NULL || b->sky == NULL) {
+        return;
+    }
+    const uint64_t start = SDL_GetPerformanceCounter();
+    eng_ibl_make_sky(b->sky, b->sky_size, b->sky_levels, &b->sky_desc);
+    eng_ibl_build_mips(b->sky, b->sky_size, b->sky_levels);
+    eng_ibl_irradiance(b->sky, b->sky_size, b->sky_levels, b->irr, b->irr_size);
+    eng_ibl_prefilter(b->sky, b->sky_size, b->sky_levels, b->pre, b->pre_size, b->pre_levels,
+                      b->samples);
+    eng_ibl_pack_rgb_to_rgba16f(b->sky, eng_ibl_cube_floats(b->sky_size, b->sky_levels) / 3U,
+                                b->sky_half);
+    eng_ibl_pack_rgb_to_rgba16f(b->irr, eng_ibl_cube_floats(b->irr_size, 1U) / 3U, b->irr_half);
+    eng_ibl_pack_rgb_to_rgba16f(b->pre, eng_ibl_cube_floats(b->pre_size, b->pre_levels) / 3U,
+                                b->pre_half);
+    b->last_ms = (double)(SDL_GetPerformanceCounter() - start) * 1000.0 /
+                 (double)SDL_GetPerformanceFrequency();
+}
+
+bool eng_environment_bake_upload(EngEnvironment *env, EngRenderer *r, const EngEnvironmentBake *b)
+{
+    if (env == NULL || r == NULL || b == NULL || b->sky_half == NULL ||
+        env->prefiltered_levels != b->pre_levels) {
+        return false;
+    }
+    const EngTextureDataDesc sky = {.name = "environment-sky",
+                                    .width = b->sky_size,
+                                    .height = b->sky_size,
+                                    .layers = 6,
+                                    .mip_levels = b->sky_levels,
+                                    .format = ENG_TEXTURE_RGBA16F,
+                                    .data = b->sky_half};
+    const EngTextureDataDesc irr = {.name = "environment-irradiance",
+                                    .width = b->irr_size,
+                                    .height = b->irr_size,
+                                    .layers = 6,
+                                    .mip_levels = 1,
+                                    .format = ENG_TEXTURE_RGBA16F,
+                                    .data = b->irr_half};
+    const EngTextureDataDesc pre = {.name = "environment-prefiltered",
+                                    .width = b->pre_size,
+                                    .height = b->pre_size,
+                                    .layers = 6,
+                                    .mip_levels = b->pre_levels,
+                                    .format = ENG_TEXTURE_RGBA16F,
+                                    .data = b->pre_half};
+    return eng_renderer_update_texture_data(r, env->sky, &sky) &&
+           eng_renderer_update_texture_data(r, env->irradiance, &irr) &&
+           eng_renderer_update_texture_data(r, env->prefiltered, &pre);
+}
