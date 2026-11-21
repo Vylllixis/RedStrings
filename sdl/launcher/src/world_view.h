@@ -3,6 +3,9 @@
 #include <stdbool.h>
 #include <stdint.h>
 
+#include "engine/world_map.h"
+#include "world_far.h"
+#include "world_trees.h"
 #include "engine/arena.h"
 #include "engine/atmosphere.h"
 #include "engine/environment.h"
@@ -42,9 +45,10 @@ typedef struct WorldCellView {
     EngModelGpu model;
     EngTextureHandle splat;
     EngBody body;
-    bool sand;    /* grande carte : le canal de l'herbe est du sable (engine/biome.h) */
-    bool lava;    /* ... et celui de la neige de la lave */
-    uint32_t lod; /* M7-05 : niveau dessiné (0 : le plus fin) */
+    EngTextureHandle splat2; /* carte du monde : seconde carte de poids (sable, lave) */
+    bool sand;               /* la cellule a du sable (compteurs, tests) */
+    bool lava;               /* ... de la lave */
+    uint32_t lod;            /* M7-05 : niveau dessiné (0 : le plus fin) */
     float height_min;
     float height_max;
 } WorldCellView;
@@ -60,8 +64,10 @@ typedef struct WorldView {
     EngRenderer *renderer;
     EngTerrainGpu shared;       /* couches, sampler et brouillard communs à toutes les cellules */
     EngPipelineHandle pipeline; /* terrain (model.vert + terrain.frag) */
-    EngTextureHandle sand;      /* grande carte : couches de sable et de lave (désert, volcan) */
-    EngTextureHandle lava;
+    const EngWorldMap *map;     /* carte du monde dessinée à la main (NULL : bandes de biomes) */
+    WorldTrees *trees;          /* arbres de la carte (NULL : aucun) */
+    WorldFar far;               /* vue lointaine de la carte (far.ready faux : aucune) */
+    EngArena map_arena;         /* relief et régions tramés de la carte */
     EngPipelineHandle shadow_pipeline; /* profondeur des modèles statiques */
     EngArena shared_arena;
     EngArena scratch; /* construction d'une cellule (restituée à chaque fois) */

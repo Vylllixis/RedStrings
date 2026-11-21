@@ -7,7 +7,10 @@
 //   t0 : splatmap RGBA8 linéaire, un texel par sommet du terrain : R herbe, G roche, B terre,
 //        A neige ; les quatre poids somment 1 (engine/splatmap.h) ;
 //   t1 à t4 : albédo (sRGB, répétées, mipmaps) de l'herbe, de la roche, de la terre, de la neige ;
-//   t5 à t7 : environnement (irradiance, préfiltrée, LUT BRDF) ; t8 : carte d'ombre.
+//   t5 à t7 : environnement (irradiance, préfiltrée, LUT BRDF) ; t8 : carte d'ombre ;
+//   t9 : seconde carte de poids (carte du monde, 2026-11-21) : R sable, G lave (B, A inutilisés) ;
+//        les six poids des deux cartes somment 1 ; t10, t11 : albédo du sable et de la lave.
+//        La lave rayonne (émissive) : elle reste visible la nuit.
 // Réglages dans `environment` du cbuffer : y = longueur en mètres d'une répétition d'une texture de
 // couche, z = netteté du triplanaire (exposant des poids : 1 = doux, grand = net) ; x reste le
 // dernier niveau de mip du cube préfiltré.
@@ -36,6 +39,13 @@ SamplerState brdf_sampler : register(s7, space2);
 // Carte d'ombre (M1-17) : voir model.frag.
 Texture2D<float4> shadow_map : register(t8, space2);
 SamplerState shadow_sampler : register(s8, space2);
+// Six matières : seconde carte de poids, sable, lave (même sampler que t0 à t7).
+Texture2D<float4> splat_map2 : register(t9, space2);
+Texture2D<float4> sand_map : register(t10, space2);
+Texture2D<float4> lava_map : register(t11, space2);
+SamplerState splat2_sampler : register(s9, space2);
+SamplerState sand_sampler : register(s10, space2);
+SamplerState lava_sampler : register(s11, space2);
 
 cbuffer Lighting : register(b0, space3)
 {
@@ -234,11 +244,15 @@ float4 main(float3 normal : TEXCOORD0, float2 uv : TEXCOORD1, float4 color : TEX
                     triplanar(rock_map, rock_sampler, world_position, tri, tile) * w.g +
                     triplanar(dirt_map, dirt_sampler, world_position, tri, tile) * w.b +
                     triplanar(snow_map, snow_sampler, world_position, tri, tile) * w.a;
+    float4 w2 = splat_map2.Sample(splat2_sampler, (uv * (splat_size - 1.0f) + 0.5f) / splat_size);
+    float3 lava_albedo = triplanar(lava_map, lava_sampler, world_position, tri, tile);
+    albedo += triplanar(sand_map, sand_sampler, world_position, tri, tile) * w2.r +
+              lava_albedo * w2.g;
     float4 base = float4(albedo * color.rgb, color.a);
     float metallic = saturate(material.x);
     float roughness = max(saturate(material.y), ROUGHNESS_MIN);
     float occlusion = 1.0f;
-    float3 emission = emissive.rgb;
+    float3 emission = emissive.rgb + (lava_albedo * lava_albedo * 3.0f * w2.g);
     float3 l = sun_direction.xyz;
     float3 v = normalize(camera_position.xyz - world_position);
     float3 h = normalize(l + v);

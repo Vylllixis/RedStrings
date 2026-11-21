@@ -25,8 +25,9 @@
 #include "engine/map_zones.h"
 
 #define ENG_WORLDMAP_MAX_FEATURES 160U
-#define ENG_WORLDMAP_MAX_POINTS 640U /* sommets de toutes les lignes (crêtes, rivières, chemins) \
-                                      */
+#define ENG_WORLDMAP_MAX_POINTS                                                                    \
+    640U /* sommets de toutes les lignes (crêtes, rivières, chemins)                             \
+          */
 #define ENG_WORLDMAP_MAX_REGIONS 16U
 #define ENG_WORLDMAP_MAX_SIZE 4097U /* échantillons par côté */
 
@@ -42,6 +43,8 @@ typedef enum EngMapFeatureKind {
     ENG_MAPF_LAKE,     /* lac : creusé sous le niveau de l'eau */
     ENG_MAPF_RIVER,    /* rivière : lit creusé le long d'une ligne */
     ENG_MAPF_LAVA,     /* coulée de lave le long d'une ligne (sillon peu profond) */
+    ENG_MAPF_FOREST,   /* forêt : arbres d'une essence dans un disque */
+    ENG_MAPF_SCATTER,  /* arbres épars d'une essence partout dans un biome */
     ENG_MAPF_KINDS
 } EngMapFeatureKind;
 
@@ -55,8 +58,26 @@ typedef struct EngMapFeature {
     float c;      /* direction des dunes (radians) */
     uint32_t first_point; /* lignes : premier sommet dans EngWorldMap.points */
     uint32_t point_count;
-    uint8_t kind; /* EngMapFeatureKind */
+    uint8_t kind;  /* EngMapFeatureKind */
+    uint8_t tree;  /* forêt, arbres épars : EngTreeKind */
+    uint8_t biome; /* arbres épars : EngBiome */
 } EngMapFeature;
+
+typedef enum EngTreeKind {
+    ENG_TREE_OAK = 0, /* chêne (plaine) */
+    ENG_TREE_PINE,    /* sapin enneigé (montagne) */
+    ENG_TREE_ACACIA,  /* arbre de savane (désert) */
+    ENG_TREE_KINDS
+} EngTreeKind;
+
+typedef struct EngMapTree {
+    float x; /* monde */
+    float z;
+    float y;      /* sol au pied */
+    float yaw;    /* radians */
+    float scale;  /* hauteur approximative en mètres */
+    uint8_t kind; /* EngTreeKind */
+} EngMapTree;
 
 typedef struct EngMapRegion {
     float x; /* graine de la région : le biome domine autour de ce point */
@@ -116,6 +137,18 @@ void eng_worldmap_weights(const EngWorldMap *map, double x, double z, float out[
 
 /* Lave : 0 à 1, 1 au milieu d'une coulée. */
 float eng_worldmap_lava(const EngWorldMap *map, double x, double z);
+
+/* Places des 12 zones de combat : celles de engine/map_zones.h (noms, PV, dégâts, butin), à la
+ * position donnée par la carte (`zone ...`) quand elle y figure. */
+bool eng_worldmap_zones(const EngWorldMap *map, EngMapZone out[ENG_MAPZONE_COUNT]);
+
+/* Arbres dont le pied est dans le carré [x0 ; x0 + size[ x [z0 ; z0 + size[ (au plus `max`) :
+ * forêts et arbres épars de la carte, sur une grille fixe du monde légèrement décalée (même
+ * résultat quel que soit le découpage en cellules). Jamais sur un chemin, dans l'eau, sur la lave,
+ * dans le volcan, sur une pente raide, ni près du départ ou d'une zone de combat. */
+uint32_t eng_worldmap_trees(const EngWorldMap *map, double x0, double z0, double size,
+                            EngMapTree *out, uint32_t max);
+const char *eng_tree_name(EngTreeKind kind);
 
 /* Aperçu vu de dessus, `size` x `size` pixels RGB (3 octets, ligne 0 = nord) : relief ombré,
  * couleur des biomes, eau, chemins, lave, zones (vert : facile, orange : dur, rouge : boss) et

@@ -252,6 +252,8 @@ typedef enum EngIndexType {
 
 /* Nombre maximal de textures liées à un dessin (emplacements 0 à 4 du fragment shader). */
 #define ENG_MAX_DRAW_TEXTURES 8U
+#define ENG_MAX_TAIL_TEXTURES 3U /* emplacements 9 à 11, après la carte d'ombre */
+#define ENG_TAIL_SLOT 9U
 
 typedef struct EngDrawCmd {
     EngPipelineHandle pipeline;
@@ -290,6 +292,11 @@ typedef struct EngDrawCmd {
      * les deux nuls : emplacement 8 non lié. */
     EngTextureHandle shadow_map;
     EngSamplerHandle shadow_sampler;
+    /* Textures APRÈS la carte d'ombre (carte du monde, 2026-11-21 : terrain à six matières),
+     * emplacements ENG_TAIL_SLOT à ENG_TAIL_SLOT + ENG_MAX_TAIL_TEXTURES - 1, lues avec le
+     * sampler de l'emplacement 0. Sans trou, et seulement avec une carte d'ombre (le shader
+     * déclare alors tous les emplacements précédents). Toutes nulles : rien de lié. */
+    EngTextureHandle tail_textures[ENG_MAX_TAIL_TEXTURES];
     /* Passe d'ombre en ATLAS (M7-09, ombres en cascade) : 0 = toute la carte ; 1 à 4 = le quart
      * k - 1 (gauche-haut, droite-haut, gauche-bas, droite-bas). Ignoré hors passe d'ombre. */
     uint8_t shadow_tile;

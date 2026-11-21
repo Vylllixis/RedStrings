@@ -96,6 +96,17 @@ static int biome_of(const char *word)
     return -1;
 }
 
+static int tree_of(const char *word)
+{
+    static const char *const names[ENG_TREE_KINDS] = {"chene", "sapin", "acacia"};
+    for (int t = 0; t < ENG_TREE_KINDS; t++) {
+        if (strcmp(word, names[t]) == 0) {
+            return t;
+        }
+    }
+    return -1;
+}
+
 static int zone_kind_of(const char *word)
 {
     static const char *const names[ENG_MAPZONE_KINDS] = {"facile", "dur", "boss"};
@@ -271,8 +282,42 @@ static bool parse_region_or_zone(EngWorldMap *m, const Line *l, char *err, size_
     return true;
 }
 
+/* foret essence x z rayon espacement | arbres_epars essence biome espacement */
+static bool parse_trees(EngWorldMap *m, const Line *l, char *err, size_t cap)
+{
+    const bool forest = strcmp(l->tok[0], "foret") == 0;
+    const int tree = l->count > 1U ? tree_of(l->tok[1]) : -1;
+    if (tree < 0) {
+        return fail(err, cap, l->number, "essence inconnue (chene, sapin, acacia)");
+    }
+    float v[4] = {0};
+    EngMapFeature f = {.tree = (uint8_t)tree};
+    if (forest) {
+        if (l->count != 6U || !numbers(l, 2U, 4U, v) || !(v[2] > 0.0F) || !(v[3] >= 3.0F)) {
+            return fail(err, cap, l->number, "« foret essence x z rayon espacement (>= 3 m) »");
+        }
+        f.kind = (uint8_t)ENG_MAPF_FOREST;
+        f.x = v[0];
+        f.z = v[1];
+        f.radius = v[2];
+        f.a = v[3];
+    } else {
+        const int biome = l->count > 2U ? biome_of(l->tok[2]) : -1;
+        if (biome < 0 || l->count != 4U || !number(l, 3U, &v[0]) || !(v[0] >= 3.0F)) {
+            return fail(err, cap, l->number, "« arbres_epars essence biome espacement (>= 3 m) »");
+        }
+        f.kind = (uint8_t)ENG_MAPF_SCATTER;
+        f.biome = (uint8_t)biome;
+        f.a = v[0];
+    }
+    return add_feature(m, f, l->number, err, cap);
+}
+
 static bool parse_one(EngWorldMap *m, const Line *l, char *err, size_t cap)
 {
+    if (strcmp(l->tok[0], "foret") == 0 || strcmp(l->tok[0], "arbres_epars") == 0) {
+        return parse_trees(m, l, err, cap);
+    }
     const char *w = l->tok[0];
     for (size_t i = 0; i < sizeof ROUND_SHAPES / sizeof ROUND_SHAPES[0]; i++) {
         if (strcmp(w, ROUND_SHAPES[i].word) == 0) {
@@ -337,8 +382,8 @@ bool eng_worldmap_parse(EngWorldMap *map, const char *text, size_t length, char 
 
 const char *eng_mapfeature_name(EngMapFeatureKind kind)
 {
-    static const char *const names[ENG_MAPF_KINDS] = {"colline", "montagne", "crete",   "volcan",
-                                                      "plateau", "dunes",    "aplanir", "chemin",
-                                                      "lac",     "riviere",  "lave"};
+    static const char *const names[ENG_MAPF_KINDS] = {
+        "colline", "montagne", "crete",   "volcan", "plateau", "dunes",       "aplanir",
+        "chemin",  "lac",      "riviere", "lave",   "foret",   "arbres_epars"};
     return (unsigned)kind < (unsigned)ENG_MAPF_KINDS ? names[kind] : "?";
 }

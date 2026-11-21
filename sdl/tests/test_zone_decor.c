@@ -152,22 +152,41 @@ UTEST(zone_decor, every_zone_has_a_decor_that_leaves_its_fight_area_clear)
     EXPECT_EQ(fires, 4U);
 }
 
-UTEST(zone_decor, the_wake_up_camp_has_a_tent_a_fire_and_a_free_spawn_point)
+UTEST(zone_decor, the_spawn_castle_has_four_gates_and_a_free_courtyard)
 {
     EngDecorBox b[ENG_DECOR_MAX];
     const uint32_t n = eng_camp_decor(b, ENG_DECOR_MAX);
-    ASSERT_GE(n, 6U);
+    ASSERT_GE(n, 50U);
+    ASSERT_LE(n, ENG_DECOR_MAX);
     EXPECT_TRUE(all_valid(b, n));
-    EXPECT_FALSE(blocked(b, n, 0.0F, 0.0F, 1.5F)); /* le joueur se réveille au centre, libre */
-    bool cloth = false;
+    for (int ix = -10; ix <= 10; ix++) { /* le joueur se réveille au centre de la cour, libre */
+        for (int iz = -10; iz <= 6; iz++) {
+            ASSERT_FALSE(blocked(b, n, (float)ix, (float)iz, 0.0F));
+        }
+    }
+    /* une porte au milieu de chaque côté : on sort dans les quatre directions (rayon 0,5 m) */
+    const float half = ENG_DECOR_CASTLE_HALF;
+    for (int i = 0; i <= 120; i++) {
+        const float t = -half - 4.0F + (0.4F * (float)i);
+        EXPECT_FALSE(blocked(b, n, t, 0.0F, 0.5F));
+        EXPECT_FALSE(blocked(b, n, 0.0F, t, 0.5F));
+    }
+    /* ailleurs, le mur est fermé */
+    EXPECT_TRUE(blocked(b, n, -half, 10.0F, 0.0F));
+    EXPECT_TRUE(blocked(b, n, 10.0F, half, 0.0F));
     bool fire = false;
     for (uint32_t i = 0; i < n; i++) {
-        cloth = cloth || (b[i].color == (uint8_t)ENG_DECOR_CLOTH && b[i].solid);
         fire = fire || b[i].color == (uint8_t)ENG_DECOR_FIRE;
-        EXPECT_LT(hypotf(b[i].x, b[i].z), 8.0F); /* tout tient dans 8 m */
     }
-    EXPECT_TRUE(cloth);
     EXPECT_TRUE(fire);
+    float wall_top = 0.0F; /* remparts bas : on voit la carte depuis la cour */
+    for (uint32_t i = 0; i < n; i++) {
+        if (b[i].solid && b[i].color == (uint8_t)ENG_DECOR_STONE &&
+            (b[i].half[0] < 1.0F || b[i].half[2] < 1.0F)) {
+            wall_top = fmaxf(wall_top, b[i].lift + (2.0F * b[i].half[1]));
+        }
+    }
+    EXPECT_NEAR(wall_top, 2.4F, 1e-4F);
     /* arguments invalides, liste trop courte */
     build();
     EXPECT_EQ(eng_zone_decor(NULL, b, ENG_DECOR_MAX), 0U);

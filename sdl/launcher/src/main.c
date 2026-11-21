@@ -206,6 +206,10 @@ static bool world_ground(void *user, float x, float z, float *out)
 }
 
 /* Point de départ du monde (coordonnées MONDE, m) : au milieu de la cellule (0, 0). */
+/* carte du monde : plan lointain (m) et brouillard (1/m) : toute la carte visible depuis le château
+ */
+#define LAUNCHER_MAP_FAR 6000.0F
+#define LAUNCHER_MAP_FOG 0.00035F
 #define WORLD_SPAWN_X 128.0
 #define WORLD_SPAWN_Z 128.0
 
@@ -213,17 +217,35 @@ static bool world_ground(void *user, float x, float z, float *out)
  * joueur), puis le personnage posé sur le relief. */
 static bool start_world(WorldView *world, PlayMode *play, EngTweaks *tweaks, float sensitivity,
                         bool invert_y, EngRenderer *renderer, const DemoScene *scene, int32_t seed,
-                        const double start[2])
+                        const double start[2], long at_zone)
 {
-    const double spawn_world[3] = {start[0], 0.0, start[1]};
     const float spawn[3] = {(float)start[0], 0.0F, (float)start[1]};
     if (!play_mode_init_world(play, tweaks, sensitivity, invert_y, spawn, world_ground, world)) {
         return false;
     }
     const uint64_t t0 = eng_clock_counter();
     if (!world_view_init(world, seed, renderer, play->world,
-                         scene->has_environment ? &scene->environment : NULL) ||
-        !world_view_prime(world, spawn_world, 1, 60.0)) {
+                         scene->has_environment ? &scene->environment : NULL)) {
+        play_mode_shutdown(play);
+        return false;
+    }
+    double spawn_world[3] = {start[0], 0.0, start[1]};
+    EngMapZone zones[ENG_MAPZONE_COUNT];
+    if (world->map != NULL) { /* carte dessinée : départ au château, ou devant la zone demandée */
+        spawn_world[0] = (double)world->map->spawn[0];
+        spawn_world[2] = (double)world->map->spawn[1];
+        if (at_zone >= 0 && eng_worldmap_zones(world->map, zones)) {
+            /* sur le chemin depuis le château : 20 m avant la zone, 34 m avant un boss */
+            const EngMapZone *z = &zones[at_zone];
+            const double dx = spawn_world[0] - z->x;
+            const double dz = spawn_world[2] - z->z;
+            const double len = hypot(dx, dz) > 1.0 ? hypot(dx, dz) : 1.0;
+            const double back = z->kind == ENG_MAPZONE_BOSS ? 34.0 : 20.0;
+            spawn_world[0] = z->x + (back * dx / len);
+            spawn_world[2] = z->z + (back * dz / len);
+        }
+    }
+    if (!world_view_prime(world, spawn_world, 1, 60.0)) {
         world_view_shutdown(world);
         play_mode_shutdown(play);
         return false;
@@ -296,7 +318,8 @@ static void update_decor(const WorldView *world, PlayMode *play, const float fee
     static bool camp_shown;
     static int32_t shown = -2; /* zone dont le décor est posé ; -1 : aucune ; -2 : rien encore */
     if (!built) {
-        built = eng_mapzones_build(&world->gen.biomes, zones);
+        built = world->map != NULL ? eng_worldmap_zones(world->map, zones)
+                                   : eng_mapzones_build(&world->gen.biomes, zones);
         if (!built) {
             return;
         }
@@ -304,7 +327,13 @@ static void update_decor(const WorldView *world, PlayMode *play, const float fee
     double pw[3];
     eng_origin_to_world(&world->origin, feet, pw);
     const int32_t near = eng_mapzones_nearest(zones, pw[0], pw[2], 300.0);
-    const bool camp = hypotf(feet[0] - play->spawn[0], feet[2] - play->spawn[2]) < 300.0F;
+    /* le château de départ est au départ de la CARTE (pas celui de --at-zone) */
+    float home[3] = {play->spawn[0], 0.0F, play->spawn[2]};
+    if (world->map != NULL) {
+        const double spawn_world[3] = {world->map->spawn[0], 0.0, world->map->spawn[1]};
+        eng_origin_to_local(&world->origin, spawn_world, home);
+    }
+    const bool camp = hypotf(feet[0] - home[0], feet[2] - home[2]) < 300.0F;
     if (complete && near == shown && camp == camp_shown) {
         return;
     }
@@ -314,7 +343,7 @@ static void update_decor(const WorldView *world, PlayMode *play, const float fee
     if (camp) {
         const uint32_t n = eng_camp_decor(boxes, ENG_DECOR_MAX);
         wanted += n;
-        placed += play_mode_add_decor(play, boxes, n, play->spawn[0], play->spawn[2]);
+        placed += play_mode_add_decor(play, boxes, n, home[0], home[2]);
     }
     if (near >= 0) {
         const double centre[3] = {zones[near].x, 0.0, zones[near].z};
@@ -329,7 +358,7 @@ static void update_decor(const WorldView *world, PlayMode *play, const float fee
     complete = placed == wanted;
     if (complete && wanted > 0U) {
         ENG_LOG_INFO("monde : décor posé : %u boîte(s) (zone %d%s)", placed, (int)near,
-                     camp ? ", camp de réveil" : "");
+                     camp ? ", château de départ" : "");
     }
 }
 
@@ -345,7 +374,8 @@ static bool update_zone(const WorldView *world, PlayMode *play, const float feet
         return false;
     }
     if (!built) {
-        built = eng_mapzones_build(&world->gen.biomes, zones);
+        built = world->map != NULL ? eng_worldmap_zones(world->map, zones)
+                                   : eng_mapzones_build(&world->gen.biomes, zones);
         if (!built) {
             return false;
         }
@@ -479,6 +509,7 @@ int main(int argc, char **argv)
     long at_zone = -1;  /* --at-zone N : départ devant la zone N de la grande carte */
     double world_start[2] = {WORLD_SPAWN_X, WORLD_SPAWN_Z};
     int32_t world_seed = 1;
+    bool fog_from_command_line = false; /* --fog-density : la carte du monde ne le remplace pas */
     double world_autopilot = 0.0;
     const char *screenshot_path = NULL;
     long screenshot_frame = 0;
@@ -663,6 +694,7 @@ int main(int argc, char **argv)
                 return 2;
             }
             demo_options.fog_density = value;
+            fog_from_command_line = true;
         } else if (strcmp(argv[i], "--rocks") == 0 && i + 1 < argc) {
             char *end = NULL;
             const unsigned long value = strtoul(argv[++i], &end, 10);
@@ -949,6 +981,9 @@ int main(int argc, char **argv)
             /* deux samplers par modèle GPU : 25 cellules du monde, personnages, armes, et les
              * boîtes des créatures (6) et du décor (8) de la grande carte : 128 ne suffit plus */
             .max_samplers = 256,
+            /* carte du monde : jusqu'à 256 morceaux de vue lointaine, les arbres par cellule */
+            .max_commands = 8192,
+            .max_uniform_bytes = 1024U * 1024U,
             /* personnages skinnés : 41 matrices d'os (~2,8 Kio) par pièce, aussi dans l'ombre ;
              * B8 : sur un terrain, 4 cascades x 5 personnages x 6 pièces ~ 340 Kio */
             .max_shadow_uniform_bytes = 1024U * 1024U};
@@ -1084,7 +1119,7 @@ int main(int argc, char **argv)
                          use_editor ? "avec l'éditeur" : "sans rendu GPU");
         } else if (world_mode ? start_world(&world, &play, &tweaks, config.camera_sensitivity,
                                             config.camera_invert_y, &renderer, &scene, world_seed,
-                                            world_start)
+                                            world_start, at_zone)
                    : demo_options.terrain_path != NULL
                        ? play_mode_init_terrain(&play, &tweaks, config.camera_sensitivity,
                                                 config.camera_invert_y, demo_options.terrain_path)
@@ -1161,6 +1196,12 @@ int main(int argc, char **argv)
     if (world.ready) { /* le monde dessine le sol ; personnages en plus s'ils sont chargés */
         demo_scene_set_model_hook(&scene, world_model_hook, &world_hook);
         scene.world_mode = true;
+        if (world.map != NULL) { /* carte du monde : on voit loin depuis la colline du château */
+            if (!fog_from_command_line) {
+                scene.fog.density = LAUNCHER_MAP_FOG;
+            }
+            camera.far_z = LAUNCHER_MAP_FAR;
+        }
         (void)demo_scene_use_cascades(&scene, &renderer); /* M7-09 */
         platform.debug_draw = false;
     } else if (use_renderer && scene.has_terrain) {
@@ -1392,7 +1433,9 @@ int main(int argc, char **argv)
                     }
                     shadow_radius = (int32_t)flow.options.shadow_quality; /* filtre 0, 1, 2 */
                     /* plan lointain : x 0,5 / 1 / 1,5 du défaut du mode (1 km ; 3 km terrain) */
-                    const float base_far = demo_options.terrain_path != NULL ? 3000.0F : 1000.0F;
+                    const float base_far = world.map != NULL                   ? LAUNCHER_MAP_FAR
+                                           : demo_options.terrain_path != NULL ? 3000.0F
+                                                                               : 1000.0F;
                     camera.far_z = base_far * (0.5F + (0.5F * (float)flow.options.view_distance));
                     static const char *const quality[3] = {"bas", "moyen", "haut"};
                     ENG_LOG_INFO(

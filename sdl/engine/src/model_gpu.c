@@ -636,6 +636,10 @@ uint32_t eng_model_gpu_draw_ex(const EngModelGpu *gpu, EngRenderQueue *queue,
                                gpu->environment.brdf_lut},
             .shadow_map = shadow_map,
             .shadow_sampler = gpu->shadow_sampler,
+            .tail_textures = {opt->tail_textures != NULL ? opt->tail_textures[0] : ENG_TEXTURE_NULL,
+                              opt->tail_textures != NULL ? opt->tail_textures[1] : ENG_TEXTURE_NULL,
+                              opt->tail_textures != NULL ? opt->tail_textures[2]
+                                                         : ENG_TEXTURE_NULL},
         };
         const void *fragment_data = &fragment;
         uint32_t fragment_size = (uint32_t)sizeof fragment;

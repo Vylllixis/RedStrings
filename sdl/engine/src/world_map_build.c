@@ -40,7 +40,8 @@ size_t eng_worldmap_build_bytes(const EngWorldMap *map)
         return 0U;
     }
     const size_t n = (size_t)lroundf(map->side / map->spacing) + 1U;
-    return (n * n * (sizeof(float) + 5U)) + 64U;
+    /* relief, régions (4 octets), lave, et les quatre lignes de bruit de travail ; alignements */
+    return (n * n * (sizeof(float) + 5U)) + (4U * n * sizeof(float)) + 256U;
 }
 
 /* distance du point (x, z) à la ligne de la forme `f` ; `seg`, `t` : segment et position */

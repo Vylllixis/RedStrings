@@ -33,6 +33,8 @@ typedef struct EngTerrainGpu {
     EngModelGpu model;
     EngTextureHandle splat;
     EngTextureHandle layers[ENG_SPLAT_LAYERS];
+    EngTextureHandle extra[2]; /* six matières : sable, lave (eng_terrain_gpu_create_extra) */
+    EngTextureHandle splat2;   /* seconde carte de poids par défaut : 1 x 1, nulle */
     EngSamplerHandle sampler;
     float tile_meters;
     float sharpness;
@@ -52,6 +54,15 @@ bool eng_terrain_gpu_create(EngTerrainGpu *gpu, EngRenderer *renderer, EngArena 
                             EngArena *scratch, const EngTerrain *terrain,
                             const EngTerrainGpuParams *params);
 void eng_terrain_gpu_destroy(EngTerrainGpu *gpu, EngRenderer *renderer);
+/* Six matières (carte du monde) : crée les couches de sable et de lave (recolorées depuis la terre
+ * et la roche générées, `layer_size` de côté) et la seconde carte de poids nulle par défaut.
+ * Appelée par eng_terrain_gpu_create. false : création impossible. */
+bool eng_terrain_gpu_create_extra(EngTerrainGpu *gpu, EngRenderer *renderer, EngArena *scratch,
+                                  uint32_t layer_size);
+/* Les trois textures liées après la carte d'ombre : seconde carte de poids (`splat2`, ou la carte
+ * nulle si `splat2` est nul), sable, lave. */
+void eng_terrain_gpu_tail(const EngTerrainGpu *gpu, EngTextureHandle splat2,
+                          EngTextureHandle out[ENG_MAX_TAIL_TEXTURES]);
 
 /* Remplace l'environnement qui éclaire le terrain (voir eng_model_gpu_set_environment). */
 bool eng_terrain_gpu_set_environment(EngTerrainGpu *gpu, EngRenderer *renderer,

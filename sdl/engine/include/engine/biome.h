@@ -77,6 +77,21 @@ void eng_biome_splat(const float weights[ENG_BIOME_COUNT], const float base[ENG_
  * entre les deux selon `weights`. NULL ou poids nuls : 1. */
 float eng_biome_shade(const float weights[ENG_BIOME_COUNT]);
 
+/* Carte du monde (2026-11-21) : six matières. Indices de `out` : herbe, roche, terre, neige, sable,
+ * lave (les quatre premiers vont dans la splatmap, sable et lave dans la seconde carte de poids du
+ * terrain). Depuis le splat de base (`base`, quatre poids de somme T) :
+ *   plaine  : herbe (la neige et la moitié de la terre deviennent de l'herbe), roche sur les pentes
+ * ; montagne: la neige remplace l'herbe et la terre ; désert : le sable les remplace ; volcan  :
+ * basalte (roche) et un peu de cendre (terre) ; puis `path` [0, 1] change 90 % de l'herbe, de la
+ * neige et du sable en terre battue, et `lava` [0, 1] remplace cette part de tout le reste par de
+ * la lave. La somme T est conservée. */
+#define ENG_TERRAIN_MATERIALS 6
+void eng_biome_splat6(const float weights[ENG_BIOME_COUNT], const float base[ENG_SPLAT_LAYERS],
+                      float path, float lava, float out[ENG_TERRAIN_MATERIALS]);
+/* Quantifie six poids (somme 1) en octets : `a` (herbe, roche, terre, neige) et `b` (sable, lave,
+ * puis 0, 0) ; la somme des six octets vaut exactement 255. */
+void eng_splat6_quantize(const float weights[ENG_TERRAIN_MATERIALS], uint8_t a[4], uint8_t b[4]);
+
 /* Le terrain n'a que quatre couches de texture ; le désert et le volcan en réutilisent deux :
  * `sand` : dans une cellule dont le bord ouest est à `x_min`, le canal de l'herbe est du SABLE (la
  * plaine n'y arrive plus) ; `lava` : le canal de la neige est de la LAVE (la montagne n'y arrive

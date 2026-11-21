@@ -188,6 +188,27 @@ bool eng_worldmap_render(const EngWorldMap *map, uint32_t size, uint8_t *rgb)
             }
         }
     }
+    static EngMapTree trees[16384]; /* aperçu : un point sombre par arbre, par bandes de 512 m */
+    static const uint8_t tree_color[ENG_TREE_KINDS][3] = {
+        {28, 70, 22}, {20, 60, 45}, {95, 110, 40}};
+    const int blocks = (int)ceil(map->side / 512.0);
+    for (int jz = 0; jz < blocks; jz++) {
+        for (int jx = 0; jx < blocks; jx++) {
+            const double bx = -half + (512.0 * jx);
+            const double bz = -half + (512.0 * jz);
+            const uint32_t n = eng_worldmap_trees(map, bx, bz, 512.0, trees, 16384U);
+            for (uint32_t t = 0; t < n; t++) {
+                const int px_x = (int)(((double)trees[t].x + half) / px);
+                const int px_y = (int)(((double)trees[t].z + half) / px);
+                if (px_x >= 0 && px_y >= 0 && px_x < (int)size && px_y < (int)size) {
+                    uint8_t *p = &rgb[(((size_t)px_y * size) + (size_t)px_x) * 3U];
+                    p[0] = tree_color[trees[t].kind][0];
+                    p[1] = tree_color[trees[t].kind][1];
+                    p[2] = tree_color[trees[t].kind][2];
+                }
+            }
+        }
+    }
     static const uint8_t kind_color[ENG_MAPZONE_KINDS][3] = {
         {60, 200, 70}, {245, 150, 30}, {220, 30, 30}};
     const float r = fmaxf(3.0F, (float)size / 220.0F);

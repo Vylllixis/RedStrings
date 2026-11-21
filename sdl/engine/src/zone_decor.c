@@ -27,12 +27,14 @@ static void add(Builder *b, EngDecorColor color, bool solid, float x, float z, f
 /* Le château : murs en 9 segments par côté (le relief passe dessous), une porte au milieu du mur
  * ouest (l'entrée, avec ses deux tours) et une au milieu du mur est (la sortie vers la montagne),
  * tours aux angles, donjon dans l'angle nord-est. */
-static void castle(Builder *b)
+static void castle(Builder *b, bool four_gates)
 {
     const float half = ENG_DECOR_CASTLE_HALF;
     const float gate = ENG_DECOR_GATE_WIDTH;
     const float thick = 0.6F;
-    const float wall_h = 2.5F;                          /* demi-hauteur : murs de 5 m */
+    /* demi-hauteur : murs de 5 m ; château de départ : remparts de 2,4 m, la caméra voit la carte
+     * par-dessus */
+    const float wall_h = four_gates ? 1.2F : 2.5F;
     const float side = ((2.0F * half) - gate) * 0.125F; /* 8 segments + la porte au centre */
     for (int i = 0; i < 9; i++) {
         /* centres le long d'un côté : 4 segments, la porte (i = 4), 4 segments */
@@ -41,8 +43,10 @@ static void castle(Builder *b)
             i < 4 ? (float)i * side
                   : (4.0F * side) + (i > 4 ? gate : 0.0F) + ((float)(i > 4 ? i - 5 : 0) * side);
         const float at = -half + before + (0.5F * len);
-        add(b, ENG_DECOR_STONE, true, at, -half, 0.5F * len, wall_h, thick, 0.0F, 0.0F); /* nord */
-        add(b, ENG_DECOR_STONE, true, at, half, 0.5F * len, wall_h, thick, 0.0F, 0.0F);  /* sud */
+        if (i != 4 || !four_gates) { /* château de départ : portes au nord et au sud aussi */
+            add(b, ENG_DECOR_STONE, true, at, -half, 0.5F * len, wall_h, thick, 0.0F, 0.0F);
+            add(b, ENG_DECOR_STONE, true, at, half, 0.5F * len, wall_h, thick, 0.0F, 0.0F);
+        }
         if (i != 4) { /* ouest et est : les portes restent ouvertes (on entre, on ressort) */
             add(b, ENG_DECOR_STONE, true, -half, at, thick, wall_h, 0.5F * len, 0.0F, 0.0F);
             add(b, ENG_DECOR_STONE, true, half, at, thick, wall_h, 0.5F * len, 0.0F, 0.0F);
@@ -103,7 +107,7 @@ uint32_t eng_zone_decor(const EngMapZone *zone, EngDecorBox *out, uint32_t max)
     if (zone->kind == ENG_MAPZONE_BOSS) {
         switch (zone->biome) {
         case ENG_BIOME_PLAIN:
-            castle(&b);
+            castle(&b, false);
             break;
         case ENG_BIOME_SNOW: /* piliers de glace, autel sombre au centre */
             ring(&b, ENG_DECOR_ICE, 10U, 18.0F, 1.0F, 5.0F, 1.5F);
@@ -152,11 +156,13 @@ uint32_t eng_camp_decor(EngDecorBox *out, uint32_t max)
     if (out == NULL) {
         return 0U;
     }
-    tent(&b, -4.0F, -3.0F);
-    add(&b, ENG_DECOR_CLOTH, false, -1.2F, -2.2F, 0.45F, 0.06F, 1.0F, 0.0F, 0.3F); /* couchage */
-    campfire(&b, 0.5F, -3.5F, 1.0F);
-    add(&b, ENG_DECOR_WOOD, true, -3.0F, 2.5F, 0.5F, 0.5F, 0.5F, 0.0F, 0.0F); /* caisses */
-    add(&b, ENG_DECOR_WOOD, true, -4.1F, 2.8F, 0.4F, 0.4F, 0.4F, 0.0F, 0.0F);
-    add(&b, ENG_DECOR_WOOD, false, -3.4F, 2.6F, 0.35F, 0.35F, 0.35F, 1.0F, 0.5F);
+    /* le château de départ : une porte sur chaque côté (les chemins partent dans toutes les
+     * directions), la cour libre autour du point de départ, un bivouac contre le mur ouest */
+    castle(&b, true);
+    tent(&b, -14.0F, 9.0F);
+    campfire(&b, -9.0F, 6.0F, 1.0F);
+    add(&b, ENG_DECOR_WOOD, true, -15.0F, -10.0F, 0.5F, 0.5F, 0.5F, 0.0F, 0.0F); /* caisses */
+    add(&b, ENG_DECOR_WOOD, true, -16.1F, -9.7F, 0.4F, 0.4F, 0.4F, 0.0F, 0.0F);
+    add(&b, ENG_DECOR_WOOD, false, -15.4F, -9.9F, 0.35F, 0.35F, 0.35F, 1.0F, 0.5F);
     return b.count;
 }

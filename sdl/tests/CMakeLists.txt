@@ -619,40 +619,40 @@ if(OW_PHYSICS AND OW_SHADERS_OK)
   set_tests_properties(launcher.world_combat_shift PROPERTIES
     ENVIRONMENT "SDL_VIDEODRIVER=offscreen"
     FAIL_REGULAR_EXPRESSION "ERROR|non détruite|perdu|TROU|a bougé"
-    PASS_REGULAR_EXPRESSION "camp de réveil.*zone 0 « .*chargée.*zone 1 « .*chargée.*zone 2 « .*chargée")
-  # Décor des zones : devant la zone 2, le château et le camp de réveil sont posés sur le relief.
+    PASS_REGULAR_EXPRESSION "carte dessinée à la main.*château de départ.*zone 2 « Plaine : château du chevalier » chargée")
+  # Décor des zones : devant la zone 2, le château du chevalier (51 boîtes) est posé sur le relief ;
+  # le château de départ, à plus de 300 m, ne l'est pas.
   add_test(NAME launcher.world_decor COMMAND launcher --world 7 --combat --at-zone 2
            --no-audio --frames 20 --env-samples 16 WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR})
   set_tests_properties(launcher.world_decor PROPERTIES
     ENVIRONMENT "SDL_VIDEODRIVER=offscreen"
     FAIL_REGULAR_EXPRESSION "ERROR|WARN  play_decor|non détruite|perdu|TROU"
-    PASS_REGULAR_EXPRESSION "décor posé : 60 boîte\\(s\\) \\(zone 2, camp de réveil\\)")
-  # Couches de sol par biome : devant la zone 0 (plaine) aucune cellule n'a de sable ni de lave ;
-  # devant la zone 7 (désert) toutes ont le sable, pas encore la lave ; devant la zone 11 (volcan)
-  # toutes ont les deux.
+    PASS_REGULAR_EXPRESSION "décor posé : 51 boîte\\(s\\) \\(zone 2\\)")
+  # Carte du monde (sol à six matières, arbres, vue lointaine) : devant la zone 0 (plaine), ni sable
+  # ni lave, des chênes ; devant la zone 7 (désert), du sable et des acacias ; devant la zone 3
+  # (montagne), ni sable ni lave, des sapins chargés, dessinés et solides ; devant la zone 11
+  # (volcan), de la lave, aucun arbre, la vue lointaine dessinée.
   add_test(NAME launcher.world_layers_plain COMMAND launcher --world 7 --combat --at-zone 0
            --no-audio --frames 20 --env-samples 16
            --screenshot ${CMAKE_CURRENT_BINARY_DIR}/world_layers_plain.ppm 15
            WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR})
   set_tests_properties(launcher.world_layers_plain PROPERTIES
-    PASS_REGULAR_EXPRESSION "dominante verte.*couches de biome : 0 cellule\\(s\\) avec sable, 0 avec lave")
+    PASS_REGULAR_EXPRESSION "couches de biome : 0 cellule\\(s\\) avec sable, 0 avec lave.*carte du monde : [1-9][0-9]* arbre")
   # ... et devant la zone 7 (désert) le sol dessiné est du sable (dominante chaude, pas verte).
   add_test(NAME launcher.world_layers_desert COMMAND launcher --world 7 --combat --at-zone 7
            --no-audio --frames 20 --env-samples 16
            --screenshot ${CMAKE_CURRENT_BINARY_DIR}/world_layers_desert.ppm 15
            WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR})
   set_tests_properties(launcher.world_layers_desert PROPERTIES
-    PASS_REGULAR_EXPRESSION "dominante chaude.*couches de biome : [1-9][0-9]* cellule\\(s\\) avec sable")
-  # devant la zone 3 (montagne, x = 1040) : dans les cellules chargées (jusqu'à 1792 m) le canal de
-  # l'herbe est déjà du sable (inutilisé), celui de la neige reste de la neige
+    PASS_REGULAR_EXPRESSION "dominante chaude.*couches de biome : [1-9][0-9]* cellule\\(s\\) avec sable.*carte du monde : [1-9][0-9]* arbre")
   add_test(NAME launcher.world_layers_mountain COMMAND launcher --world 7 --combat --at-zone 3
            --no-audio --frames 20 --env-samples 16 WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR})
   set_tests_properties(launcher.world_layers_mountain PROPERTIES
-    PASS_REGULAR_EXPRESSION "couches de biome : [1-9][0-9]* cellule\\(s\\) avec sable, 0 avec lave")
+    PASS_REGULAR_EXPRESSION "couches de biome : 0 cellule\\(s\\) avec sable, 0 avec lave.*carte du monde : [1-9][0-9]* arbre\\(s\\) chargé\\(s\\), [1-9][0-9]* dessiné\\(s\\), [1-9][0-9]* tronc")
   add_test(NAME launcher.world_layers_volcano COMMAND launcher --world 7 --combat --at-zone 11
            --no-audio --frames 20 --env-samples 16 WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR})
   set_tests_properties(launcher.world_layers_volcano PROPERTIES
-    PASS_REGULAR_EXPRESSION "couches de biome : ([1-9][0-9]*) cellule\\(s\\) avec sable, [1-9][0-9]* avec lave")
+    PASS_REGULAR_EXPRESSION "avec sable, [1-9][0-9]* avec lave.*carte du monde : 0 arbre.*vue lointaine : [1-9][0-9]* morceau")
   foreach(t launcher.world_layers_plain launcher.world_layers_desert launcher.world_layers_mountain
           launcher.world_layers_volcano)
     set_property(TEST ${t} PROPERTY ENVIRONMENT "SDL_VIDEODRIVER=offscreen")

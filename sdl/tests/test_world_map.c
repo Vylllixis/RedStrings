@@ -29,6 +29,11 @@ static const char MAP[] = "# petite carte d'essai\n"
                           "lave 12 300 -380 300 -480\n"
                           "lave 12 -190 150 -110 150\n"
                           "chemin 8 -150 100 -150 200\n"
+                          "foret chene -30 230 80 8\n"
+                          "foret chene -60 30 90 8\n"
+                          "chemin 8 -60 160 0 300\n"
+                          "foret sapin -300 -200 90 8\n"
+                          "arbres_epars acacia desert 30\n"
                           "zone plaine facile 100 0\n"
                           "zone volcan boss 300 -300\n";
 
@@ -52,7 +57,7 @@ UTEST(world_map, it_reads_the_description_and_rejects_mistakes_with_the_line_num
     ASSERT_TRUE(eng_worldmap_parse(&g_map, MAP, strlen(MAP), err, sizeof err));
     EXPECT_EQ(g_map.side, 1024.0F);
     EXPECT_EQ(g_map.region_count, 4U);
-    EXPECT_EQ(g_map.feature_count, 10U);
+    EXPECT_EQ(g_map.feature_count, 15U);
     EXPECT_EQ(g_map.features[2].kind, (uint8_t)ENG_MAPF_MOUNTAIN);
     EXPECT_EQ(g_map.features[6].point_count, 3U);
     EXPECT_TRUE(g_map.zones[ENG_BIOME_VOLCANO * 3 + ENG_MAPZONE_BOSS].used);
@@ -179,4 +184,78 @@ UTEST(world_map, the_preview_shows_water_lava_zones_and_the_spawn)
     free(rgb);
     EXPECT_EQ(eng_worldmap_height(NULL, 0.0, 0.0), 0.0F);
     EXPECT_EQ(eng_worldmap_height(&g_map, NAN, 0.0), 0.0F);
+}
+
+static EngMapTree g_trees[8192];
+static EngMapTree g_parts[8192];
+
+UTEST(world_map, trees_grow_where_drawn_and_do_not_depend_on_the_cell_grid)
+{
+    ASSERT_TRUE(build(&g_map, MAP));
+    const uint32_t n = eng_worldmap_trees(&g_map, -512.0, -512.0, 1024.0, g_trees, 8192U);
+    uint32_t by_kind[ENG_TREE_KINDS] = {0};
+    for (uint32_t i = 0; i < n; i++) {
+        const EngMapTree *t = &g_trees[i];
+        by_kind[t->kind]++;
+        float w[ENG_BIOME_COUNT];
+        float path = 0.0F;
+        eng_worldmap_weights(&g_map, t->x, t->z, w, &path);
+        EXPECT_LE(path, 0.05F);                        /* jamais sur un chemin */
+        EXPECT_LE(w[ENG_BIOME_VOLCANO], 0.25F);        /* ni dans le volcan */
+        EXPECT_GE(t->y, g_map.water + 0.8F);           /* ni dans l'eau */
+        EXPECT_GE(hypotf(t->x, t->z), 70.0F);          /* ni contre le départ */
+        EXPECT_GE(hypotf(t->x - 100.0F, t->z), 32.0F); /* ni dans une zone */
+        EXPECT_NEAR(t->y, eng_worldmap_height(&g_map, t->x, t->z), 1e-3F); /* au sol */
+        EXPECT_GT(t->scale, 4.0F);
+        if (t->kind == ENG_TREE_ACACIA) {
+            EXPECT_GE(w[ENG_BIOME_DESERT], 0.7F); /* les acacias restent dans le désert */
+        }
+    }
+    EXPECT_GT(by_kind[ENG_TREE_OAK], 20U);
+    EXPECT_GT(by_kind[ENG_TREE_PINE], 10U);
+    EXPECT_GT(by_kind[ENG_TREE_ACACIA], 5U);
+    /* les chênes restent dans leur forêt (disque de 80 m autour de (-30, 230)) */
+    for (uint32_t i = 0; i < n; i++) {
+        if (g_trees[i].kind == ENG_TREE_OAK) {
+            EXPECT_TRUE(hypotf(g_trees[i].x + 30.0F, g_trees[i].z - 230.0F) < 80.0F ||
+                        hypotf(g_trees[i].x + 60.0F, g_trees[i].z - 30.0F) < 90.0F);
+        }
+    }
+    /* même placement découpé en quatre carrés de 512 m : les mêmes arbres, dans le même ordre par
+     * carré */
+    uint32_t total = 0;
+    for (int q = 0; q < 4; q++) {
+        total += eng_worldmap_trees(&g_map, -512.0 + (512.0 * (q & 1)), -512.0 + (256.0 * (q & 2)),
+                                    512.0, &g_parts[total], 8192U - total);
+    }
+    EXPECT_EQ(total, n);
+    uint32_t found = 0;
+    for (uint32_t i = 0; i < n; i++) {
+        for (uint32_t k = 0; k < total; k++) {
+            if (g_parts[k].x == g_trees[i].x && g_parts[k].z == g_trees[i].z &&
+                g_parts[k].kind == g_trees[i].kind && g_parts[k].scale == g_trees[i].scale) {
+                found++;
+                break;
+            }
+        }
+    }
+    EXPECT_EQ(found, n);
+    EXPECT_EQ(eng_worldmap_trees(&g_map, 0.0, 0.0, 512.0, g_trees, 3U) <= 3U, true); /* borne */
+    EXPECT_EQ(eng_worldmap_trees(NULL, 0.0, 0.0, 512.0, g_trees, 10U), 0U);
+    char err[160];
+    static const char bad[] = "monde 1024 4\nregion plaine 0 0 300\nforet palmier 0 0 50 8\n";
+    EXPECT_FALSE(eng_worldmap_parse(&g_again, bad, sizeof bad - 1U, err, sizeof err));
+    EXPECT_TRUE(strstr(err, "ligne 3") != NULL);
+}
+
+UTEST(world_map, zones_take_their_place_from_the_map)
+{
+    ASSERT_TRUE(build(&g_map, MAP));
+    EngMapZone zones[ENG_MAPZONE_COUNT];
+    ASSERT_TRUE(eng_worldmap_zones(&g_map, zones));
+    EXPECT_NEAR(zones[0].x, 100.0, 1e-9); /* plaine facile, placée par la carte */
+    EXPECT_NEAR(zones[0].z, 0.0, 1e-9);
+    EXPECT_NEAR(zones[11].x, 300.0, 1e-9);                /* volcan boss */
+    EXPECT_STREQ(zones[11].boss_title, "Dragon de lave"); /* le reste vient de map_zones */
+    EXPECT_FALSE(eng_worldmap_zones(NULL, zones));
 }

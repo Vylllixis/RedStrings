@@ -24,6 +24,12 @@ void eng_terrain_gpu_destroy(EngTerrainGpu *gpu, EngRenderer *renderer)
         (void)eng_renderer_destroy_texture(renderer, gpu->layers[i]);
     }
     (void)eng_renderer_destroy_texture(renderer, gpu->splat);
+    const EngTextureHandle extra[3] = {gpu->extra[0], gpu->extra[1], gpu->splat2};
+    for (int i = 0; i < 3; i++) {
+        if (extra[i].handle.generation != 0) {
+            (void)eng_renderer_destroy_texture(renderer, extra[i]);
+        }
+    }
     (void)eng_renderer_destroy_sampler(renderer, gpu->sampler);
     *gpu = (EngTerrainGpu){0};
 }
@@ -103,6 +109,7 @@ bool eng_terrain_gpu_create(EngTerrainGpu *gpu, EngRenderer *renderer, EngArena 
         }
     }
     eng_arena_reset_to(scratch, mark);
+    ok = ok && eng_terrain_gpu_create_extra(gpu, renderer, scratch, layer_size);
     if (!ok) {
         ENG_LOG_ERROR("terrain GPU : création des textures impossible");
         eng_terrain_gpu_destroy(gpu, renderer);
@@ -135,7 +142,10 @@ uint32_t eng_terrain_gpu_draw(const EngTerrainGpu *gpu, EngRenderQueue *queue,
     glm_mat4_identity(identity);
     const EngTextureHandle textures[5] = {gpu->splat, gpu->layers[0], gpu->layers[1],
                                           gpu->layers[2], gpu->layers[3]};
+    EngTextureHandle tail[ENG_MAX_TAIL_TEXTURES];
+    eng_terrain_gpu_tail(gpu, ENG_TEXTURE_NULL, tail);
     const EngModelDrawOptions options = {.textures = textures,
+                                         .tail_textures = tail,
                                          .sampler = gpu->sampler,
                                          .user = {gpu->tile_meters, gpu->sharpness, 0.0F},
                                          .parts = chunks,

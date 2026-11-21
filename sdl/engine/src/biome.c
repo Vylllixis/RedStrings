@@ -189,3 +189,63 @@ void eng_biome_splat(const float weights[ENG_BIOME_COUNT], const float base[ENG_
         }
     }
 }
+
+static float unit01(float v)
+{
+    return isfinite(v) ? (v < 0.0F ? 0.0F : (v > 1.0F ? 1.0F : v)) : 0.0F;
+}
+
+void eng_biome_splat6(const float weights[ENG_BIOME_COUNT], const float base[ENG_SPLAT_LAYERS],
+                      float path, float lava, float out[ENG_TERRAIN_MATERIALS])
+{
+    const float grass = base[ENG_SPLAT_GRASS];
+    const float rock = base[ENG_SPLAT_ROCK];
+    const float dirt = base[ENG_SPLAT_DIRT];
+    const float snow = base[ENG_SPLAT_SNOW];
+    const float total = grass + rock + dirt + snow;
+    const float rest = total - rock;
+    const float rules[ENG_BIOME_COUNT][ENG_TERRAIN_MATERIALS] = {
+        {grass + snow + (0.5F * dirt), rock, 0.5F * dirt, 0.0F, 0.0F, 0.0F}, /* plaine */
+        {0.0F, rock, 0.0F, rest, 0.0F, 0.0F},                                /* montagne */
+        {0.0F, rock, 0.0F, 0.0F, rest, 0.0F},                                /* désert */
+        {0.0F, rock + (0.8F * rest), 0.2F * rest, 0.0F, 0.0F, 0.0F},         /* volcan */
+    };
+    for (int m = 0; m < ENG_TERRAIN_MATERIALS; m++) {
+        out[m] = 0.0F;
+        for (int k = 0; k < ENG_BIOME_COUNT; k++) {
+            out[m] += weights[k] * rules[k][m];
+        }
+    }
+    const float p = 0.9F * unit01(path); /* chemins : terre battue */
+    const float soft = out[0] + out[3] + out[4];
+    out[2] += p * soft;
+    out[0] *= 1.0F - p;
+    out[3] *= 1.0F - p;
+    out[4] *= 1.0F - p;
+    const float l = unit01(lava);
+    for (int m = 0; m < ENG_TERRAIN_MATERIALS; m++) {
+        out[m] *= 1.0F - l;
+    }
+    out[5] += l * total;
+}
+
+void eng_splat6_quantize(const float weights[ENG_TERRAIN_MATERIALS], uint8_t a[4], uint8_t b[4])
+{
+    uint8_t q[ENG_TERRAIN_MATERIALS];
+    int total = 0;
+    int largest = 0;
+    for (int m = 0; m < ENG_TERRAIN_MATERIALS; m++) {
+        q[m] = (uint8_t)lroundf(unit01(weights[m]) * 255.0F);
+        total += q[m];
+        largest = weights[m] > weights[largest] ? m : largest;
+    }
+    const int fixed = (int)q[largest] + (255 - total); /* l'arrondi va au plus grand poids */
+    q[largest] = (uint8_t)(fixed < 0 ? 0 : (fixed > 255 ? 255 : fixed));
+    for (int c = 0; c < 4; c++) {
+        a[c] = q[c];
+    }
+    b[0] = q[4];
+    b[1] = q[5];
+    b[2] = 0U;
+    b[3] = 0U;
+}

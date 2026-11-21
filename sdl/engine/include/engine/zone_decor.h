@@ -13,7 +13,7 @@
  *   boss du désert      : une arène en ruine : colonnes de grès et pans de mur ;
  *   boss du volcan      : des pics de basalte et des brasiers autour de l'antre ;
  *   zones de farm       : un campement (tentes, feu) ou une palissade (zone dure) ;
- *   camp de réveil      : tente, couchage, feu, caisses. */
+ *   départ              : le château de départ (portes sur les quatre côtés), un bivouac. */
 
 #include <stdbool.h>
 #include <stdint.h>
@@ -48,7 +48,7 @@ typedef struct EngDecorBox {
 
 /* Boîtes du décor de `zone` (au plus `max`, au plus ENG_DECOR_MAX). NULL : 0. */
 uint32_t eng_zone_decor(const EngMapZone *zone, EngDecorBox *out, uint32_t max);
-/* Boîtes du camp de réveil, autour du point de départ. */
+/* Boîtes du château de départ, autour du point de départ (cour libre au centre). */
 uint32_t eng_camp_decor(EngDecorBox *out, uint32_t max);
 
 #endif

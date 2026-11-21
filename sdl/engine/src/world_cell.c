@@ -1,5 +1,7 @@
 #include "engine/world_cell.h"
 
+#include "engine/world_map.h"
+
 #include <math.h>
 #include <string.h>
 
@@ -57,6 +59,9 @@ float eng_world_gen_height(const EngWorldGen *gen, double x, double z)
     if (gen == NULL) {
         return 0.0F;
     }
+    if (gen->map != NULL) { /* carte dessinée à la main */
+        return eng_worldmap_height(gen->map, x, z);
+    }
     float h = 0.0F;
     eng_noise_row_2d(&gen->noise, (float)x, ENG_CELL_SPACING, (float)z, 1U, &h);
     h *= gen->altitude;
@@ -84,15 +89,23 @@ bool eng_cell_generate(const EngWorldGen *gen, EngCellCoord c, EngCellData *out)
     out->height_min = INFINITY;
     out->height_max = -INFINITY;
     for (uint32_t z = 0; z < ENG_CELL_RES; z++) {
-        eng_noise_row_2d(&gen->noise, (float)ox, ENG_CELL_SPACING,
-                         (float)(oz + (double)z * ENG_CELL_SPACING), ENG_CELL_RES, row);
+        if (gen->map == NULL) {
+            eng_noise_row_2d(&gen->noise, (float)ox, ENG_CELL_SPACING,
+                             (float)(oz + (double)z * ENG_CELL_SPACING), ENG_CELL_RES, row);
+        }
         for (uint32_t x = 0; x < ENG_CELL_RES; x++) {
-            float h = row[x] * gen->altitude;
-            if (gen->biomes.enabled) { /* grande carte : relief à l'échelle du biome */
-                float w[ENG_BIOME_COUNT];
-                eng_biome_weights(&gen->biomes, ox + ((double)x * ENG_CELL_SPACING),
-                                  oz + ((double)z * ENG_CELL_SPACING), w);
-                h *= eng_biome_altitude_scale(w);
+            const double wx = ox + ((double)x * ENG_CELL_SPACING);
+            const double wz = oz + ((double)z * ENG_CELL_SPACING);
+            float h = 0.0F;
+            if (gen->map != NULL) { /* carte dessinée à la main */
+                h = eng_worldmap_height(gen->map, wx, wz);
+            } else {
+                h = row[x] * gen->altitude;
+                if (gen->biomes.enabled) { /* grande carte : relief à l'échelle du biome */
+                    float w[ENG_BIOME_COUNT];
+                    eng_biome_weights(&gen->biomes, wx, wz, w);
+                    h *= eng_biome_altitude_scale(w);
+                }
             }
             out->heights[(size_t)z * ENG_CELL_RES + x] = h;
             out->height_min = h < out->height_min ? h : out->height_min;
@@ -100,7 +113,7 @@ bool eng_cell_generate(const EngWorldGen *gen, EngCellCoord c, EngCellData *out)
         }
     }
     uint32_t n = 0;
-    const uint32_t total = gen->rocks_per_cell + gen->trees_per_cell;
+    const uint32_t total = gen->map != NULL ? 0U : gen->rocks_per_cell + gen->trees_per_cell;
     for (uint32_t i = 0; i < total; i++) {
         const uint64_t h = cell_key(gen, c, i);
         EngCellObject *o = &out->objects[n++];
@@ -119,7 +132,8 @@ bool eng_cell_generate(const EngWorldGen *gen, EngCellCoord c, EngCellData *out)
             }
         }
     }
-    if (gen->camp_every > 0U && (cell_key(gen, c, 999U) % gen->camp_every) == 0U) {
+    if (gen->map == NULL && gen->camp_every > 0U &&
+        (cell_key(gen, c, 999U) % gen->camp_every) == 0U) {
         EngCellObject *o = &out->objects[n++];
         o->kind = ENG_CELL_CAMP;
         o->pos[0] = 128.0F;

@@ -245,3 +245,43 @@ UTEST(biome, lava_rivers_cover_a_small_part_of_the_ground_in_thin_bands)
     EXPECT_EQ(eng_biome_lava_river(NAN, 0.0), 0.0F);
     EXPECT_EQ(eng_biome_lava_river(0.0, INFINITY), 0.0F);
 }
+
+/* Carte du monde : six matières ; somme conservée ; chemins en terre ; lave par-dessus tout. */
+UTEST(biome, six_materials_follow_the_biome_the_paths_and_the_lava)
+{
+    const float base[4] = {0.5F, 0.2F, 0.2F, 0.1F};
+    float out[ENG_TERRAIN_MATERIALS];
+    eng_biome_splat6((float[4]){1, 0, 0, 0}, base, 0.0F, 0.0F, out);
+    EXPECT_NEAR(out[0], 0.7F, 1e-6F); /* herbe + neige + la moitié de la terre */
+    EXPECT_NEAR(out[2], 0.1F, 1e-6F);
+    EXPECT_NEAR(out[3] + out[4] + out[5], 0.0F, 1e-6F);
+    eng_biome_splat6((float[4]){0, 1, 0, 0}, base, 0.0F, 0.0F, out);
+    EXPECT_NEAR(out[3], 0.8F, 1e-6F);
+    EXPECT_NEAR(out[1], 0.2F, 1e-6F);
+    eng_biome_splat6((float[4]){0, 0, 1, 0}, base, 0.0F, 0.0F, out);
+    EXPECT_NEAR(out[4], 0.8F, 1e-6F); /* sable */
+    EXPECT_NEAR(out[0] + out[2] + out[3], 0.0F, 1e-6F);
+    eng_biome_splat6((float[4]){0, 0, 0, 1}, base, 0.0F, 0.0F, out);
+    EXPECT_NEAR(out[1], 0.2F + 0.64F, 1e-6F);
+    EXPECT_NEAR(out[5], 0.0F, 1e-6F);
+    eng_biome_splat6((float[4]){0, 0, 1, 0}, base, 1.0F, 0.0F, out); /* chemin dans le désert */
+    EXPECT_NEAR(out[2], 0.72F, 1e-5F);
+    EXPECT_NEAR(out[4], 0.08F, 1e-5F);
+    eng_biome_splat6((float[4]){0, 0, 0, 1}, base, 0.0F, 1.0F, out); /* coulée */
+    EXPECT_NEAR(out[5], 1.0F, 1e-6F);
+    EXPECT_NEAR(out[1], 0.0F, 1e-6F);
+    eng_biome_splat6((float[4]){0.25F, 0.25F, 0.25F, 0.25F}, base, 0.5F, 0.5F, out);
+    float sum = 0.0F;
+    for (int m = 0; m < ENG_TERRAIN_MATERIALS; m++) {
+        sum += out[m];
+    }
+    EXPECT_NEAR(sum, 1.0F, 1e-5F);
+    uint8_t a[4];
+    uint8_t b[4];
+    eng_splat6_quantize(out, a, b);
+    EXPECT_EQ(a[0] + a[1] + a[2] + a[3] + b[0] + b[1], 255);
+    EXPECT_EQ(b[2] + b[3], 0);
+    eng_splat6_quantize((float[6]){0, 0, 0, 0, 0.5F, 0.5F}, a, b);
+    EXPECT_EQ(b[0] + b[1], 255);
+    EXPECT_EQ(a[0] + a[1] + a[2] + a[3], 0);
+}

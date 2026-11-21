@@ -145,6 +145,9 @@ typedef struct EngModelDrawOptions {
     /* Cinq handles qui REMPLACENT, pour toutes les parties, les cinq textures du matériau
      * (emplacements 0 à 4 du fragment shader) ; NULL : celles des matériaux. */
     const EngTextureHandle *textures;
+    /* ENG_MAX_TAIL_TEXTURES handles liés après la carte d'ombre (emplacements 9 à 11 : terrain à
+     * six matières) ; NULL : aucun. Exige une carte d'ombre (`shadow`). */
+    const EngTextureHandle *tail_textures;
     EngSamplerHandle sampler; /* sampler des emplacements 0 à 7 ; nul : celui du modèle */
     /* Trois valeurs libres pour le fragment shader (environment.yzw du cbuffer : le terrain y met
      * la taille d'une répétition de texture et la netteté du triplanaire). */

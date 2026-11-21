@@ -61,6 +61,10 @@ typedef struct EngWorldGen {
     uint32_t trees_per_cell;
     uint32_t camp_every; /* un camp toutes les `camp_every` cellules environ (0 : aucun) */
     EngBiomeMap biomes; /* grande carte : relief et arbres selon le biome ; désactivée par défaut */
+    /* Carte du monde dessinée à la main (engine/world_map.h, construite) : si non NULL, le relief
+     * vient de la carte et les cellules n'ont ni rochers, ni arbres, ni camps procéduraux (les
+     * arbres viennent de la carte). Lue en parallèle par les tâches : ne pas la modifier. */
+    const struct EngWorldMap *map;
 } EngWorldGen;
 
 EngWorldGen eng_world_gen_default(int32_t seed);

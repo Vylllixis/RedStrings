@@ -74,6 +74,21 @@ lave 12 1480 -1220 1600 -1080 1680 -980
 lave 12 1220 -1470 1100 -1600 1000 -1700
 lave 16 1455 -1350 1424 -1276 1350 -1245 1276 -1276 1245 -1350 1276 -1424 1350 -1455 1424 -1424 1455 -1350
 
+# ── Arbres : forêts de chênes dans la plaine, sapins enneigés en montagne, acacias épars dans le
+#    désert, aucun dans le volcan. foret essence x z rayon espacement ──
+foret chene -650 -150 220 9
+foret chene 560 660 250 9
+foret chene -250 900 200 10
+foret chene 1350 1200 300 10
+foret chene 300 -650 170 9
+foret chene -1150 300 170 10
+foret sapin -800 -900 250 8
+foret sapin -1350 -700 260 8
+foret sapin -650 -1450 220 8
+foret sapin -1500 -1500 200 9
+foret sapin -1150 -1700 200 9
+arbres_epars acacia desert 45
+
 # ── Chemins (8 m) depuis le château ──
 chemin 8 0 0 -200 -120 -450 -330 -700 -560 -850 -700 -1050 -950
 # lacets jusqu'au sommet du seigneur du givre

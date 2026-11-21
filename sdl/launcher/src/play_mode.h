@@ -35,7 +35,7 @@
 #define PLAY_GROUND_TOP (-0.5F) /* dessus du sol de la démonstration (demo_scene.c) */
 #define PLAY_PIVOT_HEIGHT 1.5F  /* m au-dessus des pieds : le haut du dos */
 #define PLAY_ARENA_PIECES 6U
-#define PLAY_DECOR_MAX (ENG_DECOR_MAX + 16U) /* décor d'une zone + camp de réveil */
+#define PLAY_DECOR_MAX (2U * ENG_DECOR_MAX) /* décor d'une zone + château de départ */
 #define PLAY_WALL_SEGMENTS 48U /* M6-09 : segments des murs de l'arène du boss (terrain) */
 
 typedef struct PlayMode {

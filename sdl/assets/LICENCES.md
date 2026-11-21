@@ -44,3 +44,13 @@ puis les réduit avec `tools/scripts/gltf_extract.py`).
   `tools/scripts/kaykit_nature_prepare.sh` (qui vérifie la mention CC0).
 - Licence : Creative Commons Zero (domaine public).
 - Utilisation : arbres et rochers du placement procédural (`--placement`, B8).
+
+## Arbres de la carte du monde (CC0)
+
+- Fichiers : `props/nature/oak`, `acacia`, `pine_snow` et leurs versions simplifiées `*_lod`
+  (`.gltf` + `.bin`), palette commune `props/nature/trees_palette.png`.
+- Fabriqués par `tools/scripts/arbres_make.py` (déterministe) : le chêne et l'acacia sont des
+  modèles originaux de ce projet (CC0) ; le sapin enneigé reprend la géométrie de
+  `tree_single_B` (KayKit Medieval Hexagon Pack 1.0, CC0, Kay Lousberg), recolorée (neige sur le
+  dessus des branches).
+- Utilisation : forêts et arbres épars de la carte du monde (`assets/world/carte.txt`).

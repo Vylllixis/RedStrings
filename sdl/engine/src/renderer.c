@@ -1385,6 +1385,7 @@ uint32_t eng_renderer_execute(EngRenderer *r, const EngRenderQueue *queue,
     const Sampler *bound_sampler = NULL;
     const Texture *bound_shadow = NULL;
     const Sampler *bound_shadow_sampler = NULL;
+    const Texture *bound_tail[ENG_MAX_TAIL_TEXTURES] = {NULL};
 
     for (uint32_t i = 0; i < queue->count; i++) {
         const EngDrawCmd *cmd = &queue->commands[i];
@@ -1453,8 +1454,23 @@ uint32_t eng_renderer_execute(EngRenderer *r, const EngRenderQueue *queue,
         const bool shadow_ok = has_shadow == has_shadow_sampler &&
                                (!has_shadow || (shadow != NULL && shadow_sampler != NULL &&
                                                 texture_count == ENG_SHADOW_SLOT));
+        /* textures après l'ombre : sans trou, avec une carte d'ombre et le sampler principal */
+        const Texture *tail[ENG_MAX_TAIL_TEXTURES] = {NULL};
+        uint32_t tail_count = 0;
+        bool tail_ok = true;
+        for (uint32_t t = 0; t < ENG_MAX_TAIL_TEXTURES; t++) {
+            const EngTextureHandle h = cmd->tail_textures[t];
+            if (h.handle.generation == 0) {
+                continue;
+            }
+            tail[t] = (const Texture *)eng_pool_get(&r->textures, h.handle);
+            tail_ok =
+                tail_ok && tail[t] != NULL && tail_count == t && has_shadow && sampler != NULL;
+            tail_count = t + 1U;
+        }
         if (pipeline == NULL || vertex == NULL || (indexed && index == NULL) || cmd->count == 0 ||
-            !instances_ok || !uniforms_ok || !fragment_uniforms_ok || !textures_ok || !shadow_ok) {
+            !instances_ok || !uniforms_ok || !fragment_uniforms_ok || !textures_ok || !shadow_ok ||
+            !tail_ok) {
             r->stats.rejected_commands++;
             if (!r->warned_rejected) {
                 r->warned_rejected = true;
@@ -1475,6 +1491,9 @@ uint32_t eng_renderer_execute(EngRenderer *r, const EngRenderQueue *queue,
             bound_sampler = NULL;
             bound_shadow = NULL;
             bound_shadow_sampler = NULL;
+            for (uint32_t t = 0; t < ENG_MAX_TAIL_TEXTURES; t++) {
+                bound_tail[t] = NULL;
+            }
             r->stats.pipeline_binds++;
         }
         if (vertex != bound_vertex) {
@@ -1512,6 +1531,22 @@ uint32_t eng_renderer_execute(EngRenderer *r, const EngRenderQueue *queue,
             bound_shadow = shadow;
             bound_shadow_sampler = shadow_sampler;
             r->stats.sampler_binds++;
+        }
+        if (tail_count > 0U) {
+            bool same = true;
+            for (uint32_t t = 0; t < tail_count; t++) {
+                same = same && tail[t] == bound_tail[t];
+            }
+            if (!same || sampler != bound_sampler) {
+                SDL_GPUTextureSamplerBinding bindings[ENG_MAX_TAIL_TEXTURES];
+                for (uint32_t t = 0; t < tail_count; t++) {
+                    bindings[t] = (SDL_GPUTextureSamplerBinding){.texture = tail[t]->gpu,
+                                                                 .sampler = sampler->gpu};
+                    bound_tail[t] = tail[t];
+                }
+                SDL_BindGPUFragmentSamplers(pass, ENG_TAIL_SLOT, bindings, tail_count);
+                r->stats.sampler_binds++;
+            }
         }
         if (has_uniforms) {
             SDL_PushGPUVertexUniformData(commands, 0, queue->uniforms + cmd->uniform_offset,

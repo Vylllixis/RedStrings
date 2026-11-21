@@ -92,6 +92,21 @@ int main(int argc, char **argv)
            "%.1f m ; construite en %.0f ms -> %s\n",
            (double)g_map.side, g_map.size, g_map.size, g_map.feature_count, g_map.region_count,
            (double)g_map.height_min, (double)g_map.height_max, build_ms, argv[2]);
+    static EngMapTree trees[16384];
+    uint32_t by_kind[ENG_TREE_KINDS] = {0};
+    const int blocks = (int)ceil(g_map.side / 256.0);
+    for (int jz = 0; jz < blocks; jz++) {
+        for (int jx = 0; jx < blocks; jx++) {
+            const double bx = (-0.5 * g_map.side) + (256.0 * jx);
+            const double bz = (-0.5 * g_map.side) + (256.0 * jz);
+            const uint32_t n = eng_worldmap_trees(&g_map, bx, bz, 256.0, trees, 16384U);
+            for (uint32_t t = 0; t < n; t++) {
+                by_kind[trees[t].kind]++;
+            }
+        }
+    }
+    printf("  arbres : %u chênes, %u sapins enneigés, %u acacias\n", by_kind[ENG_TREE_OAK],
+           by_kind[ENG_TREE_PINE], by_kind[ENG_TREE_ACACIA]);
     for (uint32_t k = 0; k < g_map.feature_count; k++) { /* pente la plus forte de chaque chemin */
         const EngMapFeature *f = &g_map.features[k];
         if (f->kind != (uint8_t)ENG_MAPF_PATH) {
