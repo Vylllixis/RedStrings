@@ -2,6 +2,11 @@ add_executable(assetc src/assetc.c)
 target_link_libraries(assetc PRIVATE engine)
 target_link_libraries(assetc PRIVATE project_options)
 
+# Carte du monde (2026-11-21) : aperçu vu de dessus de assets/world/carte.txt.
+add_executable(carte src/carte.c)
+target_link_libraries(carte PRIVATE engine)
+target_link_libraries(carte PRIVATE project_options)
+
 # Assets cuisinés du jeu (M2-04) : bin/assets/cooked/, recuits seulement si une source ou assetc change.
 # Les sources restent dans assets/ ; le moteur lira les .mesh / .tex cuits (gestionnaire d'assets, M2-05).
 include(${CMAKE_SOURCE_DIR}/cmake/Assets.cmake)

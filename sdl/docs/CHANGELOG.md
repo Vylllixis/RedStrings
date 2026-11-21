@@ -66,6 +66,10 @@ livraisons ; les tags sont posés par Théo après ses tests.
   montagne enneigée, désert, volcan) : relief et matières par biome, frontières fondues.
 - Grande carte : 12 zones d'ennemis (farm facile, farm dur, boss dans chaque biome), difficulté
   croissante, camp de réveil sans ennemis ; `--at-zone N` pour commencer devant une zone.
+- Carte du monde dessinée à la main (`assets/world/carte.txt`, `engine/world_map`, outil `carte`) :
+  4 km × 4 km, plaine au centre et château de départ sur sa colline, montagne au nord-ouest, désert
+  au sud-ouest, volcan au nord-est, rivière, lacs, chemins, coulées de lave ; aperçu vu de dessus.
+  Pas encore branchée dans le jeu.
 - Grande carte : décor des zones en boîtes posées sur le relief (`engine/zone_decor`) : château
   du chevalier (murs, tours, deux portes, donjon), piliers de glace, ruines du désert, pics et
   brasiers du volcan, campements, camp de réveil ; solides pour le joueur et les ennemis.
