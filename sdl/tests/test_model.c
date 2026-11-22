@@ -1759,3 +1759,101 @@ UTEST(eng_model, blender_style_metadata_and_optional_extensions_are_accepted)
     eng_model_free(&m);
     fixture_close(&f);
 }
+
+/* ── Matières découpées (2026-11-22 : le feuillage des arbres réalistes) ── */
+
+UTEST(eng_model, cut_out_and_double_sided_materials_are_read)
+{
+    Fixture f;
+    ASSERT_TRUE(fixture_open(&f));
+    EngModel m;
+    const Spec mask = {.material =
+                           "{\"alphaMode\":\"MASK\",\"alphaCutoff\":0.4,\"doubleSided\":true}"};
+    ASSERT_TRUE(load_spec(&f, &mask, &m));
+    EXPECT_NEAR(m.materials[1].alpha_cutoff, 0.4F, EPS);
+    EXPECT_TRUE(m.materials[1].double_sided);
+    EXPECT_NEAR(m.materials[0].alpha_cutoff, 0.0F, EPS); /* le matériau par défaut : opaque */
+    EXPECT_FALSE(m.materials[0].double_sided);
+    eng_model_free(&m);
+
+    /* MASK sans seuil : 0,5 (la valeur par défaut de glTF), une seule face */
+    const Spec standard = {.material = "{\"alphaMode\":\"MASK\"}"};
+    ASSERT_TRUE(load_spec(&f, &standard, &m));
+    EXPECT_NEAR(m.materials[1].alpha_cutoff, 0.5F, EPS);
+    EXPECT_FALSE(m.materials[1].double_sided);
+    eng_model_free(&m);
+
+    /* opaque ou BLEND : pas de découpe, même si le fichier donne un seuil */
+    const Spec blend = {.material = "{\"alphaMode\":\"BLEND\",\"alphaCutoff\":0.7}"};
+    ASSERT_TRUE(load_spec(&f, &blend, &m));
+    EXPECT_NEAR(m.materials[1].alpha_cutoff, 0.0F, EPS);
+    eng_model_free(&m);
+    const Spec opaque = {.material = "{\"alphaCutoff\":0.7,\"doubleSided\":false}"};
+    ASSERT_TRUE(load_spec(&f, &opaque, &m));
+    EXPECT_NEAR(m.materials[1].alpha_cutoff, 0.0F, EPS);
+    EXPECT_FALSE(m.materials[1].double_sided);
+    eng_model_free(&m);
+
+    /* un seuil hors de ]0, 1] est ramené dans le domaine : la matière reste découpée */
+    const Spec high = {.material = "{\"alphaMode\":\"MASK\",\"alphaCutoff\":3.0}"};
+    ASSERT_TRUE(load_spec(&f, &high, &m));
+    EXPECT_NEAR(m.materials[1].alpha_cutoff, 1.0F, EPS);
+    eng_model_free(&m);
+    const Spec zero = {.material = "{\"alphaMode\":\"MASK\",\"alphaCutoff\":0}"};
+    ASSERT_TRUE(load_spec(&f, &zero, &m));
+    EXPECT_NEAR(m.materials[1].alpha_cutoff, 0.5F, EPS);
+    eng_model_free(&m);
+    fixture_close(&f);
+}
+
+UTEST(eng_model_gpu, draw_sends_the_cutoff_and_the_two_faces_of_the_material)
+{
+    EngModelPart part = {.first_index = 0, .index_count = 3, .material = 0};
+    EngModelGpuMaterial material = {
+        .base_color = {1, 1, 1, 1}, .alpha_cutoff = 0.4F, .double_sided = true};
+    EngModelGpu gpu = {
+        .parts = &part, .part_count = 1, .materials = &material, .material_count = 1};
+    mat4 identity;
+    glm_mat4_identity(identity);
+    DrawQueue d;
+    init_draw_queue(&d, 2);
+    ASSERT_EQ(eng_model_gpu_draw(&gpu, &d.queue, (EngPipelineHandle){0}, identity, identity, NULL),
+              (uint32_t)1);
+    LightCopy u;
+    memcpy(&u, &d.uniforms[d.queue.commands[0].fragment_uniform_offset], sizeof u);
+    EXPECT_NEAR(u.sun_direction[3], 0.4F,
+                EPS); /* w libres du bloc d'éclairage : lus par tree.frag */
+    EXPECT_NEAR(u.sun_radiance[3], 1.0F, EPS);
+    material.alpha_cutoff = 0.0F;
+    material.double_sided = false;
+    init_draw_queue(&d, 2);
+    ASSERT_EQ(eng_model_gpu_draw(&gpu, &d.queue, (EngPipelineHandle){0}, identity, identity, NULL),
+              (uint32_t)1);
+    memcpy(&u, &d.uniforms[d.queue.commands[0].fragment_uniform_offset], sizeof u);
+    EXPECT_NEAR(u.sun_direction[3], 0.0F, EPS);
+    EXPECT_NEAR(u.sun_radiance[3], 0.0F, EPS);
+}
+
+UTEST(eng_model, a_tangent_w_between_zero_and_one_keeps_its_size_and_its_sign)
+{
+    Fixture f;
+    ASSERT_TRUE(fixture_open(&f));
+    EngModel m;
+    /* les arbres de treebake : |w| = part du ciel vue par le sommet, signe = celui de la
+     * bitangente ; tout autre module (0, plus de 1) redevient 1 */
+    const float tangents[12] = {1, 0, 0, 0.25F, 0, 1, 0, -0.5F, 0, 0, 1, 3};
+    const Spec s = {.tangent_values = tangents};
+    ASSERT_TRUE(load_spec(&f, &s, &m));
+    EXPECT_VEC4(m.vertices[0].tangent, 1.0F, 0.0F, 0.0F, 0.25F);
+    EXPECT_VEC4(m.vertices[1].tangent, 0.0F, 1.0F, 0.0F, -0.5F);
+    EXPECT_VEC4(m.vertices[2].tangent, 0.0F, 0.0F, 1.0F, 1.0F);
+    eng_model_free(&m);
+    const float edge[12] = {1, 0, 0, 0, 0, 1, 0, -7, 0, 0, 1, -1};
+    const Spec t = {.tangent_values = edge};
+    ASSERT_TRUE(load_spec(&f, &t, &m));
+    EXPECT_NEAR(m.vertices[0].tangent[3], 1.0F, EPS);  /* w nul : 1 */
+    EXPECT_NEAR(m.vertices[1].tangent[3], -1.0F, EPS); /* module trop grand : 1, signe gardé */
+    EXPECT_NEAR(m.vertices[2].tangent[3], -1.0F, EPS);
+    eng_model_free(&m);
+    fixture_close(&f);
+}
