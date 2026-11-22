@@ -34,6 +34,36 @@ ow_add_test(boot_screen test_boot_screen.c)
 ow_add_test(tree_bake test_tree_bake.c)
 ow_add_test(tree_bake_raster test_tree_bake_raster.c)
 ow_add_test(tree_bake_simplify test_tree_bake_simplify.c)
+# L'outil treebake de bout en bout, sur le petit chêne du dépôt (436 triangles, une seule matière) :
+# une fois tout en cartes (avec une forte absorption : ce petit arbre a peu de feuillage, et l'on
+# veut voir son ombre sur lui-même), une fois tout en maillage ; puis le lecteur glTF du moteur
+# relit les deux résultats et y retrouve les trois niveaux de détail (engine.tree_bake_output).
+set(ow_treebake_out ${CMAKE_CURRENT_BINARY_DIR}/treebake-out)
+file(MAKE_DIRECTORY ${ow_treebake_out})
+add_test(NAME tools.treebake_cards
+         COMMAND treebake ${CMAKE_SOURCE_DIR}/assets/props/nature/oak.gltf ${ow_treebake_out} cartes
+                 --height 5 --atlas 256 --far-atlas 128 --clusters 12 --bouquets 4 --absorption 8)
+set_tests_properties(tools.treebake_cards PROPERTIES FIXTURES_SETUP treebake_out
+  PASS_REGULAR_EXPRESSION "cartes : 5.00 m de haut . 436 triangles dans la source -> 72 de près, 48 à mi-distance, 8 de loin")
+add_test(NAME tools.treebake_mesh
+         COMMAND treebake ${CMAKE_SOURCE_DIR}/assets/props/nature/oak.gltf ${ow_treebake_out} maille
+                 --trunk palette --height 5 --far-atlas 128 --trunk-tris 200 --trunk-lod 80)
+set_tests_properties(tools.treebake_mesh PROPERTIES FIXTURES_SETUP treebake_out
+  PASS_REGULAR_EXPRESSION "tronc bark0 .trees_palette, [0-9.]+ m².* : 436 triangles -> [0-9]+ de près, [0-9]+ à mi-distance")
+add_test(NAME tools.treebake_usage COMMAND treebake)
+set_tests_properties(tools.treebake_usage PROPERTIES PASS_REGULAR_EXPRESSION "usage : treebake")
+add_test(NAME tools.treebake_bad_option
+         COMMAND treebake ${CMAKE_SOURCE_DIR}/assets/props/nature/oak.gltf ${ow_treebake_out} x
+                 --clusters 0)
+set_tests_properties(tools.treebake_bad_option PROPERTIES
+  PASS_REGULAR_EXPRESSION "option « --clusters 0 » invalide")
+add_test(NAME tools.treebake_missing_source
+         COMMAND treebake ${ow_treebake_out}/absent.gltf ${ow_treebake_out} x)
+set_tests_properties(tools.treebake_missing_source PROPERTIES
+  PASS_REGULAR_EXPRESSION "lecture de .*absent.gltf impossible")
+ow_add_test(tree_bake_output test_tree_bake_output.c)
+target_compile_definitions(test_tree_bake_output PRIVATE OW_TREEBAKE_OUT="${ow_treebake_out}")
+set_tests_properties(engine.tree_bake_output PROPERTIES FIXTURES_REQUIRED treebake_out)
 ow_add_test(zone_decor test_zone_decor.c)
 ow_add_test(world_map test_world_map.c)
 target_compile_definitions(test_world_map PRIVATE

@@ -7,6 +7,22 @@ add_executable(carte src/carte.c)
 target_link_libraries(carte PRIVATE engine)
 target_link_libraries(carte PRIVATE project_options)
 
+# Arbres réalistes (2026-11-22) : conversion d'un arbre scanné (des millions de triangles) en arbre
+# de jeu (engine/tree_bake.h, docs/arbres-realistes.md). L'écriture d'images (stb_image_write) est du
+# code tiers : compilée à part, sans project_options (pas de -Werror).
+add_library(treebake_third_party OBJECT src/treebake_third_party.c)
+target_link_libraries(treebake_third_party PRIVATE stb_headers)
+if(MSVC)
+  target_compile_definitions(treebake_third_party PRIVATE _CRT_SECURE_NO_WARNINGS)
+  target_compile_options(treebake_third_party PRIVATE /W0)
+endif()
+add_executable(treebake src/treebake.c src/treebake_source.c src/treebake_trunk.c
+               src/treebake_foliage.c src/treebake_cards.c src/treebake_far.c src/treebake_atlas.c
+               src/treebake_write.c
+               $<TARGET_OBJECTS:treebake_third_party>)
+target_link_libraries(treebake PRIVATE engine)
+target_link_libraries(treebake PRIVATE project_options)
+
 # Assets cuisinés du jeu (M2-04) : bin/assets/cooked/, recuits seulement si une source ou assetc change.
 # Les sources restent dans assets/ ; le moteur lira les .mesh / .tex cuits (gestionnaire d'assets, M2-05).
 include(${CMAKE_SOURCE_DIR}/cmake/Assets.cmake)
