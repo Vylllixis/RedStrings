@@ -45,6 +45,20 @@
 
 #define ENG_TRIGGER_THRESHOLD 0.5f
 
+/* Codes des touches de menu (ENG_MENU_KEY_* de input_state.h) : valeurs de SDL_Scancode et de
+ * SDL_GamepadButton, vérifiées à la compilation dans input_defaults.c. */
+#define ENG_KEY_RETURN 40
+#define ENG_KEY_ESCAPE 41
+#define ENG_KEY_RIGHT 79
+#define ENG_KEY_LEFT 80
+#define ENG_KEY_DOWN 81
+#define ENG_KEY_UP 82
+#define ENG_KEY_KP_ENTER 88
+#define ENG_PAD_DPAD_UP 11
+#define ENG_PAD_DPAD_DOWN 12
+#define ENG_PAD_DPAD_LEFT 13
+#define ENG_PAD_DPAD_RIGHT 14
+
 typedef enum EngBindKind {
     ENG_BIND_NONE,
     ENG_BIND_KEY,          /* code = SDL_Scancode (position PHYSIQUE : ZQSD d'un AZERTY = WASD) */
@@ -91,6 +105,8 @@ typedef struct EngInput {
     uint32_t held;
     uint32_t pressed_latch;
     uint32_t released_latch;
+    uint32_t menu_held;  /* touches de menu enfoncées (ENG_MENU_KEY_*) */
+    uint32_t menu_latch; /* ... pressées depuis le dernier pas */
 
     /* Dernière entrée PRESSÉE (touche, bouton de souris, de manette ou gâchette), quelle que soit
      * sa liaison : sert au remappage (« appuie sur une touche »). `last_serial` augmente à chaque

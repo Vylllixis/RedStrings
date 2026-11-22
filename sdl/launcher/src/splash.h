@@ -50,6 +50,7 @@ typedef struct Splash {
     bool loading;            /* un travail est en cours dans le fil de chargement */
     bool skip; /* une touche a été pressée : la sortie commence dès que possible */
     bool ready;
+    bool done; /* le chargement est fini (splash_finish) : la scène ne sert plus qu'au titre */
 } Splash;
 
 /* Crée le pipeline et l'image du titre. false (journalisé) : pas d'écran de chargement, le
@@ -63,8 +64,10 @@ void splash_frame(Splash *s, EngPlatform *platform);
  * exécuté directement. */
 bool splash_run(Splash *s, EngPlatform *platform, SplashJob job, void *user, float progress_end);
 /* Fin du chargement : laisse le titre apparaître (SPLASH_MIN_SECONDS, sauf touche pressée ou
- * fermeture demandée), joue la sortie, puis libère tout. */
-void splash_finish(Splash *s, EngPlatform *platform);
+ * fermeture demandée) puis, si `outro`, joue la sortie (éclat du soleil, fondu au noir : le jeu
+ * commence tout de suite). Sans sortie, la scène continue : c'est l'écran-titre (title.h) qui la
+ * reprend au même instant. Les ressources restent en place jusqu'à splash_shutdown. */
+void splash_finish(Splash *s, EngPlatform *platform, bool outro);
 void splash_shutdown(Splash *s);
 /* Mesures d'une image capturée (autotest) : parts de pixels, de 0 à 1. */
 typedef struct SplashStats {

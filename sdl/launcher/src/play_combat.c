@@ -1727,6 +1727,12 @@ void play_combat_reset(PlayCombat *c)
     eng_dmgnum_init(&c->numbers);
     eng_particles_init(&c->particles, 12345U);
     memset(c->was_dead, 0, sizeof c->was_dead);
+    for (uint32_t f = FIRST_ENEMY; f < c->sim.count; f++) {
+        /* Monde ouvert : un combattant sans rôle dans la zone est rangé « mort » hors de la scène.
+         * Ce n'est pas un ennemi vaincu : sans ceci, une nouvelle partie lancée depuis le menu
+         * offrait 105 XP et le niveau 2 dès la première seconde. */
+        c->was_dead[f] = c->hidden[f];
+    }
     eng_prog_init(&c->progress); /* nouvelle partie : niveau 1 */
     c->levelup_ticks = 0;
     eng_equip_init(&c->equip); /* M8-08 : épée et bouclier */
@@ -2601,6 +2607,24 @@ static void trees_selftest(CombatTest *t, const EngMapZone *zone)
     (void)play_combat_load_zone(c, NULL, -1, 12.0F, -12.0F);
 }
 
+/* Nouvelle partie dans le monde ouvert, loin de toute zone : les combattants rangés hors de la
+ * scène ne comptent pas comme des ennemis vaincus. */
+static void new_game_selftest(CombatTest *t)
+{
+    PlayCombat *c = t->play.combat;
+    (void)play_combat_load_zone(c, NULL, -1, 12.0F, -12.0F);
+    const uint32_t kills = c->stats.enemy_kills;
+    play_combat_reset(c);
+    for (int i = 0; i < 30; i++) {
+        step(t, 0U, 0U, 0.0F, 0.0F);
+    }
+    check(t, c->progress.level == 1U && c->progress.total_xp == 0U,
+          "nouvelle partie hors zone : niveau 1, aucune XP offerte (XP)",
+          (float)c->progress.total_xp);
+    check(t, c->stats.enemy_kills == kills, "nouvelle partie hors zone : aucun ennemi « vaincu »",
+          (float)(c->stats.enemy_kills - kills));
+}
+
 bool play_combat_bosses_selftest(void)
 {
     static CombatTest t;
@@ -2627,6 +2651,7 @@ bool play_combat_bosses_selftest(void)
     trees_selftest(&t, &zones[0]);
     wade_selftest(&t);
     lava_selftest(&t);
+    new_game_selftest(&t);
     const uint32_t ticks = c->sim.tick;
     play_mode_shutdown(&t.play);
     if (t.ok) {

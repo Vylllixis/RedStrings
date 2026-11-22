@@ -1,233 +1,15 @@
+/* Navigation des menus du jeu : voir game_menu.h. Les lignes de chaque écran sont dans
+ * game_menu_items.c, les options dans game_options.c. */
 #include "engine/game_menu.h"
 
 #include <math.h>
 #include <stdio.h>
-#include <stdlib.h>
 #include <string.h>
 
-#include "engine/log.h"
+#include "game_menu_internal.h"
 
 #define NAV_DEAD 0.5F
-#define NAV_REPEAT 12U /* ticks (200 ms) entre deux pas quand le stick reste penché */
-
-static const EngAction REMAPPABLE[] = {
-    ENG_ACTION_ATTACK,  ENG_ACTION_HEAVY_ATTACK, ENG_ACTION_DODGE,
-    ENG_ACTION_JUMP,    ENG_ACTION_INTERACT,     ENG_ACTION_SPRINT,
-    ENG_ACTION_LOCK_ON, ENG_ACTION_PAUSE,        ENG_ACTION_SWITCH_WEAPON};
-#define REMAP_COUNT (sizeof REMAPPABLE / sizeof REMAPPABLE[0])
-
-const char *eng_action_label(EngAction a)
-{
-    switch (a) {
-    case ENG_ACTION_ATTACK:
-        return "Attaque légère";
-    case ENG_ACTION_HEAVY_ATTACK:
-        return "Attaque lourde";
-    case ENG_ACTION_DODGE:
-        return "Esquive";
-    case ENG_ACTION_JUMP:
-        return "Saut";
-    case ENG_ACTION_INTERACT:
-        return "Garde / interagir";
-    case ENG_ACTION_SPRINT:
-        return "Sprint";
-    case ENG_ACTION_LOCK_ON:
-        return "Verrouillage";
-    case ENG_ACTION_SWITCH_WEAPON:
-        return "Changer d'arme";
-    case ENG_ACTION_PAUSE:
-        return "Pause";
-    default:
-        return "?";
-    }
-}
-
-void eng_options_default(EngGameOptions *o)
-{
-    if (o == NULL) {
-        return;
-    }
-    memset(o, 0, sizeof *o);
-    o->master = 0.8F;
-    for (uint32_t b = 0; b < ENG_BUS_COUNT; b++) {
-        o->volume[b] = 1.0F;
-    }
-    o->volume[ENG_BUS_MUSIC] = 0.6F;
-    o->sensitivity = 1.0F;
-    o->text_scale = 1.0F;
-    o->fxaa = true;
-    o->ssao = true;
-    o->render_scale = 1.0F;
-    o->bloom = 0.5F;
-    o->vsync = true;
-    o->fullscreen = false;
-    o->shadow_quality = 2U;
-    o->view_distance = 1U;
-}
-
-static bool unit(float v)
-{
-    return isfinite(v) && v >= 0.0F && v <= 1.0F;
-}
-
-bool eng_options_valid(const EngGameOptions *o)
-{
-    if (o == NULL || !unit(o->master) || !isfinite(o->sensitivity) || o->sensitivity <= 0.0F ||
-        o->sensitivity > 4.0F || !isfinite(o->text_scale) || o->text_scale < 0.75F ||
-        o->text_scale > 2.0F || !unit(o->bloom) || o->shadow_quality > 2U ||
-        o->view_distance > 2U) {
-        return false;
-    }
-    for (uint32_t b = 0; b < ENG_BUS_COUNT; b++) {
-        if (!unit(o->volume[b])) {
-            return false;
-        }
-    }
-    return true;
-}
-
-static const char *const BUS_KEYS[ENG_BUS_COUNT] = {"volume.sfx", "volume.music", "volume.ambience",
-                                                    "volume.ui"};
-
-size_t eng_options_save(const EngGameOptions *o, const EngInput *input, char *out, size_t capacity)
-{
-    if (o == NULL || out == NULL || capacity == 0U) {
-        return 0;
-    }
-    size_t n = 0;
-#define EMIT(...)                                                                                  \
-    do {                                                                                           \
-        const int emitted_ = snprintf(out + n, capacity - n, __VA_ARGS__);                         \
-        if (emitted_ < 0 || (size_t)emitted_ >= capacity - n) {                                    \
-            out[0] = '\0';                                                                         \
-            return 0;                                                                              \
-        }                                                                                          \
-        n += (size_t)emitted_;                                                                     \
-    } while (0)
-    EMIT("# options du jeu (écrites par le menu Options)\n");
-    EMIT("volume.master = %.3f\n", (double)o->master);
-    for (uint32_t b = 0; b < ENG_BUS_COUNT; b++) {
-        EMIT("%s = %.3f\n", BUS_KEYS[b], (double)o->volume[b]);
-    }
-    EMIT("camera.sensitivity = %.3f\n", (double)o->sensitivity);
-    EMIT("camera.invert_y = %d\n", o->invert_y ? 1 : 0);
-    EMIT("ui.text_scale = %.3f\n", (double)o->text_scale);
-    EMIT("ui.high_contrast = %d\n", o->high_contrast ? 1 : 0);
-    EMIT("graphics.fxaa = %d\n", o->fxaa ? 1 : 0);
-    EMIT("graphics.bloom = %.3f\n", (double)o->bloom);
-    EMIT("graphics.vsync = %d\n", o->vsync ? 1 : 0);
-    EMIT("graphics.ssao = %d\n", o->ssao ? 1 : 0);
-    EMIT("graphics.render_scale = %.2f\n", (double)o->render_scale);
-    EMIT("graphics.fullscreen = %d\n", o->fullscreen ? 1 : 0);
-    EMIT("graphics.shadows = %u\n", (unsigned)o->shadow_quality);
-    EMIT("graphics.view_distance = %u\n", (unsigned)o->view_distance);
-    if (input != NULL) {
-        for (uint32_t a = 0; a < ENG_ACTION_COUNT; a++) {
-            for (uint32_t k = 0; k < ENG_MAX_BUTTON_BINDINGS; k++) {
-                const EngButtonBinding *b = &input->buttons[a][k];
-                if (b->kind != ENG_BIND_NONE) {
-                    EMIT("bind %u %d %d\n", a, (int)b->kind, b->code);
-                }
-            }
-        }
-    }
-#undef EMIT
-    return n;
-}
-
-bool eng_options_load(EngGameOptions *o, EngInput *input, const char *text)
-{
-    if (o == NULL || text == NULL) {
-        return false;
-    }
-    bool cleared[ENG_ACTION_COUNT] = {false};
-    const char *p = text;
-    while (*p != '\0') {
-        char line[160];
-        size_t n = 0;
-        while (*p != '\0' && *p != '\n' && n + 1U < sizeof line) {
-            line[n++] = *p++;
-        }
-        while (*p != '\0' && *p != '\n') {
-            p++;
-        }
-        if (*p == '\n') {
-            p++;
-        }
-        line[n] = '\0';
-        if (line[0] == '#' || line[0] == '\0') {
-            continue;
-        }
-        unsigned a = 0;
-        int kind = 0;
-        int code = 0;
-        if (sscanf(line, "bind %u %d %d", &a, &kind, &code) == 3) {
-            if (input != NULL && a < ENG_ACTION_COUNT && kind > ENG_BIND_NONE &&
-                kind <= ENG_BIND_PAD_TRIGGER) {
-                if (!cleared[a]) {
-                    eng_input_clear_action(input, (EngAction)a);
-                    cleared[a] = true;
-                }
-                (void)eng_input_bind_button(input, (EngAction)a, (EngBindKind)kind, code);
-            }
-            continue;
-        }
-        char key[48];
-        float v = 0.0F;
-        if (sscanf(line, "%47s = %f", key, &v) != 2 || !isfinite(v)) {
-            ENG_LOG_WARN("options : ligne ignorée « %s »", line);
-            continue;
-        }
-        EngGameOptions t = *o;
-        if (strcmp(key, "volume.master") == 0) {
-            t.master = v;
-        } else if (strcmp(key, "camera.sensitivity") == 0) {
-            t.sensitivity = v;
-        } else if (strcmp(key, "camera.invert_y") == 0) {
-            t.invert_y = v != 0.0F;
-        } else if (strcmp(key, "ui.text_scale") == 0) {
-            t.text_scale = v;
-        } else if (strcmp(key, "ui.high_contrast") == 0) {
-            t.high_contrast = v != 0.0F;
-        } else if (strcmp(key, "graphics.fxaa") == 0) {
-            t.fxaa = v != 0.0F;
-        } else if (strcmp(key, "graphics.bloom") == 0) {
-            t.bloom = v;
-        } else if (strcmp(key, "graphics.ssao") == 0) {
-            t.ssao = v != 0.0F;
-        } else if (strcmp(key, "graphics.render_scale") == 0) {
-            if (v >= 0.5F && v <= 1.0F) { /* hors bornes : ignoré */
-                t.render_scale = v;
-            }
-        } else if (strcmp(key, "graphics.vsync") == 0) {
-            t.vsync = v != 0.0F;
-        } else if (strcmp(key, "graphics.fullscreen") == 0) {
-            t.fullscreen = v != 0.0F;
-        } else if (strcmp(key, "graphics.shadows") == 0) {
-            t.shadow_quality = v >= 0.0F && v <= 2.0F ? (uint32_t)v : 99U; /* 99 : refusé */
-        } else if (strcmp(key, "graphics.view_distance") == 0) {
-            t.view_distance = v >= 0.0F && v <= 2.0F ? (uint32_t)v : 99U;
-        } else {
-            bool found = false;
-            for (uint32_t b = 0; b < ENG_BUS_COUNT; b++) {
-                if (strcmp(key, BUS_KEYS[b]) == 0) {
-                    t.volume[b] = v;
-                    found = true;
-                }
-            }
-            if (!found) {
-                ENG_LOG_WARN("options : clé inconnue « %s »", key);
-                continue;
-            }
-        }
-        if (eng_options_valid(&t)) {
-            *o = t;
-        } else {
-            ENG_LOG_WARN("options : valeur hors bornes ignorée « %s »", line);
-        }
-    }
-    return true;
-}
+#define NAV_REPEAT 12U /* ticks (200 ms) entre deux pas quand la direction reste tenue */
 
 void eng_menu_init(EngMenu *m, EngGameOptions *options, EngInput *input)
 {
@@ -238,6 +20,7 @@ void eng_menu_init(EngMenu *m, EngGameOptions *options, EngInput *input)
     m->options = options;
     m->input = input;
     m->remap = -1;
+    m->hover_item = -1;
 }
 
 void eng_menu_open(EngMenu *m, EngMenuScreen screen)
@@ -255,6 +38,8 @@ void eng_menu_open(EngMenu *m, EngMenuScreen screen)
     m->nav_cooldown = 0;
     m->nav_prev_x = 0.0F;
     m->nav_prev_y = 0.0F;
+    m->hover_item = -1;
+    m->hover_dir = 0;
 }
 
 bool eng_menu_is_open(const EngMenu *m)
@@ -267,176 +52,201 @@ void eng_menu_set_status(EngMenu *m, const char *text)
     if (m != NULL && text != NULL) {
         (void)snprintf(m->status, sizeof m->status, "%s", text);
         m->status_ticks = 180U;
+        m->status_serial++;
     }
 }
 
 const char *eng_menu_title(const EngMenu *m)
 {
     static const char *const titles[ENG_MENU_SCREEN_COUNT] = {
-        "",          "RedStrings",           "Pause",           "Options",
-        "Contrôles", "Reprendre une partie", "Nouvelle partie", "Écraser cette partie ?"};
-    return m != NULL && (unsigned)m->screen < (unsigned)ENG_MENU_SCREEN_COUNT ? titles[m->screen]
-                                                                              : "";
+        "",        "Red Strings",      "Pause",
+        "Options", "Contrôles",        "Parties",
+        "Partie",  "Nom de la partie", "Supprimer cette partie ?"};
+    if (m == NULL || (unsigned)m->screen >= (unsigned)ENG_MENU_SCREEN_COUNT) {
+        return "";
+    }
+    if (m->screen == ENG_MENU_NAME && m->name_purpose == ENG_MENU_NAME_RENAME) {
+        return "Renommer la partie";
+    }
+    return titles[m->screen];
 }
 
-void eng_menu_set_slot(EngMenu *m, uint32_t index, bool used, const char *summary)
+void eng_menu_set_slot(EngMenu *m, uint32_t index, const EngMenuSlot *slot)
 {
     if (m == NULL || index >= ENG_MENU_SLOTS) {
         return;
     }
-    m->slots[index].used = used;
-    (void)snprintf(m->slots[index].summary, sizeof m->slots[index].summary, "%s",
-                   used && summary != NULL ? summary : "");
-}
-
-static bool any_slot_used(const EngMenu *m)
-{
-    for (uint32_t i = 0; i < ENG_MENU_SLOTS; i++) {
-        if (m->slots[i].used) {
-            return true;
-        }
+    if (slot == NULL || !slot->used) {
+        memset(&m->slots[index], 0, sizeof m->slots[index]);
+        return;
     }
-    return false;
+    m->slots[index] = *slot;
+    m->slots[index].name[sizeof m->slots[index].name - 1U] = '\0';
+    m->slots[index].summary[sizeof m->slots[index].summary - 1U] = '\0';
+    m->slots[index].place[sizeof m->slots[index].place - 1U] = '\0';
+    m->slots[index].date[sizeof m->slots[index].date - 1U] = '\0';
 }
 
-static int32_t valid_slot(int32_t slot)
+void eng_menu_default_name(uint32_t index, char *out, size_t capacity)
+{
+    if (out != NULL && capacity > 0U) {
+        (void)snprintf(out, capacity, "Partie %u", (unsigned)(index + 1U));
+    }
+}
+
+int32_t eng_menu_valid_slot(int32_t slot)
 {
     return slot < 0 ? 0 : (slot >= (int32_t)ENG_MENU_SLOTS ? (int32_t)ENG_MENU_SLOTS - 1 : slot);
 }
 
-static void set_item(EngMenuItem *it, const char *label, const char *value, bool enabled)
+int32_t eng_menu_free_slot(const EngMenu *m)
 {
-    (void)snprintf(it->label, sizeof it->label, "%s", label);
-    (void)snprintf(it->value, sizeof it->value, "%s", value != NULL ? value : "");
-    it->enabled = enabled;
+    for (uint32_t i = 0; i < ENG_MENU_SLOTS; i++) {
+        if (!m->slots[i].used) {
+            return (int32_t)i;
+        }
+    }
+    return -1;
 }
 
-static void binding_text(const EngInput *in, EngAction a, char *out, size_t cap)
-{
-    out[0] = '\0';
-    if (in == NULL) {
-        return;
-    }
-    size_t n = 0;
-    for (uint32_t k = 0; k < ENG_MAX_BUTTON_BINDINGS; k++) {
-        const EngButtonBinding *b = &in->buttons[a][k];
-        if (b->kind == ENG_BIND_NONE) {
-            continue;
-        }
-        const char *kind = b->kind == ENG_BIND_KEY            ? "touche"
-                           : b->kind == ENG_BIND_MOUSE_BUTTON ? "souris"
-                           : b->kind == ENG_BIND_PAD_BUTTON   ? "manette"
-                                                              : "gâchette";
-        const int k2 = snprintf(out + n, cap - n, "%s%s %d", n > 0U ? ", " : "", kind, b->code);
-        if (k2 < 0 || (size_t)k2 >= cap - n) {
-            break;
-        }
-        n += (size_t)k2;
-    }
-}
+/* ── saisie du nom ── */
 
-uint32_t eng_menu_items(const EngMenu *m, EngMenuItem *out, uint32_t max)
+static uint32_t utf8_chars(const char *s)
 {
-    if (m == NULL || out == NULL || max < ENG_MENU_MAX_ITEMS) {
-        return 0;
-    }
     uint32_t n = 0;
-    char v[ENG_MENU_LABEL];
-    const EngGameOptions *o = m->options;
-    switch (m->screen) {
-    case ENG_MENU_MAIN:
-        v[0] = '\0';
-        if (m->has_save && any_slot_used(m)) { /* la partie que « Continuer » reprend */
-            (void)snprintf(v, sizeof v, "partie %d", (int)valid_slot(m->last_slot) + 1);
-        }
-        set_item(&out[n++], "Continuer", v, m->has_save);
-        set_item(&out[n++], "Nouvelle partie", NULL, true);
-        set_item(&out[n++], "Charger une partie", NULL, any_slot_used(m));
-        set_item(&out[n++], "Options", NULL, o != NULL);
-        set_item(&out[n++], "Quitter", NULL, true);
-        break;
-    case ENG_MENU_LOAD:
-    case ENG_MENU_NEW:
-        for (uint32_t i = 0; i < ENG_MENU_SLOTS; i++) {
-            char label[ENG_MENU_LABEL];
-            (void)snprintf(label, sizeof label, "Partie %u", (unsigned)(i + 1U));
-            /* à charger : un emplacement vide est grisé ; pour une nouvelle partie : tous */
-            set_item(&out[n++], label, m->slots[i].used ? m->slots[i].summary : "vide",
-                     m->slots[i].used || m->screen == ENG_MENU_NEW);
-        }
-        set_item(&out[n++], "Retour", NULL, true);
-        break;
-    case ENG_MENU_OVERWRITE:
-        set_item(&out[n++], "Non, revenir", NULL, true);
-        (void)snprintf(v, sizeof v, "Oui, écraser la partie %d", (int)valid_slot(m->slot) + 1);
-        set_item(&out[n++], v, m->slots[valid_slot(m->slot)].summary, true);
-        break;
-    case ENG_MENU_PAUSE:
-        set_item(&out[n++], "Reprendre", NULL, true);
-        set_item(&out[n++], "Sauvegarder", NULL, true);
-        set_item(&out[n++], "Options", NULL, o != NULL);
-        set_item(&out[n++], "Menu principal", NULL, true);
-        break;
-    case ENG_MENU_OPTIONS: {
-        static const char *const names[ENG_BUS_COUNT] = {
-            "Volume des effets", "Volume de la musique", "Volume de l'ambiance",
-            "Volume de l'interface"};
-        (void)snprintf(v, sizeof v, "%d %%", (int)lroundf(o->master * 100.0F));
-        set_item(&out[n++], "Volume général", v, true);
-        for (uint32_t b = 0; b < ENG_BUS_COUNT; b++) {
-            (void)snprintf(v, sizeof v, "%d %%", (int)lroundf(o->volume[b] * 100.0F));
-            set_item(&out[n++], names[b], v, true);
-        }
-        (void)snprintf(v, sizeof v, "%.1f", (double)o->sensitivity);
-        set_item(&out[n++], "Sensibilité de la caméra", v, true);
-        set_item(&out[n++], "Inverser l'axe vertical", o->invert_y ? "oui" : "non", true);
-        (void)snprintf(v, sizeof v, "%d %%", (int)lroundf(o->text_scale * 100.0F));
-        set_item(&out[n++], "Taille du texte", v, true);
-        set_item(&out[n++], "Contraste élevé", o->high_contrast ? "oui" : "non", true);
-        set_item(&out[n++], "Anticrénelage (FXAA)", o->fxaa ? "oui" : "non", true);
-        (void)snprintf(v, sizeof v, "%d %%", (int)lroundf(o->bloom * 100.0F));
-        set_item(&out[n++], "Halo lumineux (bloom)", v, true);
-        static const char *const quality[3] = {"bas", "moyen", "haut"};
-        static const char *const distance[3] = {"proche", "moyenne", "loin"};
-        set_item(&out[n++], "Synchronisation verticale", o->vsync ? "oui" : "non", true);
-        set_item(&out[n++], "Plein écran", o->fullscreen ? "oui" : "non", true);
-        set_item(&out[n++], "Qualité des ombres", quality[o->shadow_quality % 3U], true);
-        set_item(&out[n++], "Distance de vue", distance[o->view_distance % 3U], true);
-        set_item(&out[n++], "Occlusion ambiante (SSAO)", o->ssao ? "oui" : "non", true);
-        (void)snprintf(v, sizeof v, "%d %%", (int)lroundf(o->render_scale * 100.0F));
-        set_item(&out[n++], "Échelle de résolution", v, true);
-        set_item(&out[n++], "Contrôles...", NULL, m->input != NULL);
-        set_item(&out[n++], "Retour", NULL, true);
-        break;
-    }
-    case ENG_MENU_CONTROLS:
-        for (uint32_t i = 0; i < REMAP_COUNT; i++) {
-            if (m->remap == (int32_t)i) {
-                set_item(&out[n++], eng_action_label(REMAPPABLE[i]), "appuie sur une touche...",
-                         true);
-            } else {
-                binding_text(m->input, REMAPPABLE[i], v, sizeof v);
-                set_item(&out[n++], eng_action_label(REMAPPABLE[i]), v, true);
-            }
-        }
-        set_item(&out[n++], "Par défaut", NULL, true);
-        set_item(&out[n++], "Retour", NULL, true);
-        break;
-    default:
-        break;
+    for (; *s != '\0'; s++) {
+        n += ((unsigned char)*s & 0xC0U) != 0x80U ? 1U : 0U;
     }
     return n;
 }
+
+/* longueur (1 à 4) du caractère UTF-8 valide qui commence en `s`, 0 s'il est invalide */
+static uint32_t utf8_length(const char *s)
+{
+    const unsigned char c = (unsigned char)s[0];
+    const uint32_t len = c < 0x80U           ? 1U
+                         : (c >> 5) == 0x6U  ? 2U
+                         : (c >> 4) == 0xEU  ? 3U
+                         : (c >> 3) == 0x1EU ? 4U
+                                             : 0U;
+    for (uint32_t i = 1; i < len; i++) {
+        if (((unsigned char)s[i] & 0xC0U) != 0x80U) {
+            return 0;
+        }
+    }
+    return len;
+}
+
+static void text_erase_last(EngMenu *m)
+{
+    size_t n = strlen(m->text);
+    while (n > 0U) {
+        n--;
+        if (((unsigned char)m->text[n] & 0xC0U) != 0x80U) {
+            break;
+        }
+    }
+    m->text[n] = '\0';
+}
+
+void eng_menu_text_input(EngMenu *m, const char *utf8)
+{
+    if (m == NULL || utf8 == NULL || m->screen != ENG_MENU_NAME) {
+        return;
+    }
+    const char *p = utf8;
+    while (*p != '\0') {
+        if (*p == '\b') {
+            if (m->text_fresh) {
+                m->text[0] = '\0'; /* le nom proposé s'efface d'un coup */
+            } else {
+                text_erase_last(m);
+            }
+            m->text_fresh = false;
+            m->text_serial++;
+            p++;
+            continue;
+        }
+        const uint32_t len = utf8_length(p);
+        if (len == 0U) {
+            p++; /* octet invalide : ignoré */
+            continue;
+        }
+        const unsigned char c = (unsigned char)*p;
+        const bool control = c < 0x20U || c == 0x7FU;
+        if (!control) {
+            if (m->text_fresh) { /* la première frappe remplace le nom proposé */
+                m->text[0] = '\0';
+                m->text_fresh = false;
+            }
+            const size_t used = strlen(m->text);
+            const bool leading_space = used == 0U && c == ' ';
+            if (!leading_space && utf8_chars(m->text) < ENG_MENU_NAME_CHARS &&
+                used + len < sizeof m->text) {
+                memcpy(m->text + used, p, len);
+                m->text[used + len] = '\0';
+                m->text_serial++;
+            } else if (!leading_space) {
+                m->deny_serial++; /* nom plein */
+            }
+        }
+        p += len;
+    }
+}
+
+static void open_name(EngMenu *m, int32_t slot, EngMenuNamePurpose purpose)
+{
+    m->slot = eng_menu_valid_slot(slot);
+    eng_menu_open(m, ENG_MENU_NAME);
+    m->name_purpose = purpose;
+    if (purpose == ENG_MENU_NAME_RENAME) {
+        (void)snprintf(m->text, sizeof m->text, "%s", m->slots[m->slot].name);
+    } else {
+        eng_menu_default_name((uint32_t)m->slot, m->text, sizeof m->text);
+    }
+    m->text_fresh = true;
+    m->text_serial++;
+}
+
+/* valide le nom saisi : espaces de fin retirés ; vide : refusé */
+static bool name_ready(EngMenu *m)
+{
+    size_t n = strlen(m->text);
+    while (n > 0U && m->text[n - 1U] == ' ') {
+        m->text[--n] = '\0';
+    }
+    return n > 0U;
+}
+
+/* ── réglages ── */
 
 static float clampf(float v, float lo, float hi)
 {
     return v < lo ? lo : (v > hi ? hi : v);
 }
 
+static bool same_options(const EngGameOptions *a, const EngGameOptions *b)
+{
+    bool same = a->master == b->master && a->sensitivity == b->sensitivity &&
+                a->invert_y == b->invert_y && a->text_scale == b->text_scale &&
+                a->high_contrast == b->high_contrast && a->fxaa == b->fxaa &&
+                a->bloom == b->bloom && a->vsync == b->vsync && a->fullscreen == b->fullscreen &&
+                a->shadow_quality == b->shadow_quality && a->view_distance == b->view_distance &&
+                a->ssao == b->ssao && a->render_scale == b->render_scale;
+    for (uint32_t i = 0; i < ENG_BUS_COUNT; i++) {
+        same = same && a->volume[i] == b->volume[i];
+    }
+    return same;
+}
+
 /* réglage gauche / droite d'une ligne d'Options ; true si une valeur a changé */
 static bool adjust(EngMenu *m, int dir)
 {
     EngGameOptions *o = m->options;
+    if (o == NULL) {
+        return false;
+    }
+    const EngGameOptions before = *o;
     const float step = 0.1F * (float)dir;
     const int32_t s = m->selected;
     if (s == 0) {
@@ -473,74 +283,111 @@ static bool adjust(EngMenu *m, int dir)
     } else {
         return false;
     }
-    return true;
+    m->adjust_dir = dir < 0 ? -1 : 1;
+    m->adjust_serial++; /* même en butée : la ligne réagit */
+    return !same_options(&before, o);
 }
 
-static EngMenuAction confirm(EngMenu *m, const EngMenuItem *items, uint32_t n)
+/* ── valider, revenir ── */
+
+static void back_to(EngMenu *m, EngMenuScreen screen, int32_t selected)
+{
+    eng_menu_open(m, screen);
+    m->selected = selected;
+}
+
+static EngMenuAction confirm(EngMenu *m, const EngMenuItem *items, uint32_t n, int dir)
 {
     if (m->selected < 0 || (uint32_t)m->selected >= n || !items[m->selected].enabled) {
+        m->deny_serial++;
         return ENG_MENU_ACT_NONE;
     }
     const int32_t s = m->selected;
+    m->confirm_serial++;
     switch (m->screen) {
     case ENG_MENU_MAIN:
-        if (s == 0) { /* la partie la plus récente */
-            m->slot = valid_slot(m->last_slot);
+        if (s == 0 && m->has_save) { /* la partie la plus récente */
+            m->slot = eng_menu_valid_slot(m->last_slot);
             m->screen = ENG_MENU_CLOSED;
             return ENG_MENU_ACT_CONTINUE;
         }
+        if (s == 0) { /* aucune partie : en créer une dans le premier emplacement libre */
+            const int32_t free_slot = eng_menu_free_slot(m);
+            if (free_slot >= 0) {
+                open_name(m, free_slot, ENG_MENU_NAME_CREATE);
+            } else {
+                eng_menu_open(m, ENG_MENU_SAVES);
+            }
+            return ENG_MENU_ACT_NONE;
+        }
         if (s == 1) {
-            if (!any_slot_used(m)) { /* aucune partie : elle commence dans l'emplacement 1 */
-                m->slot = 0;
-                m->screen = ENG_MENU_CLOSED;
-                return ENG_MENU_ACT_NEW_GAME;
-            }
-            eng_menu_open(m, ENG_MENU_NEW);
-            for (uint32_t i = 0; i < ENG_MENU_SLOTS; i++) { /* sur le premier emplacement libre */
-                if (!m->slots[i].used) {
-                    m->selected = (int32_t)i;
-                    break;
-                }
-            }
+            back_to(m, ENG_MENU_SAVES, m->has_save ? eng_menu_valid_slot(m->last_slot) : 0);
             return ENG_MENU_ACT_NONE;
         }
         if (s == 2) {
-            eng_menu_open(m, ENG_MENU_LOAD);
-            m->selected = valid_slot(m->last_slot);
-            return ENG_MENU_ACT_NONE;
-        }
-        if (s == 3) {
             eng_menu_open(m, ENG_MENU_OPTIONS);
             return ENG_MENU_ACT_NONE;
         }
         return ENG_MENU_ACT_QUIT;
-    case ENG_MENU_LOAD:
+    case ENG_MENU_SAVES:
         if (s >= (int32_t)ENG_MENU_SLOTS) {
-            eng_menu_open(m, ENG_MENU_MAIN);
+            back_to(m, ENG_MENU_MAIN, 1);
             return ENG_MENU_ACT_NONE;
         }
         m->slot = s;
-        m->screen = ENG_MENU_CLOSED;
-        return ENG_MENU_ACT_CONTINUE;
-    case ENG_MENU_NEW:
-        if (s >= (int32_t)ENG_MENU_SLOTS) {
-            eng_menu_open(m, ENG_MENU_MAIN);
+        if (m->slots[s].used) {
+            /* fichier illisible : seule la suppression est proposée */
+            back_to(m, ENG_MENU_SLOT, m->slots[s].unreadable ? 3 : 0);
+        } else {
+            open_name(m, s, ENG_MENU_NAME_CREATE);
+        }
+        return ENG_MENU_ACT_NONE;
+    case ENG_MENU_SLOT:
+        if (s == 0) {
+            m->screen = ENG_MENU_CLOSED;
+            return ENG_MENU_ACT_CONTINUE;
+        }
+        if (s == 1) {
+            open_name(m, m->slot, ENG_MENU_NAME_RENAME);
             return ENG_MENU_ACT_NONE;
         }
-        m->slot = s;
-        if (m->slots[s].used) { /* une partie est là : confirmer avant de l'écraser */
-            eng_menu_open(m, ENG_MENU_OVERWRITE);
+        if (s == 2) {
+            m->slot_target = eng_menu_free_slot(m);
+            back_to(m, ENG_MENU_SAVES, m->slot_target >= 0 ? m->slot_target : m->slot);
+            return m->slot_target >= 0 ? ENG_MENU_ACT_COPY_SLOT : ENG_MENU_ACT_NONE;
+        }
+        if (s == 3) {
+            eng_menu_open(m, ENG_MENU_DELETE);
             return ENG_MENU_ACT_NONE;
+        }
+        back_to(m, ENG_MENU_SAVES, eng_menu_valid_slot(m->slot));
+        return ENG_MENU_ACT_NONE;
+    case ENG_MENU_NAME:
+        if (s == 1) { /* Annuler */
+            if (m->name_purpose == ENG_MENU_NAME_RENAME) {
+                back_to(m, ENG_MENU_SLOT, 1);
+            } else {
+                back_to(m, ENG_MENU_SAVES, eng_menu_valid_slot(m->slot));
+            }
+            return ENG_MENU_ACT_NONE;
+        }
+        if (!name_ready(m)) {
+            m->confirm_serial--;
+            m->deny_serial++;
+            return ENG_MENU_ACT_NONE;
+        }
+        if (m->name_purpose == ENG_MENU_NAME_RENAME) {
+            back_to(m, ENG_MENU_SLOT, 1);
+            return ENG_MENU_ACT_RENAME_SLOT;
         }
         m->screen = ENG_MENU_CLOSED;
         return ENG_MENU_ACT_NEW_GAME;
-    case ENG_MENU_OVERWRITE:
+    case ENG_MENU_DELETE:
         if (s == 1) {
-            m->screen = ENG_MENU_CLOSED;
-            return ENG_MENU_ACT_NEW_GAME;
+            back_to(m, ENG_MENU_SAVES, eng_menu_valid_slot(m->slot));
+            return ENG_MENU_ACT_DELETE_SLOT;
         }
-        eng_menu_open(m, ENG_MENU_NEW);
-        m->selected = valid_slot(m->slot);
+        back_to(m, ENG_MENU_SLOT, 3);
         return ENG_MENU_ACT_NONE;
     case ENG_MENU_PAUSE:
         if (s == 0) {
@@ -554,46 +401,80 @@ static EngMenuAction confirm(EngMenu *m, const EngMenuItem *items, uint32_t n)
             eng_menu_open(m, ENG_MENU_OPTIONS);
             return ENG_MENU_ACT_NONE;
         }
-        eng_menu_open(m, ENG_MENU_MAIN);
-        return ENG_MENU_ACT_TO_MAIN;
+        return ENG_MENU_ACT_TO_MAIN; /* l'appelant enregistre, puis ouvre le menu principal */
     case ENG_MENU_OPTIONS:
         if (s == (int32_t)n - 2) {
             eng_menu_open(m, ENG_MENU_CONTROLS);
             return ENG_MENU_ACT_NONE;
         }
         if (s == (int32_t)n - 1) {
-            eng_menu_open(m, m->options_return != ENG_MENU_CLOSED ? m->options_return
-                                                                  : ENG_MENU_PAUSE);
+            back_to(m, m->options_return != ENG_MENU_CLOSED ? m->options_return : ENG_MENU_PAUSE,
+                    2);
             return ENG_MENU_ACT_NONE;
         }
-        return adjust(m, 1) ? ENG_MENU_ACT_OPTIONS_CHANGED : ENG_MENU_ACT_NONE;
+        return adjust(m, dir) ? ENG_MENU_ACT_OPTIONS_CHANGED : ENG_MENU_ACT_NONE;
     case ENG_MENU_CONTROLS:
-        if (s < (int32_t)REMAP_COUNT) {
+        if (s < (int32_t)eng_menu_remap_count()) {
             m->remap = s;
             m->remap_serial = m->input != NULL ? m->input->last_serial : 0U;
             return ENG_MENU_ACT_NONE;
         }
-        if (s == (int32_t)REMAP_COUNT) {
+        if (s == (int32_t)eng_menu_remap_count()) {
             if (m->input != NULL) {
                 eng_input_set_default_bindings(m->input);
             }
             eng_menu_set_status(m, "Contrôles par défaut rétablis");
             return ENG_MENU_ACT_REMAPPED;
         }
-        eng_menu_open(m, ENG_MENU_OPTIONS);
-        { /* revient sur « Contrôles... », l'avant-dernière ligne d'Options */
-            EngMenuItem lines[ENG_MENU_MAX_ITEMS];
-            m->selected = (int32_t)eng_menu_items(m, lines, ENG_MENU_MAX_ITEMS) - 2;
-        }
+        back_to(m, ENG_MENU_OPTIONS, (int32_t)ENG_BUS_COUNT + 13); /* sur « Contrôles... » */
         return ENG_MENU_ACT_NONE;
     default:
         return ENG_MENU_ACT_NONE;
     }
 }
 
-void eng_menu_hover(EngMenu *m, int32_t item)
+/* un niveau en arrière ; à la racine de la pause : la partie reprend */
+static EngMenuAction go_back(EngMenu *m)
 {
-    if (m == NULL || m->screen == ENG_MENU_CLOSED || m->remap >= 0 || item < 0) {
+    switch (m->screen) {
+    case ENG_MENU_PAUSE:
+        m->screen = ENG_MENU_CLOSED;
+        return ENG_MENU_ACT_RESUME;
+    case ENG_MENU_OPTIONS:
+        back_to(m, m->options_return != ENG_MENU_CLOSED ? m->options_return : ENG_MENU_PAUSE, 2);
+        return ENG_MENU_ACT_NONE;
+    case ENG_MENU_CONTROLS:
+        back_to(m, ENG_MENU_OPTIONS, (int32_t)ENG_BUS_COUNT + 13);
+        return ENG_MENU_ACT_NONE;
+    case ENG_MENU_SAVES:
+        back_to(m, ENG_MENU_MAIN, 1);
+        return ENG_MENU_ACT_NONE;
+    case ENG_MENU_SLOT:
+        back_to(m, ENG_MENU_SAVES, eng_menu_valid_slot(m->slot));
+        return ENG_MENU_ACT_NONE;
+    case ENG_MENU_NAME:
+        if (m->name_purpose == ENG_MENU_NAME_RENAME) {
+            back_to(m, ENG_MENU_SLOT, 1);
+        } else {
+            back_to(m, ENG_MENU_SAVES, eng_menu_valid_slot(m->slot));
+        }
+        return ENG_MENU_ACT_NONE;
+    case ENG_MENU_DELETE: /* rien n'est supprimé */
+        back_to(m, ENG_MENU_SLOT, 3);
+        return ENG_MENU_ACT_NONE;
+    default: /* menu principal : Échap n'y fait rien */
+        return ENG_MENU_ACT_NONE;
+    }
+}
+
+void eng_menu_hover(EngMenu *m, int32_t item, int32_t dir, bool moved)
+{
+    if (m == NULL || m->screen == ENG_MENU_CLOSED) {
+        return;
+    }
+    m->hover_item = item;
+    m->hover_dir = dir;
+    if (!moved || m->remap >= 0 || item < 0) {
         return;
     }
     EngMenuItem items[ENG_MENU_MAX_ITEMS];
@@ -601,6 +482,35 @@ void eng_menu_hover(EngMenu *m, int32_t item)
     if ((uint32_t)item < n && items[item].enabled) {
         m->selected = item;
     }
+}
+
+/* pas de sélection : `step` vaut -1 ou +1 ; les lignes grisées sont sautées */
+static void move_selection(EngMenu *m, const EngMenuItem *items, uint32_t first, uint32_t count,
+                           int step, bool wrap)
+{
+    if (count == 0U) {
+        return;
+    }
+    int32_t at = m->selected - (int32_t)first;
+    for (uint32_t tries = 0; tries < count; tries++) {
+        at += step;
+        if (at < 0 || at >= (int32_t)count) {
+            if (!wrap) {
+                return;
+            }
+            at = (at + (int32_t)count) % (int32_t)count;
+        }
+        if (items[first + (uint32_t)at].enabled) {
+            m->selected = (int32_t)first + at;
+            return;
+        }
+    }
+}
+
+/* la dernière pression vient-elle de ce genre d'entrée ? (sans `input` : inconnu, donc non) */
+static bool last_press_is(const EngMenu *m, EngBindKind a, EngBindKind b)
+{
+    return m->input != NULL && (m->input->last_kind == a || m->input->last_kind == b);
 }
 
 EngMenuAction eng_menu_update(EngMenu *m, const EngInputState *in)
@@ -614,16 +524,23 @@ EngMenuAction eng_menu_update(EngMenu *m, const EngInputState *in)
             m->status[0] = '\0';
         }
     }
+    const bool back_key = (in->menu_pressed & ENG_MENU_KEY_BACK) != 0U;
     if (m->screen == ENG_MENU_CLOSED) {
-        if (eng_action_pressed(in, ENG_ACTION_PAUSE)) {
+        if (eng_action_pressed(in, ENG_ACTION_PAUSE) || back_key) {
             eng_menu_open(m, ENG_MENU_PAUSE);
         }
         return ENG_MENU_ACT_NONE;
     }
-    /* remappage : la prochaine pression (autre que celle qui a validé) devient la liaison */
+    /* remappage : la prochaine pression (autre que celle qui a validé) devient la liaison ;
+     * Échap annule */
     if (m->remap >= 0) {
+        if (back_key) {
+            m->remap = -1;
+            eng_menu_set_status(m, "Touche inchangée");
+            return ENG_MENU_ACT_NONE;
+        }
         if (m->input != NULL && m->input->last_serial != m->remap_serial) {
-            const EngAction a = REMAPPABLE[m->remap];
+            const EngAction a = eng_menu_remap_action((uint32_t)m->remap);
             eng_input_clear_action(m->input, a);
             (void)eng_input_bind_button(m->input, a, m->input->last_kind, m->input->last_code);
             m->remap = -1;
@@ -635,51 +552,36 @@ EngMenuAction eng_menu_update(EngMenu *m, const EngInputState *in)
     EngMenuItem items[ENG_MENU_MAX_ITEMS];
     const uint32_t n = eng_menu_items(m, items, ENG_MENU_MAX_ITEMS);
     if (n > 0U && (m->selected < 0 || (uint32_t)m->selected >= n || !items[m->selected].enabled)) {
-        for (uint32_t k = 0; k < n;
-             k++) { /* jamais sur une ligne grisée (« Continuer » sans sauvegarde) */
+        for (uint32_t k = 0; k < n; k++) { /* jamais sur une ligne grisée */
             if (items[k].enabled) {
                 m->selected = (int32_t)k;
                 break;
             }
         }
     }
-    if (eng_action_pressed(in, ENG_ACTION_PAUSE)) {
-        if (m->screen == ENG_MENU_PAUSE) {
-            m->screen = ENG_MENU_CLOSED;
-            return ENG_MENU_ACT_RESUME;
-        }
-        if (m->screen == ENG_MENU_OPTIONS || m->screen == ENG_MENU_CONTROLS) {
-            eng_menu_open(m, ENG_MENU_PAUSE);
-            return ENG_MENU_ACT_NONE;
-        }
+    /* Écran Nom : le clavier écrit. Seules comptent les touches de menu, la manette et la
+     * souris ; ZQSD, Espace, P... sont du texte (eng_menu_text_input). */
+    const bool typing = m->screen == ENG_MENU_NAME;
+    const bool pad = last_press_is(m, ENG_BIND_PAD_BUTTON, ENG_BIND_PAD_TRIGGER);
+    const bool mouse = last_press_is(m, ENG_BIND_MOUSE_BUTTON, ENG_BIND_MOUSE_BUTTON);
+    const bool back_action =
+        eng_action_pressed(in, ENG_ACTION_DODGE) || eng_action_pressed(in, ENG_ACTION_PAUSE);
+    if (back_key || (back_action && (!typing || pad))) {
+        return go_back(m);
     }
-    if (eng_action_pressed(in, ENG_ACTION_DODGE)) { /* retour */
-        switch (m->screen) {
-        case ENG_MENU_PAUSE:
-            m->screen = ENG_MENU_CLOSED;
-            return ENG_MENU_ACT_RESUME;
-        case ENG_MENU_OPTIONS:
-            eng_menu_open(m, m->options_return != ENG_MENU_CLOSED ? m->options_return
-                                                                  : ENG_MENU_PAUSE);
-            return ENG_MENU_ACT_NONE;
-        case ENG_MENU_CONTROLS:
-            eng_menu_open(m, ENG_MENU_OPTIONS);
-            return ENG_MENU_ACT_NONE;
-        case ENG_MENU_LOAD:
-        case ENG_MENU_NEW:
-            eng_menu_open(m, ENG_MENU_MAIN);
-            return ENG_MENU_ACT_NONE;
-        case ENG_MENU_OVERWRITE: /* rien n'est écrasé */
-            eng_menu_open(m, ENG_MENU_NEW);
-            m->selected = valid_slot(m->slot);
-            return ENG_MENU_ACT_NONE;
-        default:
-            return ENG_MENU_ACT_NONE;
-        }
+    /* navigation : un pas par pression, puis répétition toutes les 200 ms */
+    float y = typing ? 0.0F : in->axis[ENG_AXIS_MOVE].y;
+    float x = typing ? 0.0F : in->axis[ENG_AXIS_MOVE].x;
+    if ((in->menu_held & ENG_MENU_KEY_UP) != 0U) {
+        y = 1.0F;
+    } else if ((in->menu_held & ENG_MENU_KEY_DOWN) != 0U) {
+        y = -1.0F;
     }
-    /* navigation : un pas par penchée du stick, puis répétition toutes les 200 ms */
-    const float y = in->axis[ENG_AXIS_MOVE].y;
-    const float x = in->axis[ENG_AXIS_MOVE].x;
+    if ((in->menu_held & ENG_MENU_KEY_LEFT) != 0U) {
+        x = -1.0F;
+    } else if ((in->menu_held & ENG_MENU_KEY_RIGHT) != 0U) {
+        x = 1.0F;
+    }
     const bool fresh_y = fabsf(y) > NAV_DEAD && fabsf(m->nav_prev_y) <= NAV_DEAD;
     const bool fresh_x = fabsf(x) > NAV_DEAD && fabsf(m->nav_prev_x) <= NAV_DEAD;
     m->nav_prev_y = y;
@@ -687,26 +589,55 @@ EngMenuAction eng_menu_update(EngMenu *m, const EngInputState *in)
     if (m->nav_cooldown > 0U) {
         m->nav_cooldown--;
     }
+    const bool step_y = fabsf(y) > NAV_DEAD && (fresh_y || m->nav_cooldown == 0U);
+    const bool step_x = fabsf(x) > NAV_DEAD && (fresh_x || m->nav_cooldown == 0U);
+    const int dir_y = y > 0.0F ? -1 : 1; /* avant (haut) = ligne précédente */
+    const int dir_x = x > 0.0F ? 1 : -1;
     EngMenuAction act = ENG_MENU_ACT_NONE;
-    if (n > 0U && fabsf(y) > NAV_DEAD && (fresh_y || m->nav_cooldown == 0U)) {
-        const int dir = y > 0.0F ? -1 : 1; /* avant (haut) = ligne précédente */
-        for (uint32_t tries = 0; tries < n; tries++) {
-            m->selected = (int32_t)(((uint32_t)(m->selected + dir + (int32_t)n)) % n);
-            if (items[m->selected].enabled) {
-                break;
-            }
+    if (m->screen == ENG_MENU_MAIN) { /* la barre du bas : gauche / droite (haut / bas aussi) */
+        if (step_x || step_y) {
+            move_selection(m, items, 0, n, step_x ? dir_x : dir_y, true);
+            m->nav_cooldown = NAV_REPEAT;
         }
+    } else if (m->screen == ENG_MENU_SAVES) { /* trois cartes côte à côte, « Retour » dessous */
+        if (step_x && m->selected < (int32_t)ENG_MENU_SLOTS) {
+            move_selection(m, items, 0, ENG_MENU_SLOTS, dir_x, false);
+            m->nav_cooldown = NAV_REPEAT;
+        } else if (step_y) {
+            if (dir_y > 0 && m->selected < (int32_t)ENG_MENU_SLOTS) {
+                m->slot = m->selected; /* on y revient en remontant */
+                m->selected = (int32_t)ENG_MENU_SLOTS;
+            } else if (dir_y < 0 && m->selected >= (int32_t)ENG_MENU_SLOTS) {
+                m->selected = eng_menu_valid_slot(m->slot);
+            }
+            m->nav_cooldown = NAV_REPEAT;
+        }
+    } else if (step_y) {
+        move_selection(m, items, 0, n, dir_y, true);
         m->nav_cooldown = NAV_REPEAT;
-    } else if (m->screen == ENG_MENU_OPTIONS && fabsf(x) > NAV_DEAD &&
-               (fresh_x || m->nav_cooldown == 0U)) {
-        if (adjust(m, x > 0.0F ? 1 : -1)) {
+    } else if (m->screen == ENG_MENU_OPTIONS && step_x) {
+        if (adjust(m, dir_x)) {
             act = ENG_MENU_ACT_OPTIONS_CHANGED;
         }
         m->nav_cooldown = NAV_REPEAT;
     }
-    if (act == ENG_MENU_ACT_NONE &&
-        (eng_action_pressed(in, ENG_ACTION_JUMP) || eng_action_pressed(in, ENG_ACTION_ATTACK))) {
-        act = confirm(m, items, n);
+    if (act != ENG_MENU_ACT_NONE) {
+        return act;
+    }
+    const bool ok_key = (in->menu_pressed & ENG_MENU_KEY_OK) != 0U;
+    const bool jump = eng_action_pressed(in, ENG_ACTION_JUMP) && (!typing || pad);
+    bool attack = eng_action_pressed(in, ENG_ACTION_ATTACK) && (!typing || pad || mouse);
+    int dir = 1;
+    if (attack && mouse) { /* un clic ne valide que la ligne sous la souris */
+        if (m->hover_item < 0 || (uint32_t)m->hover_item >= n) {
+            attack = false;
+        } else {
+            m->selected = m->hover_item;
+            dir = m->hover_dir < 0 ? -1 : 1;
+        }
+    }
+    if (ok_key || jump || attack) {
+        act = confirm(m, items, n, dir);
     }
     return act;
 }

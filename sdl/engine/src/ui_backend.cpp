@@ -19,7 +19,8 @@ namespace
 {
 
 bool g_ready = false;
-bool g_platform = false; // backend SDL3 initialisé (fenêtre réelle)
+bool g_platform = false;  // backend SDL3 initialisé (fenêtre réelle)
+ImFont *g_bold = nullptr; // police grasse des menus (ow_ui_set_bold_font)
 
 // ImGui alloue par SDL_malloc : visible du compteur d'allocations du moteur, et libérable par SDL.
 void *ui_alloc(size_t size, void *)
@@ -49,6 +50,25 @@ extern "C" bool ow_ui_set_font(const char *ttf_path, float size_px)
     io.FontDefault = font;
     ImGui::GetStyle().FontSizeBase = size_px;
     return true;
+}
+
+extern "C" bool ow_ui_set_bold_font(const char *ttf_path, float size_px)
+{
+    if (!g_ready || ttf_path == nullptr || !(size_px >= 6.0F && size_px <= 128.0F)) {
+        return false;
+    }
+    ImFont *font = ImGui::GetIO().Fonts->AddFontFromFileTTF(ttf_path, size_px);
+    if (font == nullptr) {
+        ENG_LOG_WARN("UI : police grasse illisible : %s (police courante à sa place)", ttf_path);
+        return false;
+    }
+    g_bold = font;
+    return true;
+}
+
+extern "C" void *ow_ui_bold_font(void)
+{
+    return g_ready ? g_bold : nullptr;
 }
 
 extern "C" bool ow_ui_create(void *window, void *device, uint32_t color_format)
@@ -111,6 +131,7 @@ extern "C" void ow_ui_destroy(void)
         g_platform = false;
     }
     ImGui::DestroyContext();
+    g_bold = nullptr;
     g_ready = false;
 }
 
@@ -195,6 +216,13 @@ extern "C" void ow_ui_add_mouse_pos(float x, float y)
     if (g_ready) {
         ImGui::GetIO().AddMousePosEvent(x, y);
     }
+}
+
+extern "C" void ow_ui_mouse_pos(float *x, float *y)
+{
+    const ImVec2 at = g_ready ? ImGui::GetIO().MousePos : ImVec2(-1.0F, -1.0F);
+    *x = at.x;
+    *y = at.y;
 }
 
 extern "C" void ow_ui_add_mouse_button(int button, bool down)

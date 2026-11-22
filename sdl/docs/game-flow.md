@@ -1,48 +1,95 @@
 # Partie : menus, sauvegarde, options, interface (M8)
 
-`launcher --combat` (ou `--combat --terrain fichier.hmap`) démarre sur le **menu principal**,
-après l'écran de chargement animé (`docs/splash.md`). `--new-game` le saute ; `--combat-autoplay`
-aussi (démonstration).
+`launcher --combat` (ou `--world 7 --combat`) démarre sur l'**écran-titre**, dans la continuité de
+l'écran de chargement animé (`docs/splash.md`, `docs/title-menu.md`). `--new-game` le saute ;
+`--combat-autoplay` aussi (démonstration). Lancé à la main, le jeu s'ouvre **en plein écran** tant
+que les options ne disent pas le contraire (`--windowed` : en fenêtre pour ce lancement ; F11 ou
+l'option « Plein écran » ensuite). Les lancements automatiques (`--frames`, autotests) restent en
+fenêtre.
 
-## Menus (M8-04) — `game_menu` (logique) + `ui_game` (rendu)
+## Touches des menus (2026-11-22)
+
+| Geste | Clavier | Manette | Souris |
+|---|---|---|---|
+| ouvrir le menu en jeu | **Échap**, P | Start | |
+| choisir | flèches, ZQSD | croix, stick gauche | survol (quand elle bouge) |
+| valider | **Entrée**, Espace | A, X | clic sur la ligne |
+| régler une valeur | gauche / droite | gauche / droite | clic à gauche ou à droite de la valeur |
+| revenir d'un niveau | **Échap**, Ctrl, P | B, Start | « Retour » |
+
+- **Échap ne ferme plus le jeu** : en jeu il ouvre la pause ; dans un menu il revient d'un niveau,
+  sur la ligne d'où l'on venait ; à la racine de la pause il reprend la partie ; à l'écran-titre il
+  ne fait rien. Le jeu se ferme par « Quitter », la croix de la fenêtre ou Alt+F4. (Les outils sans
+  menu, démonstration et éditeur, gardent Échap = fermer : `EngPlatform.escape_quits`.)
+- Flèches, Entrée, Échap et croix de la manette sont des **touches de menu fixes**
+  (`ENG_MENU_KEY_*` dans `EngInputState`) : elles ne dépendent pas des liaisons, on ne peut pas les
+  perdre en remappant.
+- Un clic ne valide que la ligne sous la souris (avant : il validait la ligne choisie, où que soit
+  la souris).
+- Le jeu est figé quand un menu est ouvert (la souris est alors libérée).
+- Remapper : valider une action, puis presser la nouvelle touche (clavier, souris ou manette) ; elle
+  remplace les anciennes ; Échap annule. Les liaisons s'affichent par leur nom (« Espace, manette
+  A »), dans la disposition du clavier (AZERTY : « Z » pour avancer).
+
+## Écrans — `game_menu` (logique), `menu_motion` (animation), `ui_menu` (dessin)
 
 | Écran | Lignes |
 |---|---|
-| Principal | Continuer (la partie la plus récente ; grisé sans sauvegarde), Nouvelle partie, Charger une partie (grisé sans sauvegarde), Options, Quitter |
-| Reprendre une partie | Partie 1, Partie 2, Partie 3 (résumé « Niv. 3 · 12 min » ; les emplacements vides sont grisés), Retour |
-| Nouvelle partie | Partie 1, 2, 3 (tous choisissables ; le curseur est sur le premier libre), Retour |
-| Écraser cette partie ? | Non, revenir (choisi par défaut) ; Oui, écraser la partie N |
-| Pause (P / Start) | Reprendre, Sauvegarder, Options, Menu principal |
-| Options | Volume général, effets, musique, ambiance, interface ; sensibilité ; inverser Y ; taille du texte ; contraste élevé ; anticrénelage (FXAA) ; halo lumineux (bloom) ; synchronisation verticale ; plein écran ; qualité des ombres (bas : sans filtre, moyen, haut) ; distance de vue (plan lointain x 0,5 / 1 / 1,5) ; Contrôles... ; Retour |
-| Contrôles | une ligne par action (attaque, lourde, esquive, saut, garde, sprint, verrouillage, pause), Par défaut, Retour |
+| Principal | Continuer (la partie la plus récente, nommée) — ou « Nouvelle partie » s'il n'y en a aucune —, Parties, Options, Quitter |
+| Parties | les trois emplacements (cartes), Retour |
+| Partie (emplacement occupé) | Jouer, Renommer, Dupliquer (grisé sans emplacement libre), Supprimer, Retour |
+| Nom de la partie | le nom, saisi au clavier ; Créer la partie (ou Renommer), Annuler |
+| Supprimer cette partie ? | Non, garder la partie (choisi par défaut) ; Oui, supprimer |
+| Pause | Reprendre, Sauvegarder, Options, Sauvegarder et quitter |
+| Options | Volume général, effets, musique, ambiance, interface ; sensibilité ; inverser Y ; taille du texte ; contraste élevé ; anticrénelage (FXAA) ; halo lumineux (bloom) ; synchronisation verticale ; plein écran ; qualité des ombres ; distance de vue ; SSAO ; échelle de résolution ; Contrôles... ; Retour |
+| Contrôles | une ligne par action, Par défaut, Retour |
 
-Navigation possible **sans souris** : haut/bas (ZQSD, stick) choisit, gauche/droite règle une
-valeur, Espace / A ou clic / X valide, Ctrl / B revient, P / Start ouvre ou ferme la pause. **Avec
-la souris** (2026-11-22) : la ligne survolée devient la ligne choisie quand la souris bouge, et le
-clic la valide. Le jeu est figé quand un menu est ouvert (la souris est alors libérée). Remapper :
-valider une action, puis presser la nouvelle touche (clavier, souris ou manette) ; elle remplace
-les anciennes.
+## Gestion des parties (2026-11-22) : comme la liste des mondes de Minecraft
 
-Le menu principal et les écrans des emplacements sont dessinés en colonne à gauche, sous le titre
-du jeu, sur un dégradé sombre qui laisse voir le monde à droite ; pause, options et contrôles
-restent au centre sur un voile.
+Trois emplacements : `partie1.rssv`, `partie2.rssv`, `partie3.rssv` dans le dossier de préférences
+(`~/.local/share/RedStrings/game/`). Chaque partie a un **nom**, et sa carte montre son niveau, son
+temps de jeu, le lieu et la date de sa dernière sauvegarde, et les boss vaincus.
 
-## Trois emplacements de sauvegarde (2026-11-22)
-
-- Fichiers `partie1.rssv`, `partie2.rssv`, `partie3.rssv` dans le dossier de préférences.
-- **Continuer** reprend la partie enregistrée le plus récemment (date du fichier).
-- **Nouvelle partie** : sans aucune sauvegarde, elle commence tout de suite dans l'emplacement 1 ;
-  sinon elle fait choisir l'emplacement, et demande confirmation avant d'écraser une partie
-  (« Non » est choisi par défaut). Elle est enregistrée aussitôt dans son emplacement.
-- **Sauvegarder** (pause) écrit dans l'emplacement de la partie en cours.
+- **Créer** : choisir un emplacement libre (ou « Nouvelle partie » à l'écran-titre quand il n'y en a
+  aucune), taper un nom (22 caractères au plus ; « Partie N » est proposé, la première frappe le
+  remplace ; un nom vide est refusé), Entrée. La partie est enregistrée aussitôt.
+- **Jouer** : « Continuer » reprend la partie enregistrée le plus récemment ; « Parties » permet de
+  choisir.
+- **Renommer** : le nom actuel est proposé ; le fichier garde tout le reste, sa date comprise
+  (renommer ne fait pas d'une partie « la plus récente »).
+- **Dupliquer** : copie dans le premier emplacement libre, nommée « <nom> (copie) », datée une
+  seconde avant l'original (« Continuer » reste sur l'original).
+- **Supprimer** : après confirmation (« Non » par défaut ; Échap annule). Le fichier n'est pas
+  détruit : il est renommé `partieN.rssv.supprimee` (une seule partie supprimée gardée par
+  emplacement), pour qu'une suppression par erreur reste rattrapable à la main.
+- **En jeu** : « Sauvegarder » écrit dans l'emplacement de la partie en cours ; **« Sauvegarder et
+  quitter »** enregistre puis revient à l'écran-titre (si l'écriture échoue, on reste en pause avec
+  le message d'échec). Fermer la fenêtre n'enregistre pas.
+- Pour recommencer dans un emplacement occupé : le supprimer, puis créer (il n'y a plus d'écran
+  « écraser »).
 - Une ancienne sauvegarde unique (`savegame.rssv`) est **copiée** dans l'emplacement 1 s'il est
-  libre ; l'ancien fichier reste en place.
-- Un fichier illisible compte comme occupé (« illisible ») : il n'est jamais écrasé sans
-  confirmation.
+  libre ; l'ancien fichier reste en place. Une sauvegarde d'avant les noms s'appelle « Partie N »
+  et porte la date de son fichier.
+- Un fichier illisible compte comme occupé : il n'est jamais proposé à « Continuer » ni comme
+  emplacement libre ; il ne peut qu'être supprimé.
+- Pendant la saisie du nom, le clavier **écrit** : Espace, ZQSD, P, Ctrl ne commandent rien
+  (`eng_menu_text_input`, `EngPlatform.text`). Entrée valide, Échap annule ; à la manette, A valide
+  le nom proposé.
 - `--new-game` (développement) n'écrit rien au lancement ; « Sauvegarder » vise alors le premier
   emplacement libre (le troisième s'ils sont tous pris).
 - `--save-dir DOSSIER` range les parties et les options ailleurs que dans le dossier de
   préférences (tests, essais sans toucher aux vraies parties).
+
+Fichiers : `launcher/src/game_slots.{h,c}` (décrire, renommer, copier, supprimer),
+`launcher/src/game_flow.{h,c}` (déroulé, fondus), section META de la sauvegarde (plus bas).
+
+### Fondus entre le titre et le jeu
+
+Avec l'écran de chargement (lancement à la main) : choisir une partie éteint la scène du titre
+(éclat du soleil puis noir, 0,7 s), la partie est chargée dans le noir (le relief du monde aussi),
+puis le jeu apparaît en fondu ; « Sauvegarder et quitter » assombrit le jeu puis fait apparaître le
+titre. L'action attend la fin de son fondu de sortie. Sans écran de chargement (tests) : tout est
+immédiat.
 
 ### Dans le monde ouvert (`--world`)
 
@@ -77,6 +124,11 @@ Contenu sauvegardé : position (double), cap, PV, PV max, endurance, posture, te
 chaque ennemi du camp : vivant, PV, position, cap. **Pas sauvegardé** : le mannequin, les cellules du
 monde ouvert (la section WRLD existe mais le mode combat ne l'utilise pas encore).
 
+Section facultative **META** (2026-11-22) : nom de la partie et lieu de la sauvegarde (longueur
+puis octets UTF-8), date (secondes depuis 1970, 64 bits). Sans changer de version : un jeu plus
+ancien ignore la section. Un texte plus long que la borne fait refuser le fichier ; les octets de
+contrôle d'un nom deviennent des espaces.
+
 ## Interface (M8-03) — `ui_game`
 
 Barres PV / endurance / posture en haut à gauche, cible verrouillée (nom de l'archétype, PV,
@@ -93,13 +145,21 @@ d'ambiance dans le jeu (aucun fichier son) ; seuls les coups utilisent le mixeur
 
 ## Autotest
 
-`launcher --game-selftest` (ctest `launcher.game`) : menu principal, nouvelle partie, marche,
-pause, sauvegarde, menu principal, destruction complète, relance, Continuer : position, temps de
-jeu, PV, endurance et ennemis identiques ; options relues après relance ; puis les trois
-emplacements : choix de l'emplacement d'une nouvelle partie, enregistrement immédiat,
-« Sauvegarder » dans l'emplacement en cours sans toucher aux autres, « Charger une partie »,
-confirmation avant d'écraser (« Non » ne change rien, « Oui » remplace), copie de l'ancienne
-sauvegarde unique.
+`launcher --game-selftest` (ctest `launcher.game`, 74 mesures) pilote le menu comme un joueur
+(touches de menu, texte tapé), dans un dossier à part : création d'une partie nommée, les touches
+du jeu ignorées pendant la saisie, marche, Échap et P (pause), « Sauvegarder », « Sauvegarder et
+quitter », destruction complète, relance, « Continuer » : position, temps de jeu, heure, PV,
+endurance, niveau et ennemis identiques ; options relues ; puis les emplacements : nom vide
+refusé, enregistrement immédiat, « Sauvegarder » sans toucher aux autres parties, renommer (date et
+état intacts), dupliquer, supprimer (« Non » puis « Oui », fichier mis de côté), jouer depuis la
+liste, fondus, fichier illisible (jamais proposé à « Continuer »), ancienne sauvegarde unique,
+carte d'une partie (résumé, date, boss, nom d'une copie), plein écran par défaut.
+
+De bout en bout avec le rendu (un tick par image, `--menu-script`) : `launcher.title_menu` (avec la
+scène du titre : créer, jouer, « Sauvegarder et quitter », renommer, dupliquer, supprimer),
+`launcher.menu_plain` (sans scène, de vrais événements Échap : la fenêtre ne se ferme pas),
+`launcher.menu_mouse` (survol, clics, de vrais événements de texte) ; `launcher.world_save` vérifie
+aussi le lieu (« Désert », « Château ») et les boss de la carte de la partie.
 
 ## Options graphiques (finition M8)
 

@@ -1,3 +1,4 @@
+#include <SDL3/SDL_events.h>
 #include <SDL3/SDL_filesystem.h>
 #include <SDL3/SDL_mouse.h>
 #include <SDL3/SDL_timer.h>
@@ -44,6 +45,7 @@
 #include "world_view.h"
 #include "skeleton_view.h"
 #include "splash.h"
+#include "title.h"
 #include "avatar_gallery.h"
 
 #define LAUNCHER_SSAO 0.6F /* force du SSAO quand il est activé (finition M8-06) */
@@ -114,8 +116,13 @@ static void usage(const char *prog)
     fprintf(stderr, "  --no-splash    pas d'écran de chargement animé (chargement direct, comme "
                     "avec --frames et les autotests)\n");
     fprintf(stderr, "  --splash       (développement) écran de chargement même avec --frames\n");
-    fprintf(stderr, "  --menu-screen load|new  (développement) ouvre directement la liste des "
-                    "parties à charger, ou le choix de l'emplacement d'une nouvelle partie\n");
+    fprintf(stderr, "  --windowed     fenêtre au lieu du plein écran (le jeu s'ouvre en plein "
+                    "écran par défaut)\n");
+    fprintf(stderr, "  --menu-script S  (développement) joue des touches dans le menu : "
+                    "« image:touche,... » avec up, down, left, right, ok, back, esc (événement "
+                    "Échap), bs (effacer), text=MOT, mouse=X/Y, click\n");
+    fprintf(stderr, "  --shots DOSSIER N1,N2,...  (développement) écrit les images n° N1, N2... "
+                    "en PPM dans DOSSIER\n");
     fprintf(stderr, "  --save-dir DOSSIER  parties et options dans ce dossier (au lieu du dossier "
                     "de préférences)\n");
     fprintf(stderr, "  --save-selftest  (développement) avec --world --combat --new-game : "
@@ -270,6 +277,146 @@ static bool flow_place(void *user, const double at[3], float yaw)
     return true;
 }
 
+/* Nom du lieu d'un point de la carte, pour la carte de la partie dans le menu : le château près
+ * du point de départ, sinon le biome dominant. */
+static void flow_place_name(void *user, const double at[3], char *out, size_t capacity)
+{
+    static const char *const names[ENG_BIOME_COUNT] = {"Plaine", "Montagnes", "Désert", "Volcan"};
+    const FlowWorld *h = user;
+    out[0] = '\0';
+    const EngWorldMap *map = h->world->map;
+    if (map == NULL) {
+        return;
+    }
+    if (hypot(at[0] - (double)map->spawn[0], at[2] - (double)map->spawn[1]) < 70.0) {
+        (void)snprintf(out, capacity, "Château");
+        return;
+    }
+    float weights[ENG_BIOME_COUNT];
+    eng_worldmap_weights(map, at[0], at[2], weights, NULL);
+    uint32_t best = 0;
+    for (uint32_t b = 1; b < ENG_BIOME_COUNT; b++) {
+        best = weights[b] > weights[best] ? b : best;
+    }
+    (void)snprintf(out, capacity, "%s", names[best]);
+}
+
+/* --menu-script « image:touche,... » (développement, tests) : des touches jouées dans le menu à
+ * des images données. Touches : up, down, left, right, ok, back ; bs efface un caractère ;
+ * text=MOT tape MOT ; mouse=X/Y place la souris (fractions de l'écran, de 0 à 1) ; click clique ;
+ * esc envoie un vrai événement Échap à la fenêtre, et type=MOT un vrai événement de texte : ils
+ * passent par la plateforme, comme au clavier. */
+#define MENU_SCRIPT_MAX 96U
+
+typedef struct MenuScript {
+    struct {
+        long frame;
+        uint32_t keys;
+        char text[40];
+        float mouse[2]; /* fractions de l'écran ; négatif : pas de déplacement */
+        bool click;
+        bool escape; /* événement clavier Échap, traité par la plateforme à l'image suivante */
+        bool typed;  /* `text` part en événement de texte (plateforme) au lieu d'aller au menu */
+    } step[MENU_SCRIPT_MAX];
+    uint32_t count;
+    uint32_t next;
+    uint32_t pending; /* touches en attente du prochain tick */
+} MenuScript;
+
+static bool menu_script_parse(MenuScript *s, const char *spec)
+{
+    memset(s, 0, sizeof *s);
+    const char *p = spec;
+    while (p != NULL && *p != '\0' && s->count < MENU_SCRIPT_MAX) {
+        char *end = NULL;
+        const long frame = strtol(p, &end, 10);
+        if (end == p || *end != ':') {
+            return false;
+        }
+        const char *key = end + 1;
+        const char *stop = strchr(key, ',');
+        const size_t len = stop != NULL ? (size_t)(stop - key) : strlen(key);
+        s->step[s->count].frame = frame;
+        s->step[s->count].mouse[0] = -1.0F;
+        if (len > 6U && strncmp(key, "mouse=", 6) == 0) {
+            if (sscanf(key + 6, "%f/%f", &s->step[s->count].mouse[0],
+                       &s->step[s->count].mouse[1]) != 2) {
+                return false;
+            }
+        } else if (len == 5U && strncmp(key, "click", 5) == 0) {
+            s->step[s->count].click = true;
+        } else if (len == 3U && strncmp(key, "esc", 3) == 0) {
+            s->step[s->count].escape = true;
+        } else if (len > 5U && strncmp(key, "type=", 5) == 0) {
+            (void)snprintf(s->step[s->count].text, sizeof s->step[s->count].text, "%.*s",
+                           (int)(len - 5U), key + 5);
+            s->step[s->count].typed = true;
+        } else if (len > 5U && strncmp(key, "text=", 5) == 0) {
+            (void)snprintf(s->step[s->count].text, sizeof s->step[s->count].text, "%.*s",
+                           (int)(len - 5U), key + 5);
+        } else if (len == 2U && strncmp(key, "bs", 2) == 0) {
+            (void)snprintf(s->step[s->count].text, sizeof s->step[s->count].text, "\b");
+        } else {
+            static const struct {
+                const char *name;
+                uint32_t key;
+            } keys[] = {{"up", ENG_MENU_KEY_UP},     {"down", ENG_MENU_KEY_DOWN},
+                        {"left", ENG_MENU_KEY_LEFT}, {"right", ENG_MENU_KEY_RIGHT},
+                        {"ok", ENG_MENU_KEY_OK},     {"back", ENG_MENU_KEY_BACK}};
+            for (size_t k = 0; k < sizeof keys / sizeof keys[0]; k++) {
+                if (strlen(keys[k].name) == len && strncmp(key, keys[k].name, len) == 0) {
+                    s->step[s->count].keys = keys[k].key;
+                }
+            }
+            if (s->step[s->count].keys == 0U) {
+                return false;
+            }
+        }
+        s->count++;
+        p = stop != NULL ? stop + 1 : NULL;
+    }
+    return true;
+}
+
+/* les pas de l'image `frame` : le texte va au menu, les touches attendent le prochain tick, la
+ * souris passe par l'interface (position) et par les entrées (clic gauche) */
+static void menu_script_frame(MenuScript *s, GameFlow *flow, uint64_t frame, EngUi *ui,
+                              EngPlatform *platform)
+{
+    while (s->next < s->count && s->step[s->next].frame <= (long)frame) {
+        if (s->step[s->next].typed) { /* le texte reste en place : la file le lit plus tard */
+            SDL_Event ev;
+            SDL_zero(ev);
+            ev.type = SDL_EVENT_TEXT_INPUT;
+            ev.text.text = s->step[s->next].text;
+            (void)SDL_PushEvent(&ev);
+        } else if (s->step[s->next].text[0] != '\0') {
+            game_flow_text(flow, s->step[s->next].text);
+        }
+        if (s->step[s->next].mouse[0] >= 0.0F) {
+            eng_ui_add_mouse_pos(ui, s->step[s->next].mouse[0] * (float)platform->width,
+                                 s->step[s->next].mouse[1] * (float)platform->height);
+        }
+        if (s->step[s->next].click) {
+            eng_input_mouse_button(&platform->input, SDL_BUTTON_LEFT, true);
+            eng_input_mouse_button(&platform->input, SDL_BUTTON_LEFT, false);
+        }
+        if (s->step[s->next].escape) {
+            for (int down = 1; down >= 0; down--) {
+                SDL_Event ev;
+                SDL_zero(ev);
+                ev.type = down != 0 ? SDL_EVENT_KEY_DOWN : SDL_EVENT_KEY_UP;
+                ev.key.scancode = SDL_SCANCODE_ESCAPE;
+                ev.key.key = SDLK_ESCAPE;
+                ev.key.down = down != 0;
+                (void)SDL_PushEvent(&ev);
+            }
+        }
+        s->pending |= s->step[s->next].keys;
+        s->next++;
+    }
+}
+
 /* --save-selftest (monde ouvert) : la partie est enregistrée où se trouve le joueur, le joueur est
  * envoyé au château de départ de la carte, puis la partie est reprise : il revient à sa position
  * MONDE, au sol, alors que l'origine a été recentrée entre-temps. */
@@ -290,6 +437,15 @@ static void world_save_selftest(GameFlow *flow, PlayMode *play, const WorldView 
     const bool wrote = game_flow_save_now(flow, play);
     const double castle[3] = {world->map != NULL ? (double)world->map->spawn[0] : 0.0, 0.0,
                               world->map != NULL ? (double)world->map->spawn[1] : 0.0};
+    /* la carte de la partie (menu « Parties ») : le lieu de la sauvegarde, les boss de la carte */
+    char near_castle[32] = "";
+    if (flow->world.place_name != NULL) {
+        flow->world.place_name(flow->world.user, castle, near_castle, sizeof near_castle);
+    }
+    const EngMenuSlot *card = &flow->menu.slots[slot];
+    ENG_LOG_INFO("AUTOTEST SAUVEGARDE MONDE : carte de la partie : lieu « %s », %u boss ; au "
+                 "château : « %s »",
+                 card->place, (unsigned)card->boss_count, near_castle);
     const bool sent =
         flow->world.place != NULL && flow->world.place(flow->world.user, castle, 0.0F);
     /* mesuré ici, au milieu du trajet : un aller-retour ramène la même origine et masquerait un
@@ -806,9 +962,12 @@ int main(int argc, char **argv)
     bool splash_forced = false;          /* --splash : écran de chargement même avec --frames */
     bool splash_disabled = false;        /* --no-splash */
     const char *splash_shots_dir = NULL; /* --splash-shots DOSSIER */
-    const char *menu_screen = NULL;      /* --menu-screen load|new : écran ouvert au lancement */
-    const char *save_dir = NULL;         /* --save-dir DOSSIER : parties et options ailleurs */
-    bool save_selftest = false;          /* --save-selftest : sauvegarde dans le monde ouvert */
+    const char *menu_script_spec = NULL; /* --menu-script : touches jouées dans le menu */
+    const char *shots_dir = NULL;        /* --shots DOSSIER LISTE : images écrites en PPM */
+    const char *shots_list = NULL;
+    bool windowed = false;       /* --windowed : pas de plein écran par défaut */
+    const char *save_dir = NULL; /* --save-dir DOSSIER : parties et options ailleurs */
+    bool save_selftest = false;  /* --save-selftest : sauvegarde dans le monde ouvert */
     double world_autopilot = 0.0;
     const char *screenshot_path = NULL;
     long screenshot_frame = 0;
@@ -869,8 +1028,13 @@ int main(int argc, char **argv)
             splash_disabled = true;
         } else if (strcmp(argv[i], "--splash-shots") == 0 && i + 1 < argc) {
             splash_shots_dir = argv[++i];
-        } else if (strcmp(argv[i], "--menu-screen") == 0 && i + 1 < argc) {
-            menu_screen = argv[++i];
+        } else if (strcmp(argv[i], "--menu-script") == 0 && i + 1 < argc) {
+            menu_script_spec = argv[++i];
+        } else if (strcmp(argv[i], "--shots") == 0 && i + 2 < argc) {
+            shots_dir = argv[++i];
+            shots_list = argv[++i];
+        } else if (strcmp(argv[i], "--windowed") == 0) {
+            windowed = true;
         } else if (strcmp(argv[i], "--save-dir") == 0 && i + 1 < argc) {
             save_dir = argv[++i];
         } else if (strcmp(argv[i], "--save-selftest") == 0) {
@@ -1212,15 +1376,26 @@ int main(int argc, char **argv)
         .width = config.window_width,
         .height = config.window_height,
         .resizable = true,
-        /* le plein écran des options du jeu dès l'ouverture (pas au milieu du chargement) */
-        .fullscreen = config.fullscreen || (interactive && play_enabled && combat_enabled &&
-                                            game_flow_saved_fullscreen()),
+        /* le plein écran des options du jeu dès l'ouverture (pas au milieu du chargement) ; le
+         * jeu lancé à la main s'ouvre en plein écran tant que les options ne disent pas le
+         * contraire (--windowed : en fenêtre) */
+        .fullscreen = config.fullscreen || (interactive && !windowed && play_enabled &&
+                                            combat_enabled && game_flow_saved_fullscreen(true)),
         .vsync = config.vsync,
         .no_software_surface = !force_software, /* la fenêtre ira au GPU, sauf repli */
         .hidden_until_shown = splash_wanted && splash_shots_dir == NULL,
     };
     EngPlatform platform;
     if (!eng_platform_init(&platform, &desc)) {
+        eng_log_shutdown();
+        return 1;
+    }
+    /* le jeu a un menu : Échap l'ouvre ou y revient en arrière, et ne ferme plus la fenêtre */
+    platform.escape_quits = !(play_enabled && combat_enabled);
+    static MenuScript menu_script;
+    if (menu_script_spec != NULL && !menu_script_parse(&menu_script, menu_script_spec)) {
+        ENG_LOG_ERROR("--menu-script : « %s » illisible (image:touche,...)", menu_script_spec);
+        eng_platform_shutdown(&platform);
         eng_log_shutdown();
         return 1;
     }
@@ -1359,6 +1534,7 @@ int main(int argc, char **argv)
     /* Interface de debug (M1-12) : Dear ImGui dessinée par-dessus la scène, dans une passe à part.
      * F1 l'affiche ou la masque ; masquée, elle ne coûte rien (aucune image d'interface). */
     EngUi ui = {0};
+    static Title title;
     bool use_ui = false;
     if (use_renderer && eng_ui_available()) {
         use_ui = eng_ui_init(&ui, platform.window, gpu.device, eng_gpu_swapchain_format(&gpu));
@@ -1368,9 +1544,15 @@ int main(int argc, char **argv)
                                  "assets/fonts/NotoSans-Regular.ttf")) { /* M8-03 (OFL) */
                 (void)eng_ui_set_font(&ui, font_path, 17.0F);
             }
+            if (eng_path_resolve(font_path, sizeof font_path,
+                                 "assets/fonts/NotoSans-Bold.ttf")) { /* titres des menus */
+                (void)eng_ui_set_bold_font(&ui, font_path, 17.0F);
+            }
             platform.event_hook = eng_ui_event_hook;
             platform.event_hook_user = &ui;
-            eng_renderer_set_overlay(&renderer, eng_ui_overlay_prepare, eng_ui_overlay_draw, &ui);
+            /* la passe de l'interface : la scène de l'écran-titre (title.h), puis l'interface */
+            title_init(&title, NULL, &ui);
+            eng_renderer_set_overlay(&renderer, title_overlay_prepare, title_overlay_draw, &title);
             platform.debug_ui = start_with_ui;
             ENG_LOG_INFO("interface de debug : F1 l'affiche (la souris est alors libérée), F3 le "
                          "debug draw");
@@ -1509,12 +1691,16 @@ int main(int argc, char **argv)
             if (save_dir != NULL) {
                 (void)SDL_CreateDirectory(save_dir);
             }
-            use_flow =
-                play.combat != NULL && game_flow_init(&flow, &play, &platform.input, save_dir);
+            use_flow = play.combat != NULL && game_flow_init(&flow, &play, &platform.input,
+                                                             save_dir, interactive && !windowed);
             if (use_flow && world_mode) { /* sauvegarde : position monde, relief rechargé */
                 flow_world = (FlowWorld){&world, &play, &camera, &camera_prev};
-                game_flow_set_world(&flow,
-                                    &(GameFlowWorld){&flow_world, flow_to_world, flow_place});
+                game_flow_set_world(
+                    &flow, &(GameFlowWorld){&flow_world, flow_to_world, flow_place, flow_place_name,
+                                            world.map != NULL ? ENG_BIOME_COUNT : 0U});
+            }
+            if (use_flow && windowed) { /* --windowed : ce lancement reste en fenêtre */
+                flow.options.fullscreen = platform.fullscreen;
             }
             if (use_flow && flow.options.fullscreen != platform.fullscreen) {
                 /* B19 : le plein écran enregistré, appliqué au lancement (ensuite les options
@@ -1523,9 +1709,6 @@ int main(int argc, char **argv)
             }
             if (use_flow && (start_new_game || combat_autoplay)) {
                 game_flow_start_new(&flow, &play);
-            } else if (use_flow && menu_screen != NULL) { /* développement : captures du menu */
-                eng_menu_open(&flow.menu,
-                              strcmp(menu_screen, "new") == 0 ? ENG_MENU_NEW : ENG_MENU_LOAD);
             }
             float gate[3];
             if (at_boss && play.combat != NULL && play_combat_boss_gate(play.combat, gate)) {
@@ -1702,13 +1885,38 @@ int main(int argc, char **argv)
     /* Fin de l'écran de chargement : le titre finit d'apparaître, la scène s'éteint. Une touche
      * pressée pendant l'animation ne doit pas agir sur le menu qui suit. */
     if (splash.ready) {
-        splash_finish(&splash, &platform);
+        /* vers l'écran-titre : la scène continue, sans sortie ; vers le jeu : éclat puis noir */
+        const bool to_title = use_flow && use_ui && game_flow_in_title(&flow);
+        splash_finish(&splash, &platform, !to_title);
         eng_input_release_all(&platform.input);
         EngInputState discarded;
         eng_input_begin_tick(&platform.input, &discarded);
-        if (use_flow) {
-            game_flow_fade_in(&flow); /* l'écran de chargement finit au noir : le menu en sort */
+        if (use_flow && !to_title) {
+            game_flow_fade_in(&flow); /* l'écran de chargement finit au noir : le jeu en sort */
         }
+        if (use_ui) {
+            title_init(&title, &splash, &ui);
+        }
+    }
+    if (use_flow) { /* fondus entre le titre et le jeu : avec l'écran de chargement seulement */
+        game_flow_set_transitions(&flow, splash.ready, title_ready(&title));
+    }
+    /* --shots : numéros des images à écrire */
+    long shot_frames[64];
+    uint32_t shot_count = 0;
+    uint32_t shot_next = 0;
+    static char shot_path[1100];
+    for (const char *sp = shots_list; sp != NULL && *sp != '\0' && shot_count < 64U;) {
+        char *end = NULL;
+        const long n = strtol(sp, &end, 10);
+        if (end == sp) {
+            break;
+        }
+        shot_frames[shot_count++] = n;
+        sp = *end == ',' ? end + 1 : end;
+    }
+    if (shots_dir != NULL) {
+        (void)SDL_CreateDirectory(shots_dir);
     }
 
     /* Échauffement : SDL alloue paresseusement sa file d'événements. On la sollicite une fois
@@ -1764,6 +1972,13 @@ int main(int argc, char **argv)
         alive = eng_platform_pump(&platform);
         if (use_flow) {
             flow.options.fullscreen = platform.fullscreen;
+            /* nom d'une partie : le clavier écrit (les touches du jeu sont alors ignorées) */
+            eng_platform_set_text_input(&platform, game_flow_wants_text(&flow));
+            char typed[64];
+            if (eng_platform_take_text(&platform, typed, sizeof typed) > 0U) {
+                game_flow_text(&flow, typed);
+            }
+            menu_script_frame(&menu_script, &flow, frame, &ui, &platform);
         }
         if (save_selftest && use_flow && world.ready && frame == 8U) {
             world_save_selftest(&flow, &play, &world);
@@ -1777,6 +1992,9 @@ int main(int argc, char **argv)
         }
         ENG_PROF_ZONE_END(z_events);
         uint32_t steps = eng_loop_advance(&loop, clock.dt_counter);
+        if (menu_script.count > 0U) {
+            steps = 1; /* --menu-script : un tick par image, le même déroulé sur toute machine */
+        }
         ENG_PROF_PLOT("pas de simulation", steps);
         ENG_PROF_ZONE(z_sim, "simulation");
         uint32_t frozen_steps = 0; /* F6 : ticks avancés pendant le gel (animations) */
@@ -1786,6 +2004,11 @@ int main(int argc, char **argv)
             platform.input.axes[ENG_AXIS_LOOK].mouse_sensitivity =
                 platform.mouse_captured ? mouse_look_sensitivity : 0.0F;
             eng_input_begin_tick(&platform.input, &input); /* UNE fois par pas */
+            if (menu_script.pending != 0U) { /* --menu-script : touches du menu jouées */
+                input.menu_pressed |= menu_script.pending;
+                input.menu_held |= menu_script.pending;
+                menu_script.pending = 0;
+            }
             camera_prev = camera;
             if (use_play) {
                 /* F5 : jeu gelé ; F6 : un tick par pression (débogage du combat, M5-16) */
@@ -1968,8 +2191,16 @@ int main(int argc, char **argv)
                     EngRenderQueue *queue = eng_renderer_begin_frame(&renderer);
                     (void)eng_lighting_set_sun_angles(&lighting, sun_azimuth, sun_elevation);
                     shadow_params.pcf_radius = (uint32_t)shadow_radius;
-                    demo_scene_draw(&scene, &renderer, queue, sim_time, &view_camera, aspect,
-                                    &lighting, shadow_enabled ? &shadow_params : NULL);
+                    /* écran-titre : sa scène couvre tout l'écran, le jeu n'est pas dessiné */
+                    const bool title_on =
+                        use_flow && title_ready(&title) && game_flow_in_title(&flow);
+                    /* animation du menu : au rythme des images ; pas fixe pour les lancements
+                     * automatiques (l'image n° N montre toujours le même instant) */
+                    const float menu_dt = interactive ? (float)clock.dt : 1.0F / 60.0F;
+                    if (!title_on) {
+                        demo_scene_draw(&scene, &renderer, queue, sim_time, &view_camera, aspect,
+                                        &lighting, shadow_enabled ? &shadow_params : NULL);
+                    }
                     if (use_editor) {
                         if (editor_selftest) {
                             /* le modèle est chargé par demo_scene_update : on attend quelques
@@ -2010,8 +2241,8 @@ int main(int argc, char **argv)
                         }
                     }
                     play_hook.alpha = frame_alpha;
-                    if (platform.debug_draw || use_editor || use_play ||
-                        play_hook.skeleton != NULL) {
+                    if (!title_on && (platform.debug_draw || use_editor || use_play ||
+                                      play_hook.skeleton != NULL)) {
                         /* F3 ; en dernier : les lignes recouvrent la scène */
                         demo_scene_draw_debug(&scene, &renderer, queue, sim_time, &view_camera,
                                               aspect, platform.debug_draw,
@@ -2070,7 +2301,7 @@ int main(int argc, char **argv)
                             }
                             if (use_flow) {
                                 game_flow_draw(&flow, &ui, &play, &view_camera, aspect,
-                                               platform.width, platform.height);
+                                               platform.width, platform.height, menu_dt);
                             }
                             if (use_editor) {
                                 EngUiEditorResult editor_result = {0};
@@ -2082,6 +2313,17 @@ int main(int argc, char **argv)
                             }
                             eng_ui_end_frame(&ui);
                         }
+                    }
+                    title_frame(&title, use_flow ? &flow : NULL, menu_dt, (uint32_t)platform.width,
+                                (uint32_t)platform.height);
+                    if (shot_next < shot_count && (gpu.capture_path == NULL || gpu.captured)) {
+                        /* --shots : l'image suivante de la liste */
+                        (void)snprintf(shot_path, sizeof shot_path, "%s/image-%04ld.ppm", shots_dir,
+                                       shot_frames[shot_next]);
+                        gpu.capture_path = shot_path;
+                        gpu.capture_frame = (uint64_t)shot_frames[shot_next];
+                        gpu.captured = false;
+                        shot_next++;
                     }
                     /* Fin du travail CPU de l'image (la présentation, qui attend la synchro
                      * verticale, n'en fait pas partie). */
@@ -2111,6 +2353,17 @@ int main(int argc, char **argv)
         (unsigned long long)loop.tick_count, (unsigned)loop.tick_hz,
         (unsigned long long)loop.clamped_frames, (unsigned)game.reload_count);
     eng_memory_log_stats(&memory);
+    if (use_flow) { /* état du menu à l'arrêt (tests de --menu-script) */
+        uint32_t used_slots = 0;
+        for (uint32_t i = 0; i < ENG_MENU_SLOTS; i++) {
+            used_slots += flow.menu.slots[i].used ? 1U : 0U;
+        }
+        ENG_LOG_INFO("MENU : écran %d, ligne %d ; %u emplacement(s) occupé(s) ; partie en cours "
+                     "« %s »%s ; scène du titre : %llu image(s)",
+                     (int)flow.menu.screen, (int)flow.menu.selected, used_slots, flow.name,
+                     flow.started && !game_flow_in_title(&flow) ? " (en jeu)" : "",
+                     (unsigned long long)title.frames);
+    }
     if (use_ui) {
         platform.event_hook = NULL;
         eng_renderer_set_overlay(&renderer, NULL, NULL, NULL);
@@ -2175,6 +2428,7 @@ int main(int argc, char **argv)
     int exit_code = selftest_failed ? 1 : 0;
     if (use_gpu) {
         eng_gpu_wait_idle(&gpu);
+        splash_shutdown(&splash); /* la scène de l'écran de chargement et du titre */
         const bool balanced = eng_gpu_resources_balanced(&gpu);
         ENG_LOG_INFO(
             "GPU : %llu redimensionnement(s), %llu image(s) ignorée(s), %u image(s) en vol "

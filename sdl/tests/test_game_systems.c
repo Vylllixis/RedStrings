@@ -253,6 +253,110 @@ UTEST(save_game, file_write_is_atomic_and_reads_back)
     EXPECT_FALSE(eng_save_read_file(path, &r, NULL, err, sizeof err));
 }
 
+UTEST(save_game, the_meta_section_names_the_game_and_is_optional)
+{
+    EngSaveGame s = sample();
+    /* sans META : rien n'est inventé */
+    size_t n = eng_save_encode(&s, NULL, g_buf, sizeof g_buf);
+    ASSERT_GT(n, 0U);
+    EngSaveGame r;
+    char err[128];
+    ASSERT_TRUE(eng_save_decode(g_buf, n, &r, NULL, err, sizeof err));
+    EXPECT_FALSE(r.has_meta);
+    EXPECT_STREQ(r.name, "");
+    EXPECT_EQ(r.saved_at, 0);
+    /* nom (accents compris), lieu et date reviennent à l'identique */
+    s.has_meta = true;
+    (void)snprintf(s.name, sizeof s.name, "Th\xC3\xA9o, l'\xC3\xA9t\xC3\xA9");
+    (void)snprintf(s.place, sizeof s.place, "D\xC3\xA9sert");
+    s.saved_at = 1795343215LL + (5LL << 32); /* plus de 32 bits : les deux moitiés comptent */
+    const size_t with_meta = eng_save_encode(&s, NULL, g_buf, sizeof g_buf);
+    ASSERT_GT(with_meta, n);
+    ASSERT_TRUE(eng_save_decode(g_buf, with_meta, &r, NULL, err, sizeof err));
+    EXPECT_TRUE(r.has_meta);
+    EXPECT_STREQ(r.name, s.name);
+    EXPECT_STREQ(r.place, s.place);
+    EXPECT_EQ(r.saved_at, s.saved_at);
+    EXPECT_NEAR(r.play_time, s.play_time, 0.0); /* le reste de la partie n'a pas bougé */
+    EXPECT_EQ(r.enemy_count, 3U);
+    /* le nom le plus long accepté (31 octets) passe ; un texte sans zéro final n'est pas écrit */
+    memset(s.name, 'x', sizeof s.name - 1U);
+    s.name[sizeof s.name - 1U] = '\0';
+    n = eng_save_encode(&s, NULL, g_buf, sizeof g_buf);
+    ASSERT_GT(n, 0U);
+    ASSERT_TRUE(eng_save_decode(g_buf, n, &r, NULL, err, sizeof err));
+    EXPECT_EQ(strlen(r.name), sizeof r.name - 1U);
+    memset(s.name, 'x', sizeof s.name);
+    EXPECT_EQ(eng_save_encode(&s, NULL, g_buf, sizeof g_buf), 0U);
+}
+
+/* Une sauvegarde dont la section META est fabriquée à la main : `name_len` octets de `name`
+ * annoncés comme nom (ou `announced` s'il est donné), un lieu vide, une date. La section est
+ * ajoutée à une sauvegarde sans META ; le nombre de sections et la somme de contrôle sont refaits.
+ */
+static size_t forged_meta(const char *name, uint32_t name_len, uint32_t announced)
+{
+    const EngSaveGame s = sample();
+    size_t n = eng_save_encode(&s, NULL, g_buf, sizeof g_buf);
+    if (n == 0U || n + 64U + name_len > sizeof g_buf) {
+        return 0;
+    }
+    const uint32_t size = 4U + name_len + 4U + 8U;
+    memcpy(&g_buf[n], "META", 4);
+    g_buf[n + 4U] = (uint8_t)size;
+    g_buf[n + 5U] = (uint8_t)(size >> 8);
+    g_buf[n + 6U] = 0;
+    g_buf[n + 7U] = 0;
+    n += 8U;
+    g_buf[n] = (uint8_t)announced;
+    g_buf[n + 1U] = (uint8_t)(announced >> 8);
+    g_buf[n + 2U] = 0;
+    g_buf[n + 3U] = 0;
+    memcpy(&g_buf[n + 4U], name, name_len);
+    n += 4U + name_len;
+    memset(&g_buf[n], 0, 4U); /* lieu vide */
+    memset(&g_buf[n + 4U], 0, 8U);
+    g_buf[n + 4U] = 42U; /* date : 42 s */
+    n += 12U;
+    g_buf[8]++;               /* une section de plus (le nombre tient sur un octet ici) */
+    uint32_t h = 2166136261U; /* FNV-1a de tout ce qui suit l'en-tête de 16 octets */
+    for (size_t i = 16; i < n; i++) {
+        h = (h ^ g_buf[i]) * 16777619U;
+    }
+    g_buf[12] = (uint8_t)h;
+    g_buf[13] = (uint8_t)(h >> 8);
+    g_buf[14] = (uint8_t)(h >> 16);
+    g_buf[15] = (uint8_t)(h >> 24);
+    return n;
+}
+
+UTEST(save_game, a_damaged_meta_section_is_refused_and_control_bytes_are_blanked)
+{
+    static const char long_name[] = "0123456789012345678901234567890123456789";
+    EngSaveGame r;
+    char err[128];
+    /* des octets de contrôle dans le nom deviennent des espaces (pas de saut de ligne dans un
+     * menu) */
+    size_t n = forged_meta("a\n\tb\x7F", 5U, 5U);
+    ASSERT_GT(n, 0U);
+    ASSERT_TRUE(eng_save_decode(g_buf, n, &r, NULL, err, sizeof err));
+    EXPECT_TRUE(r.has_meta);
+    EXPECT_STREQ(r.name, "a  b ");
+    EXPECT_EQ(r.saved_at, 42);
+    /* le nom le plus long accepté : 31 octets (le 32e est le zéro final) */
+    n = forged_meta(long_name, (uint32_t)sizeof r.name - 1U, (uint32_t)sizeof r.name - 1U);
+    ASSERT_TRUE(eng_save_decode(g_buf, n, &r, NULL, err, sizeof err));
+    EXPECT_EQ(strlen(r.name), sizeof r.name - 1U);
+    /* un octet de plus, bien présent dans le fichier : le fichier ENTIER est refusé (rien n'est lu
+     * à moitié, rien n'est écrit hors du nom) */
+    n = forged_meta(long_name, (uint32_t)sizeof r.name, (uint32_t)sizeof r.name);
+    ASSERT_GT(n, 0U);
+    EXPECT_FALSE(eng_save_decode(g_buf, n, &r, NULL, err, sizeof err));
+    /* une longueur annoncée qui dépasse la section : refusé aussi */
+    n = forged_meta("abcd", 4U, 200U);
+    EXPECT_FALSE(eng_save_decode(g_buf, n, &r, NULL, err, sizeof err));
+}
+
 /* ── menus ── */
 
 static EngInputState none_in(void)
@@ -283,6 +387,27 @@ static EngMenuAction stick(EngMenu *m, float x, float y)
     return r;
 }
 
+static EngMenuAction menu_key(EngMenu *m, uint32_t k)
+{
+    EngInputState in = none_in();
+    in.menu_pressed = k;
+    in.menu_held = k;
+    const EngMenuAction r = eng_menu_update(m, &in);
+    EngInputState idle = none_in();
+    (void)eng_menu_update(m, &idle); /* touche relâchée */
+    return r;
+}
+
+static void use_slot(EngMenu *m, uint32_t index, const char *name, const char *summary)
+{
+    EngMenuSlot s;
+    memset(&s, 0, sizeof s);
+    s.used = true;
+    (void)snprintf(s.name, sizeof s.name, "%s", name);
+    (void)snprintf(s.summary, sizeof s.summary, "%s", summary);
+    eng_menu_set_slot(m, index, &s);
+}
+
 UTEST(game_menu, the_whole_menu_tree_is_reachable_without_a_mouse)
 {
     EngGameOptions opt;
@@ -293,12 +418,18 @@ UTEST(game_menu, the_whole_menu_tree_is_reachable_without_a_mouse)
     EngMenu m;
     eng_menu_init(&m, &opt, &input);
     eng_menu_open(&m, ENG_MENU_MAIN);
-    m.has_save = false;
     EngInputState idle = none_in();
     (void)eng_menu_update(&m, &idle);
-    EXPECT_EQ(m.selected, 1); /* « Continuer » grisé : sélection sur « Nouvelle partie » */
-    (void)stick(&m, 0.0F, -1.0F);
-    EXPECT_EQ(m.selected, 3); /* Options : « Charger une partie », grisé, est sauté */
+    EngMenuItem items[ENG_MENU_MAX_ITEMS];
+    ASSERT_EQ(eng_menu_items(&m, items, ENG_MENU_MAX_ITEMS), 4U);
+    EXPECT_STREQ(items[0].label, "Nouvelle partie"); /* aucune sauvegarde : pas de « Continuer » */
+    EXPECT_STREQ(items[1].label, "Parties");
+    EXPECT_STREQ(items[3].label, "Quitter");
+    EXPECT_EQ(m.selected, 0);
+    /* la barre du menu principal : gauche / droite (le stick comme les flèches) */
+    (void)stick(&m, 1.0F, 0.0F);
+    (void)stick(&m, 1.0F, 0.0F);
+    EXPECT_EQ(m.selected, 2);
     EXPECT_EQ(press(&m, ENG_ACTION_JUMP), ENG_MENU_ACT_NONE);
     EXPECT_EQ(m.screen, ENG_MENU_OPTIONS);
     EXPECT_EQ(stick(&m, -1.0F, 0.0F), ENG_MENU_ACT_OPTIONS_CHANGED); /* volume général -10 % */
@@ -309,166 +440,374 @@ UTEST(game_menu, the_whole_menu_tree_is_reachable_without_a_mouse)
     EXPECT_NEAR(opt.master, 0.0F, 1e-6F); /* borné à 0 */
     (void)press(&m, ENG_ACTION_DODGE);    /* retour */
     EXPECT_EQ(m.screen, ENG_MENU_MAIN);
-    EXPECT_EQ(press(&m, ENG_ACTION_JUMP), ENG_MENU_ACT_NEW_GAME); /* sélection revenue au début */
-    EXPECT_FALSE(eng_menu_is_open(&m));
-    /* en jeu : Pause ouvre, Pause referme */
+    EXPECT_EQ(m.selected, 2);     /* on revient sur « Options » */
+    (void)stick(&m, 0.0F, -1.0F); /* bas : ligne suivante aussi */
+    EXPECT_EQ(m.selected, 3);
+    (void)stick(&m, 1.0F, 0.0F); /* la barre boucle */
+    EXPECT_EQ(m.selected, 0);
+    (void)stick(&m, -1.0F, 0.0F);
+    EXPECT_EQ(m.selected, 3);
+    EXPECT_EQ(press(&m, ENG_ACTION_JUMP), ENG_MENU_ACT_QUIT);
+    /* en jeu : Pause ouvre ; revenir à la racine de la pause reprend la partie */
+    m.screen = ENG_MENU_CLOSED;
     EXPECT_EQ(press(&m, ENG_ACTION_PAUSE), ENG_MENU_ACT_NONE);
     EXPECT_EQ(m.screen, ENG_MENU_PAUSE);
     EXPECT_EQ(press(&m, ENG_ACTION_PAUSE), ENG_MENU_ACT_RESUME);
+    EXPECT_FALSE(eng_menu_is_open(&m));
     (void)press(&m, ENG_ACTION_PAUSE);
     (void)stick(&m, 0.0F, -1.0F);
     EXPECT_EQ(press(&m, ENG_ACTION_ATTACK), ENG_MENU_ACT_SAVE);
     EXPECT_EQ(m.screen, ENG_MENU_PAUSE); /* sauvegarder ne ferme pas la pause */
     (void)stick(&m, 0.0F, -1.0F);
     (void)stick(&m, 0.0F, -1.0F);
+    ASSERT_EQ(eng_menu_items(&m, items, ENG_MENU_MAX_ITEMS), 4U);
+    EXPECT_STREQ(items[3].label, "Sauvegarder et quitter");
     EXPECT_EQ(press(&m, ENG_ACTION_JUMP), ENG_MENU_ACT_TO_MAIN);
-    EXPECT_EQ(m.screen, ENG_MENU_MAIN);
+    EXPECT_EQ(m.screen, ENG_MENU_PAUSE); /* l'appelant enregistre, puis ouvre le menu principal */
+    /* avec une partie : « Continuer » reprend la plus récente */
+    eng_menu_open(&m, ENG_MENU_MAIN);
+    use_slot(&m, 1, "Aube", "Niv. 3 · 12 min");
     m.has_save = true;
-    EXPECT_EQ(m.selected, 1);    /* « Continuer » était grisé à l'arrivée */
-    (void)stick(&m, 0.0F, 1.0F); /* remonte d'une ligne */
-    EXPECT_EQ(m.selected, 0);
+    m.last_slot = 1;
+    ASSERT_EQ(eng_menu_items(&m, items, ENG_MENU_MAX_ITEMS), 4U);
+    EXPECT_STREQ(items[0].label, "Continuer");
+    EXPECT_NE(strstr(items[0].value, "Aube"), NULL);
+    EXPECT_NE(strstr(items[0].value, "Niv. 3"), NULL);
     EXPECT_EQ(press(&m, ENG_ACTION_JUMP), ENG_MENU_ACT_CONTINUE);
+    EXPECT_EQ(m.slot, 1);
+    EXPECT_FALSE(eng_menu_is_open(&m));
 }
 
-UTEST(game_menu, three_slots_continue_the_latest_load_any_and_confirm_before_overwriting)
+UTEST(game_menu, escape_opens_the_menu_goes_back_one_level_and_never_quits)
+{
+    EngGameOptions opt;
+    eng_options_default(&opt);
+    EngMenu m;
+    eng_menu_init(&m, &opt, NULL);
+    /* en jeu : Échap ouvre la pause */
+    EXPECT_EQ(menu_key(&m, ENG_MENU_KEY_BACK), ENG_MENU_ACT_NONE);
+    EXPECT_EQ(m.screen, ENG_MENU_PAUSE);
+    /* pause -> options (flèches, Entrée) ; Échap revient d'UN niveau, sur la ligne d'où l'on vient
+     */
+    (void)menu_key(&m, ENG_MENU_KEY_DOWN);
+    (void)menu_key(&m, ENG_MENU_KEY_DOWN);
+    EXPECT_EQ(m.selected, 2);
+    EXPECT_EQ(menu_key(&m, ENG_MENU_KEY_OK), ENG_MENU_ACT_NONE);
+    EXPECT_EQ(m.screen, ENG_MENU_OPTIONS);
+    EXPECT_EQ(menu_key(&m, ENG_MENU_KEY_LEFT), ENG_MENU_ACT_OPTIONS_CHANGED); /* flèche : régler */
+    EXPECT_NEAR(opt.master, 0.7F, 1e-5F);
+    EXPECT_EQ(menu_key(&m, ENG_MENU_KEY_BACK), ENG_MENU_ACT_NONE);
+    EXPECT_EQ(m.screen, ENG_MENU_PAUSE);
+    EXPECT_EQ(m.selected, 2);
+    /* à la racine de la pause, Échap reprend la partie */
+    EXPECT_EQ(menu_key(&m, ENG_MENU_KEY_BACK), ENG_MENU_ACT_RESUME);
+    EXPECT_FALSE(eng_menu_is_open(&m));
+    /* à l'écran-titre, Échap ne ferme rien : seul « Quitter » quitte */
+    eng_menu_open(&m, ENG_MENU_MAIN);
+    for (int i = 0; i < 3; i++) {
+        EXPECT_EQ(menu_key(&m, ENG_MENU_KEY_BACK), ENG_MENU_ACT_NONE);
+        EXPECT_EQ(m.screen, ENG_MENU_MAIN);
+    }
+    (void)menu_key(&m, ENG_MENU_KEY_RIGHT);
+    EXPECT_EQ(m.selected, 1);
+    EXPECT_EQ(menu_key(&m, ENG_MENU_KEY_OK), ENG_MENU_ACT_NONE);
+    EXPECT_EQ(m.screen, ENG_MENU_SAVES);
+    EXPECT_EQ(menu_key(&m, ENG_MENU_KEY_BACK), ENG_MENU_ACT_NONE);
+    EXPECT_EQ(m.screen, ENG_MENU_MAIN);
+    EXPECT_EQ(m.selected, 1);
+    /* une flèche tenue se répète : un pas tout de suite, puis un toutes les 200 ms (12 ticks) */
+    eng_menu_open(&m, ENG_MENU_PAUSE);
+    EngInputState held = none_in();
+    held.menu_held = ENG_MENU_KEY_DOWN;
+    held.menu_pressed = ENG_MENU_KEY_DOWN;
+    (void)eng_menu_update(&m, &held);
+    EXPECT_EQ(m.selected, 1);
+    held.menu_pressed = 0;
+    for (int i = 0; i < 11; i++) {
+        (void)eng_menu_update(&m, &held);
+    }
+    EXPECT_EQ(m.selected, 1);
+    (void)eng_menu_update(&m, &held);
+    EXPECT_EQ(m.selected, 2);
+}
+
+UTEST(game_menu, three_slots_are_managed_like_a_list_of_worlds)
 {
     EngGameOptions opt;
     eng_options_default(&opt);
     EngMenu m;
     eng_menu_init(&m, &opt, NULL);
     eng_menu_open(&m, ENG_MENU_MAIN);
-    EngInputState idle = none_in();
     EngMenuItem items[ENG_MENU_MAX_ITEMS];
-    /* aucune partie : « Continuer » et « Charger » grisés ; la nouvelle partie commence aussitôt
-     * dans l'emplacement 1 */
-    (void)eng_menu_update(&m, &idle);
-    ASSERT_EQ(eng_menu_items(&m, items, ENG_MENU_MAX_ITEMS), 5U);
-    EXPECT_STREQ(items[2].label, "Charger une partie");
-    EXPECT_FALSE(items[0].enabled);
-    EXPECT_FALSE(items[2].enabled);
-    EXPECT_STREQ(items[0].value, "");
-    m.slot = 2;
-    EXPECT_EQ(press(&m, ENG_ACTION_JUMP), ENG_MENU_ACT_NEW_GAME);
+    /* aucune partie : « Nouvelle partie » fait nommer la partie de l'emplacement 1 */
+    EXPECT_EQ(menu_key(&m, ENG_MENU_KEY_OK), ENG_MENU_ACT_NONE);
+    EXPECT_EQ(m.screen, ENG_MENU_NAME);
     EXPECT_EQ(m.slot, 0);
-    EXPECT_FALSE(eng_menu_is_open(&m));
-    /* une partie dans l'emplacement 1 : « Continuer » la reprend, et l'annonce */
-    eng_menu_set_slot(&m, 0U, true, "Niv. 2 · 5 min");
+    EXPECT_STREQ(m.text, "Partie 1");
+    EXPECT_TRUE(m.text_fresh);
+    EXPECT_EQ(menu_key(&m, ENG_MENU_KEY_BACK), ENG_MENU_ACT_NONE); /* annuler : rien n'est créé */
+    EXPECT_EQ(m.screen, ENG_MENU_SAVES);
+    /* les trois emplacements côte à côte : gauche / droite sans boucler, « Retour » dessous */
+    use_slot(&m, 0, "Alpha", "Niv. 3 · 12 min");
     m.has_save = true;
     m.last_slot = 0;
-    eng_menu_open(&m, ENG_MENU_MAIN);
-    (void)eng_menu_update(&m, &idle);
-    EXPECT_EQ(m.selected, 0);
-    (void)eng_menu_items(&m, items, ENG_MENU_MAX_ITEMS);
-    EXPECT_STREQ(items[0].value, "partie 1");
-    EXPECT_TRUE(items[2].enabled);
-    /* « Nouvelle partie » fait maintenant choisir l'emplacement : curseur sur le premier libre */
-    (void)stick(&m, 0.0F, -1.0F);
-    EXPECT_EQ(press(&m, ENG_ACTION_JUMP), ENG_MENU_ACT_NONE);
-    EXPECT_EQ(m.screen, ENG_MENU_NEW);
-    EXPECT_EQ(m.selected, 1);
+    eng_menu_open(&m, ENG_MENU_SAVES);
     ASSERT_EQ(eng_menu_items(&m, items, ENG_MENU_MAX_ITEMS), 4U);
-    EXPECT_STREQ(items[0].label, "Partie 1");
-    EXPECT_STREQ(items[0].value, "Niv. 2 · 5 min");
-    EXPECT_STREQ(items[1].value, "vide");
-    EXPECT_TRUE(items[0].enabled && items[1].enabled && items[2].enabled);
+    EXPECT_STREQ(items[0].label, "Alpha");
+    EXPECT_STREQ(items[0].value, "Niv. 3 · 12 min");
+    EXPECT_STREQ(items[1].label, "Emplacement libre");
     EXPECT_STREQ(items[3].label, "Retour");
-    EXPECT_EQ(press(&m, ENG_ACTION_JUMP), ENG_MENU_ACT_NEW_GAME); /* emplacement libre : aussitôt */
-    EXPECT_EQ(m.slot, 1);
+    (void)menu_key(&m, ENG_MENU_KEY_LEFT);
+    EXPECT_EQ(m.selected, 0);
+    (void)menu_key(&m, ENG_MENU_KEY_RIGHT);
+    (void)menu_key(&m, ENG_MENU_KEY_RIGHT);
+    (void)menu_key(&m, ENG_MENU_KEY_RIGHT);
+    EXPECT_EQ(m.selected, 2);
+    (void)menu_key(&m, ENG_MENU_KEY_DOWN);
+    EXPECT_EQ(m.selected, 3);
+    (void)menu_key(&m, ENG_MENU_KEY_RIGHT); /* sur « Retour », gauche / droite ne font rien */
+    EXPECT_EQ(m.selected, 3);
+    (void)menu_key(&m, ENG_MENU_KEY_UP); /* on remonte sur la carte d'où l'on venait */
+    EXPECT_EQ(m.selected, 2);
+    /* emplacement libre : créer une partie, avec un nom */
+    EXPECT_EQ(menu_key(&m, ENG_MENU_KEY_OK), ENG_MENU_ACT_NONE);
+    EXPECT_EQ(m.screen, ENG_MENU_NAME);
+    EXPECT_EQ(m.name_purpose, ENG_MENU_NAME_CREATE);
+    EXPECT_STREQ(m.text, "Partie 3");
+    eng_menu_text_input(&m, "Nuit");
+    EXPECT_STREQ(m.text, "Nuit"); /* la première frappe remplace le nom proposé */
+    EXPECT_FALSE(m.text_fresh);
+    eng_menu_text_input(&m, " d'\xC3\xA9t\xC3\xA9"); /* « été » : deux octets par é */
+    EXPECT_STREQ(m.text, "Nuit d'\xC3\xA9t\xC3\xA9");
+    eng_menu_text_input(&m, "\b\b");
+    EXPECT_STREQ(m.text, "Nuit d'\xC3\xA9");         /* effacer retire un caractère entier */
+    eng_menu_text_input(&m, "\x01\t\n\x7F\xFF\xC3"); /* contrôles et octets invalides : ignorés */
+    EXPECT_STREQ(m.text, "Nuit d'\xC3\xA9");
+    const uint32_t denied = m.deny_serial;
+    eng_menu_text_input(&m, "0123456789012345678901234567890");
+    EXPECT_EQ(strlen(m.text), (size_t)ENG_MENU_NAME_CHARS + 1U); /* 22 caractères, dont un é */
+    EXPECT_GT(m.deny_serial, denied);                            /* nom plein : signalé */
+    eng_menu_text_input(&m, "\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b");
+    EXPECT_STREQ(m.text, "");
+    eng_menu_text_input(&m, "  ");
+    EXPECT_STREQ(m.text, "");                                    /* pas d'espace en tête */
+    EXPECT_EQ(menu_key(&m, ENG_MENU_KEY_OK), ENG_MENU_ACT_NONE); /* nom vide : refusé */
+    EXPECT_EQ(m.screen, ENG_MENU_NAME);
+    eng_menu_text_input(&m, "Brume  ");
+    EXPECT_EQ(menu_key(&m, ENG_MENU_KEY_OK), ENG_MENU_ACT_NEW_GAME);
+    EXPECT_STREQ(m.text, "Brume"); /* espaces de fin retirés */
+    EXPECT_EQ(m.slot, 2);
     EXPECT_FALSE(eng_menu_is_open(&m));
-    /* deux parties, la 2 est la plus récente : « Continuer » reprend la 2 */
-    eng_menu_set_slot(&m, 1U, true, "Niv. 1 · 0 min");
-    m.last_slot = 1;
-    eng_menu_open(&m, ENG_MENU_MAIN);
-    (void)eng_menu_update(&m, &idle);
-    (void)eng_menu_items(&m, items, ENG_MENU_MAX_ITEMS);
-    EXPECT_STREQ(items[0].value, "partie 2");
-    EXPECT_EQ(press(&m, ENG_ACTION_JUMP), ENG_MENU_ACT_CONTINUE);
+    /* emplacement occupé : Jouer, Renommer, Dupliquer, Supprimer, Retour */
+    use_slot(&m, 2, "Brume", "Niv. 1 · 0 min");
+    eng_menu_open(&m, ENG_MENU_SAVES);
+    EXPECT_EQ(menu_key(&m, ENG_MENU_KEY_OK), ENG_MENU_ACT_NONE);
+    EXPECT_EQ(m.screen, ENG_MENU_SLOT);
+    EXPECT_EQ(m.slot, 0);
+    ASSERT_EQ(eng_menu_items(&m, items, ENG_MENU_MAX_ITEMS), 5U);
+    EXPECT_STREQ(items[0].label, "Jouer");
+    EXPECT_STREQ(items[2].label, "Dupliquer");
+    EXPECT_TRUE(items[2].enabled);
+    EXPECT_STREQ(items[2].value, "vers l'emplacement 2");
+    /* renommer : le nom actuel est proposé ; Échap annule */
+    (void)menu_key(&m, ENG_MENU_KEY_DOWN);
+    EXPECT_EQ(menu_key(&m, ENG_MENU_KEY_OK), ENG_MENU_ACT_NONE);
+    EXPECT_EQ(m.screen, ENG_MENU_NAME);
+    EXPECT_EQ(m.name_purpose, ENG_MENU_NAME_RENAME);
+    EXPECT_STREQ(m.text, "Alpha");
+    EXPECT_EQ(menu_key(&m, ENG_MENU_KEY_BACK), ENG_MENU_ACT_NONE);
+    EXPECT_EQ(m.screen, ENG_MENU_SLOT);
+    EXPECT_EQ(m.selected, 1);
+    (void)menu_key(&m, ENG_MENU_KEY_OK);
+    eng_menu_text_input(&m, "Aube");
+    EXPECT_EQ(menu_key(&m, ENG_MENU_KEY_OK), ENG_MENU_ACT_RENAME_SLOT);
+    EXPECT_STREQ(m.text, "Aube");
+    EXPECT_EQ(m.slot, 0);
+    EXPECT_EQ(m.screen, ENG_MENU_SLOT);
+    /* dupliquer : dans le premier emplacement libre, sur lequel le curseur se pose */
+    (void)menu_key(&m, ENG_MENU_KEY_DOWN);
+    EXPECT_EQ(menu_key(&m, ENG_MENU_KEY_OK), ENG_MENU_ACT_COPY_SLOT);
+    EXPECT_EQ(m.slot, 0);
+    EXPECT_EQ(m.slot_target, 1);
+    EXPECT_EQ(m.screen, ENG_MENU_SAVES);
+    EXPECT_EQ(m.selected, 1);
+    use_slot(&m, 1, "Aube (copie)", "Niv. 3 · 12 min");
+    /* plus d'emplacement libre : « Dupliquer » est grisé et le curseur le saute */
+    (void)menu_key(&m, ENG_MENU_KEY_OK);
+    ASSERT_EQ(eng_menu_items(&m, items, ENG_MENU_MAX_ITEMS), 5U);
+    EXPECT_FALSE(items[2].enabled);
+    (void)menu_key(&m, ENG_MENU_KEY_DOWN);
+    (void)menu_key(&m, ENG_MENU_KEY_DOWN);
+    EXPECT_EQ(m.selected, 3); /* Supprimer */
+    /* supprimer : confirmation, curseur sur « Non » ; seul « Oui » supprime */
+    EXPECT_EQ(menu_key(&m, ENG_MENU_KEY_OK), ENG_MENU_ACT_NONE);
+    EXPECT_EQ(m.screen, ENG_MENU_DELETE);
+    EXPECT_EQ(m.selected, 0);
+    EXPECT_EQ(menu_key(&m, ENG_MENU_KEY_OK), ENG_MENU_ACT_NONE);
+    EXPECT_EQ(m.screen, ENG_MENU_SLOT);
+    EXPECT_EQ(m.selected, 3);
+    (void)menu_key(&m, ENG_MENU_KEY_OK);
+    EXPECT_EQ(menu_key(&m, ENG_MENU_KEY_BACK), ENG_MENU_ACT_NONE); /* Échap : rien n'est supprimé */
+    EXPECT_EQ(m.screen, ENG_MENU_SLOT);
+    (void)menu_key(&m, ENG_MENU_KEY_OK);
+    (void)menu_key(&m, ENG_MENU_KEY_DOWN);
+    EXPECT_EQ(menu_key(&m, ENG_MENU_KEY_OK), ENG_MENU_ACT_DELETE_SLOT);
     EXPECT_EQ(m.slot, 1);
-    /* « Charger une partie » : curseur sur la plus récente, l'emplacement vide est grisé */
+    EXPECT_EQ(m.screen, ENG_MENU_SAVES);
+    EXPECT_EQ(m.selected, 1);
+    eng_menu_set_slot(&m, 1, NULL);
+    EXPECT_FALSE(m.slots[1].used);
+    /* jouer : l'emplacement visé */
+    (void)menu_key(&m, ENG_MENU_KEY_RIGHT);
+    (void)menu_key(&m, ENG_MENU_KEY_OK);
+    EXPECT_EQ(menu_key(&m, ENG_MENU_KEY_OK), ENG_MENU_ACT_CONTINUE);
+    EXPECT_EQ(m.slot, 2);
+    /* fichier illisible : ni jouable ni renommable, seulement supprimable */
+    EngMenuSlot broken;
+    memset(&broken, 0, sizeof broken);
+    broken.used = true;
+    broken.unreadable = true;
+    eng_menu_set_slot(&m, 1, &broken);
+    eng_menu_open(&m, ENG_MENU_SAVES);
+    (void)menu_key(&m, ENG_MENU_KEY_RIGHT);
+    (void)menu_key(&m, ENG_MENU_KEY_OK);
+    ASSERT_EQ(eng_menu_items(&m, items, ENG_MENU_MAX_ITEMS), 5U);
+    EXPECT_FALSE(items[0].enabled);
+    EXPECT_FALSE(items[1].enabled);
+    EXPECT_FALSE(items[2].enabled);
+    EXPECT_TRUE(items[3].enabled);
+    EXPECT_EQ(m.selected, 3);
+}
+
+UTEST(game_menu, typing_a_name_ignores_game_keys_but_not_the_pad_or_the_mouse)
+{
+    EngGameOptions opt;
+    eng_options_default(&opt);
+    static EngInput input;
+    eng_input_init(&input);
+    eng_input_set_default_bindings(&input);
+    EngMenu m;
+    eng_menu_init(&m, &opt, &input);
+    eng_menu_open(&m, ENG_MENU_SAVES);
+    (void)menu_key(&m, ENG_MENU_KEY_OK);
+    ASSERT_EQ(m.screen, ENG_MENU_NAME);
+    /* au clavier : Espace (Saut), Ctrl (Esquive), P (Pause) et ZQSD sont du texte */
+    eng_input_key(&input, 44, true); /* espace */
+    EXPECT_EQ(press(&m, ENG_ACTION_JUMP), ENG_MENU_ACT_NONE);
+    EXPECT_EQ(press(&m, ENG_ACTION_DODGE), ENG_MENU_ACT_NONE);
+    EXPECT_EQ(press(&m, ENG_ACTION_PAUSE), ENG_MENU_ACT_NONE);
+    EXPECT_EQ(press(&m, ENG_ACTION_ATTACK), ENG_MENU_ACT_NONE);
+    (void)stick(&m, 0.0F, -1.0F);
+    EXPECT_EQ(m.screen, ENG_MENU_NAME);
+    EXPECT_EQ(m.selected, 0);
+    /* les flèches choisissent entre « Créer » et « Annuler » */
+    (void)menu_key(&m, ENG_MENU_KEY_DOWN);
+    EXPECT_EQ(m.selected, 1);
+    (void)menu_key(&m, ENG_MENU_KEY_UP);
+    EXPECT_EQ(m.selected, 0);
+    /* à la manette : B revient, A valide */
+    eng_input_pad_button(&input, 1, true);
+    EXPECT_EQ(press(&m, ENG_ACTION_DODGE), ENG_MENU_ACT_NONE);
+    EXPECT_EQ(m.screen, ENG_MENU_SAVES);
+    (void)menu_key(&m, ENG_MENU_KEY_OK);
+    eng_input_pad_button(&input, 0, true);
+    EXPECT_EQ(press(&m, ENG_ACTION_JUMP), ENG_MENU_ACT_NEW_GAME);
+    EXPECT_STREQ(m.text, "Partie 1"); /* le nom proposé, sans clavier */
+}
+
+UTEST(game_menu, a_mouse_click_only_validates_the_line_under_the_pointer)
+{
+    EngGameOptions opt;
+    eng_options_default(&opt);
+    static EngInput input;
+    eng_input_init(&input);
+    eng_input_set_default_bindings(&input);
+    EngMenu m;
+    eng_menu_init(&m, &opt, &input);
     eng_menu_open(&m, ENG_MENU_MAIN);
-    (void)eng_menu_update(&m, &idle);
-    (void)stick(&m, 0.0F, -1.0F);
-    (void)stick(&m, 0.0F, -1.0F);
+    eng_input_mouse_button(&input, 1, true); /* la dernière pression est un clic */
+    /* hors de toute ligne : le clic ne valide rien (avant : il validait la ligne choisie) */
+    eng_menu_hover(&m, -1, 0, true);
+    EXPECT_EQ(press(&m, ENG_ACTION_ATTACK), ENG_MENU_ACT_NONE);
+    EXPECT_EQ(m.screen, ENG_MENU_MAIN);
+    /* la souris immobile ne change pas la ligne choisie ; en bougeant, elle la choisit */
+    eng_menu_hover(&m, 2, 0, false);
+    EXPECT_EQ(m.selected, 0);
+    eng_menu_hover(&m, 2, 0, true);
     EXPECT_EQ(m.selected, 2);
     EXPECT_EQ(press(&m, ENG_ACTION_ATTACK), ENG_MENU_ACT_NONE);
-    EXPECT_EQ(m.screen, ENG_MENU_LOAD);
-    EXPECT_EQ(m.selected, 1);
+    EXPECT_EQ(m.screen, ENG_MENU_OPTIONS);
+    /* options : un clic à gauche de la valeur la baisse, à droite il la monte */
+    eng_menu_hover(&m, 0, -1, true);
+    EXPECT_EQ(press(&m, ENG_ACTION_ATTACK), ENG_MENU_ACT_OPTIONS_CHANGED);
+    EXPECT_NEAR(opt.master, 0.7F, 1e-5F);
+    eng_menu_hover(&m, 0, 1, true);
+    EXPECT_EQ(press(&m, ENG_ACTION_ATTACK), ENG_MENU_ACT_OPTIONS_CHANGED);
+    EXPECT_NEAR(opt.master, 0.8F, 1e-5F);
+    /* à la manette (X = Attaque), pas besoin de pointeur */
+    eng_menu_hover(&m, -1, 0, false);
+    eng_input_pad_button(&input, 2, true);
+    m.selected = (int32_t)ENG_BUS_COUNT + 2; /* inverser l'axe vertical */
+    EXPECT_EQ(press(&m, ENG_ACTION_ATTACK), ENG_MENU_ACT_OPTIONS_CHANGED);
+    EXPECT_TRUE(opt.invert_y);
+}
+
+UTEST(game_menu, option_rows_describe_their_widget_and_bindings_have_readable_names)
+{
+    EngGameOptions opt;
+    eng_options_default(&opt);
+    opt.master = 0.3F;
+    opt.shadow_quality = 1U;
+    static EngInput input;
+    eng_input_init(&input);
+    eng_input_set_default_bindings(&input);
+    EngMenu m;
+    eng_menu_init(&m, &opt, &input);
+    eng_menu_open(&m, ENG_MENU_OPTIONS);
+    EngMenuItem items[ENG_MENU_MAX_ITEMS];
+    const uint32_t n = eng_menu_items(&m, items, ENG_MENU_MAX_ITEMS);
+    ASSERT_EQ(n, (uint32_t)ENG_BUS_COUNT + 15U);
+    EXPECT_EQ(items[0].kind, ENG_MENU_ITEM_SLIDER);
+    EXPECT_NEAR(items[0].frac, 0.3F, 1e-6F);
+    EXPECT_EQ(items[ENG_BUS_COUNT + 2].kind, ENG_MENU_ITEM_TOGGLE);
+    EXPECT_NEAR(items[ENG_BUS_COUNT + 2].frac, 0.0F, 0.0F);
+    EXPECT_EQ(items[ENG_BUS_COUNT + 5].kind, ENG_MENU_ITEM_TOGGLE); /* FXAA : oui */
+    EXPECT_NEAR(items[ENG_BUS_COUNT + 5].frac, 1.0F, 0.0F);
+    EXPECT_EQ(items[ENG_BUS_COUNT + 9].kind, ENG_MENU_ITEM_CHOICE);
+    EXPECT_NEAR(items[ENG_BUS_COUNT + 9].frac, 0.5F, 1e-6F);
+    EXPECT_EQ(items[n - 1U].kind, ENG_MENU_ITEM_PLAIN);
+    /* les touches portent un nom, pas un numéro */
+    char name[32];
+    eng_binding_name(ENG_BIND_KEY, ENG_KEY_ESCAPE, name, sizeof name);
+    EXPECT_STREQ(name, "\xC3\x89"
+                       "chap");
+    eng_binding_name(ENG_BIND_KEY, 44, name, sizeof name);
+    EXPECT_STREQ(name, "Espace");
+    eng_binding_name(ENG_BIND_MOUSE_BUTTON, 1, name, sizeof name);
+    EXPECT_STREQ(name, "clic gauche");
+    eng_binding_name(ENG_BIND_MOUSE_BUTTON, 3, name, sizeof name);
+    EXPECT_STREQ(name, "clic droit");
+    eng_binding_name(ENG_BIND_PAD_BUTTON, 0, name, sizeof name);
+    EXPECT_STREQ(name, "manette A");
+    eng_binding_name(ENG_BIND_PAD_BUTTON, 6, name, sizeof name);
+    EXPECT_STREQ(name, "Start");
+    eng_binding_name(ENG_BIND_PAD_TRIGGER, ENG_PAD_AXIS_RIGHT_TRIGGER, name, sizeof name);
+    EXPECT_STREQ(name, "g\xC3\xA2"
+                       "chette droite");
+    eng_menu_open(&m, ENG_MENU_CONTROLS);
     (void)eng_menu_items(&m, items, ENG_MENU_MAX_ITEMS);
-    EXPECT_FALSE(items[2].enabled);
-    (void)stick(&m, 0.0F, -1.0F);
-    EXPECT_EQ(m.selected, 3); /* l'emplacement 3, vide, est sauté : « Retour » */
-    (void)stick(&m, 0.0F, 1.0F);
-    (void)stick(&m, 0.0F, 1.0F);
-    EXPECT_EQ(m.selected, 0);
-    EXPECT_EQ(press(&m, ENG_ACTION_JUMP), ENG_MENU_ACT_CONTINUE);
-    EXPECT_EQ(m.slot, 0);
-    /* écraser demande confirmation : « Non » et Retour ne changent rien */
-    eng_menu_open(&m, ENG_MENU_MAIN);
-    (void)eng_menu_update(&m, &idle);
-    (void)stick(&m, 0.0F, -1.0F);
-    (void)press(&m, ENG_ACTION_JUMP);
-    EXPECT_EQ(m.screen, ENG_MENU_NEW);
-    EXPECT_EQ(m.selected, 2); /* le premier libre : l'emplacement 3 */
-    (void)stick(&m, 0.0F, 1.0F);
-    (void)stick(&m, 0.0F, 1.0F);
-    EXPECT_EQ(m.selected, 0);
-    EXPECT_EQ(press(&m, ENG_ACTION_JUMP), ENG_MENU_ACT_NONE);
-    EXPECT_EQ(m.screen, ENG_MENU_OVERWRITE);
-    EXPECT_EQ(m.selected, 0); /* sur « Non » : valider par mégarde n'écrase rien */
-    ASSERT_EQ(eng_menu_items(&m, items, ENG_MENU_MAX_ITEMS), 2U);
-    EXPECT_STREQ(items[0].label, "Non, revenir");
-    EXPECT_STREQ(items[1].label, "Oui, écraser la partie 1");
-    EXPECT_STREQ(items[1].value, "Niv. 2 · 5 min");
-    EXPECT_STREQ(eng_menu_title(&m), "Écraser cette partie ?");
-    EXPECT_EQ(press(&m, ENG_ACTION_JUMP), ENG_MENU_ACT_NONE); /* Non */
-    EXPECT_EQ(m.screen, ENG_MENU_NEW);
-    EXPECT_EQ(m.selected, 0);
-    (void)press(&m, ENG_ACTION_JUMP);
-    EXPECT_EQ(m.screen, ENG_MENU_OVERWRITE);
-    EXPECT_EQ(press(&m, ENG_ACTION_DODGE), ENG_MENU_ACT_NONE); /* Retour */
-    EXPECT_EQ(m.screen, ENG_MENU_NEW);
-    (void)press(&m, ENG_ACTION_JUMP);
-    (void)stick(&m, 0.0F, -1.0F);
-    EXPECT_EQ(press(&m, ENG_ACTION_JUMP), ENG_MENU_ACT_NEW_GAME); /* Oui */
-    EXPECT_EQ(m.slot, 0);
-    EXPECT_FALSE(eng_menu_is_open(&m));
-    /* Retour : des listes vers le menu principal */
-    eng_menu_open(&m, ENG_MENU_LOAD);
-    EXPECT_EQ(press(&m, ENG_ACTION_DODGE), ENG_MENU_ACT_NONE);
-    EXPECT_EQ(m.screen, ENG_MENU_MAIN);
-    eng_menu_open(&m, ENG_MENU_NEW);
+    EXPECT_STREQ(items[0].value, "clic gauche, manette X"); /* attaque légère */
+    EXPECT_STREQ(items[3].value, "Espace, manette A");      /* saut */
+    EXPECT_EQ(strstr(items[2].value, "touche "), NULL);     /* plus de « touche 224 » */
+    /* remappage : Échap annule (et ne devient pas la touche de l'action) */
     m.selected = 3;
-    EXPECT_EQ(press(&m, ENG_ACTION_JUMP), ENG_MENU_ACT_NONE);
-    EXPECT_EQ(m.screen, ENG_MENU_MAIN);
-    eng_menu_open(&m, ENG_MENU_LOAD);
-    m.selected = 3;
-    EXPECT_EQ(press(&m, ENG_ACTION_JUMP), ENG_MENU_ACT_NONE);
-    EXPECT_EQ(m.screen, ENG_MENU_MAIN);
-    /* la souris : survoler une ligne la choisit, sauf si elle est grisée ou n'existe pas */
-    eng_menu_hover(&m, 3);
-    EXPECT_EQ(m.selected, 3);
-    eng_menu_hover(&m, -1);
-    eng_menu_hover(&m, 9);
-    EXPECT_EQ(m.selected, 3);
-    m.has_save = false;
-    eng_menu_hover(&m, 0); /* « Continuer » grisé */
-    EXPECT_EQ(m.selected, 3);
-    eng_menu_hover(&m, 4);
-    EXPECT_EQ(m.selected, 4);
-    eng_menu_hover(NULL, 1);
-    /* emplacement hors bornes : ignoré ; un emplacement libéré perd son résumé */
-    eng_menu_set_slot(&m, 3U, true, "x");
-    eng_menu_set_slot(NULL, 0U, true, "x");
-    eng_menu_set_slot(&m, 0U, false, "reste");
-    EXPECT_FALSE(m.slots[0].used);
-    EXPECT_STREQ(m.slots[0].summary, "");
-    /* un `last_slot` hors bornes ne fait pas sortir du tableau */
-    m.has_save = true;
-    m.last_slot = 17;
-    eng_menu_open(&m, ENG_MENU_MAIN);
-    (void)eng_menu_update(&m, &idle);
-    EXPECT_EQ(press(&m, ENG_ACTION_JUMP), ENG_MENU_ACT_CONTINUE);
-    EXPECT_EQ(m.slot, 2);
+    (void)menu_key(&m, ENG_MENU_KEY_OK);
+    EXPECT_EQ(m.remap, 3);
+    eng_input_key(&input, ENG_KEY_ESCAPE, true);
+    EXPECT_EQ(menu_key(&m, ENG_MENU_KEY_BACK), ENG_MENU_ACT_NONE);
+    EXPECT_EQ(m.remap, -1);
+    EXPECT_EQ(m.screen, ENG_MENU_CONTROLS);
+    EXPECT_EQ(input.buttons[ENG_ACTION_JUMP][0].code, 44);
 }
 
 UTEST(game_menu, every_action_can_be_remapped_from_the_controls_screen)

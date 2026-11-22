@@ -354,3 +354,85 @@ UTEST(eng_platform_input, refused_capture_leaves_the_state_unchanged)
     EXPECT_EQ(SDL_GetWindowRelativeMouseMode(p.window), accepted);
     eng_platform_shutdown(&p);
 }
+
+/* ── Échap dans un jeu qui a un menu, saisie de texte ── */
+
+static void push_named_key(SDL_Keycode key, SDL_Scancode code, bool down, bool repeat)
+{
+    SDL_Event ev;
+    SDL_zero(ev);
+    ev.type = down ? SDL_EVENT_KEY_DOWN : SDL_EVENT_KEY_UP;
+    ev.key.scancode = code;
+    ev.key.key = key;
+    ev.key.down = down;
+    ev.key.repeat = repeat;
+    SDL_PushEvent(&ev);
+}
+
+static void push_text(const char *utf8)
+{
+    SDL_Event ev;
+    SDL_zero(ev);
+    ev.type = SDL_EVENT_TEXT_INPUT;
+    ev.text.text = utf8; /* littéral : reste valide jusqu'à la lecture de la file */
+    SDL_PushEvent(&ev);
+}
+
+UTEST(eng_platform_input, escape_opens_the_menu_instead_of_quitting_when_the_game_has_one)
+{
+    EngPlatform p;
+    ASSERT_TRUE(open_platform(&p));
+    EXPECT_TRUE(p.escape_quits); /* par défaut (outils sans menu) : Échap ferme */
+    p.escape_quits = false;      /* le jeu : Échap est une touche de menu */
+    push_named_key(SDLK_ESCAPE, SDL_SCANCODE_ESCAPE, true, false);
+    EXPECT_TRUE(eng_platform_pump(&p));
+    EXPECT_FALSE(p.quit_requested);
+    EngInputState s = tick(&p);
+    EXPECT_EQ(s.menu_pressed, (uint32_t)ENG_MENU_KEY_BACK);
+    push_named_key(SDLK_ESCAPE, SDL_SCANCODE_ESCAPE, false, false);
+    EXPECT_TRUE(eng_platform_pump(&p));
+    /* la croix de la fenêtre ferme toujours */
+    SDL_Event ev;
+    SDL_zero(ev);
+    ev.type = SDL_EVENT_WINDOW_CLOSE_REQUESTED;
+    SDL_PushEvent(&ev);
+    EXPECT_FALSE(eng_platform_pump(&p));
+    eng_platform_shutdown(&p);
+}
+
+UTEST(eng_platform_input, typed_text_and_backspaces_are_kept_in_order_while_text_input_is_on)
+{
+    EngPlatform p;
+    ASSERT_TRUE(open_platform(&p));
+    char out[64];
+    push_text("ignor\xC3\xA9"); /* saisie inactive : rien n'est retenu */
+    (void)eng_platform_pump(&p);
+    EXPECT_EQ(eng_platform_take_text(&p, out, sizeof out), 0U);
+    eng_platform_set_text_input(&p, true);
+    push_text("Th");
+    push_text("\xC3\xA9");
+    push_named_key(SDLK_BACKSPACE, SDL_SCANCODE_BACKSPACE, true, false);
+    push_named_key(SDLK_BACKSPACE, SDL_SCANCODE_BACKSPACE, true, true); /* touche tenue */
+    push_text("o");
+    (void)eng_platform_pump(&p);
+    EXPECT_EQ(eng_platform_take_text(&p, out, sizeof out), 7U);
+    EXPECT_STREQ(out, "Th\xC3\xA9\b\bo");
+    EXPECT_EQ(eng_platform_take_text(&p, out, sizeof out), 0U); /* lu une seule fois */
+    /* une petite capacité ne coupe pas un caractère en deux, et rien ne déborde */
+    push_text("a\xC3\xA9");
+    (void)eng_platform_pump(&p);
+    EXPECT_EQ(eng_platform_take_text(&p, out, 3U), 1U);
+    EXPECT_STREQ(out, "a");
+    for (int i = 0; i < 40; i++) {
+        push_text("\xC3\xA9\xC3\xA9");
+    }
+    (void)eng_platform_pump(&p);
+    const uint32_t kept = eng_platform_take_text(&p, out, sizeof out);
+    EXPECT_LT(kept, (uint32_t)sizeof out);
+    EXPECT_EQ(kept % 4U, 0U); /* des « éé » entiers */
+    eng_platform_set_text_input(&p, false);
+    push_text("x");
+    (void)eng_platform_pump(&p);
+    EXPECT_EQ(eng_platform_take_text(&p, out, sizeof out), 0U);
+    eng_platform_shutdown(&p);
+}

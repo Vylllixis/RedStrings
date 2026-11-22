@@ -65,10 +65,38 @@ static bool source_down(const EngInput *input, EngButtonBinding binding)
     return false;
 }
 
+/* touches de menu enfoncées : flèches, Entrée, Échap, croix de la manette (jamais remappées) */
+static uint32_t menu_mask(const EngInput *input)
+{
+    uint32_t mask = 0;
+    if (input->key_down[ENG_KEY_UP] || input->pad_down[ENG_PAD_DPAD_UP]) {
+        mask |= ENG_MENU_KEY_UP;
+    }
+    if (input->key_down[ENG_KEY_DOWN] || input->pad_down[ENG_PAD_DPAD_DOWN]) {
+        mask |= ENG_MENU_KEY_DOWN;
+    }
+    if (input->key_down[ENG_KEY_LEFT] || input->pad_down[ENG_PAD_DPAD_LEFT]) {
+        mask |= ENG_MENU_KEY_LEFT;
+    }
+    if (input->key_down[ENG_KEY_RIGHT] || input->pad_down[ENG_PAD_DPAD_RIGHT]) {
+        mask |= ENG_MENU_KEY_RIGHT;
+    }
+    if (input->key_down[ENG_KEY_RETURN] || input->key_down[ENG_KEY_KP_ENTER]) {
+        mask |= ENG_MENU_KEY_OK;
+    }
+    if (input->key_down[ENG_KEY_ESCAPE]) {
+        mask |= ENG_MENU_KEY_BACK;
+    }
+    return mask;
+}
+
 /* Recalcule l'état de chaque action et mémorise les transitions : c'est ici qu'une pression
  * est « enregistrée », même si elle est relâchée avant le prochain pas. */
 static void refresh(EngInput *input)
 {
+    const uint32_t menu_now = menu_mask(input);
+    input->menu_latch |= menu_now & ~input->menu_held;
+    input->menu_held = menu_now;
     uint32_t now = 0;
     for (int a = 0; a < ENG_ACTION_COUNT; a++) {
         for (int i = 0; i < ENG_MAX_BUTTON_BINDINGS; i++) {
@@ -249,4 +277,7 @@ void eng_input_begin_tick(EngInput *input, EngInputState *out)
     input->mouse_dy = 0.0F;
     out->wheel = input->wheel;
     input->wheel = 0.0F;
+    out->menu_pressed = input->menu_latch;
+    out->menu_held = input->menu_held;
+    input->menu_latch = 0;
 }

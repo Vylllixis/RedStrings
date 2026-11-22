@@ -64,6 +64,14 @@ static void w_f64(Writer *w, double d)
     w_u32(w, (uint32_t)(u >> 32));
 }
 
+/* texte : longueur u32 puis octets, sans zéro final */
+static void w_text(Writer *w, const char *s)
+{
+    const size_t len = strlen(s);
+    w_u32(w, (uint32_t)len);
+    w_bytes(w, s, len);
+}
+
 static size_t section_begin(Writer *w, const char tag[4])
 {
     w_bytes(w, tag, 4);
@@ -194,6 +202,19 @@ size_t eng_save_encode(const EngSaveGame *s, const EngWorldState *world, void *o
         section_end(&w, at);
         sections++;
     }
+    if (s->has_meta) { /* gestion des parties : nom, lieu, date */
+        if (memchr(s->name, 0, sizeof s->name) == NULL ||
+            memchr(s->place, 0, sizeof s->place) == NULL) {
+            return 0; /* texte sans zéro final : rien n'est écrit */
+        }
+        at = section_begin(&w, "META");
+        w_text(&w, s->name);
+        w_text(&w, s->place);
+        w_u32(&w, (uint32_t)(uint64_t)s->saved_at);
+        w_u32(&w, (uint32_t)((uint64_t)s->saved_at >> 32));
+        section_end(&w, at);
+        sections++;
+    }
     return finish(&w, ENG_SAVE_VERSION, sections);
 }
 
@@ -252,6 +273,24 @@ static double r_f64(Reader *r)
     double d = 0.0;
     memcpy(&d, &u, 8);
     return d;
+}
+
+/* texte borné à `cap` octets (zéro final compris) ; trop long : lecture en échec. Les octets de
+ * contrôle deviennent des espaces (un nom ne contient ni saut de ligne ni tabulation). */
+static void r_text(Reader *r, char *out, size_t cap)
+{
+    const uint32_t len = r_u32(r);
+    if (!r->ok || len >= cap || r->at + len > r->n) {
+        r->ok = false;
+        out[0] = '\0';
+        return;
+    }
+    for (uint32_t i = 0; i < len; i++) {
+        const uint8_t c = r->p[r->at + i];
+        out[i] = (char)(c < 0x20U || c == 0x7FU ? 0x20U : c);
+    }
+    out[len] = '\0';
+    r->at += len;
 }
 
 static void fail(char *err, size_t cap, const char *msg)
@@ -408,6 +447,17 @@ bool eng_save_decode(const void *data, size_t size, EngSaveGame *out, EngWorldSt
             }
             s.equipment = eq;
             s.has_equipment = true;
+        } else if (memcmp(tag, "META", 4) == 0) {
+            r_text(&sec, s.name, sizeof s.name);
+            r_text(&sec, s.place, sizeof s.place);
+            const uint64_t lo = r_u32(&sec);
+            const uint64_t hi = r_u32(&sec);
+            if (!sec.ok) {
+                r.ok = false;
+                break;
+            }
+            s.saved_at = (int64_t)(lo | (hi << 32));
+            s.has_meta = true;
         }
         /* section inconnue : ignorée */
     }

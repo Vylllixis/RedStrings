@@ -41,6 +41,11 @@ bool eng_ui_set_font(EngUi *ui, const char *ttf_path, float size_px)
     return true;
 }
 
+bool eng_ui_set_bold_font(EngUi *ui, const char *ttf_path, float size_px)
+{
+    return ui != NULL && ui->ready && ttf_path != NULL && ow_ui_set_bold_font(ttf_path, size_px);
+}
+
 void eng_ui_shutdown(EngUi *ui)
 {
     if (!ui->ready) {
@@ -473,6 +478,15 @@ void eng_ui_add_mouse_button(EngUi *ui, int button, bool down)
     }
 }
 
+void eng_ui_mouse_pos(const EngUi *ui, float out[2])
+{
+    out[0] = -1.0F;
+    out[1] = -1.0F;
+    if (ui != NULL && ui->ready) {
+        ow_ui_mouse_pos(&out[0], &out[1]);
+    }
+}
+
 #else /* sans OW_UI : tout est sans effet */
 
 bool eng_ui_available(void)
@@ -492,6 +506,14 @@ bool eng_ui_init(EngUi *ui, struct SDL_Window *window, struct SDL_GPUDevice *dev
 }
 
 bool eng_ui_set_font(EngUi *ui, const char *ttf_path, float size_px)
+{
+    (void)ui;
+    (void)ttf_path;
+    (void)size_px;
+    return false;
+}
+
+bool eng_ui_set_bold_font(EngUi *ui, const char *ttf_path, float size_px)
 {
     (void)ui;
     (void)ttf_path;
@@ -616,6 +638,13 @@ void eng_ui_add_mouse_button(EngUi *ui, int button, bool down)
     (void)ui;
     (void)button;
     (void)down;
+}
+
+void eng_ui_mouse_pos(const EngUi *ui, float out[2])
+{
+    (void)ui;
+    out[0] = -1.0F;
+    out[1] = -1.0F;
 }
 
 #endif

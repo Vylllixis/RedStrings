@@ -60,6 +60,16 @@ Avec l'écran de chargement, sous X11 et hors plein écran, la fenêtre est cré
 options du jeu est maintenant appliqué dès l'ouverture de la fenêtre (avant : au milieu du
 chargement).
 
+## Après le chargement (2026-11-22)
+
+- Vers l'**écran-titre** : la scène ne s'éteint plus. `splash_finish(..., false)` laisse le titre
+  apparaître puis rend la main ; l'écran-titre (`docs/title-menu.md`) reprend la même scène au même
+  instant, dans la boucle du jeu.
+- Vers le jeu directement (`--new-game`) : la sortie d'avant (éclat du soleil, fondu au noir).
+- Les ressources (pipeline, image du titre) ne sont plus libérées à la fin du chargement : elles
+  servent à l'écran-titre, jusqu'à l'arrêt du jeu (`splash_shutdown`).
+- Échap pendant le chargement passe l'animation (il ne ferme plus le jeu).
+
 ## Tests
 
 - `engine.text_sdf` (4) : champ de distance, marges, espacement, accents, lecture bilinéaire, refus.

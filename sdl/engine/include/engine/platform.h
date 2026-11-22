@@ -50,6 +50,13 @@ typedef struct EngPlatform {
     EngEventHook event_hook; /* filtre d'événements, NULL si aucun */
     void *event_hook_user;
     bool quit_requested;
+    /* Échap demande la fermeture (vrai au départ : outils sans menu). Le jeu, qui a un menu, le met
+     * à faux : Échap y ouvre le menu ou revient en arrière (ENG_MENU_KEY_BACK), et la fenêtre ne
+     * se ferme que par « Quitter », la croix de la fenêtre ou Alt+F4. */
+    bool escape_quits;
+    bool text_input;   /* saisie de texte active (eng_platform_set_text_input) */
+    uint32_t text_len; /* octets en attente dans `text` */
+    char text[64]; /* texte tapé depuis le dernier eng_platform_take_text : UTF-8, '\b' = effacer */
 } EngPlatform;
 
 /* Initialise SDL et ouvre la fenêtre. false en cas d'échec (message sur stderr). */
@@ -81,6 +88,13 @@ bool eng_platform_set_window_size(EngPlatform *p, int width, int height);
  * libère. Renvoie false si SDL refuse (mode non disponible) : l'état ne change alors pas. F2 la
  * bascule ; elle est aussi libérée quand la fenêtre perd le focus. */
 bool eng_platform_set_mouse_capture(EngPlatform *p, bool captured);
+
+/* Saisie de texte (nom d'une partie) : active, le texte tapé (caractères composés compris) et les
+ * effacements (Retour arrière, répétition comprise) s'accumulent dans `text`, dans l'ordre.
+ * eng_platform_take_text les copie dans `out` (terminé par 0, au plus `capacity` - 1 octets, sans
+ * couper un caractère) et vide la mémoire ; retourne le nombre d'octets copiés. */
+void eng_platform_set_text_input(EngPlatform *p, bool active);
+uint32_t eng_platform_take_text(EngPlatform *p, char *out, uint32_t capacity);
 
 /* Change le titre de la fenêtre (alloue : à appeler rarement, pas à chaque image). */
 void eng_platform_set_title(EngPlatform *p, const char *title);

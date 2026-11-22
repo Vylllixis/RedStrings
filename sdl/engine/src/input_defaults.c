@@ -12,6 +12,17 @@ _Static_assert(ENG_PAD_AXIS_RIGHT_TRIGGER == SDL_GAMEPAD_AXIS_RIGHT_TRIGGER, "ax
 _Static_assert(SDL_GAMEPAD_AXIS_COUNT == ENG_PAD_AXIS_COUNT, "nombre d'axes de manette");
 _Static_assert(SDL_SCANCODE_COUNT <= ENG_KEY_CODE_COUNT, "taille du tableau de touches");
 _Static_assert(SDL_GAMEPAD_BUTTON_COUNT <= ENG_PAD_BUTTON_COUNT, "taille du tableau de boutons");
+_Static_assert(ENG_KEY_RETURN == SDL_SCANCODE_RETURN && ENG_KEY_ESCAPE == SDL_SCANCODE_ESCAPE &&
+                   ENG_KEY_KP_ENTER == SDL_SCANCODE_KP_ENTER,
+               "touches de menu");
+_Static_assert(ENG_KEY_RIGHT == SDL_SCANCODE_RIGHT && ENG_KEY_LEFT == SDL_SCANCODE_LEFT &&
+                   ENG_KEY_DOWN == SDL_SCANCODE_DOWN && ENG_KEY_UP == SDL_SCANCODE_UP,
+               "flèches du clavier");
+_Static_assert(ENG_PAD_DPAD_UP == SDL_GAMEPAD_BUTTON_DPAD_UP &&
+                   ENG_PAD_DPAD_DOWN == SDL_GAMEPAD_BUTTON_DPAD_DOWN &&
+                   ENG_PAD_DPAD_LEFT == SDL_GAMEPAD_BUTTON_DPAD_LEFT &&
+                   ENG_PAD_DPAD_RIGHT == SDL_GAMEPAD_BUTTON_DPAD_RIGHT,
+               "croix de la manette");
 
 /* Touches désignées par leur position PHYSIQUE (scancodes) : sur un clavier AZERTY, « WASD »
  * est la zone ZQSD, ce qui est le bon comportement. */

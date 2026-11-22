@@ -66,12 +66,28 @@ livraisons ; les tags sont posés par Théo après ses tests.
   montagne enneigée, désert, volcan) : relief et matières par biome, frontières fondues.
 - Grande carte : 12 zones d'ennemis (farm facile, farm dur, boss dans chaque biome), difficulté
   croissante, camp de réveil sans ennemis ; `--at-zone N` pour commencer devant une zone.
+- Écran-titre et menus animés (2026-11-22, `docs/title-menu.md`) : la scène de l'écran de
+  chargement continue derrière le menu, sans coupure (le jeu n'est plus dessiné derrière) ; les
+  lignes du menu principal sont posées sur le fil rouge ; les parties sont trois cartes suspendues
+  au fil ; listes à curseurs pour les options ; ressorts, cascades et fondus (`engine/menu_motion`,
+  `engine/ui_menu`, `launcher/title`).
+- Gestion des parties « comme les mondes de Minecraft » (2026-11-22, `docs/game-flow.md`) : créer
+  une partie avec un nom, jouer, renommer, dupliquer, supprimer (avec confirmation, fichier mis de
+  côté) ; « Sauvegarder et quitter » ; section de sauvegarde META (nom, lieu, date).
+- Échap (2026-11-22) : il ouvre le menu en jeu et revient d'un niveau dans les menus ; il ne ferme
+  plus le jeu. Flèches, Entrée et croix de la manette dans les menus ; un clic ne valide que la
+  ligne sous la souris ; les touches s'affichent par leur nom.
+- Plein écran par défaut pour le jeu lancé à la main (2026-11-22) ; `--windowed`.
+- Corrigé (2026-11-22) : une nouvelle partie lancée depuis le menu dans le monde ouvert donnait
+  105 XP et le niveau 2 dès la première seconde (combattants rangés hors de la scène comptés comme
+  vaincus).
 - Écran de chargement animé (2026-11-22, `docs/splash.md`) : dès que le GPU est prêt, une scène
   animée (l'aube sur la carte du monde, le chevalier, le fil rouge, le titre) pendant que le
   chargement s'exécute dans un fil à part ; avant, la fenêtre restait une copie figée de l'écran
   pendant plusieurs secondes. `--no-splash` pour s'en passer. Texte en champ de distance
   (`engine/text_sdf`).
-- Menu principal (2026-11-22) : trois emplacements de sauvegarde (Continuer la plus récente,
+- Menu principal (2026-11-22, première version, remplacée le jour même par l'écran-titre et la
+  gestion des parties ci-dessus) : trois emplacements de sauvegarde (Continuer la plus récente,
   Charger une partie, Nouvelle partie avec choix de l'emplacement et confirmation avant d'écraser),
   souris dans les menus, colonne à gauche sur le monde, fondu d'entrée. Corrigé : dans le monde
   ouvert, la sauvegarde enregistrait la position locale du joueur (fausse après un recentrage de

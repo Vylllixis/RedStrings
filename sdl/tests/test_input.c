@@ -306,3 +306,53 @@ UTEST(eng_input, unbound_input_does_nothing)
     EXPECT_EQ(s.pressed | s.held, (uint32_t)0);
     EXPECT_EQ(s.axis[ENG_AXIS_MOVE].y, 0.0F);
 }
+
+/* ── Touches de menu (fixes : flèches, Entrée, Échap, croix de la manette) ── */
+
+UTEST(eng_input, menu_keys_are_fixed_latched_once_and_held_while_down)
+{
+    EngInput in;
+    eng_input_init(&in); /* aucune liaison : les touches de menu marchent quand même */
+    eng_input_key(&in, ENG_KEY_DOWN, true);
+    eng_input_key(&in, ENG_KEY_RETURN, true);
+    eng_input_key(&in, ENG_KEY_RETURN, false); /* pression plus courte qu'un pas : gardée */
+    EngInputState s = tick(&in);
+    EXPECT_EQ(s.menu_pressed, (uint32_t)(ENG_MENU_KEY_DOWN | ENG_MENU_KEY_OK));
+    EXPECT_EQ(s.menu_held, (uint32_t)ENG_MENU_KEY_DOWN);
+    s = tick(&in); /* tenue : plus « pressée », toujours « enfoncée » */
+    EXPECT_EQ(s.menu_pressed, 0U);
+    EXPECT_EQ(s.menu_held, (uint32_t)ENG_MENU_KEY_DOWN);
+    eng_input_key(&in, SDL_SCANCODE_SPACE, true); /* un autre événement ne la « presse » pas */
+    eng_input_mouse_button(&in, SDL_BUTTON_LEFT, true);
+    s = tick(&in);
+    EXPECT_EQ(s.menu_pressed, 0U);
+    EXPECT_EQ(s.menu_held, (uint32_t)ENG_MENU_KEY_DOWN);
+    eng_input_key(&in, SDL_SCANCODE_SPACE, false);
+    eng_input_mouse_button(&in, SDL_BUTTON_LEFT, false);
+    eng_input_key(&in, ENG_KEY_DOWN, false);
+    s = tick(&in);
+    EXPECT_EQ(s.menu_held, 0U);
+    /* chaque touche a son bit ; les deux Entrée valident ; Échap = retour */
+    eng_input_key(&in, ENG_KEY_UP, true);
+    eng_input_key(&in, ENG_KEY_LEFT, true);
+    eng_input_key(&in, ENG_KEY_RIGHT, true);
+    eng_input_key(&in, ENG_KEY_KP_ENTER, true);
+    eng_input_key(&in, ENG_KEY_ESCAPE, true);
+    s = tick(&in);
+    EXPECT_EQ(s.menu_pressed, (uint32_t)(ENG_MENU_KEY_UP | ENG_MENU_KEY_LEFT | ENG_MENU_KEY_RIGHT |
+                                         ENG_MENU_KEY_OK | ENG_MENU_KEY_BACK));
+    /* fenêtre qui perd le focus : tout est relâché */
+    eng_input_release_all(&in);
+    s = tick(&in);
+    EXPECT_EQ(s.menu_held, 0U);
+    EXPECT_EQ(s.menu_pressed, 0U);
+    /* la croix de la manette choisit aussi ; une touche ordinaire n'est pas une touche de menu */
+    eng_input_pad_button(&in, ENG_PAD_DPAD_UP, true);
+    eng_input_pad_button(&in, ENG_PAD_DPAD_RIGHT, true);
+    eng_input_key(&in, SDL_SCANCODE_SPACE, true);
+    s = tick(&in);
+    EXPECT_EQ(s.menu_pressed, (uint32_t)(ENG_MENU_KEY_UP | ENG_MENU_KEY_RIGHT));
+    eng_input_pad_reset(&in);
+    s = tick(&in);
+    EXPECT_EQ(s.menu_held, 0U);
+}

@@ -82,6 +82,20 @@ void splash_fill_uniforms(const Splash *s, SplashUniforms *u, double time_s, flo
     memcpy(u->title_rect, s->title_rect, sizeof u->title_rect);
     memcpy(u->label_rect, s->label_rect, sizeof u->label_rect);
     memcpy(u->text_info, s->text_info, sizeof u->text_info);
+    /* écran de chargement : pas de menu, cadrage neutre, titre à sa place habituelle */
+    memcpy(u->menu, (const float[4]){0.0F, 0.0F, 1.0F, 0.0F}, sizeof u->menu);
+    memcpy(u->view, (const float[4]){0.0F, 0.0F, 1.0F, 0.0F}, sizeof u->view);
+    memcpy(u->title, (const float[4]){0.0F, 0.255F, 0.56F, 0.0F}, sizeof u->title);
+}
+
+void splash_draw_pass(const Splash *s, SDL_GPUCommandBuffer *cmd, SDL_GPURenderPass *pass,
+                      const SplashUniforms *uniforms)
+{
+    SDL_BindGPUGraphicsPipeline(pass, s->pipeline);
+    const SDL_GPUTextureSamplerBinding binding = {.texture = s->text, .sampler = s->sampler};
+    SDL_BindGPUFragmentSamplers(pass, 0, &binding, 1);
+    SDL_PushGPUFragmentUniformData(cmd, 0, uniforms, (Uint32)sizeof *uniforms);
+    SDL_DrawGPUPrimitives(pass, 3, 1, 0, 0);
 }
 
 /* la scène dans `target` : un triangle plein écran */
@@ -98,11 +112,7 @@ void splash_draw(const Splash *s, SDL_GPUCommandBuffer *cmd, SDL_GPUTexture *tar
     if (pass == NULL) {
         return;
     }
-    SDL_BindGPUGraphicsPipeline(pass, s->pipeline);
-    const SDL_GPUTextureSamplerBinding binding = {.texture = s->text, .sampler = s->sampler};
-    SDL_BindGPUFragmentSamplers(pass, 0, &binding, 1);
-    SDL_PushGPUFragmentUniformData(cmd, 0, uniforms, (Uint32)sizeof *uniforms);
-    SDL_DrawGPUPrimitives(pass, 3, 1, 0, 0);
+    splash_draw_pass(s, cmd, pass, uniforms);
     SDL_EndGPURenderPass(pass);
 }
 
@@ -165,7 +175,7 @@ static void pump(Splash *s, EngPlatform *platform)
 
 void splash_frame(Splash *s, EngPlatform *platform)
 {
-    if (s == NULL || !s->ready || platform == NULL) {
+    if (s == NULL || !s->ready || s->done || platform == NULL) {
         return;
     }
     pump(s, platform);
@@ -185,7 +195,7 @@ bool splash_run(Splash *s, EngPlatform *platform, SplashJob job, void *user, flo
     if (job == NULL) {
         return false;
     }
-    if (s == NULL || !s->ready || platform == NULL) {
+    if (s == NULL || !s->ready || s->done || platform == NULL) {
         return job(user);
     }
     JobRun run = {.job = job, .user = user};
@@ -212,7 +222,8 @@ bool splash_run(Splash *s, EngPlatform *platform, SplashJob job, void *user, flo
     return run.result;
 }
 
-void splash_finish(Splash *s, EngPlatform *platform)
+/* laisse le fil se dérouler et le titre apparaître, sauf touche pressée */
+static void splash_hold(Splash *s, EngPlatform *platform)
 {
     if (s == NULL || !s->ready || platform == NULL) {
         return;
@@ -222,8 +233,16 @@ void splash_finish(Splash *s, EngPlatform *platform)
         pump(s, platform);
         present(s, 0.0F);
     }
+}
+
+void splash_finish(Splash *s, EngPlatform *platform, bool outro)
+{
+    if (s == NULL || !s->ready || platform == NULL) {
+        return;
+    }
+    splash_hold(s, platform);
     const double outro_from = s->time_s;
-    while (s->time_s - outro_from < SPLASH_OUTRO_SECONDS && !platform->quit_requested) {
+    while (outro && s->time_s - outro_from < SPLASH_OUTRO_SECONDS && !platform->quit_requested) {
         pump(s, platform);
         present(s, (float)((s->time_s - outro_from) / SPLASH_OUTRO_SECONDS));
     }
@@ -233,5 +252,5 @@ void splash_finish(Splash *s, EngPlatform *platform)
                  s->frames, s->frames_loading, s->jobs, s->loading_s, s->time_s, s->worst_gap_ms,
                  s->skip ? " ; passée par une touche" : "");
     (void)SDL_WaitForGPUIdle(s->device); /* plus aucune image de l'écran en vol */
-    splash_shutdown(s);
+    s->done = true; /* les ressources restent : la scène est celle de l'écran-titre */
 }

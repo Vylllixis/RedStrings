@@ -28,6 +28,16 @@ typedef enum EngAxis {
     ENG_AXIS_COUNT,
 } EngAxis;
 
+/* Touches de MENU : fixes, jamais remappées, en plus des actions (un menu reste utilisable quelles
+ * que soient les liaisons). Flèches du clavier et croix de la manette pour choisir, Entrée pour
+ * valider, Échap pour ouvrir le menu ou revenir en arrière. Masques de bits. */
+#define ENG_MENU_KEY_UP 1u
+#define ENG_MENU_KEY_DOWN 2u
+#define ENG_MENU_KEY_LEFT 4u
+#define ENG_MENU_KEY_RIGHT 8u
+#define ENG_MENU_KEY_OK 16u   /* Entrée (les deux) */
+#define ENG_MENU_KEY_BACK 32u /* Échap */
+
 typedef struct EngAxisValue {
     float x;
     float y;
@@ -45,6 +55,8 @@ typedef struct EngInputState {
     uint32_t released;
     EngAxisValue axis[ENG_AXIS_COUNT];
     float wheel; /* crans de molette depuis le pas précédent : vers l'avant (haut) > 0 */
+    uint32_t menu_pressed; /* touches de menu pressées depuis le pas précédent (ENG_MENU_KEY_*) */
+    uint32_t menu_held;    /* touches de menu enfoncées maintenant */
 } EngInputState;
 
 static inline bool eng_action_pressed(const EngInputState *in, EngAction action)

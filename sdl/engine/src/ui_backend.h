@@ -16,6 +16,10 @@ extern "C" {
  * SDL_GPUTextureFormat de la cible où l'interface est dessinée. false (journalisé) en cas d'échec ;
  * tout est alors libéré. */
 bool ow_ui_set_font(const char *ttf_path, float size_px);
+/* Seconde police (grasse : titres des menus) ; ow_ui_bold_font renvoie son ImFont*, NULL si elle
+ * n'a pas été chargée. */
+bool ow_ui_set_bold_font(const char *ttf_path, float size_px);
+void *ow_ui_bold_font(void);
 bool ow_ui_create(void *window, void *device, uint32_t color_format);
 void ow_ui_destroy(void);
 
@@ -39,6 +43,8 @@ bool ow_ui_wants_keyboard(void);
 
 /* Entrées synthétiques (tests, scripts) : position de la souris en pixels, bouton gauche. */
 void ow_ui_add_mouse_pos(float x, float y);
+/* Position de la souris vue par l'interface (pixels). */
+void ow_ui_mouse_pos(float *x, float *y);
 void ow_ui_add_mouse_button(int button, bool down);
 
 #ifdef __cplusplus

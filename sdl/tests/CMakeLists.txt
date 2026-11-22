@@ -135,6 +135,7 @@ ow_add_test(world_stream test_world_stream.c)
 ow_add_test(world_ai test_world_ai.c)
 ow_add_test(world_lod test_world_lod.c)
 ow_add_test(game_systems test_game_systems.c)
+ow_add_test(menu_motion test_menu_motion.c)
 ow_add_test(daynight test_daynight.c)
 ow_add_test(progression test_progression.c)
 ow_add_test(combat_sim test_combat_sim.c)
@@ -655,7 +656,7 @@ if(OW_PHYSICS AND OW_SHADERS_OK)
            --save-dir ${CMAKE_CURRENT_BINARY_DIR}/saves-world
            WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR})
   set_tests_properties(launcher.world_save PROPERTIES
-    PASS_REGULAR_EXPRESSION "AUTOTEST SAUVEGARDE MONDE : OK.*MONDE : joueur au sol")
+    PASS_REGULAR_EXPRESSION "carte de la partie : lieu « Désert », 4 boss . au château : « Château ».*AUTOTEST SAUVEGARDE MONDE : OK.*MONDE : joueur au sol")
   add_test(NAME launcher.world_trees_avoid COMMAND launcher --world 7 --combat --new-game
            --at-zone 3 --no-audio --frames 35 --env-samples 16
            WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR})
@@ -673,8 +674,36 @@ if(OW_PHYSICS AND OW_SHADERS_OK)
            WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR})
   set_tests_properties(launcher.splash_shots PROPERTIES
     PASS_REGULAR_EXPRESSION "AUTOTEST CHARGEMENT : OK")
+  # Écran-titre et gestion des parties (2026-11-22), de bout en bout, le menu piloté touche par
+  # touche (--menu-script, un tick par image). 1) Avec la scène du titre : créer la partie « Aube »,
+  # jouer, Échap, « Sauvegarder et quitter », puis la renommer, la dupliquer et supprimer la copie.
+  # 2) Sans scène (pas d'écran de chargement) : créer « Brume », jouer, puis de VRAIS événements
+  # Échap (ils passent par la plateforme) : pause, « Sauvegarder », reprendre, pause de nouveau :
+  # le jeu ne se ferme pas et finit en pause. Dossiers de parties propres au test. ATTENTION : pas de point-virgule dans le texte attendu (CMake).
+  add_test(NAME launcher.title_menu
+           COMMAND sh -c "rm -rf \"$1\" && \"$2\" --combat --no-audio --splash --frames 380 --env-samples 16 --save-dir \"$1\" --menu-script '40:ok,50:text=Aube,60:ok,150:back,160:down,164:down,168:down,172:ok,230:right,236:ok,250:ok,256:down,260:ok,266:text=Zénith,272:ok,280:down,284:ok,300:ok,306:down,310:down,314:down,318:ok,322:down,326:ok,340:back'"
+                   sh ${CMAKE_CURRENT_BINARY_DIR}/saves-title $<TARGET_FILE:launcher>
+           WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR})
+  set_tests_properties(launcher.title_menu PROPERTIES TIMEOUT 600
+    PASS_REGULAR_EXPRESSION "nouvelle partie « Aube » dans l'emplacement 1.*MENU : écran 1, ligne 1 . 1 emplacement\\(s\\) occupé\\(s\\) . partie en cours « Zénith » . scène du titre : [1-9][0-9][0-9] image")
+  add_test(NAME launcher.menu_plain
+           COMMAND sh -c "rm -rf \"$1\" && \"$2\" --combat --no-audio --frames 90 --env-samples 16 --save-dir \"$1\" --menu-script '10:ok,14:text=Brume,18:ok,40:esc,46:down,50:ok,60:esc,66:esc,72:down,76:down'"
+                   sh ${CMAKE_CURRENT_BINARY_DIR}/saves-plain $<TARGET_FILE:launcher>
+           WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR})
+  set_tests_properties(launcher.menu_plain PROPERTIES
+    PASS_REGULAR_EXPRESSION "MENU : écran 2, ligne 2 . 1 emplacement\\(s\\) occupé\\(s\\) . partie en cours « Brume » \\(en jeu\\) . scène du titre : 0 image")
+  # 3) À la souris (fenêtre de 1280 x 720) : survoler « Parties » la choisit, le clic l'ouvre ; un
+  # clic sur la première carte (libre) ouvre la saisie du nom ; le clavier écrit (de vrais événements
+  # de texte, par la plateforme), Entrée crée.
+  add_test(NAME launcher.menu_mouse
+           COMMAND sh -c "rm -rf \"$1\" && \"$2\" --combat --no-audio --frames 90 --env-samples 16 --save-dir \"$1\" --menu-script '10:mouse=0.413/0.895,14:click,30:mouse=0.306/0.52,34:click,40:type=Souris,46:ok'"
+                   sh ${CMAKE_CURRENT_BINARY_DIR}/saves-mouse $<TARGET_FILE:launcher>
+           WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR})
+  set_tests_properties(launcher.menu_mouse PROPERTIES
+    PASS_REGULAR_EXPRESSION "nouvelle partie « Souris » dans l'emplacement 1.*MENU : écran 0, ligne [0-9] . 1 emplacement\\(s\\) occupé\\(s\\) . partie en cours « Souris » \\(en jeu\\)")
   foreach(t launcher.world_water launcher.world_lava launcher.world_grass
-          launcher.world_trees_avoid launcher.world_save launcher.splash launcher.splash_shots)
+          launcher.world_trees_avoid launcher.world_save launcher.splash launcher.splash_shots
+          launcher.title_menu launcher.menu_plain launcher.menu_mouse)
     set_property(TEST ${t} PROPERTY ENVIRONMENT "SDL_VIDEODRIVER=offscreen")
     set_property(TEST ${t} PROPERTY FAIL_REGULAR_EXPRESSION "ERROR|non détruite|perdu|TROU")
   endforeach()
@@ -722,7 +751,8 @@ if(OW_PHYSICS AND OW_SHADERS_OK)
     foreach(t launcher.world_combat launcher.world_combat_shift launcher.world_decor
             launcher.world_water launcher.world_lava launcher.world_grass
             launcher.world_trees_avoid launcher.world_save launcher.splash
-            launcher.splash_shots launcher.world_layers_plain
+            launcher.splash_shots launcher.title_menu launcher.menu_plain launcher.menu_mouse
+            launcher.world_layers_plain
             launcher.world_layers_desert launcher.world_layers_mountain
             launcher.world_layers_volcano)
       set_property(TEST ${t} APPEND PROPERTY ENVIRONMENT_MODIFICATION

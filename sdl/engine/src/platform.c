@@ -9,6 +9,7 @@ bool eng_platform_init(EngPlatform *p, const EngWindowDesc *desc)
 {
     *p = (EngPlatform){0};
     p->debug_draw = true;
+    p->escape_quits = true;
     eng_input_set_default_bindings(&p->input);
 
     if (!SDL_Init(SDL_INIT_VIDEO | SDL_INIT_EVENTS)) {
@@ -103,6 +104,50 @@ bool eng_platform_set_window_size(EngPlatform *p, int width, int height)
     return SDL_SetWindowSize(p->window, width, height);
 }
 
+/* ajoute `utf8` au texte en attente, en entier ou pas du tout (jamais un caractère coupé) */
+static void text_append(EngPlatform *p, const char *utf8)
+{
+    const size_t n = SDL_strlen(utf8);
+    if (n > 0U && (size_t)p->text_len + n < sizeof p->text) {
+        SDL_memcpy(p->text + p->text_len, utf8, n);
+        p->text_len += (uint32_t)n;
+        p->text[p->text_len] = '\0';
+    }
+}
+
+void eng_platform_set_text_input(EngPlatform *p, bool active)
+{
+    if (p == NULL || p->text_input == active) {
+        return;
+    }
+    p->text_input = active;
+    p->text_len = 0;
+    p->text[0] = '\0';
+    if (p->window != NULL) {
+        if (active) {
+            (void)SDL_StartTextInput(p->window);
+        } else {
+            (void)SDL_StopTextInput(p->window);
+        }
+    }
+}
+
+uint32_t eng_platform_take_text(EngPlatform *p, char *out, uint32_t capacity)
+{
+    if (p == NULL || out == NULL || capacity == 0U) {
+        return 0;
+    }
+    uint32_t n = p->text_len < capacity - 1U ? p->text_len : capacity - 1U;
+    while (n > 0U && n < p->text_len && ((unsigned char)p->text[n] & 0xC0U) == 0x80U) {
+        n--; /* ne coupe pas un caractère en plusieurs octets */
+    }
+    SDL_memcpy(out, p->text, n);
+    out[n] = '\0';
+    p->text_len = 0;
+    p->text[0] = '\0';
+    return n;
+}
+
 bool eng_platform_pump(EngPlatform *p)
 {
     SDL_Event ev;
@@ -135,15 +180,25 @@ bool eng_platform_pump(EngPlatform *p)
             p->fullscreen = false;
             ENG_LOG_DEBUG("plein écran désactivé");
             break;
+        case SDL_EVENT_TEXT_INPUT:
+            if (p->text_input && ev.text.text != NULL) {
+                text_append(p, ev.text.text);
+            }
+            break;
         case SDL_EVENT_KEY_DOWN:
         case SDL_EVENT_KEY_UP:
+            if (p->text_input && ev.key.down && ev.key.key == SDLK_BACKSPACE) {
+                text_append(p, "\b"); /* répétition comprise : la touche tenue efface */
+            }
             if (ev.key.repeat) {
                 break; /* la répétition automatique n'est pas une nouvelle pression */
             }
             eng_input_key(&p->input, (int)ev.key.scancode, ev.key.down);
             /* Touches du SYSTÈME (hors actions de jeu) : quitter et plein écran. */
             if (ev.key.down && ev.key.key == SDLK_ESCAPE) {
-                p->quit_requested = true;
+                if (p->escape_quits) { /* sinon : touche de menu (ENG_MENU_KEY_BACK) */
+                    p->quit_requested = true;
+                }
             } else if (ev.key.down && ev.key.key == SDLK_F11) {
                 eng_platform_toggle_fullscreen(p);
             } else if (ev.key.down && ev.key.key == SDLK_F2) {

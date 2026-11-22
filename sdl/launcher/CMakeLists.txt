@@ -1,4 +1,4 @@
-add_executable(launcher src/main.c src/post_bench.c src/demo_scene.c src/editor_mode.c src/play_mode.c src/play_combat.c src/play_boss.c src/play_decor.c src/world_bench.c src/skeleton_view.c src/game_flow.c src/avatar.c src/avatar_gallery.c src/world_view.c src/world_trees.c src/world_trees_near.c src/world_far.c src/world_water.c src/world_grass.c src/splash.c src/splash_build.c src/splash_capture.c)
+add_executable(launcher src/main.c src/post_bench.c src/demo_scene.c src/editor_mode.c src/play_mode.c src/play_combat.c src/play_boss.c src/play_decor.c src/world_bench.c src/skeleton_view.c src/game_flow.c src/game_flow_selftest.c src/game_slots.c src/title.c src/avatar.c src/avatar_gallery.c src/world_view.c src/world_trees.c src/world_trees_near.c src/world_far.c src/world_water.c src/world_grass.c src/splash.c src/splash_build.c src/splash_capture.c)
 target_link_libraries(launcher PRIVATE engine)
 add_dependencies(launcher game)
 target_link_libraries(launcher PRIVATE project_options)

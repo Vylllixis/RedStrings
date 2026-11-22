@@ -18,6 +18,13 @@ cbuffer Splash : register(b0, space3)
     float4 title_rect; // uv du titre dans l'image (u0, v0, u1, v1)
     float4 label_rect; // uv de la légende
     float4 text_info;  // x : largeur / hauteur du titre ; y : largeur / hauteur de la légende
+    // Écran-titre (2026-11-22) : la même scène derrière le menu. Écran de chargement : menu =
+    // (0, 0, 1, 0), view = (0, 0, 1, 0), title.w = 0 (rien ne change).
+    float4 menu;  // x : menu [0, 1] (la corde de chargement s'efface) ; y : assombrissement [0, 1] ;
+                  // z : fondu (1 : visible) ; w : libre
+    float4 view;  // xy : cadrage (déplacement du premier plan ; les plans lointains bougent moins) ;
+                  // z : zoom autour du centre ; w : libre
+    float4 title; // xy : centre du titre ; z : sa demi-largeur ; w : 1 pour les utiliser
 };
 
 struct Input {
@@ -247,8 +254,14 @@ float4 main(Input input) : SV_Target0
     float title_in = saturate(anim.y);
     float aspect = res.x / res.y;
     float2 p = float2((input.uv.x - 0.5f) * aspect, 0.5f - input.uv.y);
-    float aa = 1.5f / res.y;
+    // Cadrage (écran-titre) : chaque plan se déplace selon sa profondeur, autour d'un zoom commun.
+    // `screen_p` reste le repère de l'écran (titre, corde de chargement).
+    float2 screen_p = p;
+    float2 cam = view.xy;
+    float2 scene_p = p / max(view.z, 0.5f);
+    float aa = 1.5f / res.y / max(view.z, 0.5f);
     float pan = t * 0.006f; // lent travelling : les couches lointaines défilent moins vite
+    p = scene_p - cam * 0.08f; // le ciel : très loin
 
     // ── Ciel : nuit en haut, aube à l'horizon, soleil qui se lève derrière le château ──
     float rise = ease(t / 9.0f);
@@ -280,6 +293,7 @@ float4 main(Input input) : SV_Target0
     col = lerp(col, float3(0.5f, 0.16f, 0.2f) + float3(0.9f, 0.4f, 0.12f) * exp(-sun_d * 3.0f), cloud * 0.6f);
 
     // ── Le dragon passe devant le soleil, de la droite (le volcan) vers la gauche ──
+    p = scene_p - cam * 0.15f;
     float fly = frac(t / 13.0f + 0.66f);
     float2 dragon_at = float2(lerp(1.15f, -1.15f, fly), 0.33f + sin(fly * PI) * 0.06f + sin(t * 0.8f) * 0.008f);
     float2 dp = p;
@@ -288,6 +302,7 @@ float4 main(Input input) : SV_Target0
     col = lerp(col, float3(0.03f, 0.01f, 0.04f), smoothstep(aa, -aa, dragon_d));
 
     // ── Montagnes lointaines : enneigées à gauche ──
+    p = scene_p - cam * 0.25f;
     float far_ridge = -0.16f + 0.2f * fbm1(p.x * 2.4f + pan * 4.0f + 3.0f) +
                       0.1f * smoothstep(0.1f, -0.9f, p.x);
     float3 far_col = lerp(float3(0.2f, 0.12f, 0.27f), float3(0.62f, 0.3f, 0.26f), exp(-sun_d * 2.2f));
@@ -298,6 +313,7 @@ float4 main(Input input) : SV_Target0
     col = lerp(col, far_col, smoothstep(aa, -aa, p.y - far_ridge));
 
     // ── Le volcan, à droite : cratère rougeoyant, fumée, braises ──
+    p = scene_p - cam * 0.4f;
     float2 crater = CRATER;
     float cone = crater.y - abs(p.x - crater.x) * 0.52f - 0.012f * noise1(p.x * 30.0f);
     cone = min(cone, crater.y - 0.012f + 0.4f * abs(p.x - crater.x)); // le creux du cratère
@@ -331,6 +347,7 @@ float4 main(Input input) : SV_Target0
     }
 
     // ── Collines et forêts ; dunes du désert à droite ──
+    p = scene_p - cam * 0.6f;
     float mid = -0.215f + 0.075f * fbm1(p.x * 3.6f + pan * 9.0f + 40.0f);
     float pines = abs(frac(p.x * 46.0f + pan * 115.0f) - 0.5f) * 2.0f;
     float pine_h = 0.03f * (1.0f - pines) * (0.5f + 0.5f * noise1(floor(p.x * 46.0f + pan * 115.0f)));
@@ -347,6 +364,7 @@ float4 main(Input input) : SV_Target0
     col = lerp(col, float3(0.75f, 0.36f, 0.3f), mist * mist_band * 0.38f);
 
     // ── La colline du château, au centre, à contre-jour ──
+    p = scene_p - cam * 0.8f;
     float hill = -0.27f + 0.225f * exp(-pow(p.x / 0.3f, 2.0f)) + 0.006f * noise1(p.x * 60.0f);
     float2 keep = KEEP_AT;
     float castle_d = castle(p, keep);
@@ -366,6 +384,7 @@ float4 main(Input input) : SV_Target0
     col = lerp(col, THREAD * 0.95f, smoothstep(aa, -aa, flag));
 
     // ── Premier plan : la falaise du chevalier à gauche, l'herbe au vent ──
+    p = scene_p - cam;
     float gust = sin(t * 1.4f + p.x * 5.0f) * 0.5f + sin(t * 2.3f + p.x * 11.0f) * 0.25f;
     float blades = pow(noise1(p.x * 170.0f + gust * 0.9f), 2.0f) * 0.02f + noise1(p.x * 63.0f + gust * 0.5f) * 0.007f;
     float cliff = smoothstep(-0.3f, -0.52f, p.x); // 1 sur le plateau de la falaise
@@ -390,29 +409,40 @@ float4 main(Input input) : SV_Target0
     }
 
     // ── Le fil rouge : trois brins tressés ; du chevalier au mât du donjon, puis au cratère ──
+    // ses attaches suivent chacune leur plan : l'écharpe (premier plan), le mât, le cratère
+    p = scene_p;
+    float2 scarf = SCARF + cam;
+    float2 mast = MAST + cam * 0.8f;
+    float2 crater_at = CRATER + cam * 0.4f;
     float unroll_a = ease((t - 0.35f) / 1.7f);
     float unroll_b = ease((t - 1.95f) / 1.3f);
-    float thread = thread_glow(p, t, 0.0f, SCARF, MAST, 0.085f, unroll_a, 0.0026f, aa) +
-                   thread_glow(p, t, 1.0f, SCARF, MAST, 0.085f, unroll_a, 0.0012f, aa) * 0.6f +
-                   thread_glow(p, t, 2.0f, SCARF, MAST, 0.085f, unroll_a, 0.0012f, aa) * 0.45f;
-    thread += thread_glow(p, t, 3.0f, MAST, CRATER, 0.03f, unroll_b, 0.0026f, aa) +
-              thread_glow(p, t, 4.0f, MAST, CRATER, 0.03f, unroll_b, 0.0012f, aa) * 0.6f +
-              thread_glow(p, t, 5.0f, MAST, CRATER, 0.03f, unroll_b, 0.0012f, aa) * 0.45f;
+    float thread = thread_glow(p, t, 0.0f, scarf, mast, 0.085f, unroll_a, 0.0026f, aa) +
+                   thread_glow(p, t, 1.0f, scarf, mast, 0.085f, unroll_a, 0.0012f, aa) * 0.6f +
+                   thread_glow(p, t, 2.0f, scarf, mast, 0.085f, unroll_a, 0.0012f, aa) * 0.45f;
+    thread += thread_glow(p, t, 3.0f, mast, crater_at, 0.03f, unroll_b, 0.0026f, aa) +
+              thread_glow(p, t, 4.0f, mast, crater_at, 0.03f, unroll_b, 0.0012f, aa) * 0.6f +
+              thread_glow(p, t, 5.0f, mast, crater_at, 0.03f, unroll_b, 0.0012f, aa) * 0.45f;
     col += THREAD * thread * (1.0f + outro * 2.0f);
     // l'aiguille : un éclat à la pointe du fil tant qu'il se déroule
     float first = step(unroll_a, 0.999f);
-    float tip_x = first > 0.5f ? lerp(SCARF.x, MAST.x, unroll_a) : lerp(MAST.x, CRATER.x, unroll_b);
-    float tip_y = first > 0.5f ? thread_y(tip_x, t, 0.0f, SCARF, MAST, 0.085f)
-                               : thread_y(tip_x, t, 3.0f, MAST, CRATER, 0.03f);
+    float tip_x = first > 0.5f ? lerp(scarf.x, mast.x, unroll_a) : lerp(mast.x, crater_at.x, unroll_b);
+    float tip_y = first > 0.5f ? thread_y(tip_x, t, 0.0f, scarf, mast, 0.085f)
+                               : thread_y(tip_x, t, 3.0f, mast, crater_at, 0.03f);
     float needle = exp(-length(p - float2(tip_x, tip_y)) * 90.0f) * step(0.001f, unroll_a) *
                    (1.0f - smoothstep(0.92f, 1.0f, unroll_b));
     col += float3(1.0f, 0.75f, 0.6f) * needle * 1.6f;
 
+    // ── Écran-titre : la scène s'assombrit et se désature derrière les cartes et les listes ──
+    float dim = saturate(menu.y);
+    float grey = dot(col, float3(0.299f, 0.587f, 0.114f));
+    col = lerp(col, lerp(col, float3(grey, grey * 0.9f, grey * 1.12f), 0.5f) * 0.15f, dim);
+    p = screen_p; // le titre et la corde de chargement sont dans le repère de l'écran
+
     // ── Le titre : il apparaît de gauche à droite, derrière un éclat ; halo rouge ──
     float zoom = 1.0f + outro * 0.1f;
-    float2 title_half = float2(min(0.56f, aspect * 0.4f), 0.0f) * zoom;
+    float2 title_half = float2(title.w > 0.5f ? title.z : min(0.56f, aspect * 0.4f), 0.0f) * zoom;
     title_half.y = title_half.x / max(text_info.x, 0.01f);
-    float2 title_at = float2(0.0f, 0.255f);
+    float2 title_at = title.w > 0.5f ? title.xy : float2(0.0f, 0.255f);
     float field = text_field(p, title_at, title_half, title_rect);
     float sweep = lerp(-title_half.x - 0.12f, title_half.x + 0.12f, ease(title_in));
     float shown = smoothstep(sweep, sweep - 0.1f, p.x);
@@ -436,27 +466,29 @@ float4 main(Input input) : SV_Target0
     float pluck = sin(u_bar * PI) * sin(t * 13.0f) * 0.0022f * exp(-frac(t * 0.5f) * 3.0f);
     float bar_d = abs(p.y - (-0.435f + pluck));
     float filled = smoothstep(progress + 0.004f, progress - 0.004f, u_bar);
-    float string_core = smoothstep(0.0022f + aa, 0.0022f - aa, bar_d) * in_bar;
+    // écran-titre : la corde s'efface, le menu dessine la sienne au même endroit
+    float loading = 1.0f - smoothstep(0.0f, 0.35f, menu.x);
+    float string_core = smoothstep(0.0022f + aa, 0.0022f - aa, bar_d) * in_bar * loading;
     col = lerp(col, float3(0.2f, 0.03f, 0.05f), string_core * 0.9f * (1.0f - filled));
-    col += THREAD * (string_core + exp(-bar_d * 150.0f) * 0.5f * in_bar) * filled;
+    col += THREAD * (string_core + exp(-bar_d * 150.0f) * 0.5f * in_bar * loading) * filled;
     float pegs = min(length(p - float2(-bar_half, -0.435f)), length(p - float2(bar_half, -0.435f))) - 0.0055f;
-    col = lerp(col, float3(0.75f, 0.55f, 0.45f), smoothstep(aa, -aa, pegs)); // les chevilles
+    col = lerp(col, float3(0.75f, 0.55f, 0.45f), smoothstep(aa, -aa, pegs) * loading); // les chevilles
     float2 bead = float2(-bar_half + progress * 2.0f * bar_half, -0.435f + pluck);
-    col += float3(1.0f, 0.55f, 0.45f) * exp(-length(p - bead) * 150.0f) * 1.3f; // le nœud qui avance
+    col += float3(1.0f, 0.55f, 0.45f) * exp(-length(p - bead) * 150.0f) * 1.3f * loading; // le nœud qui avance
     // la légende, sous la corde
     float2 label_half = float2(0.0f, 0.0125f);
     label_half.x = label_half.y * max(text_info.y, 0.01f);
     float label = text_field(p, float2(0.0f, -0.467f), label_half, label_rect);
     float label_edge = fwidth(label) * 0.75f + 0.004f;
     col = lerp(col, float3(0.95f, 0.8f, 0.72f),
-               smoothstep(0.5f - label_edge, 0.5f + label_edge, label) * (0.55f + 0.2f * sin(t * 2.2f)));
+               smoothstep(0.5f - label_edge, 0.5f + label_edge, label) * (0.55f + 0.2f * sin(t * 2.2f)) * loading);
 
     // ── Sortie : le soleil éclate, puis tout s'éteint ; entrée : fondu depuis le noir ──
     float flare = sin(saturate(outro / 0.6f) * PI); // l'éclat monte puis retombe
     col += float3(1.0f, 0.62f, 0.3f) * exp(-sun_d * lerp(5.0f, 2.2f, flare)) * flare * 1.1f;
     float dusk = smoothstep(0.35f, 1.0f, outro);     // puis la scène rougit et s'éteint
     col *= lerp(float3(1.0f, 1.0f, 1.0f), float3(1.0f, 0.22f, 0.26f), dusk) * (1.0f - dusk);
-    col *= smoothstep(0.0f, 0.9f, t);
+    col *= smoothstep(0.0f, 0.9f, t) * saturate(menu.z);
 
     // vignette, grain, courbe de ton, encodage sRGB (la swapchain n'est pas sRGB)
     float2 v = input.uv - 0.5f;

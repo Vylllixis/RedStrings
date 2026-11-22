@@ -113,6 +113,10 @@ void eng_ui_shutdown(EngUi *ui); /* sans effet si déjà arrêtée */
  * fichier illisible ou interface pas prête ; la police intégrée reste alors en place. */
 bool eng_ui_set_font(EngUi *ui, const char *ttf_path, float size_px);
 
+/* Police grasse des menus du jeu (titres, lignes choisies). false : la police courante la remplace.
+ */
+bool eng_ui_set_bold_font(EngUi *ui, const char *ttf_path, float size_px);
+
 void eng_ui_set_visible(EngUi *ui, bool visible);
 
 /* Commence l'image d'interface. false (rien à faire ni à terminer) si l'interface n'est pas prête,
@@ -163,3 +167,5 @@ bool eng_ui_wants_keyboard(const EngUi *ui);
 /* Entrées synthétiques, pour les tests : position de la souris (pixels), bouton (0 : gauche). */
 void eng_ui_add_mouse_pos(EngUi *ui, float x, float y);
 void eng_ui_add_mouse_button(EngUi *ui, int button, bool down);
+/* Position de la souris vue par l'interface (pixels) : celle qui désigne les lignes des menus. */
+void eng_ui_mouse_pos(const EngUi *ui, float out[2]);
