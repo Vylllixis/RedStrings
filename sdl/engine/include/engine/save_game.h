@@ -24,7 +24,8 @@
  * has_equipment = false (épée et bouclier) ; incohérente (eng_equip_valid) : fichier refusé.
  * Section facultative META (2026-11-22, gestion des parties) : nom de la partie et lieu de la
  * sauvegarde (longueur u32 puis octets UTF-8, sans zéro final), date de la sauvegarde (secondes
- * depuis 1970, u64). Absente : has_meta = false ; un texte trop long : fichier refusé. */
+ * depuis 1970, u64), puis des drapeaux (u32, facultatifs : bit 0 = partie en mode créatif).
+ * Absente : has_meta = false ; un texte trop long : fichier refusé. */
 
 #include <stdbool.h>
 #include <stddef.h>
@@ -64,10 +65,11 @@ typedef struct EngSaveGame {
     EngEquipment equipment;
     uint32_t enemy_count;
     EngSaveEnemy enemies[ENG_SAVE_MAX_ENEMIES];
-    bool has_gear;                  /* section GEAR (grande carte) */
-    uint32_t gear_tier;             /* palier d'équipement, 0 à 4 (engine/gear.h) */
-    uint32_t bosses_beaten;         /* bit i : boss de la zone i vaincu (engine/map_zones.h) */
-    bool has_meta;                  /* section META présente */
+    bool has_gear;          /* section GEAR (grande carte) */
+    uint32_t gear_tier;     /* palier d'équipement, 0 à 4 (engine/gear.h) */
+    uint32_t bosses_beaten; /* bit i : boss de la zone i vaincu (engine/map_zones.h) */
+    bool has_meta;          /* section META présente */
+    bool creative; /* META : partie en mode créatif (choisi à la création, fixé ensuite) */
     char name[ENG_SAVE_NAME_MAX];   /* nom de la partie (UTF-8) */
     char place[ENG_SAVE_PLACE_MAX]; /* lieu de la sauvegarde (« Plaine ») ; vide : inconnu */
     int64_t saved_at;               /* date de la sauvegarde, secondes depuis 1970 (0 : inconnue) */

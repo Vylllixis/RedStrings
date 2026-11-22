@@ -212,13 +212,14 @@ static void new_game(GameFlow *f, PlayMode *play)
     if (play->combat != NULL) {
         play_combat_reset(play->combat);
     }
+    play_mode_set_creative(play, f->creative); /* le mode de la partie, pour toute la partie */
     f->play_time = 0.0;
     (void)eng_daynight_set_hour(&f->daynight, NEW_GAME_HOUR);
     f->started = true;
     f->in_title = false;
 }
 
-void game_flow_start_new(GameFlow *f, PlayMode *play)
+void game_flow_start_new(GameFlow *f, PlayMode *play, bool creative)
 {
     if (f == NULL || play == NULL) {
         return;
@@ -235,6 +236,7 @@ void game_flow_start_new(GameFlow *f, PlayMode *play)
     }
     use_slot(f, slot);
     eng_menu_default_name((uint32_t)f->slot, f->name, sizeof f->name);
+    f->creative = creative;
     new_game(f, play);
 }
 
@@ -261,6 +263,7 @@ static bool save_game(GameFlow *f, PlayMode *play)
     s.has_meta = true;
     (void)snprintf(s.name, sizeof s.name, "%s", f->name);
     s.saved_at = game_slot_now();
+    s.creative = f->creative;
     if (f->world.place_name != NULL) {
         f->world.place_name(f->world.user, s.player_pos, s.place, sizeof s.place);
     }
@@ -301,6 +304,8 @@ static bool load_game(GameFlow *f, PlayMode *play)
     if (play->combat != NULL) {
         play_combat_restore(play->combat, &s);
     }
+    f->creative = s.has_meta && s.creative; /* le mode choisi à la création de cette partie */
+    play_mode_set_creative(play, f->creative);
     f->play_time = s.play_time;
     (void)eng_daynight_set_hour(&f->daynight, s.has_time ? s.hour : NEW_GAME_HOUR);
     if (s.has_meta && s.name[0] != '\0') {
@@ -310,8 +315,8 @@ static bool load_game(GameFlow *f, PlayMode *play)
     }
     f->started = true;
     f->in_title = false;
-    ENG_LOG_INFO("partie %d reprise : « %s » (version %u, %.0f s de jeu)", (int)f->slot + 1,
-                 f->name, s.version_read, s.play_time);
+    ENG_LOG_INFO("partie %d reprise : « %s »%s (version %u, %.0f s de jeu)", (int)f->slot + 1,
+                 f->name, f->creative ? " (mode créatif)" : "", s.version_read, s.play_time);
     return true;
 }
 
@@ -341,11 +346,13 @@ static void run_action(GameFlow *f, PlayMode *play, EngMenuAction act)
         } else {
             eng_menu_default_name((uint32_t)f->slot, f->name, sizeof f->name);
         }
+        f->creative = f->menu.creative;
         new_game(f, play);
         (void)save_game(f, play);
         f->menu.status[0] = '\0'; /* pas de message « sauvegardée » au début d'une partie */
         f->menu.status_ticks = 0;
-        ENG_LOG_INFO("nouvelle partie « %s » dans l'emplacement %d", f->name, (int)f->slot + 1);
+        ENG_LOG_INFO("nouvelle partie « %s »%s dans l'emplacement %d", f->name,
+                     f->creative ? " (mode créatif)" : "", (int)f->slot + 1);
         break;
     case ENG_MENU_ACT_CONTINUE:
         (void)load_game(f, play);
@@ -498,7 +505,7 @@ void game_flow_draw(GameFlow *f, EngUi *ui, const PlayMode *play, const EngCamer
         play_combat_fill_hud(play->combat, play, vp, width, height, &hud);
         (void)snprintf(hud.hint, sizeof hud.hint, "%s",
                        "clic : attaque   clic droit : lourde   Ctrl : esquive   E : garde   A/Q : "
-                       "cible   R : arme   , : créatif   Échap : menu");
+                       "cible   R : arme   Échap : menu");
         (void)eng_daynight_format(&f->daynight, hud.clock, sizeof hud.clock);
         eng_ui_draw_hud(ui, &hud, width, height);
     }

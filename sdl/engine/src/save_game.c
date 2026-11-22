@@ -212,6 +212,7 @@ size_t eng_save_encode(const EngSaveGame *s, const EngWorldState *world, void *o
         w_text(&w, s->place);
         w_u32(&w, (uint32_t)(uint64_t)s->saved_at);
         w_u32(&w, (uint32_t)((uint64_t)s->saved_at >> 32));
+        w_u32(&w, s->creative ? 1U : 0U); /* drapeaux : bit 0 = mode créatif */
         section_end(&w, at);
         sections++;
     }
@@ -458,6 +459,9 @@ bool eng_save_decode(const void *data, size_t size, EngSaveGame *out, EngWorldSt
             }
             s.saved_at = (int64_t)(lo | (hi << 32));
             s.has_meta = true;
+            if (sec.at + 4U <= sec.n) { /* drapeaux : absents d'une section plus ancienne */
+                s.creative = (r_u32(&sec) & 1U) != 0U;
+            }
         }
         /* section inconnue : ignorée */
     }

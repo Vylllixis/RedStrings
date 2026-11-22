@@ -2807,7 +2807,8 @@ bool play_combat_selftest(bool rig)
     check(&t, c->equip.equipped == ENG_WEAPON_SWORD, "équipement : R remet l'épée",
           (float)c->equip.equipped);
 
-    /* 1 ter. mode créatif (touche « , ») : invincible, vol libre, dégâts du joueur inchangés */
+    /* 1 ter. mode créatif (choisi à la création de la partie) : invincible, vol libre, dégâts du
+     * joueur inchangés */
     for (int i = 0; i < 60; i++) {
         step(&t, 0U, 0U, 0.0F, 0.0F);
     }
@@ -2816,8 +2817,18 @@ bool play_combat_selftest(bool rig)
         step(&t, i == 0 ? atk : 0U, 0U, 0.0F, 0.0F);
     }
     const float normal_hit = c->dummy.total_damage - dealt;
-    step(&t, 1U << ENG_ACTION_CREATIVE, 0U, 0.0F, 0.0F);
-    check(&t, t.play.creative, "créatif : la touche l'active", t.play.creative ? 1.0F : 0.0F);
+    play_mode_set_creative(&t.play, true);
+    step(&t, 0U, 0U, 0.0F, 0.0F);
+    check(&t, t.play.creative && c->invincible, "créatif : activé avec la partie",
+          t.play.creative ? 1.0F : 0.0F);
+    static EngHud creative_hud; /* le HUD l'annonce en entier (« MODE CR » était coupé avant) */
+    mat4 no_view = GLM_MAT4_IDENTITY_INIT;
+    play_combat_fill_hud(c, &t.play, no_view, 1280, 720, &creative_hud);
+    check(&t,
+          strstr(creative_hud.weapon, "MODE CR\xC3\x89"
+                                      "ATIF") != NULL,
+          "créatif : « MODE CRÉATIF » entier dans le HUD (octets)",
+          (float)strlen(creative_hud.weapon));
     dealt = c->dummy.total_damage;
     for (int i = 0; i < 60; i++) {
         step(&t, i == 0 ? atk : 0U, 0U, 0.0F, 0.0F);
@@ -2838,15 +2849,38 @@ bool play_combat_selftest(bool rig)
         step(&t, 0U, 1U << ENG_ACTION_JUMP, 0.0F, 0.0F);
     }
     (void)eng_character_position(t.play.character, high);
-    check(&t, high[1] - low[1] > 8.0F, "créatif : Espace fait monter (m en 1 s)", high[1] - low[1]);
+    check(&t, high[1] - low[1] > 23.0F && high[1] - low[1] < 25.0F,
+          "créatif : Espace fait monter de 24 m en 1 s (12 m avant)", high[1] - low[1]);
     for (int i = 0; i < 60; i++) { /* rien : reste en l'air */
         step(&t, 0U, 0U, 0.0F, 0.0F);
     }
     (void)eng_character_position(t.play.character, later);
     check(&t, fabsf(later[1] - high[1]) < 0.05F, "créatif : ne retombe pas (écart en 1 s, m)",
           later[1] - high[1]);
-    step(&t, 1U << ENG_ACTION_CREATIVE, 0U, 0.0F, 0.0F);
-    check(&t, !t.play.creative, "créatif : la touche le coupe", t.play.creative ? 1.0F : 0.0F);
+    /* vol horizontal, loin de tout combattant (aucune poussée) : six fois la vitesse de
+     * déplacement du personnage (trois fois avant) */
+    put(&t, 20.0F, 20.0F, 0.0F);
+    float from[3];
+    float to[3];
+    float walked = 0.0F;
+    (void)eng_character_position(t.play.character, from);
+    for (int i = 0; i < 60; i++) {
+        step(&t, 0U, 0U, 0.0F, 1.0F);
+        float v[3];
+        eng_locomotion_velocity(&t.play.loco, v);
+        walked += hypotf(v[0], v[2]) / 60.0F;
+    }
+    (void)eng_character_position(t.play.character, to);
+    const float flown = hypotf(to[0] - from[0], to[2] - from[2]);
+    check(&t, walked > 2.0F && fabsf(flown - (6.0F * walked)) < 0.03F * flown,
+          "créatif : vol six fois plus rapide que la marche (m en 1 s)", flown);
+    /* retour au-dessus du point de départ, en l'air : repasser en aventure fait retomber */
+    put(&t, low[0], low[2], 0.0F);
+    const float aloft[3] = {low[0], high[1], low[2]};
+    (void)eng_character_teleport(t.play.character, aloft);
+    play_mode_set_creative(&t.play, false);
+    check(&t, !t.play.creative && !c->invincible,
+          "retour en aventure : plus de vol ni d'invincibilité", t.play.creative ? 1.0F : 0.0F);
     for (int i = 0; i < 180; i++) {
         step(&t, 0U, 0U, 0.0F, 0.0F);
     }

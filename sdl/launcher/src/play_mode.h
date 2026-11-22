@@ -90,7 +90,8 @@ typedef struct PlayMode {
     bool sprinting;
     bool ready;
     bool on_terrain;
-    bool creative; /* mode créatif (touche « , ») : invincible, vol libre, dégâts inchangés */
+    bool creative;   /* mode créatif : invincible, vol libre, dégâts inchangés
+                        (play_mode_set_creative) */
     bool wall_ready; /* `wall_model` créé (play_mode_load_arena_visuals) */
     /* M7 : point de départ (repère local ; suit le recentrage de l'origine) */ /* --terrain :
                                                                                    sol = champ
@@ -198,6 +199,10 @@ void play_mode_draw_models(const PlayMode *play, EngRenderQueue *queue, mat4 vie
 
 /* Écrit position et orientation de la caméra du pas courant dans `out` (champ de vision et plans
  * inchangés). */
+/* Mode de jeu (2026-11-22) : créatif (invincible, vol libre sans collision : Espace monte, avancer
+ * suit le regard) ou aventure. Il est choisi à la création de la partie et ne se change PAS en jeu
+ * : il n'y a plus de touche pour le basculer. Repasser en aventure en plein vol fait retomber. */
+void play_mode_set_creative(PlayMode *play, bool creative);
 void play_mode_view(const PlayMode *play, EngCamera *out);
 
 /* Dessin de debug : arène, capsule du personnage (interpolée avec `alpha`), flèche de direction. */

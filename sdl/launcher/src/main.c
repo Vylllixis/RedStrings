@@ -118,6 +118,8 @@ static void usage(const char *prog)
     fprintf(stderr, "  --splash       (développement) écran de chargement même avec --frames\n");
     fprintf(stderr, "  --windowed     fenêtre au lieu du plein écran (le jeu s'ouvre en plein "
                     "écran par défaut)\n");
+    fprintf(stderr, "  --creative     avec --new-game : la partie est en mode créatif (invincible, "
+                    "vol) ; sinon le mode se choisit au menu, à la création de la partie\n");
     fprintf(stderr, "  --menu-script S  (développement) joue des touches dans le menu : "
                     "« image:touche,... » avec up, down, left, right, ok, back, esc (événement "
                     "Échap), bs (effacer), text=MOT, mouse=X/Y, click\n");
@@ -966,6 +968,7 @@ int main(int argc, char **argv)
     const char *shots_dir = NULL;        /* --shots DOSSIER LISTE : images écrites en PPM */
     const char *shots_list = NULL;
     bool windowed = false;       /* --windowed : pas de plein écran par défaut */
+    bool creative_game = false;  /* --creative : avec --new-game, partie en mode créatif */
     const char *save_dir = NULL; /* --save-dir DOSSIER : parties et options ailleurs */
     bool save_selftest = false;  /* --save-selftest : sauvegarde dans le monde ouvert */
     double world_autopilot = 0.0;
@@ -1035,6 +1038,8 @@ int main(int argc, char **argv)
             shots_list = argv[++i];
         } else if (strcmp(argv[i], "--windowed") == 0) {
             windowed = true;
+        } else if (strcmp(argv[i], "--creative") == 0) {
+            creative_game = true;
         } else if (strcmp(argv[i], "--save-dir") == 0 && i + 1 < argc) {
             save_dir = argv[++i];
         } else if (strcmp(argv[i], "--save-selftest") == 0) {
@@ -1708,7 +1713,7 @@ int main(int argc, char **argv)
                 eng_platform_toggle_fullscreen(&platform);
             }
             if (use_flow && (start_new_game || combat_autoplay)) {
-                game_flow_start_new(&flow, &play);
+                game_flow_start_new(&flow, &play, creative_game);
             }
             float gate[3];
             if (at_boss && play.combat != NULL && play_combat_boss_gate(play.combat, gate)) {
@@ -2359,8 +2364,9 @@ int main(int argc, char **argv)
             used_slots += flow.menu.slots[i].used ? 1U : 0U;
         }
         ENG_LOG_INFO("MENU : écran %d, ligne %d ; %u emplacement(s) occupé(s) ; partie en cours "
-                     "« %s »%s ; scène du titre : %llu image(s)",
+                     "« %s »%s%s ; scène du titre : %llu image(s)",
                      (int)flow.menu.screen, (int)flow.menu.selected, used_slots, flow.name,
+                     flow.creative ? " en mode créatif" : "",
                      flow.started && !game_flow_in_title(&flow) ? " (en jeu)" : "",
                      (unsigned long long)title.frames);
     }

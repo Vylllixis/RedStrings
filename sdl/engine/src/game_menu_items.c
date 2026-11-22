@@ -322,6 +322,10 @@ uint32_t eng_menu_items(const EngMenu *m, EngMenuItem *out, uint32_t max)
         break;
     }
     case ENG_MENU_NAME:
+        if (m->name_purpose == ENG_MENU_NAME_CREATE) { /* choisi ici, pour toute la partie */
+            add_choice(out, &n, "Mode de jeu", m->creative ? "Créatif" : "Aventure",
+                       m->creative ? 1.0F : 0.0F);
+        }
         (void)add(out, &n, m->name_purpose == ENG_MENU_NAME_RENAME ? "Renommer" : "Créer la partie",
                   NULL, true);
         (void)add(out, &n, "Annuler", NULL, true);

@@ -130,7 +130,7 @@ bool game_flow_selftest(void)
     /* les touches du jeu sont du texte ici : Espace (Saut) et P (Pause) ne commandent rien */
     tick(&flow, &play, (1U << ENG_ACTION_JUMP) | (1U << ENG_ACTION_PAUSE), 0.0F, -1.0F, 0U);
     idle(&flow, &play, 2);
-    check(flow.menu.screen == ENG_MENU_NAME && flow.menu.selected == 0,
+    check(flow.menu.screen == ENG_MENU_NAME && flow.menu.selected == 1,
           "saisie : Espace, P et ZQSD ne valident ni ne quittent", (double)flow.menu.selected);
     game_flow_text(&flow, "Théo");
     check(strcmp(flow.menu.text, "Théo") == 0,
@@ -274,10 +274,21 @@ bool game_flow_selftest(void)
               !file_exists(flow.slot_path[1]),
           "nom vide : refusé, rien n'est créé", 0);
     game_flow_text(&flow, "Deux");
+    /* le mode de jeu : première ligne de la création ; cette partie sera créative */
+    key(&flow, &play, UP);
+    key(&flow, &play, RIGHT);
+    key(&flow, &play, DOWN);
+    check(flow.menu.creative && flow.menu.selected == 1 && !play.creative,
+          "création : mode créatif choisi (rien ne change avant de créer)",
+          (double)flow.menu.creative);
     key(&flow, &play, OK);
     check(!eng_menu_is_open(&flow.menu) && flow.started && flow.slot == 1 &&
               strcmp(flow.name, "Deux") == 0,
           "partie « Deux » dans l'emplacement 2", (double)flow.slot);
+    check(flow.creative && play.creative && flow.menu.slots[1].creative &&
+              !flow.menu.slots[0].creative,
+          "partie créative : vol et invincibilité dès le départ, mode enregistré",
+          (double)play.creative);
     check(file_exists(flow.slot_path[1]) && flow.menu.slots[1].used && flow.menu.last_slot == 1,
           "enregistrée aussitôt ; c'est la plus récente", (double)flow.menu.last_slot);
     for (int i = 0; i < 90; i++) {
@@ -343,7 +354,7 @@ bool game_flow_selftest(void)
     key(&flow, &play, OK); /* Dupliquer */
     static EngSaveGame copy;
     check(flow.menu.screen == ENG_MENU_SAVES && flow.menu.selected == 2 &&
-              flow.menu.slots[2].used &&
+              flow.menu.slots[2].used && flow.menu.slots[2].creative &&
               strcmp(flow.menu.slots[2].name, "Second souffle (copie)") == 0,
           "dupliquer : la copie est dans l'emplacement 3, nommée « (copie) »",
           (double)flow.menu.selected);
@@ -385,6 +396,8 @@ bool game_flow_selftest(void)
               fabsf(here[0] - (float)saved.player_pos[0]) < 1e-3F &&
               fabsf(here[2] - (float)saved.player_pos[2]) < 1e-3F,
           "jouer la partie 1 : son nom et sa position (x)", here[0]);
+    check(!flow.creative && !play.creative, "jouer une partie d'aventure : plus de mode créatif",
+          (double)play.creative);
 
     /* ── fondus : l'action attend la fin du fondu de sortie ── */
     key(&flow, &play, BACK);
@@ -405,6 +418,13 @@ bool game_flow_selftest(void)
     check(flow.pending == ENG_MENU_ACT_NONE && !flow.in_title && flow.started,
           "fondus : la partie commence à la fin du fondu", (double)flow.cover_ticks);
     game_flow_set_transitions(&flow, false, false);
+    /* le mode de jeu est celui de la partie : il revient avec elle, rien ne le change en jeu */
+    const bool second = game_flow_load_slot(&flow, &play, 1);
+    check(second && flow.creative && play.creative, "reprendre la partie créative : mode créatif",
+          (double)play.creative);
+    const bool first = game_flow_load_slot(&flow, &play, 0);
+    check(first && !flow.creative && !play.creative, "reprendre la partie d'aventure : aventure",
+          (double)play.creative);
 
     /* ── fichiers : sauvegarde illisible, ancienne sauvegarde unique ── */
     play_mode_shutdown(&play);
@@ -471,8 +491,12 @@ bool game_flow_selftest(void)
     (void)eng_save_write_file(path, &crafted, NULL);
     game_slot_describe(path, 0, 4, &card, &when);
     check(when == 1795343215 && strstr(card.date, "nov. 2026") != NULL &&
-              strcmp(card.place, "Volcan") == 0,
+              strcmp(card.place, "Volcan") == 0 && !card.creative,
           "carte : nom, lieu et date enregistrés", (double)when);
+    crafted.creative = true;
+    (void)eng_save_write_file(path, &crafted, NULL);
+    game_slot_describe(path, 0, 4, &card, &when);
+    check(card.creative, "carte : partie en mode créatif", (double)card.creative);
     char copy_path[1100];
     (void)snprintf(copy_path, sizeof copy_path, "%sessai-copie.rssv", dir);
     const bool copied = game_slot_copy(path, copy_path);

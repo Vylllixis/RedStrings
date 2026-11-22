@@ -679,7 +679,8 @@ if(OW_PHYSICS AND OW_SHADERS_OK)
   # jouer, Échap, « Sauvegarder et quitter », puis la renommer, la dupliquer et supprimer la copie.
   # 2) Sans scène (pas d'écran de chargement) : créer « Brume », jouer, puis de VRAIS événements
   # Échap (ils passent par la plateforme) : pause, « Sauvegarder », reprendre, pause de nouveau :
-  # le jeu ne se ferme pas et finit en pause. Dossiers de parties propres au test. ATTENTION : pas de point-virgule dans le texte attendu (CMake).
+  # le jeu ne se ferme pas et finit en pause. La partie est créée en mode créatif (flèches sur la
+  # ligne « Mode de jeu »). Dossiers de parties propres au test. ATTENTION : pas de point-virgule dans le texte attendu (CMake).
   add_test(NAME launcher.title_menu
            COMMAND sh -c "rm -rf \"$1\" && \"$2\" --combat --no-audio --splash --frames 380 --env-samples 16 --save-dir \"$1\" --menu-script '40:ok,50:text=Aube,60:ok,150:back,160:down,164:down,168:down,172:ok,230:right,236:ok,250:ok,256:down,260:ok,266:text=Zénith,272:ok,280:down,284:ok,300:ok,306:down,310:down,314:down,318:ok,322:down,326:ok,340:back'"
                    sh ${CMAKE_CURRENT_BINARY_DIR}/saves-title $<TARGET_FILE:launcher>
@@ -687,11 +688,18 @@ if(OW_PHYSICS AND OW_SHADERS_OK)
   set_tests_properties(launcher.title_menu PROPERTIES TIMEOUT 600
     PASS_REGULAR_EXPRESSION "nouvelle partie « Aube » dans l'emplacement 1.*MENU : écran 1, ligne 1 . 1 emplacement\\(s\\) occupé\\(s\\) . partie en cours « Zénith » . scène du titre : [1-9][0-9][0-9] image")
   add_test(NAME launcher.menu_plain
-           COMMAND sh -c "rm -rf \"$1\" && \"$2\" --combat --no-audio --frames 90 --env-samples 16 --save-dir \"$1\" --menu-script '10:ok,14:text=Brume,18:ok,40:esc,46:down,50:ok,60:esc,66:esc,72:down,76:down'"
+           COMMAND sh -c "rm -rf \"$1\" && \"$2\" --combat --no-audio --frames 90 --env-samples 16 --save-dir \"$1\" --menu-script '10:ok,14:text=Brume,15:up,16:right,17:down,18:ok,40:esc,46:down,50:ok,60:esc,66:esc,72:down,76:down'"
                    sh ${CMAKE_CURRENT_BINARY_DIR}/saves-plain $<TARGET_FILE:launcher>
            WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR})
   set_tests_properties(launcher.menu_plain PROPERTIES
-    PASS_REGULAR_EXPRESSION "MENU : écran 2, ligne 2 . 1 emplacement\\(s\\) occupé\\(s\\) . partie en cours « Brume » \\(en jeu\\) . scène du titre : 0 image")
+    PASS_REGULAR_EXPRESSION "nouvelle partie « Brume » \\(mode créatif\\) dans l'emplacement 1.*MENU : écran 2, ligne 2 . 1 emplacement\\(s\\) occupé\\(s\\) . partie en cours « Brume » en mode créatif \\(en jeu\\) . scène du titre : 0 image")
+  # --new-game --creative : la partie lancée sans passer par le menu est en mode créatif.
+  add_test(NAME launcher.creative_flag
+           COMMAND sh -c "rm -rf \"$1\" && \"$2\" --combat --new-game --creative --no-audio --frames 5 --env-samples 16 --save-dir \"$1\""
+                   sh ${CMAKE_CURRENT_BINARY_DIR}/saves-creative $<TARGET_FILE:launcher>
+           WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR})
+  set_tests_properties(launcher.creative_flag PROPERTIES
+    PASS_REGULAR_EXPRESSION "mode de jeu : créatif.*MENU : écran 0, ligne [0-9] . 0 emplacement\\(s\\) occupé\\(s\\) . partie en cours « Partie 1 » en mode créatif \\(en jeu\\)")
   # 3) À la souris (fenêtre de 1280 x 720) : survoler « Parties » la choisit, le clic l'ouvre ; un
   # clic sur la première carte (libre) ouvre la saisie du nom ; le clavier écrit (de vrais événements
   # de texte, par la plateforme), Entrée crée.
@@ -703,7 +711,7 @@ if(OW_PHYSICS AND OW_SHADERS_OK)
     PASS_REGULAR_EXPRESSION "nouvelle partie « Souris » dans l'emplacement 1.*MENU : écran 0, ligne [0-9] . 1 emplacement\\(s\\) occupé\\(s\\) . partie en cours « Souris » \\(en jeu\\)")
   foreach(t launcher.world_water launcher.world_lava launcher.world_grass
           launcher.world_trees_avoid launcher.world_save launcher.splash launcher.splash_shots
-          launcher.title_menu launcher.menu_plain launcher.menu_mouse)
+          launcher.title_menu launcher.menu_plain launcher.menu_mouse launcher.creative_flag)
     set_property(TEST ${t} PROPERTY ENVIRONMENT "SDL_VIDEODRIVER=offscreen")
     set_property(TEST ${t} PROPERTY FAIL_REGULAR_EXPRESSION "ERROR|non détruite|perdu|TROU")
   endforeach()
@@ -752,6 +760,7 @@ if(OW_PHYSICS AND OW_SHADERS_OK)
             launcher.world_water launcher.world_lava launcher.world_grass
             launcher.world_trees_avoid launcher.world_save launcher.splash
             launcher.splash_shots launcher.title_menu launcher.menu_plain launcher.menu_mouse
+            launcher.creative_flag
             launcher.world_layers_plain
             launcher.world_layers_desert launcher.world_layers_mountain
             launcher.world_layers_volcano)

@@ -1,5 +1,8 @@
 # Partie : menus, sauvegarde, options, interface (M8)
 
+`make sdl` à la racine du dépôt compile le jeu en Release et le lance (`make sdl ARGS="--windowed"`
+pour ajouter des options du lanceur). C'est `launcher --world 7 --combat`.
+
 `launcher --combat` (ou `--world 7 --combat`) démarre sur l'**écran-titre**, dans la continuité de
 l'écran de chargement animé (`docs/splash.md`, `docs/title-menu.md`). `--new-game` le saute ;
 `--combat-autoplay` aussi (démonstration). Lancé à la main, le jeu s'ouvre **en plein écran** tant
@@ -38,7 +41,7 @@ fenêtre.
 | Principal | Continuer (la partie la plus récente, nommée) — ou « Nouvelle partie » s'il n'y en a aucune —, Parties, Options, Quitter |
 | Parties | les trois emplacements (cartes), Retour |
 | Partie (emplacement occupé) | Jouer, Renommer, Dupliquer (grisé sans emplacement libre), Supprimer, Retour |
-| Nom de la partie | le nom, saisi au clavier ; Créer la partie (ou Renommer), Annuler |
+| Nom de la partie | le nom, saisi au clavier ; à la création : Mode de jeu (Aventure / Créatif) ; Créer la partie (ou Renommer), Annuler |
 | Supprimer cette partie ? | Non, garder la partie (choisi par défaut) ; Oui, supprimer |
 | Pause | Reprendre, Sauvegarder, Options, Sauvegarder et quitter |
 | Options | Volume général, effets, musique, ambiance, interface ; sensibilité ; inverser Y ; taille du texte ; contraste élevé ; anticrénelage (FXAA) ; halo lumineux (bloom) ; synchronisation verticale ; plein écran ; qualité des ombres ; distance de vue ; SSAO ; échelle de résolution ; Contrôles... ; Retour |
@@ -53,6 +56,12 @@ temps de jeu, le lieu et la date de sa dernière sauvegarde, et les boss vaincus
 - **Créer** : choisir un emplacement libre (ou « Nouvelle partie » à l'écran-titre quand il n'y en a
   aucune), taper un nom (22 caractères au plus ; « Partie N » est proposé, la première frappe le
   remplace ; un nom vide est refusé), Entrée. La partie est enregistrée aussitôt.
+- **Mode de jeu** (2026-11-22) : il se choisit à la création, sur la première ligne (flèche haut,
+  puis gauche / droite : Aventure ou Créatif ; le curseur part de « Créer la partie », donc Entrée
+  crée une partie d'aventure sans y passer). Créatif : invincible et vol libre
+  (`docs/combat-play.md`). Le mode est enregistré avec la partie (section META), repris avec elle,
+  affiché sur sa carte, et **ne se change pas en jeu** ni en la renommant. `--new-game --creative`
+  lance directement une partie créative.
 - **Jouer** : « Continuer » reprend la partie enregistrée le plus récemment ; « Parties » permet de
   choisir.
 - **Renommer** : le nom actuel est proposé ; le fichier garde tout le reste, sa date comprise
@@ -125,7 +134,8 @@ chaque ennemi du camp : vivant, PV, position, cap. **Pas sauvegardé** : le mann
 monde ouvert (la section WRLD existe mais le mode combat ne l'utilise pas encore).
 
 Section facultative **META** (2026-11-22) : nom de la partie et lieu de la sauvegarde (longueur
-puis octets UTF-8), date (secondes depuis 1970, 64 bits). Sans changer de version : un jeu plus
+puis octets UTF-8), date (secondes depuis 1970, 64 bits), puis des drapeaux (32 bits, eux-mêmes
+facultatifs : bit 0 = partie en mode créatif). Sans changer de version : un jeu plus
 ancien ignore la section. Un texte plus long que la borne fait refuser le fichier ; les octets de
 contrôle d'un nom deviennent des espaces.
 

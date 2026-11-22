@@ -20,7 +20,9 @@ voulait « ultra bien animé en motion design », comme l'écran de chargement.
   - parties : trois **cartes suspendues au fil** par un nœud et deux brins ; chacune montre une
     vignette du lieu de la sauvegarde (château, plaine, montagnes, désert, volcan), le nom, le
     niveau, le temps de jeu, la date, les boss vaincus ; la carte choisie est cousue de rouge ; la
-    carte visée vient à gauche et ses actions s'ouvrent à droite ; une carte supprimée tombe (son
+    carte visée vient à gauche et ses actions s'ouvrent à droite ; à la création, le mode de jeu
+    (Aventure ou Créatif) se choisit sur la première ligne et la carte en aperçu porte la pastille
+    « CRÉATIF » ; une carte supprimée tombe (son
     fil est coupé), une carte créée descend le long du fil ; les cartes se balancent quand on les
     déplace ;
   - pause, options, contrôles : une colonne de lignes ; les curseurs sont des perles sur un fil ;
@@ -53,8 +55,9 @@ assombrit le jeu et écrit le titre lui-même.
 ## Essayer, capturer
 
 ```
-./launcher --world 7 --combat              # l'écran-titre, en plein écran
-./launcher --world 7 --combat --windowed   # en fenêtre
+make sdl                                   # à la racine du dépôt : compile et lance le jeu
+make sdl ARGS="--windowed"                 # ... en fenêtre
+./launcher --world 7 --combat              # depuis sdl/build/release/bin : l'écran-titre
 ```
 
 Développement : `--menu-script "40:ok,50:text=Aube,60:ok"` joue des touches dans le menu (un tick

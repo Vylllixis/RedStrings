@@ -277,7 +277,16 @@ UTEST(save_game, the_meta_section_names_the_game_and_is_optional)
     EXPECT_STREQ(r.name, s.name);
     EXPECT_STREQ(r.place, s.place);
     EXPECT_EQ(r.saved_at, s.saved_at);
+    EXPECT_FALSE(r.creative);
     EXPECT_NEAR(r.play_time, s.play_time, 0.0); /* le reste de la partie n'a pas bougé */
+    /* le mode de jeu (choisi à la création) est enregistré avec la partie */
+    s.creative = true;
+    const size_t creative_size = eng_save_encode(&s, NULL, g_buf, sizeof g_buf);
+    ASSERT_EQ(creative_size, with_meta);
+    ASSERT_TRUE(eng_save_decode(g_buf, creative_size, &r, NULL, err, sizeof err));
+    EXPECT_TRUE(r.creative);
+    EXPECT_STREQ(r.name, s.name);
+    s.creative = false;
     EXPECT_EQ(r.enemy_count, 3U);
     /* le nom le plus long accepté (31 octets) passe ; un texte sans zéro final n'est pas écrit */
     memset(s.name, 'x', sizeof s.name - 1U);
@@ -343,6 +352,7 @@ UTEST(save_game, a_damaged_meta_section_is_refused_and_control_bytes_are_blanked
     EXPECT_TRUE(r.has_meta);
     EXPECT_STREQ(r.name, "a  b ");
     EXPECT_EQ(r.saved_at, 42);
+    EXPECT_FALSE(r.creative); /* section sans drapeaux (plus ancienne) : partie d'aventure */
     /* le nom le plus long accepté : 31 octets (le 32e est le zéro final) */
     n = forged_meta(long_name, (uint32_t)sizeof r.name - 1U, (uint32_t)sizeof r.name - 1U);
     ASSERT_TRUE(eng_save_decode(g_buf, n, &r, NULL, err, sizeof err));
@@ -545,6 +555,7 @@ UTEST(game_menu, three_slots_are_managed_like_a_list_of_worlds)
     EXPECT_EQ(m.slot, 0);
     EXPECT_STREQ(m.text, "Partie 1");
     EXPECT_TRUE(m.text_fresh);
+    EXPECT_EQ(m.selected, 1);                                      /* sur « Créer la partie » */
     EXPECT_EQ(menu_key(&m, ENG_MENU_KEY_BACK), ENG_MENU_ACT_NONE); /* annuler : rien n'est créé */
     EXPECT_EQ(m.screen, ENG_MENU_SAVES);
     /* les trois emplacements côte à côte : gauche / droite sans boucler, « Retour » dessous */
@@ -574,6 +585,35 @@ UTEST(game_menu, three_slots_are_managed_like_a_list_of_worlds)
     EXPECT_EQ(m.screen, ENG_MENU_NAME);
     EXPECT_EQ(m.name_purpose, ENG_MENU_NAME_CREATE);
     EXPECT_STREQ(m.text, "Partie 3");
+    /* le mode de jeu se choisit ici, sur la première ligne ; le curseur est sur « Créer la
+     * partie » : Entrée crée une partie d'aventure sans passer par le mode */
+    ASSERT_EQ(eng_menu_items(&m, items, ENG_MENU_MAX_ITEMS), 3U);
+    EXPECT_STREQ(items[0].label, "Mode de jeu");
+    EXPECT_STREQ(items[0].value, "Aventure");
+    EXPECT_EQ(items[0].kind, ENG_MENU_ITEM_CHOICE);
+    EXPECT_STREQ(items[1].label, "Cr\xC3\xA9"
+                                 "er la partie");
+    EXPECT_STREQ(items[2].label, "Annuler");
+    EXPECT_EQ(m.selected, 1);
+    EXPECT_FALSE(m.creative);
+    (void)menu_key(&m, ENG_MENU_KEY_RIGHT); /* ailleurs que sur le mode : sans effet */
+    EXPECT_FALSE(m.creative);
+    (void)menu_key(&m, ENG_MENU_KEY_UP);
+    EXPECT_EQ(m.selected, 0);
+    (void)menu_key(&m, ENG_MENU_KEY_RIGHT);
+    EXPECT_TRUE(m.creative);
+    (void)eng_menu_items(&m, items, ENG_MENU_MAX_ITEMS);
+    EXPECT_STREQ(items[0].value, "Cr\xC3\xA9"
+                                 "atif");
+    EXPECT_NEAR(items[0].frac, 1.0F, 0.0F);
+    (void)menu_key(&m, ENG_MENU_KEY_LEFT);
+    EXPECT_FALSE(m.creative);
+    EXPECT_EQ(menu_key(&m, ENG_MENU_KEY_OK),
+              ENG_MENU_ACT_NONE); /* Entrée sur le mode : il bascule */
+    EXPECT_TRUE(m.creative);
+    EXPECT_EQ(m.screen, ENG_MENU_NAME);
+    (void)menu_key(&m, ENG_MENU_KEY_DOWN);
+    EXPECT_EQ(m.selected, 1);
     eng_menu_text_input(&m, "Nuit");
     EXPECT_STREQ(m.text, "Nuit"); /* la première frappe remplace le nom proposé */
     EXPECT_FALSE(m.text_fresh);
@@ -596,6 +636,7 @@ UTEST(game_menu, three_slots_are_managed_like_a_list_of_worlds)
     eng_menu_text_input(&m, "Brume  ");
     EXPECT_EQ(menu_key(&m, ENG_MENU_KEY_OK), ENG_MENU_ACT_NEW_GAME);
     EXPECT_STREQ(m.text, "Brume"); /* espaces de fin retirés */
+    EXPECT_TRUE(m.creative);       /* le mode choisi accompagne l'action */
     EXPECT_EQ(m.slot, 2);
     EXPECT_FALSE(eng_menu_is_open(&m));
     /* emplacement occupé : Jouer, Renommer, Dupliquer, Supprimer, Retour */
@@ -615,6 +656,12 @@ UTEST(game_menu, three_slots_are_managed_like_a_list_of_worlds)
     EXPECT_EQ(m.screen, ENG_MENU_NAME);
     EXPECT_EQ(m.name_purpose, ENG_MENU_NAME_RENAME);
     EXPECT_STREQ(m.text, "Alpha");
+    /* renommer ne propose pas le mode : il est fixé depuis la création */
+    ASSERT_EQ(eng_menu_items(&m, items, ENG_MENU_MAX_ITEMS), 2U);
+    EXPECT_STREQ(items[0].label, "Renommer");
+    EXPECT_EQ(m.selected, 0);
+    (void)menu_key(&m, ENG_MENU_KEY_RIGHT);
+    EXPECT_TRUE(m.creative); /* (resté de la création précédente : aucune ligne ne le change ici) */
     EXPECT_EQ(menu_key(&m, ENG_MENU_KEY_BACK), ENG_MENU_ACT_NONE);
     EXPECT_EQ(m.screen, ENG_MENU_SLOT);
     EXPECT_EQ(m.selected, 1);
@@ -698,21 +745,32 @@ UTEST(game_menu, typing_a_name_ignores_game_keys_but_not_the_pad_or_the_mouse)
     EXPECT_EQ(press(&m, ENG_ACTION_PAUSE), ENG_MENU_ACT_NONE);
     EXPECT_EQ(press(&m, ENG_ACTION_ATTACK), ENG_MENU_ACT_NONE);
     (void)stick(&m, 0.0F, -1.0F);
+    (void)stick(&m, 1.0F, 0.0F); /* ni le stick ni D ne changent le mode pendant la saisie */
     EXPECT_EQ(m.screen, ENG_MENU_NAME);
-    EXPECT_EQ(m.selected, 0);
-    /* les flèches choisissent entre « Créer » et « Annuler » */
-    (void)menu_key(&m, ENG_MENU_KEY_DOWN);
     EXPECT_EQ(m.selected, 1);
+    EXPECT_FALSE(m.creative);
+    /* les flèches choisissent entre le mode, « Créer » et « Annuler » */
+    (void)menu_key(&m, ENG_MENU_KEY_DOWN);
+    EXPECT_EQ(m.selected, 2);
     (void)menu_key(&m, ENG_MENU_KEY_UP);
-    EXPECT_EQ(m.selected, 0);
+    EXPECT_EQ(m.selected, 1);
+    /* à la souris : un clic sur la ligne du mode le bascule */
+    eng_input_mouse_button(&input, 1, true);
+    eng_menu_hover(&m, 0, 0, true);
+    EXPECT_EQ(press(&m, ENG_ACTION_ATTACK), ENG_MENU_ACT_NONE);
+    EXPECT_TRUE(m.creative);
+    EXPECT_EQ(m.screen, ENG_MENU_NAME);
+    eng_menu_hover(&m, 1, 0, true);
     /* à la manette : B revient, A valide */
     eng_input_pad_button(&input, 1, true);
     EXPECT_EQ(press(&m, ENG_ACTION_DODGE), ENG_MENU_ACT_NONE);
     EXPECT_EQ(m.screen, ENG_MENU_SAVES);
     (void)menu_key(&m, ENG_MENU_KEY_OK);
+    EXPECT_FALSE(m.creative); /* une nouvelle création repart en aventure */
     eng_input_pad_button(&input, 0, true);
     EXPECT_EQ(press(&m, ENG_ACTION_JUMP), ENG_MENU_ACT_NEW_GAME);
     EXPECT_STREQ(m.text, "Partie 1"); /* le nom proposé, sans clavier */
+    EXPECT_FALSE(m.creative);
 }
 
 UTEST(game_menu, a_mouse_click_only_validates_the_line_under_the_pointer)

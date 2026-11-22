@@ -82,6 +82,7 @@ void game_slot_describe(const char *path, uint32_t index, uint32_t boss_count, E
     summary(&s, out->summary, sizeof out->summary);
     game_slot_date(*when, out->date, sizeof out->date);
     out->level = s.has_progress && s.progress.level > 0U ? s.progress.level : 1U;
+    out->creative = s.has_meta && s.creative;
     out->boss_count = boss_count;
     for (uint32_t b = 0; b < boss_count && b < ENG_BIOME_COUNT; b++) {
         const uint32_t zone = (b * ENG_MAPZONES_PER_BIOME) + (uint32_t)ENG_MAPZONE_BOSS;

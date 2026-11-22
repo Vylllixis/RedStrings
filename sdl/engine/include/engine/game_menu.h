@@ -18,7 +18,9 @@
  *   Partie      Jouer, Renommer, Dupliquer (dans le premier emplacement libre), Supprimer, Retour.
  *   Nom         saisie du nom (création ou renommage) : le texte tapé arrive par
  *               eng_menu_text_input ; Entrée valide, Échap annule. Les touches du clavier liées
- *               à des actions (Espace, ZQSD, P...) y sont du texte, pas des commandes.
+ *               à des actions (Espace, ZQSD, P...) y sont du texte, pas des commandes. À la
+ *               création, la première ligne choisit le MODE DE JEU (Aventure ou Créatif, gauche /
+ *               droite) : il est enregistré avec la partie et ne change plus ensuite.
  *   Suppression confirmation ; le choix par défaut garde la partie.
  *   Pause       Reprendre, Sauvegarder, Options, Sauvegarder et quitter (vers le menu principal).
  *   Options, Contrôles : réglages, remappage (une ligne par action ; valider attend la prochaine
@@ -51,7 +53,7 @@ typedef enum EngMenuScreen {
 typedef enum EngMenuAction {
     ENG_MENU_ACT_NONE = 0,
     ENG_MENU_ACT_RESUME,   /* menu fermé : la partie reprend */
-    ENG_MENU_ACT_NEW_GAME, /* nouvelle partie dans l'emplacement `slot`, nommée `text` */
+    ENG_MENU_ACT_NEW_GAME, /* nouvelle partie dans `slot`, nommée `text`, en mode `creative` */
     ENG_MENU_ACT_CONTINUE, /* charger la sauvegarde de l'emplacement `slot` */
     ENG_MENU_ACT_SAVE,     /* enregistrer dans l'emplacement de la partie en cours */
     ENG_MENU_ACT_TO_MAIN,  /* « Sauvegarder et quitter » : enregistrer puis menu principal */
@@ -105,6 +107,7 @@ typedef struct EngMenuItem {
 typedef struct EngMenuSlot {
     bool used;                    /* une partie y est enregistrée */
     bool unreadable;              /* fichier abîmé : ni jouable ni renommable, supprimable */
+    bool creative;                /* partie en mode créatif */
     char name[ENG_MENU_NAME_MAX]; /* nom de la partie */
     char summary[ENG_MENU_LABEL]; /* « Niv. 3 · 12 min » */
     char place[32];               /* où le joueur a enregistré (« Plaine ») ; vide : inconnu */
@@ -137,6 +140,7 @@ typedef struct EngMenu {
     char text[ENG_MENU_NAME_MAX];
     EngMenuNamePurpose name_purpose;
     bool text_fresh;      /* nom proposé, pas encore modifié : la première frappe le remplace */
+    bool creative;        /* création : mode de jeu choisi (faux : aventure) */
     uint32_t text_serial; /* augmente à chaque modification du texte (animation du curseur) */
     /* souris : ligne survolée à la dernière image (-1 : aucune) et côté de sa valeur (-1 gauche,
      * +1 droite, 0 ailleurs) ; un clic hors de toute ligne ne valide rien */

@@ -310,6 +310,19 @@ static void used_card(const MenuCtx *c, uint32_t index, const EngMenuSlot *s, co
     const float inner = b->w - (2.0F * pad);
     const float pic_bottom = y0 + pad + (b->h * 0.4F);
     vignette(c, s->place, x0 + pad, y0 + pad, x0 + b->w - pad, pic_bottom);
+    if (s->creative) { /* le mode de la partie, sur sa vignette */
+        const float bs = b->h * 0.034F;
+        const float track = bs * 0.2F;
+        const float bw = mm_tracked_w(c->bold, bs, "CRÉATIF", track) + (bs * 1.5F);
+        const float bx = x0 + b->w - pad - bw - (bs * 0.5F);
+        const float by = y0 + pad + (bs * 0.5F);
+        ImDrawList_AddRectFilled(c->dl, (ImVec2_c){bx, by}, (ImVec2_c){bx + bw, by + (bs * 1.9F)},
+                                 mm_col(0.05F, 0.03F, 0.08F, 0.84F), bs * 0.95F, 0);
+        ImDrawList_AddRect(c->dl, (ImVec2_c){bx, by}, (ImVec2_c){bx + bw, by + (bs * 1.9F)},
+                           mm_red(0.9F), bs * 0.95F, 1.3F * c->u, 0);
+        mm_tracked(c, c->bold, bs, bx + (bs * 0.75F), by + (bs * 0.3F), mm_ivory(1.0F), "CRÉATIF",
+                   track, 0.0F);
+    }
     char line[96];
     (void)snprintf(line, sizeof line, "EMPLACEMENT %u", (unsigned)(index + 1U));
     const float tiny = b->h * 0.034F;
@@ -463,6 +476,7 @@ static void shown_slot(const MenuCtx *c, uint32_t index, EngMenuSlot *out, bool 
         out->used = true;
         (void)snprintf(out->summary, sizeof out->summary, "Niv. 1  ·  nouvelle partie");
         (void)snprintf(out->place, sizeof out->place, "Château");
+        out->creative = m->creative;
     }
     (void)snprintf(out->name, sizeof out->name, "%s", m->text);
 }
@@ -634,8 +648,21 @@ static void name_panel(MenuCtx *c, const EngMenu *m, float x, float y, float wid
                            .live = live,
                            .danger = -1};
     const float bottom = mm_rows(c, items, n, m->selected, &rows);
-    mm_hint(c, x + (width * 0.42F), bottom + (c->px * 0.6F),
-            "écris le nom   ·   Entrée : valider   ·   Échap : annuler", presence);
+    if (m->name_purpose != ENG_MENU_NAME_CREATE) {
+        mm_hint(c, x + (width * 0.42F), bottom + (c->px * 0.6F),
+                "écris le nom   ·   Entrée : valider   ·   Échap : annuler", presence);
+        return;
+    }
+    /* création : ce que change le mode choisi, et qu'il est choisi pour de bon */
+    const char *about =
+        m->creative ? "Créatif : invincible, on vole (Espace monte). Le mode ne change plus."
+                    : "Aventure : on peut mourir, on reste au sol. Le mode ne change plus.";
+    const float about_size = mm_fit(c->font, c->px * 0.76F, about, 0.0F, width);
+    mm_text(c, c->font, about_size, x + (18.0F * c->u), bottom + (c->px * 0.25F),
+            mm_col(1.0F, 0.84F, 0.8F, 0.92F * presence), about, 1.0F);
+    mm_hint(c, x + (width * 0.42F), bottom + (c->px * 1.9F),
+            "écris le nom   ·   flèches : mode de jeu   ·   Entrée : créer   ·   Échap : annuler",
+            presence);
 }
 
 void mm_draw_cards_screen(MenuCtx *c, const EngMenu *m, float enter, float presence, bool live)

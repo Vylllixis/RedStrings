@@ -7,8 +7,9 @@
 
 #define STATIC_MASK (1U << ENG_LAYER_STATIC)
 #define PLAY_OBSTACLE_MIN_HALF 0.01F /* m : demi-cylindre minimal d'une capsule d'obstacle (B8) */
-#define PLAY_CREATIVE_SPEED 3.0F     /* mode créatif : vitesse horizontale x 3 */
-#define PLAY_CREATIVE_CLIMB 12.0F    /* m/s : montée (Espace) et vol dans l'axe du regard */
+/* mode créatif : deux fois plus rapide qu'avant le 2026-11-22 (c'était x 3 et 12 m/s) */
+#define PLAY_CREATIVE_SPEED 6.0F  /* vitesse horizontale x 6 */
+#define PLAY_CREATIVE_CLIMB 24.0F /* m/s : montée (Espace) et vol dans l'axe du regard */
 #define GROUND_HALF 28.0F
 #define GRID_HALF 3
 #define GRID_SPACING 8.0F
@@ -468,16 +469,6 @@ void play_mode_tick(PlayMode *play, const EngInputState *input, float dt)
     }
     (void)eng_character_set_gravity_scale(play->character, 1.0F, play->gravity_fall);
 
-    if (eng_action_pressed(input, ENG_ACTION_CREATIVE)) { /* touche « , » */
-        play->creative = !play->creative;
-        if (play->combat != NULL) {
-            play_combat_set_invincible(play->combat, play->creative);
-        }
-        ENG_LOG_INFO("mode créatif : %s", play->creative
-                                              ? "activé (invincible, vol : Espace monte, avancer "
-                                                "suit le regard ; dégâts inchangés)"
-                                              : "désactivé");
-    }
     float velocity[3];
     eng_locomotion_velocity(&play->loco, velocity);
     if (play->combat != NULL) {
@@ -536,6 +527,22 @@ void play_mode_tick(PlayMode *play, const EngInputState *input, float dt)
     }
     (void)eng_physics_step(play->world, dt);
     (void)eng_character_update(play->character, dt, velocity);
+}
+
+void play_mode_set_creative(PlayMode *play, bool creative)
+{
+    if (play == NULL || !play->ready) {
+        return;
+    }
+    if (play->creative != creative) {
+        ENG_LOG_INFO("mode de jeu : %s", creative ? "créatif (invincible, vol : Espace monte, "
+                                                    "avancer suit le regard ; dégâts inchangés)"
+                                                  : "aventure");
+    }
+    play->creative = creative;
+    if (play->combat != NULL) {
+        play_combat_set_invincible(play->combat, creative);
+    }
 }
 
 void play_mode_view(const PlayMode *play, EngCamera *out)

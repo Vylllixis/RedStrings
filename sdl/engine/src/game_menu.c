@@ -203,6 +203,8 @@ static void open_name(EngMenu *m, int32_t slot, EngMenuNamePurpose purpose)
         (void)snprintf(m->text, sizeof m->text, "%s", m->slots[m->slot].name);
     } else {
         eng_menu_default_name((uint32_t)m->slot, m->text, sizeof m->text);
+        m->creative = false; /* aventure, sauf choix contraire sur la première ligne */
+        m->selected = 1; /* sur « Créer la partie » : Entrée crée, sans passer par le mode */
     }
     m->text_fresh = true;
     m->text_serial++;
@@ -288,6 +290,14 @@ static bool adjust(EngMenu *m, int dir)
     return !same_options(&before, o);
 }
 
+/* création d'une partie : aventure <-> créatif */
+static void toggle_mode(EngMenu *m, int dir)
+{
+    m->creative = !m->creative;
+    m->adjust_dir = dir < 0 ? -1 : 1;
+    m->adjust_serial++;
+}
+
 /* ── valider, revenir ── */
 
 static void back_to(EngMenu *m, EngMenuScreen screen, int32_t selected)
@@ -362,8 +372,15 @@ static EngMenuAction confirm(EngMenu *m, const EngMenuItem *items, uint32_t n, i
         }
         back_to(m, ENG_MENU_SAVES, eng_menu_valid_slot(m->slot));
         return ENG_MENU_ACT_NONE;
-    case ENG_MENU_NAME:
-        if (s == 1) { /* Annuler */
+    case ENG_MENU_NAME: {
+        /* création : la première ligne est le mode de jeu ; puis valider, annuler */
+        const int32_t first = m->name_purpose == ENG_MENU_NAME_CREATE ? 1 : 0;
+        if (s < first) {
+            toggle_mode(m, dir);
+            m->confirm_serial--;
+            return ENG_MENU_ACT_NONE;
+        }
+        if (s == first + 1) { /* Annuler */
             if (m->name_purpose == ENG_MENU_NAME_RENAME) {
                 back_to(m, ENG_MENU_SLOT, 1);
             } else {
@@ -382,6 +399,7 @@ static EngMenuAction confirm(EngMenu *m, const EngMenuItem *items, uint32_t n, i
         }
         m->screen = ENG_MENU_CLOSED;
         return ENG_MENU_ACT_NEW_GAME;
+    }
     case ENG_MENU_DELETE:
         if (s == 1) {
             back_to(m, ENG_MENU_SAVES, eng_menu_valid_slot(m->slot));
@@ -618,6 +636,11 @@ EngMenuAction eng_menu_update(EngMenu *m, const EngInputState *in)
     } else if (m->screen == ENG_MENU_OPTIONS && step_x) {
         if (adjust(m, dir_x)) {
             act = ENG_MENU_ACT_OPTIONS_CHANGED;
+        }
+        m->nav_cooldown = NAV_REPEAT;
+    } else if (m->screen == ENG_MENU_NAME && step_x) {
+        if (m->name_purpose == ENG_MENU_NAME_CREATE && m->selected == 0) {
+            toggle_mode(m, dir_x); /* gauche / droite sur « Mode de jeu » */
         }
         m->nav_cooldown = NAV_REPEAT;
     }

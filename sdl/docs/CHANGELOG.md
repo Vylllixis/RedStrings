@@ -66,6 +66,14 @@ livraisons ; les tags sont posés par Théo après ses tests.
   montagne enneigée, désert, volcan) : relief et matières par biome, frontières fondues.
 - Grande carte : 12 zones d'ennemis (farm facile, farm dur, boss dans chaque biome), difficulté
   croissante, camp de réveil sans ennemis ; `--at-zone N` pour commencer devant une zone.
+- Mode de jeu choisi à la création de la partie (2026-11-22) : Aventure ou Créatif, enregistré avec
+  la partie (drapeaux de la section META), affiché sur sa carte, impossible à changer en jeu (la
+  touche « , » et l'action `creative` disparaissent) ; `--new-game --creative`. Vol créatif deux
+  fois plus rapide (x 6 à l'horizontale, 24 m/s en montée). Corrigé : « MODE CRÉATIF » était coupé
+  dans le HUD (« MODE CR »).
+- `make sdl` à la racine du dépôt : compile le jeu en Release et le lance (avant : la démonstration,
+  en Debug ; cette ancienne recette reste disponible sous `make sdl-demo`) ; `make clean`,
+  `make fclean` et `make re` n'échouent plus sur le dossier `sdl/`.
 - Écran-titre et menus animés (2026-11-22, `docs/title-menu.md`) : la scène de l'écran de
   chargement continue derrière le menu, sans coupure (le jeu n'est plus dessiné derrière) ; les
   lignes du menu principal sont posées sur le fil rouge ; les parties sont trois cartes suspendues

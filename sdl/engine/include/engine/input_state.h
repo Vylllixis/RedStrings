@@ -18,7 +18,6 @@ typedef enum EngAction {
     ENG_ACTION_LOCK_ON,
     ENG_ACTION_PAUSE,
     ENG_ACTION_SWITCH_WEAPON, /* M8-08 */
-    ENG_ACTION_CREATIVE,      /* mode créatif (invincible, vol) : touche « , » */
     ENG_ACTION_COUNT,         /* au plus 32 : les états sont des masques de bits */
 } EngAction;
 

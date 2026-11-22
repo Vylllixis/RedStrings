@@ -74,11 +74,4 @@ void eng_input_set_default_bindings(EngInput *input)
     (void)eng_input_bind_button(input, ENG_ACTION_SWITCH_WEAPON, ENG_BIND_KEY, SDL_SCANCODE_R);
     (void)eng_input_bind_button(input, ENG_ACTION_SWITCH_WEAPON, ENG_BIND_PAD_BUTTON,
                                 SDL_GAMEPAD_BUTTON_DPAD_RIGHT);
-    /* mode créatif : la touche qui écrit « , » dans la disposition du clavier (AZERTY : à droite
-     * du N ; QWERTY : à droite du M) ; sans disposition connue, la position QWERTY */
-    SDL_Scancode comma = SDL_GetScancodeFromKey(SDLK_COMMA, NULL);
-    if (comma == SDL_SCANCODE_UNKNOWN) {
-        comma = SDL_SCANCODE_COMMA;
-    }
-    (void)eng_input_bind_button(input, ENG_ACTION_CREATIVE, ENG_BIND_KEY, (int)comma);
 }

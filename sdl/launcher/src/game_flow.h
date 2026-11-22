@@ -19,8 +19,9 @@
  * Gestion des parties (2026-11-22, comme la liste des mondes de Minecraft) :
  *   - écran-titre : « Continuer » reprend la partie enregistrée le plus récemment ; « Parties »
  *     ouvre les trois emplacements ;
- *   - un emplacement libre crée une partie, à laquelle on donne un NOM ; elle est enregistrée tout
- *     de suite ;
+ *   - un emplacement libre crée une partie, à laquelle on donne un NOM et un MODE DE JEU
+ *     (aventure ou créatif : invincible et vol libre) ; elle est enregistrée tout de suite. Le
+ *     mode est enregistré avec la partie et ne se change pas en jeu ;
  *   - un emplacement occupé propose : Jouer, Renommer, Dupliquer (dans le premier emplacement
  *     libre), Supprimer (avec confirmation ; game_slots.h) ;
  *   - en jeu : « Sauvegarder » écrit dans l'emplacement de la partie en cours ; « Sauvegarder et
@@ -58,7 +59,8 @@ typedef struct GameFlow {
     char slot_path[ENG_MENU_SLOTS][1024];
     char options_path[1024];
     char name[ENG_MENU_NAME_MAX]; /* nom de la partie en cours */
-    int32_t slot;                 /* emplacement de la partie en cours (0 à 2) */
+    bool creative; /* mode de la partie en cours : créatif (choisi à la création, fixé ensuite) */
+    int32_t slot;          /* emplacement de la partie en cours (0 à 2) */
     uint64_t fade_last_ms; /* fondu d'entrée : instant de l'image précédente ; 0 : première */
     float fade;            /* fondu d'entrée : 1 (noir) à 0 (fini) ; game_flow_fade_in */
     float mouse[2]; /* dernière position de la souris : seul un mouvement choisit une ligne */
@@ -98,8 +100,9 @@ void game_flow_set_transitions(GameFlow *f, bool transitions, bool title_scene);
 bool game_flow_save_now(GameFlow *f, PlayMode *play);
 bool game_flow_load_slot(GameFlow *f, PlayMode *play, int32_t slot);
 
-/* Lance directement une nouvelle partie (menu fermé) : option --new-game. */
-void game_flow_start_new(GameFlow *f, PlayMode *play);
+/* Lance directement une nouvelle partie (menu fermé) : option --new-game ; `creative` : en mode
+ * créatif (option --creative). */
+void game_flow_start_new(GameFlow *f, PlayMode *play, bool creative);
 
 /* Un tick. true : la partie avance ce tick (sinon un menu est ouvert et le jeu est figé). */
 bool game_flow_tick(GameFlow *f, PlayMode *play, const EngInputState *in, float dt);

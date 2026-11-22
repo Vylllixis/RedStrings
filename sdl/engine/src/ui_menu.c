@@ -247,7 +247,28 @@ float mm_rows(MenuCtx *c, const EngMenuItem *items, uint32_t count, int32_t sele
                 mm_thread(c, line, 2, 2.0F * c->u, alpha * k);
             }
         }
-        if (it->value[0] != '\0') {
+        if (it->kind == ENG_MENU_ITEM_CHOICE) { /* un choix : sa valeur entre deux flèches */
+            const float vs = rows->size * 0.92F;
+            const float vx = x + label_w + (36.0F * c->u);
+            const float vw = mm_text_w(c->bold, vs, it->value);
+            const float mid = y + (size * 0.66F);
+            const float tri = 5.0F * c->u;
+            const float push =
+                sel && rows->live ? a->adjust * 5.0F * c->u * (float)a->adjust_dir : 0.0F;
+            const ImU32 arrow = mm_col(1.0F, 0.4F, 0.4F, alpha * (0.4F + (0.6F * k)));
+            const float lx = vx - (16.0F * c->u) + (push < 0.0F ? push : 0.0F);
+            const float rx = vx + vw + (16.0F * c->u) + (push > 0.0F ? push : 0.0F);
+            ImDrawList_AddTriangleFilled(c->dl, (ImVec2_c){lx, mid},
+                                         (ImVec2_c){lx + tri, mid - tri},
+                                         (ImVec2_c){lx + tri, mid + tri}, arrow);
+            ImDrawList_AddTriangleFilled(c->dl, (ImVec2_c){rx, mid},
+                                         (ImVec2_c){rx - tri, mid - tri},
+                                         (ImVec2_c){rx - tri, mid + tri}, arrow);
+            mm_text(c, c->bold, vs, vx, y + ((size - vs) * 0.72F),
+                    c->hc && k > 0.5F ? mm_col(0.0F, 0.0F, 0.0F, alpha)
+                                      : mm_col(1.0F, 0.86F, 0.8F, alpha),
+                    it->value, c->hc && k > 0.5F ? 0.0F : 1.0F);
+        } else if (it->value[0] != '\0') {
             const float vs = rows->size * 0.7F;
             mm_text(c, c->font, vs, x + label_w + (16.0F * c->u), y + (size - vs) * 0.72F,
                     c->hc && k > 0.5F ? mm_col(0.0F, 0.0F, 0.0F, alpha) : mm_soft(0.85F * alpha),
