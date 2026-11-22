@@ -58,3 +58,22 @@ puis les réduit avec `tools/scripts/gltf_extract.py`).
   (CC0), fabriqués par le même script.
 - Utilisation : forêts, arbres épars, buissons et rochers de la carte du monde
   (`assets/world/carte.txt`).
+
+## Arbres réalistes : arbres scannés de Poly Haven (CC0)
+
+- Fichiers : `props/nature/real/oak.*`, `pine.*`, `acacia.*` (`.gltf` + `.bin`) et leurs images
+  (`*_leaves*`, `*_far*`, `*_bark*`).
+- Sources (Poly Haven, https://polyhaven.com, modèles en glTF 1k) :
+  - `oak` : « Jacaranda Tree », Rob Tuytel et Rico Cilliers — https://polyhaven.com/a/jacaranda_tree
+  - `pine` : « Fir Tree 01 » (le premier des trois arbres du fichier), Rob Tuytel et Rico
+    Cilliers — https://polyhaven.com/a/fir_tree_01
+  - `acacia` : « Quiver Tree 01 », James Ray Cock, Dario Barresi et Rico Cilliers —
+    https://polyhaven.com/a/quiver_tree_01
+- Licence : Creative Commons Zero 1.0 (domaine public), comme tous les assets de Poly Haven
+  (https://polyhaven.com/license). Le crédit n'est pas obligatoire ; il figure ici.
+- Modifications : conversion par l'outil du dépôt `treebake` (tronc allégé, feuillage remplacé par
+  des cartes photographiées, vue lointaine, mise à l'échelle, neige sur le sapin) ; les images
+  d'écorce (`*_bark*_diff/nor/arm.jpg`) sont celles de la source, recopiées telles quelles.
+- Pour les refaire : `tools/scripts/arbres_realistes.sh` (télécharge les sources hors du dépôt,
+  vérifie leurs empreintes, lance `treebake`). Voir `docs/arbres-realistes.md`.
+- Utilisation : chênes, sapins et arbres du désert de la carte du monde.
