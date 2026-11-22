@@ -237,3 +237,20 @@ Vertex shader des maillages instanciés : même entrée de sommet que `model.ver
 (emplacements 4 à 6, flux 1, voir `docs/instancing.md`). Uniforms (`register(b0, space1)`) : `view_proj` et la couleur
 du matériau. Les sorties sont celles de `model.vert` : le fragment shader est `model.frag`. Test d'équivalence :
 `engine.instancing_gpu`.
+
+## `tree.vert.hlsl`, `tree.frag.hlsl`, `tree_shadow.*.hlsl` (2026-11-22)
+
+Shaders des arbres réalistes (`engine/tree_render.h`, `docs/arbres-realistes.md`).
+
+- `tree.vert` : comme `instanced.vert`, plus le vent (deux `float4` après la couleur : `wind`, `shape` ; référence CPU
+  `eng_tree_vertex_world`) et une sortie de plus, la direction du centre du houppier vers le sommet.
+- `tree.frag` : le texte de `model.frag` (PBR, ombres, éclairage par image), plus la découpe tramée des matériaux à
+  seuil d'alpha (`sun_direction.w`), l'éclairage du feuillage, l'ombre du houppier lue dans `|tangente.w|` et le
+  brouillard du terrain. Le cbuffer `Lighting` se prolonge de trois `float4` (`foliage_a` à `foliage_c`,
+  `eng_tree_pack_fragment`) puis des cinq `float4` du brouillard (`eng_fog_pack`).
+- `tree_shadow.vert` : position (emplacement 0) et UV (1) du sommet, instance (2 et 3), même vent.
+- `tree_shadow.frag` : n'écrit pas la profondeur là où la texture de couleur est transparente, ni pour une part des
+  texels (densité de l'ombre du feuillage) ; cbuffer `Cut` : seuil, densité.
+
+`apply_fog` et les ombres sont recopiés de `terrain.frag` et de `model.frag` (pas d'`#include` dans cette chaîne
+d'outils) : à garder alignés. Tests : `engine.tree_render_gpu`.
