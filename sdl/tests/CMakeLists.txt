@@ -30,6 +30,10 @@ ow_add_test(creature test_creature.c)
 ow_add_test(boss_special test_boss_special.c)
 ow_add_test(dragon_flight test_dragon_flight.c)
 ow_add_test(boot_screen test_boot_screen.c)
+# Arbres réalistes (2026-11-22) : conversion d'un arbre scanné en arbre de jeu (engine/tree_bake.h).
+ow_add_test(tree_bake test_tree_bake.c)
+ow_add_test(tree_bake_raster test_tree_bake_raster.c)
+ow_add_test(tree_bake_simplify test_tree_bake_simplify.c)
 ow_add_test(zone_decor test_zone_decor.c)
 ow_add_test(world_map test_world_map.c)
 target_compile_definitions(test_world_map PRIVATE
