@@ -128,6 +128,10 @@ static void usage(const char *prog)
                     "m/s (25 par défaut ; en jeu : « accélérer » et « ralentir », la molette par "
                     "défaut, remappables dans Options > Contrôles)\n");
     fprintf(stderr,
+            "  --trees simple|real  arbres du monde : « real » (défaut), des arbres scannés "
+            "au feuillage découpé ; « simple », les arbres légers d'avant (aussi : variable "
+            "d'environnement OW_TREES=simple)\n");
+    fprintf(stderr,
             "  --look-at X Z  (développement) la caméra regarde le point (x, z) de la carte "
             "au départ ; --look-pitch D : inclinée de D degrés (positif : vers le haut)\n");
     fprintf(stderr, "  --look-at-boss (développement) la caméra suit le boss spécial de la zone "
@@ -1153,7 +1157,11 @@ int main(int argc, char **argv)
     bool windowed = false;       /* --windowed : pas de plein écran par défaut */
     bool creative_game = false;  /* --creative : avec --new-game, partie en mode créatif */
     double creative_speed = 0.0; /* --creative-speed V : vitesse de vol au départ (m/s) */
-    bool look_at_set = false;    /* --look-at X Z : la caméra regarde ce point de la carte */
+    /* --trees simple|real : arbres du monde. Sans l'option : réalistes, sauf si la variable
+     * d'environnement OW_TREES vaut « simple » (les tests automatiques : le rendu logiciel est trop
+     * lent pour des arbres aussi détaillés). */
+    const char *trees_choice = SDL_getenv("OW_TREES");
+    bool look_at_set = false; /* --look-at X Z : la caméra regarde ce point de la carte */
     double look_at[2] = {0.0, 0.0};
     double look_pitch = 0.0; /* --look-pitch D : degrés (positif : vers le haut) */
     long warp_ticks = 0;     /* --warp N : N ticks de jeu joués d'un coup à la troisième image */
@@ -1239,6 +1247,12 @@ int main(int argc, char **argv)
             creative_game = true;
         } else if (strcmp(argv[i], "--creative-speed") == 0 && i + 1 < argc) {
             creative_speed = strtod(argv[++i], NULL);
+        } else if (strcmp(argv[i], "--trees") == 0 && i + 1 < argc) {
+            trees_choice = argv[++i];
+            if (strcmp(trees_choice, "simple") != 0 && strcmp(trees_choice, "real") != 0) {
+                usage(argv[0]);
+                return 2;
+            }
         } else if (strcmp(argv[i], "--look-at") == 0 && i + 2 < argc) {
             look_at[0] = strtod(argv[++i], NULL);
             look_at[1] = strtod(argv[++i], NULL);
@@ -1884,6 +1898,7 @@ int main(int argc, char **argv)
     PlayHook play_hook = {0};
     bool use_debug_hook = false;
     static WorldView world; /* M7 : ~1,3 Mo, hors pile */
+    world_view_use_real_trees(trees_choice == NULL || strcmp(trees_choice, "simple") != 0);
     static FlowWorld flow_world;
     WorldHook world_hook = {&world, &play_hook, &scene};
     double world_travelled = 0.0;

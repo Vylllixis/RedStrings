@@ -115,6 +115,7 @@ void world_trees_update_bodies(WorldTrees *t, const float feet[3])
     /* ici, avant tout dessin de l'image : refaire les listes détruit leurs anciens buffers, qu'un
      * dessin déjà en file (la passe d'ombre précède l'image) ne doit plus désigner */
     world_trees_near_refresh(t);
+    world_trees_real_refresh(t);
     if (t->has_center &&
         hypotf(feet[0] - t->body_center[0], feet[2] - t->body_center[1]) < BODY_REFRESH_M) {
         return;

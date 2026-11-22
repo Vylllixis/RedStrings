@@ -820,7 +820,27 @@ if(OW_PHYSICS AND OW_SHADERS_OK)
            WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR})
   set_tests_properties(launcher.world_dragon_far PROPERTIES TIMEOUT 600
     PASS_REGULAR_EXPRESSION "décor posé : 22 boîte\\(s\\) \\(zone 11\\).*zone 11 « Volcan : antre du dragon » chargée")
+  # Arbres réalistes (2026-11-22, docs/arbres-realistes.md) : dans la forêt de sapins, avec
+  # « --trees real », les trois essences se chargent et des arbres sont dessinés aux trois niveaux
+  # de détail (de près, à mi-distance, en vue lointaine). Sans l'option, les tests gardent les
+  # arbres simples (OW_TREES=simple, posé plus bas pour tous les tests).
+  add_test(NAME launcher.world_real_trees COMMAND launcher --world 7 --combat --new-game
+           --trees real --at-pos -790 -900 --no-audio --frames 30 --env-samples 16
+           WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR})
+  set_tests_properties(launcher.world_real_trees PROPERTIES
+    PASS_REGULAR_EXPRESSION "arbres réalistes : 3 essences chargées.*MONDE : arbres réalistes : dernière image : [1-9][0-9]* de près, [1-9][0-9]* à mi-distance, [1-9][0-9]* en vue lointaine")
+  add_test(NAME launcher.world_simple_trees COMMAND launcher --world 7 --combat --new-game
+           --at-pos -790 -900 --no-audio --frames 12 --env-samples 16
+           WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR})
+  set_tests_properties(launcher.world_simple_trees PROPERTIES
+    PASS_REGULAR_EXPRESSION "MONDE : arbres simples")
+  # une valeur inconnue de --trees est un mauvais usage (code 2), pas un choix silencieux
+  add_test(NAME launcher.trees_bad_choice COMMAND launcher --trees partout --frames 1
+           WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR})
+  set_tests_properties(launcher.trees_bad_choice PROPERTIES
+    ENVIRONMENT "${LAUNCHER_ENV}" PASS_REGULAR_EXPRESSION "--trees simple.real")
   foreach(t launcher.world_water launcher.world_lava launcher.world_grass
+          launcher.world_real_trees launcher.world_simple_trees
           launcher.world_trees_avoid launcher.world_save launcher.splash launcher.splash_shots
           launcher.splash_wait launcher.splash_no_wait
           launcher.title_menu launcher.menu_plain launcher.menu_mouse launcher.creative_flag
@@ -876,6 +896,7 @@ if(OW_PHYSICS AND OW_SHADERS_OK)
   if(OW_SOFTWARE_VULKAN_ICD)
     foreach(t launcher.world_combat launcher.world_combat_shift launcher.world_decor
             launcher.world_water launcher.world_lava launcher.world_grass
+            launcher.world_real_trees launcher.world_simple_trees
             launcher.world_trees_avoid launcher.world_save launcher.splash
             launcher.splash_shots launcher.splash_wait launcher.splash_no_wait
             launcher.title_menu launcher.menu_plain launcher.menu_mouse
@@ -976,8 +997,12 @@ endif()
 # avant la seconde : SDL_Quit l'efface, et une vraie fenêtre de 64 x 48 px est apparue un instant).
 # Les tests s'exécutent donc sans accès à l'écran réel : une ouverture hors des pilotes « dummy »
 # et « offscreen » échoue au lieu de s'afficher.
+#
+# Arbres (2026-11-22) : les tests gardent les arbres SIMPLES (OW_TREES=simple), sauf ceux qui
+# demandent les arbres réalistes par « --trees real » : le rendu logiciel (lavapipe) est trop lent
+# pour dessiner des forêts d'arbres scannés dans chaque test du monde.
 get_property(ow_all_tests DIRECTORY PROPERTY TESTS)
 foreach(t ${ow_all_tests})
   set_property(TEST ${t} APPEND PROPERTY ENVIRONMENT_MODIFICATION
-    "DISPLAY=unset:" "WAYLAND_DISPLAY=unset:")
+    "DISPLAY=unset:" "WAYLAND_DISPLAY=unset:" "OW_TREES=set:simple")
 endforeach()

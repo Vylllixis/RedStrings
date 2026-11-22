@@ -417,6 +417,13 @@ static const EngWorldMap *load_world_map(EngArena *arena)
     return &map;
 }
 
+static bool g_real_trees = true; /* world_view_use_real_trees */
+
+void world_view_use_real_trees(bool on)
+{
+    g_real_trees = on;
+}
+
 bool world_view_init(WorldView *w, int32_t seed, EngRenderer *renderer, EngPhysics *physics,
                      const EngEnvironment *env)
 {
@@ -474,7 +481,7 @@ bool world_view_init(WorldView *w, int32_t seed, EngRenderer *renderer, EngPhysi
         }
     }
     static WorldTrees trees; /* ~6 Mo : hors pile ; une seule vue du monde */
-    if (ok && w->map != NULL && world_trees_init(&trees, renderer, physics, env)) {
+    if (ok && w->map != NULL && world_trees_init(&trees, renderer, physics, env, g_real_trees)) {
         w->trees = &trees;
     }
     if (ok && w->map != NULL) {
@@ -745,7 +752,8 @@ void world_view_draw(WorldView *w, EngRenderQueue *queue, mat4 view_proj, const 
         (void)eng_model_gpu_draw_ex(&v->model, queue, w->pipeline, model, view_proj, light, shadow,
                                     &options);
     }
-    world_trees_draw(w->trees, queue, view_proj, light, shadow, cull ? &frustum : NULL);
+    world_trees_draw(w->trees, queue, view_proj, light, shadow, cull ? &frustum : NULL,
+                     w->shared.fog);
     world_grass_draw(&w->grass, queue, view_proj, light, shadow);
     if (w->far.ready) { /* vue lointaine : les morceaux dont la cellule détaillée n'est pas là */
         static bool skip[WORLD_FAR_MAX_CHUNKS];
@@ -795,8 +803,9 @@ void world_view_note_frame(WorldView *w, float frame_ms, float cpu_ms)
     w->frame_hist[bucket]++;
     w->frames++;
     w->frame_sum_ms += (double)frame_ms;
-    w->water.time_s += (double)frame_ms * 0.001; /* rides de l'eau */
-    w->grass.time_s += (double)frame_ms * 0.001; /* vent dans l'herbe */
+    w->water.time_s += (double)frame_ms * 0.001;   /* rides de l'eau */
+    w->grass.time_s += (double)frame_ms * 0.001;   /* vent dans l'herbe */
+    world_trees_tick(w->trees, frame_ms * 0.001F); /* et dans les arbres */
     if (frame_ms > 25.0F) {
         w->frames_over_25++;
         ENG_LOG_INFO("monde : image de %.1f ms (CPU %.1f ms) ; mise à jour %.2f ms, %u envoi(s), "
@@ -852,6 +861,13 @@ void world_view_log_summary(const WorldView *w, double travelled_m)
                      w->trees != NULL ? w->trees->loaded - w->trees->loaded_small : 0U,
                      w->trees != NULL ? w->trees->drawn : 0U,
                      w->trees != NULL ? w->trees->body_count : 0U, w->far.drawn);
+        if (w->trees != NULL && w->trees->realistic) {
+            ENG_LOG_INFO("MONDE : arbres réalistes : dernière image : %u de près, %u à "
+                         "mi-distance, %u en vue lointaine",
+                         w->trees->real_drawn[0], w->trees->real_drawn[1], w->trees->real_drawn[2]);
+        } else {
+            ENG_LOG_INFO("MONDE : arbres simples");
+        }
         ENG_LOG_INFO("MONDE : décor : %u buisson(s) et rocher(s) chargé(s), %u dessiné(s) autour "
                      "de la caméra ; herbe : %u touffe(s), %u écartée(s) sous le décor, %u semis "
                      "refait(s)",
