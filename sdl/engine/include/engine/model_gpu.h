@@ -33,6 +33,8 @@ typedef struct EngModelGpuMaterial {
     float normal_scale;
     float occlusion_strength;
     float emissive[3];
+    float alpha_cutoff; /* > 0 : matière découpée (engine/model.h) ; 0 : opaque */
+    bool double_sided;
     bool has_normal_map; /* sans normal map, la normale du sommet sert telle quelle */
     /* Les cinq textures sont TOUJOURS valides : celle de l'image, ou la blanche */
     EngTextureHandle texture;                    /* couleur de base (sRGB) */

@@ -559,8 +559,12 @@ static bool fill_primitive(EngModel *model, EngArena *scratch, const cgltf_data 
                 break;
             }
             glm_vec3_normalize(vertex->tangent);
-            /* une matrice qui inverse l'orientation inverse aussi la bitangente */
-            const float w = tmp[((size_t)v * 4U) + 3U] < 0.0F ? -1.0F : 1.0F;
+            /* une matrice qui inverse l'orientation inverse aussi la bitangente. Un module de w
+             * dans ]0, 1[ est conservé (la part du ciel vue par le sommet d'un arbre de treebake,
+             * engine/tree_render.h) ; tout autre module vaut 1, comme dans un fichier ordinaire */
+            const float raw = tmp[((size_t)v * 4U) + 3U];
+            const float size = fabsf(raw) > 0.0F && fabsf(raw) < 1.0F ? fabsf(raw) : 1.0F;
+            const float w = raw < 0.0F ? -size : size;
             vertex->tangent[3] = flip ? -w : w;
         }
     }
@@ -804,6 +808,11 @@ static bool build(EngModel *model, EngArena *arena, EngArena *scratch, cgltf_dat
         if (src->occlusion_texture.texture != NULL) {
             dst->occlusion_strength = src->occlusion_texture.scale;
         }
+        if (src->alpha_mode == cgltf_alpha_mode_mask) {
+            const float cutoff = src->alpha_cutoff;
+            dst->alpha_cutoff = isfinite(cutoff) && cutoff > 0.0F ? fminf(cutoff, 1.0F) : 0.5F;
+        }
+        dst->double_sided = src->double_sided != 0;
         const float strength =
             src->has_emissive_strength ? src->emissive_strength.emissive_strength : 1.0F;
         for (int c = 0; c < 3; c++) {
