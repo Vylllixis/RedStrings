@@ -101,6 +101,10 @@ typedef struct WorldView {
     float worst_cpu_ms;
 } WorldView;
 
+/* Arbres du prochain world_view_init : réalistes (arbres scannés, world_trees.h ; c'est le défaut)
+ * ou simples. Les arbres simples servent aussi de repli si les réalistes ne se chargent pas. */
+void world_view_use_real_trees(bool on);
+
 /* `physics` : le monde du joueur (les cellules y ajoutent leurs corps). `env` : éclairage par image
  * (peut être NULL). false (journalisé) si une ressource manque. */
 bool world_view_init(WorldView *w, int32_t seed, EngRenderer *renderer, EngPhysics *physics,

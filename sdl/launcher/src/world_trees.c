@@ -29,7 +29,26 @@ static const float SOLID_RATIO[ENG_TREE_KINDS] = {0.055F, 0.06F, 0.05F, 0.0F, 0.
 static const float SPREAD[ENG_TREE_KINDS] = {0.5F, 0.5F, 0.5F, 1.0F, 1.0F, 1.0F, 0.6F};
 static const float RISE[ENG_TREE_KINDS] = {1.0F, 1.0F, 1.0F, 1.0F, 1.0F, 1.0F, 0.6F};
 
-static bool load_model(EngRenderer *renderer, const char *relative, EngModelGpu *out)
+/* arbres réalistes : le tronc d'un sapin scanné est bien plus mince, un feuillu plus large */
+static const float REAL_SOLID_RATIO[WORLD_REAL_KINDS] = {0.05F, 0.028F, 0.045F};
+static const float REAL_SPREAD[WORLD_REAL_KINDS] = {0.65F, 0.3F, 0.3F};
+
+float world_tree_model_size(const WorldTrees *t, uint32_t kind)
+{
+    return t->realistic && kind < WORLD_REAL_KINDS ? t->real[kind].size : MODEL_SIZE[kind];
+}
+
+float world_tree_solid_ratio(const WorldTrees *t, uint32_t kind)
+{
+    return t->realistic && kind < WORLD_REAL_KINDS ? REAL_SOLID_RATIO[kind] : SOLID_RATIO[kind];
+}
+
+float world_tree_spread(const WorldTrees *t, uint32_t kind)
+{
+    return t->realistic && kind < WORLD_REAL_KINDS ? REAL_SPREAD[kind] : SPREAD[kind];
+}
+
+bool world_tree_load_model(EngRenderer *renderer, const char *relative, EngModelGpu *out)
 {
     char path[1024];
     if (!eng_path_resolve(path, sizeof path, relative)) {
@@ -39,8 +58,8 @@ static bool load_model(EngRenderer *renderer, const char *relative, EngModelGpu 
     static EngArena cpu;
     static EngArena scratch;
     static EngArena gpu_tables;
-    if (cpu.base == NULL && (!eng_arena_init(&cpu, "arbres", (size_t)4 << 20) ||
-                             !eng_arena_init(&scratch, "arbres-lecture", (size_t)8 << 20) ||
+    if (cpu.base == NULL && (!eng_arena_init(&cpu, "arbres", (size_t)8 << 20) ||
+                             !eng_arena_init(&scratch, "arbres-lecture", (size_t)24 << 20) ||
                              !eng_arena_init(&gpu_tables, "arbres-gpu", (size_t)1 << 20))) {
         return false;
     }
@@ -59,15 +78,15 @@ static bool load_model(EngRenderer *renderer, const char *relative, EngModelGpu 
 }
 
 bool world_trees_init(WorldTrees *t, EngRenderer *renderer, EngPhysics *physics,
-                      const EngEnvironment *env)
+                      const EngEnvironment *env, bool realistic)
 {
     memset(t, 0, sizeof *t);
     t->renderer = renderer;
     t->physics = physics;
     bool ok = renderer != NULL && physics != NULL;
     for (uint32_t k = 0; ok && k < ENG_TREE_KINDS; k++) {
-        ok = load_model(renderer, MODEL_PATH[k], &t->models[k]) &&
-             (LOD_PATH[k] == NULL || load_model(renderer, LOD_PATH[k], &t->lods[k]));
+        ok = world_tree_load_model(renderer, MODEL_PATH[k], &t->models[k]) &&
+             (LOD_PATH[k] == NULL || world_tree_load_model(renderer, LOD_PATH[k], &t->lods[k]));
         if (ok && env != NULL) {
             (void)eng_model_gpu_set_environment(&t->models[k], renderer, env);
             if (LOD_PATH[k] != NULL) {
@@ -91,6 +110,7 @@ bool world_trees_init(WorldTrees *t, EngRenderer *renderer, EngPhysics *physics,
     for (uint32_t i = 0; i < WORLD_TREE_BODIES; i++) {
         t->bodies[i] = ENG_BODY_INVALID;
     }
+    t->realistic = realistic && world_trees_real_init(t, env);
     t->ready = true;
     return true;
 }
@@ -145,13 +165,15 @@ void world_trees_load_cell(WorldTrees *t, uint32_t slot, const EngWorldMap *map,
             eng_origin_to_local(origin, world, local);
             const float size = trees[i].scale;
             const uint8_t tint[4] = {trees[i].tint[0], trees[i].tint[1], trees[i].tint[2], 255U};
-            eng_instance_make_yaw(&s->inst[s->total], local, size / MODEL_SIZE[k], trees[i].yaw,
-                                  tint);
-            s->solid[s->total] = SOLID_RATIO[k] > 0.0F ? fmaxf(0.3F, size * SOLID_RATIO[k]) : 0.0F;
+            const float solid = world_tree_solid_ratio(t, k);
+            const float spread = world_tree_spread(t, k);
+            eng_instance_make_yaw(&s->inst[s->total], local, size / world_tree_model_size(t, k),
+                                  trees[i].yaw, tint);
+            s->solid[s->total] = solid > 0.0F ? fmaxf(0.3F, size * solid) : 0.0F;
             for (int a = 0; a < 3; a++) {
-                s->bmin[a] = fminf(s->bmin[a], local[a] - (a == 1 ? 0.0F : SPREAD[k] * size));
+                s->bmin[a] = fminf(s->bmin[a], local[a] - (a == 1 ? 0.0F : spread * size));
                 s->bmax[a] =
-                    fmaxf(s->bmax[a], local[a] + (a == 1 ? RISE[k] * size : SPREAD[k] * size));
+                    fmaxf(s->bmax[a], local[a] + (a == 1 ? RISE[k] * size : spread * size));
             }
             s->total++;
         }
@@ -161,10 +183,12 @@ void world_trees_load_cell(WorldTrees *t, uint32_t slot, const EngWorldMap *map,
         }
     }
     s->used = s->total > 0U;
+    s->listed = false;
     t->loaded += s->total;
     upload_slot(t, s);
-    t->has_center = false; /* corps solides et petit décor à rechoisir */
+    t->has_center = false; /* corps solides, petit décor et listes d'arbres à rechoisir */
     t->near_valid = false;
+    t->real_valid = false;
 }
 
 void world_trees_unload_cell(WorldTrees *t, uint32_t slot)
@@ -186,8 +210,10 @@ void world_trees_unload_cell(WorldTrees *t, uint32_t slot)
     t->loaded -= s->total <= t->loaded ? s->total : t->loaded;
     s->total = 0;
     s->used = false;
+    s->listed = false;
     t->has_center = false;
     t->near_valid = false;
+    t->real_valid = false;
 }
 
 void world_trees_shift(WorldTrees *t, const float shift[3])
@@ -214,11 +240,19 @@ void world_trees_shift(WorldTrees *t, const float shift[3])
     world_trees_clear_bodies(t);
     t->has_center = false;
     t->near_valid = false;
+    t->real_valid = false;
+}
+
+void world_trees_tick(WorldTrees *t, float dt_s)
+{
+    if (t != NULL && isfinite(dt_s) && dt_s > 0.0F) {
+        t->time_s += (double)dt_s;
+    }
 }
 
 void world_trees_draw(WorldTrees *t, EngRenderQueue *queue, mat4 view_proj,
                       const EngLighting *light, const EngModelShadow *shadow,
-                      const EngFrustum *frustum)
+                      const EngFrustum *frustum, const float *fog)
 {
     if (t == NULL || !t->ready || queue == NULL) {
         return;
@@ -237,7 +271,7 @@ void world_trees_draw(WorldTrees *t, EngRenderQueue *queue, mat4 view_proj,
             continue;
         }
         const bool far = world_tree_slot_distance(s, t->camera) > LOD_DISTANCE_M;
-        for (uint32_t k = 0; k < ENG_TREE_KINDS; k++) {
+        for (uint32_t k = 0; k < ENG_TREE_KINDS && !t->realistic; k++) {
             if (s->count[k] == 0U || world_tree_is_small(k)) {
                 continue;
             }
@@ -258,6 +292,9 @@ void world_trees_draw(WorldTrees *t, EngRenderQueue *queue, mat4 view_proj,
                                     shadow, &options);
         t->near_drawn += t->near[k].count;
     }
+    if (t->realistic) {
+        world_trees_real_draw(t, queue, view_proj, light, shadow, frustum, fog);
+    }
 }
 
 void world_trees_draw_depth(const WorldTrees *t, EngRenderQueue *queue, mat4 light_view_proj)
@@ -271,7 +308,7 @@ void world_trees_draw_depth(const WorldTrees *t, EngRenderQueue *queue, mat4 lig
             continue; /* ombre des arbres proches seulement */
         }
         const bool far = world_tree_slot_distance(s, t->camera) > 0.5F * SHADOW_DISTANCE_M;
-        for (uint32_t k = 0; k < ENG_TREE_KINDS; k++) {
+        for (uint32_t k = 0; k < ENG_TREE_KINDS && !t->realistic; k++) {
             if (s->count[k] > 0U && !world_tree_is_small(k)) {
                 (void)eng_model_gpu_draw_depth_instanced(far ? &t->lods[k] : &t->models[k], queue,
                                                          t->shadow_pipeline, light_view_proj,
@@ -285,6 +322,9 @@ void world_trees_draw_depth(const WorldTrees *t, EngRenderQueue *queue, mat4 lig
                                                      light_view_proj, t->near[k].buffer,
                                                      t->near[k].shadow_count);
         }
+    }
+    if (t->realistic) {
+        world_trees_real_draw_depth(t, queue, light_view_proj);
     }
 }
 
@@ -306,6 +346,7 @@ void world_trees_shutdown(WorldTrees *t)
         world_trees_unload_cell(t, i);
     }
     if (t->renderer != NULL) {
+        world_trees_real_shutdown(t);
         world_trees_near_release(t);
         for (uint32_t k = 0; k < ENG_TREE_KINDS; k++) {
             destroy_model(&t->models[k], t->renderer);
