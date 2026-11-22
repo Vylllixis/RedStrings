@@ -49,14 +49,11 @@ typedef struct PlayMode {
     float air_control;  /* ]0 ; 1] : part des accélérations disponible en l'air */
     float gravity_fall; /* ]0 ; 5], x la gravité en chute (la montée garde 1) */
     float cut_factor;   /* [0 ; 1[ : vitesse verticale gardée si on relâche Espace en montant */
-    uint32_t jumps;     /* sauts effectués (autotest, journal) */
-    uint32_t landings;  /* atterrissages */
     PlayCombat *combat; /* NULL sans --combat */
     EngArena terrain_arena;
     EngHeightmap map;
     float terrain_half;
-    float combat_time; /* secondes de jeu (rechargement des attaques) */
-    uint32_t ticks;
+    float combat_time;      /* secondes de jeu (rechargement des attaques) */
     AvatarLibrary *avatars; /* M4 : personnages animés ; NULL : capsules en fil de fer */
     EngModelGpu arena_models[PLAY_ARENA_PIECES]; /* arène dessinée (marches, mur, rampe...) */
     mat4 arena_place[PLAY_ARENA_PIECES];
@@ -74,17 +71,27 @@ typedef struct PlayMode {
     uint8_t decor_color[PLAY_DECOR_MAX];
     bool decor_solid[PLAY_DECOR_MAX];
     bool decor_ready;      /* `decor_models` créés */
+    bool creature_ready;   /* `creature_models` créés */
+    bool safe_valid;       /* `safe` est un lieu sûr relevé */
+    bool wading;           /* dernier tick : le joueur est dans l'eau jusqu'à la taille */
     float cinematic_blend; /* caméra : 0 sur le joueur, 1 sur la cinématique */
+    /* carte du monde : eau (le joueur patauge sous ce niveau, plus lentement) et dernier lieu sûr
+     * (au sol, hors de la lave) où il renaît */
+    float water_level; /* niveau de l'eau, repère local ; -INFINITY : pas d'eau */
+    float safe[3];
+    uint32_t safe_ticks;
     uint32_t wall_count;
     float spawn[3];
     uint32_t arena_count;
-    Avatar avatar; /* le chevalier du joueur */
+    uint32_t ticks;
+    uint32_t jumps;    /* sauts effectués (autotest, journal) */
+    uint32_t landings; /* atterrissages */
+    Avatar avatar;     /* le chevalier du joueur */
     bool sprinting;
     bool ready;
     bool on_terrain;
     bool creative; /* mode créatif (touche « , ») : invincible, vol libre, dégâts inchangés */
-    bool wall_ready;     /* `wall_model` créé (play_mode_load_arena_visuals) */
-    bool creature_ready; /* `creature_models` créés */
+    bool wall_ready; /* `wall_model` créé (play_mode_load_arena_visuals) */
     /* M7 : point de départ (repère local ; suit le recentrage de l'origine) */ /* --terrain :
                                                                                    sol = champ
                                                                                    de hauteurs
@@ -121,6 +128,10 @@ void play_mode_shift(PlayMode *play, const float shift[3]);
 
 /* Hauteur du sol au point (x, z) : relief en mode terrain, PLAY_GROUND_TOP sinon. */
 float play_mode_ground(const PlayMode *play, float x, float z);
+/* Carte du monde : niveau de l'eau (repère local). Sous ce niveau le joueur patauge : il avance à
+ * PLAY_WADE_SPEED fois sa vitesse. -INFINITY : pas d'eau (défaut). */
+#define PLAY_WADE_SPEED 0.6F
+void play_mode_set_water_level(PlayMode *play, float level);
 
 /* Grande carte : décor des zones (engine/zone_decor.h). `boxes` sont relatives à (cx, cz), en
  * repère local ; chacune est posée sur le relief ; les solides bloquent le joueur, la caméra et les

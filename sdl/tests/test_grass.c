@@ -338,3 +338,115 @@ UTEST(eng_grass, the_tip_of_an_offset_blade_only_ever_leans_downwind)
     }
     EXPECT_GT(best, 0.1F);
 }
+
+/* ── Touffe (2026-11-22) ── */
+
+static const float ROOT[3] = {0.04F, 0.1F, 0.02F};
+static const float TIP[3] = {0.2F, 0.4F, 0.08F};
+
+UTEST(eng_grass, the_tuft_is_a_fan_of_two_sided_blades_one_metre_tall_lit_from_above)
+{
+    EngArena a;
+    ASSERT_TRUE(eng_arena_init(&a, "grass", 1U << 20));
+    for (uint32_t blades = 3; blades <= 12; blades++) {
+        EngModel m;
+        ASSERT_TRUE(eng_grass_tuft_build(&a, blades, 7U, ROOT, TIP, &m));
+        ASSERT_EQ(m.vertex_count, blades * 10U);
+        ASSERT_EQ(m.index_count, blades * 18U);
+        EXPECT_EQ(m.vertex_count, eng_grass_tuft_vertex_count(blades));
+        EXPECT_EQ(m.index_count / 3U, eng_grass_tuft_triangle_count(blades));
+        EXPECT_EQ(m.part_count, 1U);
+        EXPECT_EQ(m.parts[0].index_count, m.index_count);
+        EXPECT_EQ(m.parts[0].material, 1U);
+        EXPECT_EQ(m.bounds_min[1], 0.0F); /* le pied au sol */
+        EXPECT_EQ(m.bounds_max[1], 1.0F); /* le plus grand brin fait 1 m */
+        EXPECT_LT(m.bounds_max[0], 0.8F); /* un éventail, pas un tapis */
+        EXPECT_GT(m.bounds_max[0] - m.bounds_min[0], 0.25F);
+        for (uint32_t i = 0; i < m.vertex_count; i++) {
+            const EngModelVertex *v = &m.vertices[i];
+            const float len = sqrtf((v->normal[0] * v->normal[0]) + (v->normal[1] * v->normal[1]) +
+                                    (v->normal[2] * v->normal[2]));
+            ASSERT_NEAR(len, 1.0F, 1e-5F);
+            ASSERT_GT(v->normal[1], 0.9F); /* tournée vers le haut : pas de face noire */
+            ASSERT_GE(v->uv[1], 0.0F);     /* v = 1 au pied, 0 à la pointe du brin */
+            ASSERT_LE(v->uv[1], 1.0F);
+            if (v->position[1] == 0.0F) {
+                ASSERT_EQ(v->uv[1], 1.0F);
+                /* le pied reste près du centre : le vent (y²) ne le déplace pas */
+                ASSERT_LT(hypotf(v->position[0], v->position[2]), 0.3F);
+            }
+        }
+        /* chaque brin : deux faces de trois triangles, de normales géométriques opposées */
+        for (uint32_t b = 0; b < blades; b++) {
+            float n[2][3];
+            for (uint32_t face = 0; face < 2U; face++) {
+                const uint32_t *t = &m.indices[(size_t)((b * 2U) + face) * 9U];
+                ASSERT_LT(t[0], m.vertex_count);
+                const float *p0 = m.vertices[t[0]].position;
+                const float *p1 = m.vertices[t[1]].position;
+                const float *p2 = m.vertices[t[2]].position;
+                const float u[3] = {p1[0] - p0[0], p1[1] - p0[1], p1[2] - p0[2]};
+                const float w[3] = {p2[0] - p0[0], p2[1] - p0[1], p2[2] - p0[2]};
+                n[face][0] = (u[1] * w[2]) - (u[2] * w[1]);
+                n[face][1] = (u[2] * w[0]) - (u[0] * w[2]);
+                n[face][2] = (u[0] * w[1]) - (u[1] * w[0]);
+            }
+            const float dot = (n[0][0] * n[1][0]) + (n[0][1] * n[1][1]) + (n[0][2] * n[1][2]);
+            ASSERT_LT(dot, 0.0F);
+        }
+        eng_model_free(&m);
+    }
+    eng_arena_shutdown(&a);
+}
+
+UTEST(eng_grass, the_tuft_colour_goes_from_the_root_to_the_tip_and_the_seed_fixes_the_shape)
+{
+    EngArena a;
+    ASSERT_TRUE(eng_arena_init(&a, "grass", 1U << 20));
+    EngModel m;
+    ASSERT_TRUE(eng_grass_tuft_build(&a, 6U, 7U, ROOT, TIP, &m));
+    ASSERT_EQ(m.image_count, 1U);
+    ASSERT_EQ(m.materials[1].image, 0);
+    ASSERT_EQ(m.images[0].width, 1U);
+    ASSERT_EQ(m.images[0].height, 16U);
+    const uint8_t *top = m.images[0].pixels;                       /* v = 0 : la pointe */
+    const uint8_t *bottom = &m.images[0].pixels[(size_t)15U * 4U]; /* v = 1 : le pied */
+    EXPECT_GT(top[1], bottom[1] + 60); /* la pointe est bien plus claire */
+    EXPECT_EQ(top[3], 255);
+    /* sRGB de 0,4 et de 0,1 (linéaire) : 170 et 89 */
+    EXPECT_NEAR((float)top[1], 170.0F, 1.5F);
+    EXPECT_NEAR((float)bottom[1], 89.0F, 1.5F);
+    for (uint32_t row = 1; row < 16U; row++) { /* de plus en plus sombre vers le pied */
+        EXPECT_LE(m.images[0].pixels[(row * 4U) + 1U], m.images[0].pixels[((row - 1U) * 4U) + 1U]);
+    }
+    EngModel same;
+    EngModel other;
+    ASSERT_TRUE(eng_grass_tuft_build(&a, 6U, 7U, ROOT, TIP, &same));
+    ASSERT_TRUE(eng_grass_tuft_build(&a, 6U, 8U, ROOT, TIP, &other));
+    uint32_t differ = 0;
+    for (uint32_t i = 0; i < m.vertex_count; i++) {
+        ASSERT_EQ(m.vertices[i].position[0], same.vertices[i].position[0]);
+        ASSERT_EQ(m.vertices[i].position[2], same.vertices[i].position[2]);
+        differ += m.vertices[i].position[0] != other.vertices[i].position[0] ? 1U : 0U;
+    }
+    EXPECT_GT(differ, m.vertex_count / 2U);
+    eng_model_free(&m);
+    eng_model_free(&same);
+    eng_model_free(&other);
+    /* paramètres invalides : modèle à zéro, arène restituée */
+    const EngArenaMark mark = eng_arena_mark(&a);
+    EXPECT_FALSE(eng_grass_tuft_build(&a, 2U, 7U, ROOT, TIP, &m));
+    EXPECT_EQ(m.vertex_count, 0U);
+    EXPECT_FALSE(eng_grass_tuft_build(&a, 13U, 7U, ROOT, TIP, &m));
+    EXPECT_FALSE(eng_grass_tuft_build(&a, 6U, 7U, NULL, TIP, &m));
+    EXPECT_FALSE(eng_grass_tuft_build(&a, 6U, 7U, ROOT, NULL, &m));
+    EXPECT_FALSE(eng_grass_tuft_build(NULL, 6U, 7U, ROOT, TIP, &m));
+    EXPECT_FALSE(eng_grass_tuft_build(&a, 6U, 7U, ROOT, TIP, NULL));
+    EXPECT_EQ(eng_arena_mark(&a).used, mark.used);
+    eng_arena_shutdown(&a);
+    EngArena tiny;
+    ASSERT_TRUE(eng_arena_init(&tiny, "petite", 256U));
+    EXPECT_FALSE(eng_grass_tuft_build(&tiny, 6U, 7U, ROOT, TIP, &m)); /* arène trop petite */
+    EXPECT_EQ(m.vertex_count, 0U);
+    eng_arena_shutdown(&tiny);
+}

@@ -298,7 +298,7 @@ UTEST(game_menu, the_whole_menu_tree_is_reachable_without_a_mouse)
     (void)eng_menu_update(&m, &idle);
     EXPECT_EQ(m.selected, 1); /* « Continuer » grisé : sélection sur « Nouvelle partie » */
     (void)stick(&m, 0.0F, -1.0F);
-    EXPECT_EQ(m.selected, 2); /* Options */
+    EXPECT_EQ(m.selected, 3); /* Options : « Charger une partie », grisé, est sauté */
     EXPECT_EQ(press(&m, ENG_ACTION_JUMP), ENG_MENU_ACT_NONE);
     EXPECT_EQ(m.screen, ENG_MENU_OPTIONS);
     EXPECT_EQ(stick(&m, -1.0F, 0.0F), ENG_MENU_ACT_OPTIONS_CHANGED); /* volume général -10 % */
@@ -328,6 +328,147 @@ UTEST(game_menu, the_whole_menu_tree_is_reachable_without_a_mouse)
     (void)stick(&m, 0.0F, 1.0F); /* remonte d'une ligne */
     EXPECT_EQ(m.selected, 0);
     EXPECT_EQ(press(&m, ENG_ACTION_JUMP), ENG_MENU_ACT_CONTINUE);
+}
+
+UTEST(game_menu, three_slots_continue_the_latest_load_any_and_confirm_before_overwriting)
+{
+    EngGameOptions opt;
+    eng_options_default(&opt);
+    EngMenu m;
+    eng_menu_init(&m, &opt, NULL);
+    eng_menu_open(&m, ENG_MENU_MAIN);
+    EngInputState idle = none_in();
+    EngMenuItem items[ENG_MENU_MAX_ITEMS];
+    /* aucune partie : « Continuer » et « Charger » grisés ; la nouvelle partie commence aussitôt
+     * dans l'emplacement 1 */
+    (void)eng_menu_update(&m, &idle);
+    ASSERT_EQ(eng_menu_items(&m, items, ENG_MENU_MAX_ITEMS), 5U);
+    EXPECT_STREQ(items[2].label, "Charger une partie");
+    EXPECT_FALSE(items[0].enabled);
+    EXPECT_FALSE(items[2].enabled);
+    EXPECT_STREQ(items[0].value, "");
+    m.slot = 2;
+    EXPECT_EQ(press(&m, ENG_ACTION_JUMP), ENG_MENU_ACT_NEW_GAME);
+    EXPECT_EQ(m.slot, 0);
+    EXPECT_FALSE(eng_menu_is_open(&m));
+    /* une partie dans l'emplacement 1 : « Continuer » la reprend, et l'annonce */
+    eng_menu_set_slot(&m, 0U, true, "Niv. 2 · 5 min");
+    m.has_save = true;
+    m.last_slot = 0;
+    eng_menu_open(&m, ENG_MENU_MAIN);
+    (void)eng_menu_update(&m, &idle);
+    EXPECT_EQ(m.selected, 0);
+    (void)eng_menu_items(&m, items, ENG_MENU_MAX_ITEMS);
+    EXPECT_STREQ(items[0].value, "partie 1");
+    EXPECT_TRUE(items[2].enabled);
+    /* « Nouvelle partie » fait maintenant choisir l'emplacement : curseur sur le premier libre */
+    (void)stick(&m, 0.0F, -1.0F);
+    EXPECT_EQ(press(&m, ENG_ACTION_JUMP), ENG_MENU_ACT_NONE);
+    EXPECT_EQ(m.screen, ENG_MENU_NEW);
+    EXPECT_EQ(m.selected, 1);
+    ASSERT_EQ(eng_menu_items(&m, items, ENG_MENU_MAX_ITEMS), 4U);
+    EXPECT_STREQ(items[0].label, "Partie 1");
+    EXPECT_STREQ(items[0].value, "Niv. 2 · 5 min");
+    EXPECT_STREQ(items[1].value, "vide");
+    EXPECT_TRUE(items[0].enabled && items[1].enabled && items[2].enabled);
+    EXPECT_STREQ(items[3].label, "Retour");
+    EXPECT_EQ(press(&m, ENG_ACTION_JUMP), ENG_MENU_ACT_NEW_GAME); /* emplacement libre : aussitôt */
+    EXPECT_EQ(m.slot, 1);
+    EXPECT_FALSE(eng_menu_is_open(&m));
+    /* deux parties, la 2 est la plus récente : « Continuer » reprend la 2 */
+    eng_menu_set_slot(&m, 1U, true, "Niv. 1 · 0 min");
+    m.last_slot = 1;
+    eng_menu_open(&m, ENG_MENU_MAIN);
+    (void)eng_menu_update(&m, &idle);
+    (void)eng_menu_items(&m, items, ENG_MENU_MAX_ITEMS);
+    EXPECT_STREQ(items[0].value, "partie 2");
+    EXPECT_EQ(press(&m, ENG_ACTION_JUMP), ENG_MENU_ACT_CONTINUE);
+    EXPECT_EQ(m.slot, 1);
+    /* « Charger une partie » : curseur sur la plus récente, l'emplacement vide est grisé */
+    eng_menu_open(&m, ENG_MENU_MAIN);
+    (void)eng_menu_update(&m, &idle);
+    (void)stick(&m, 0.0F, -1.0F);
+    (void)stick(&m, 0.0F, -1.0F);
+    EXPECT_EQ(m.selected, 2);
+    EXPECT_EQ(press(&m, ENG_ACTION_ATTACK), ENG_MENU_ACT_NONE);
+    EXPECT_EQ(m.screen, ENG_MENU_LOAD);
+    EXPECT_EQ(m.selected, 1);
+    (void)eng_menu_items(&m, items, ENG_MENU_MAX_ITEMS);
+    EXPECT_FALSE(items[2].enabled);
+    (void)stick(&m, 0.0F, -1.0F);
+    EXPECT_EQ(m.selected, 3); /* l'emplacement 3, vide, est sauté : « Retour » */
+    (void)stick(&m, 0.0F, 1.0F);
+    (void)stick(&m, 0.0F, 1.0F);
+    EXPECT_EQ(m.selected, 0);
+    EXPECT_EQ(press(&m, ENG_ACTION_JUMP), ENG_MENU_ACT_CONTINUE);
+    EXPECT_EQ(m.slot, 0);
+    /* écraser demande confirmation : « Non » et Retour ne changent rien */
+    eng_menu_open(&m, ENG_MENU_MAIN);
+    (void)eng_menu_update(&m, &idle);
+    (void)stick(&m, 0.0F, -1.0F);
+    (void)press(&m, ENG_ACTION_JUMP);
+    EXPECT_EQ(m.screen, ENG_MENU_NEW);
+    EXPECT_EQ(m.selected, 2); /* le premier libre : l'emplacement 3 */
+    (void)stick(&m, 0.0F, 1.0F);
+    (void)stick(&m, 0.0F, 1.0F);
+    EXPECT_EQ(m.selected, 0);
+    EXPECT_EQ(press(&m, ENG_ACTION_JUMP), ENG_MENU_ACT_NONE);
+    EXPECT_EQ(m.screen, ENG_MENU_OVERWRITE);
+    EXPECT_EQ(m.selected, 0); /* sur « Non » : valider par mégarde n'écrase rien */
+    ASSERT_EQ(eng_menu_items(&m, items, ENG_MENU_MAX_ITEMS), 2U);
+    EXPECT_STREQ(items[0].label, "Non, revenir");
+    EXPECT_STREQ(items[1].label, "Oui, écraser la partie 1");
+    EXPECT_STREQ(items[1].value, "Niv. 2 · 5 min");
+    EXPECT_STREQ(eng_menu_title(&m), "Écraser cette partie ?");
+    EXPECT_EQ(press(&m, ENG_ACTION_JUMP), ENG_MENU_ACT_NONE); /* Non */
+    EXPECT_EQ(m.screen, ENG_MENU_NEW);
+    EXPECT_EQ(m.selected, 0);
+    (void)press(&m, ENG_ACTION_JUMP);
+    EXPECT_EQ(m.screen, ENG_MENU_OVERWRITE);
+    EXPECT_EQ(press(&m, ENG_ACTION_DODGE), ENG_MENU_ACT_NONE); /* Retour */
+    EXPECT_EQ(m.screen, ENG_MENU_NEW);
+    (void)press(&m, ENG_ACTION_JUMP);
+    (void)stick(&m, 0.0F, -1.0F);
+    EXPECT_EQ(press(&m, ENG_ACTION_JUMP), ENG_MENU_ACT_NEW_GAME); /* Oui */
+    EXPECT_EQ(m.slot, 0);
+    EXPECT_FALSE(eng_menu_is_open(&m));
+    /* Retour : des listes vers le menu principal */
+    eng_menu_open(&m, ENG_MENU_LOAD);
+    EXPECT_EQ(press(&m, ENG_ACTION_DODGE), ENG_MENU_ACT_NONE);
+    EXPECT_EQ(m.screen, ENG_MENU_MAIN);
+    eng_menu_open(&m, ENG_MENU_NEW);
+    m.selected = 3;
+    EXPECT_EQ(press(&m, ENG_ACTION_JUMP), ENG_MENU_ACT_NONE);
+    EXPECT_EQ(m.screen, ENG_MENU_MAIN);
+    eng_menu_open(&m, ENG_MENU_LOAD);
+    m.selected = 3;
+    EXPECT_EQ(press(&m, ENG_ACTION_JUMP), ENG_MENU_ACT_NONE);
+    EXPECT_EQ(m.screen, ENG_MENU_MAIN);
+    /* la souris : survoler une ligne la choisit, sauf si elle est grisée ou n'existe pas */
+    eng_menu_hover(&m, 3);
+    EXPECT_EQ(m.selected, 3);
+    eng_menu_hover(&m, -1);
+    eng_menu_hover(&m, 9);
+    EXPECT_EQ(m.selected, 3);
+    m.has_save = false;
+    eng_menu_hover(&m, 0); /* « Continuer » grisé */
+    EXPECT_EQ(m.selected, 3);
+    eng_menu_hover(&m, 4);
+    EXPECT_EQ(m.selected, 4);
+    eng_menu_hover(NULL, 1);
+    /* emplacement hors bornes : ignoré ; un emplacement libéré perd son résumé */
+    eng_menu_set_slot(&m, 3U, true, "x");
+    eng_menu_set_slot(NULL, 0U, true, "x");
+    eng_menu_set_slot(&m, 0U, false, "reste");
+    EXPECT_FALSE(m.slots[0].used);
+    EXPECT_STREQ(m.slots[0].summary, "");
+    /* un `last_slot` hors bornes ne fait pas sortir du tableau */
+    m.has_save = true;
+    m.last_slot = 17;
+    eng_menu_open(&m, ENG_MENU_MAIN);
+    (void)eng_menu_update(&m, &idle);
+    EXPECT_EQ(press(&m, ENG_ACTION_JUMP), ENG_MENU_ACT_CONTINUE);
+    EXPECT_EQ(m.slot, 2);
 }
 
 UTEST(game_menu, every_action_can_be_remapped_from_the_controls_screen)

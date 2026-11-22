@@ -67,3 +67,16 @@ et signe de l'inclinaison dans le sens du vent par composante, plus la boîte en
 tous équivalents ou inobservables : seuils d'égalité (`> 1e-12`, bornes du clamp), termes du quaternion
 nuls pour une rotation de lacet seul (lignes de `rotate_quat`), `<` → `<=` des boucles de remplissage (un tour de
 plus écrit dans l'arène au-delà du compte, invisible aux tests), `>` à l'intérieur d'un message de journal.
+
+## Touffes et herbe de la carte du monde (2026-11-22)
+
+- `eng_grass_tuft_build(arena, brins, graine, pied, pointe, &modèle)` : une touffe de 3 à 12 brins
+  partant d'un même pied, en éventail, courbés vers l'extérieur, hauts de 0,55 à 1 m (10 sommets et
+  6 triangles par brin, deux faces). Les normales sont tournées vers le haut : l'herbe s'éclaire
+  comme le sol, sans faces noires à contre-jour. La couleur va du pied (sombre, fondu dans le sol)
+  à la pointe (claire) par une image 1 x 16 : le modèle a une image, à libérer avec
+  `eng_model_free`. Même graine, même touffe.
+- Le shader est le même (`grass.vert`) : vent selon y², disparition entre `fade_start` et
+  `fade_end`.
+- Dans le monde ouvert : `eng_worldmap_grass` (placement fixe, `docs/world-map.md`) et
+  `launcher/src/world_grass.c` (deux semis autour de la caméra, refaits tous les 5 m).

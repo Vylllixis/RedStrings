@@ -89,6 +89,20 @@ foret sapin -1500 -1500 200 9
 foret sapin -1150 -1700 200 9
 arbres_epars acacia desert 45
 
+# ── Entre les forêts : quelques arbres isolés (seuls, par deux ou par trois), des buissons et
+#    quelques rochers. arbres_epars essence biome espacement [groupe de 1 à 4].
+#    Ces lignes restent APRÈS les précédentes : l'ordre des lignes d'arbres fixe leur placement
+#    (en insérer une au milieu déplacerait les forêts). ──
+arbres_epars chene plaine 110 3
+arbres_epars buisson plaine 38 3
+arbres_epars rocher plaine 95 2
+arbres_epars sapin montagne 120 3
+arbres_epars buisson_neige montagne 46 2
+arbres_epars rocher montagne 60 3
+arbres_epars buisson_sec desert 32 3
+arbres_epars rocher desert 70 2
+arbres_epars rocher volcan 45 3
+
 # ── Chemins (8 m) depuis le château ──
 chemin 8 0 0 -200 -120 -450 -330 -700 -560 -850 -700 -1050 -950
 # lacets jusqu'au sommet du seigneur du givre

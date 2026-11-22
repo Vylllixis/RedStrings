@@ -186,12 +186,23 @@ void play_mode_shift(PlayMode *play, const float shift[3])
     (void)eng_character_teleport(play->character, feet);
 }
 
+void play_mode_set_water_level(PlayMode *play, float level)
+{
+    if (play != NULL) {
+        play->water_level = isnan(level) ? -INFINITY : level;
+    }
+}
+
 void play_mode_origin_shift(PlayMode *play, const float shift[3])
 {
     if (play == NULL || !play->ready || shift == NULL) {
         return;
     }
     play_mode_shift(play, shift);
+    for (int a = 0; a < 3; a++) {
+        play->safe[a] += shift[a]; /* le lieu sûr suit le recentrage */
+    }
+    play->water_level += shift[1];
     for (int a = 0; a < 3; a++) {
         play->spawn[a] += shift[a];
     }
@@ -257,6 +268,8 @@ static bool init_common(PlayMode *play, EngTweaks *tweaks, float camera_sensitiv
         (void)eng_tweaks_add_float(tweaks, "distance caméra (m)", &play->orbit.distance,
                                    ENG_ORBIT_DISTANCE_MIN, ENG_ORBIT_DISTANCE_MAX);
     }
+    play->water_level = -INFINITY; /* pas d'eau tant que le monde ne la donne pas */
+    play->safe_valid = false;
     play->ready = true;
     ENG_LOG_INFO("mode jouable : ZQSD/WASD, souris, molette, Espace = saut, Maj = sprint ; "
                  "marches 0,15/0,30/0,45 m et mur vers +X, plateforme et rampe vers -X");
@@ -482,6 +495,25 @@ void play_mode_tick(PlayMode *play, const EngInputState *input, float dt)
         }
         velocity[0] += step.push[0] / dt; /* esquive, recul, séparation : vitesse de ce pas */
         velocity[2] += step.push[1] / dt;
+        if (step.respawned && play->safe_valid) { /* mort (lave...) : retour au dernier lieu sûr */
+            play_mode_teleport(play, play->safe, play->loco.facing);
+            ENG_LOG_INFO("mode jouable : le joueur renaît au dernier lieu sûr (%.1f, %.1f, %.1f)",
+                         (double)play->safe[0], (double)play->safe[1], (double)play->safe[2]);
+            return;
+        }
+    }
+    /* carte du monde : dans l'eau jusqu'à la taille, on patauge */
+    play->wading = feet[1] < play->water_level - 0.35F;
+    if (play->wading && !play->creative) {
+        velocity[0] *= PLAY_WADE_SPEED;
+        velocity[2] *= PLAY_WADE_SPEED;
+    }
+    /* dernier lieu sûr : au sol, vivant, hors de la lave ; relevé deux fois par seconde */
+    if (++play->safe_ticks >= 30U && grounded && !play->creative &&
+        (play->combat == NULL || !play_combat_in_lava(play->combat))) {
+        play->safe_ticks = 0;
+        memcpy(play->safe, feet, sizeof play->safe);
+        play->safe_valid = true;
     }
     if (play->creative) {
         /* vol libre : le personnage est déplacé sans gravité ni collision (jamais sous le sol) ;

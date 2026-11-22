@@ -229,7 +229,8 @@ void eng_biome_splat6(const float weights[ENG_BIOME_COUNT], const float base[ENG
     out[5] += l * total;
 }
 
-void eng_splat6_quantize(const float weights[ENG_TERRAIN_MATERIALS], uint8_t a[4], uint8_t b[4])
+void eng_splat6_quantize(const float weights[ENG_TERRAIN_MATERIALS], float shade, uint8_t a[4],
+                         uint8_t b[4])
 {
     uint8_t q[ENG_TERRAIN_MATERIALS];
     int total = 0;
@@ -248,4 +249,11 @@ void eng_splat6_quantize(const float weights[ENG_TERRAIN_MATERIALS], uint8_t a[4
     b[1] = q[5];
     b[2] = 0U;
     b[3] = 0U;
+    const float k = isfinite(shade) ? unit01(shade) : 1.0F;
+    if (k < 1.0F) { /* tout sauf la lave */
+        for (int c = 0; c < 4; c++) {
+            a[c] = (uint8_t)lroundf((float)a[c] * k);
+        }
+        b[0] = (uint8_t)lroundf((float)b[0] * k);
+    }
 }

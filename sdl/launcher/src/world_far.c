@@ -24,9 +24,14 @@ static bool far_heightmap(EngArena *scratch, const EngWorldMap *map, EngHeightma
     const double half = 0.5 * (double)map->side;
     for (uint32_t j = 0; j < size; j++) {
         for (uint32_t i = 0; i < size; i++) {
-            const float h = eng_worldmap_height(map, -half + ((double)i * WORLD_FAR_SPACING),
-                                                -half + ((double)j * WORLD_FAR_SPACING)) -
-                            FAR_SINK_M;
+            const double x = -half + ((double)i * WORLD_FAR_SPACING);
+            const double z = -half + ((double)j * WORLD_FAR_SPACING);
+            float h = eng_worldmap_height(map, x, z) - FAR_SINK_M;
+            /* près de l'eau (une maille lointaine autour), le relief lointain passe sous la
+             * surface : sinon ses grandes mailles cacheraient les rivières et le bord des lacs */
+            if (eng_worldmap_near_water(map, x, z, (double)WORLD_FAR_SPACING)) {
+                h = fminf(h, map->water - 1.0F);
+            }
             samples[((size_t)j * size) + i] = (uint16_t)lroundf(65535.0F * (h - lo) / (hi - lo));
         }
     }
@@ -57,11 +62,7 @@ static void far_materials(const EngWorldMap *map, EngSplatmap *splat, uint8_t *s
             eng_worldmap_weights(map, x, z, w, &path);
             float mixed[ENG_TERRAIN_MATERIALS];
             eng_biome_splat6(w, base, path, eng_worldmap_lava(map, x, z), mixed);
-            const float shade = eng_biome_shade(w);
-            for (int m = 0; m < 4; m++) {
-                mixed[m] *= shade;
-            }
-            eng_splat6_quantize(mixed, px, &splat2[at * 4U]);
+            eng_splat6_quantize(mixed, eng_biome_shade(w), px, &splat2[at * 4U]);
         }
     }
 }

@@ -89,8 +89,11 @@ float eng_biome_shade(const float weights[ENG_BIOME_COUNT]);
 void eng_biome_splat6(const float weights[ENG_BIOME_COUNT], const float base[ENG_SPLAT_LAYERS],
                       float path, float lava, float out[ENG_TERRAIN_MATERIALS]);
 /* Quantifie six poids (somme 1) en octets : `a` (herbe, roche, terre, neige) et `b` (sable, lave,
- * puis 0, 0) ; la somme des six octets vaut exactement 255. */
-void eng_splat6_quantize(const float weights[ENG_TERRAIN_MATERIALS], uint8_t a[4], uint8_t b[4]);
+ * puis 0, 0) ; la somme des six octets vaut exactement 255. Puis `shade` (eng_biome_shade, borné à
+ * [0, 1] ; non fini : 1) assombrit tout sauf la lave : le shader du terrain somme les couches sans
+ * les normaliser, des poids de somme inférieure à 255 donnent un sol plus sombre (basalte). */
+void eng_splat6_quantize(const float weights[ENG_TERRAIN_MATERIALS], float shade, uint8_t a[4],
+                         uint8_t b[4]);
 
 /* Le terrain n'a que quatre couches de texture ; le désert et le volcan en réutilisent deux :
  * `sand` : dans une cellule dont le bord ouest est à `x_min`, le canal de l'herbe est du SABLE (la

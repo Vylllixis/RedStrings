@@ -31,6 +31,11 @@
  * rendu ni dans Jolt), et la splatmap (altitude relative) est cohérente d'une cellule à l'autre. */
 static void height_range(const WorldView *w, float *lo, float *hi)
 {
+    if (w->map != NULL) { /* carte du monde : toute sa plage (montagnes, volcan, falaises) */
+        *lo = w->map->height_min - 1.0F;
+        *hi = w->map->height_max + 1.0F;
+        return;
+    }
     *lo = -w->gen.altitude - 1.0F;
     *hi = w->gen.altitude + 1.0F;
 }
@@ -182,13 +187,8 @@ static void map_materials(const WorldView *w, EngCellCoord c, EngSplatmap *splat
             eng_worldmap_weights(w->map, wx, wz, weights, &path);
             float mixed[ENG_TERRAIN_MATERIALS];
             eng_biome_splat6(weights, base, path, eng_worldmap_lava(w->map, wx, wz), mixed);
-            /* volcan : basalte sombre (le shader somme les couches sans les normaliser) */
-            const float shade = eng_biome_shade(weights);
-            for (int m = 0; m < 4; m++) {
-                mixed[m] *= shade;
-            }
             uint8_t *px2 = &splat2[at * 4U];
-            eng_splat6_quantize(mixed, px, px2);
+            eng_splat6_quantize(mixed, eng_biome_shade(weights), px, px2); /* basalte sombre */
             *sand = *sand || px2[0] > 0U;
             *lava = *lava || px2[1] > 0U;
         }
@@ -469,10 +469,16 @@ bool world_view_init(WorldView *w, int32_t seed, EngRenderer *renderer, EngPhysi
     }
     if (ok && w->map != NULL) { /* toute la carte au loin */
         (void)world_far_init(&w->far, renderer, &w->shared_arena, &w->scratch, w->map, env);
+        if (world_water_init(&w->water, renderer, physics, &w->shared_arena, w->map)) {
+            world_water_place_floor(&w->water, &w->origin);
+        }
     }
-    static WorldTrees trees; /* ~3,3 Mo : hors pile ; une seule vue du monde */
+    static WorldTrees trees; /* ~6 Mo : hors pile ; une seule vue du monde */
     if (ok && w->map != NULL && world_trees_init(&trees, renderer, physics, env)) {
         w->trees = &trees;
+    }
+    if (ok && w->map != NULL) {
+        (void)world_grass_init(&w->grass, renderer, env);
     }
     EngPipelineDesc desc;
     eng_terrain_pipeline_desc(&desc);
@@ -533,11 +539,23 @@ void world_view_shutdown(WorldView *w)
         w->trees = NULL;
     }
     world_far_shutdown(&w->far, w->renderer);
+    world_water_shutdown(&w->water, w->renderer);
+    world_grass_shutdown(&w->grass);
     eng_arena_shutdown(&w->shared_arena);
     eng_arena_shutdown(&w->scratch);
     eng_arena_shutdown(&w->map_arena);
     w->map = NULL;
     w->ready = false;
+}
+
+/* sol affiché sous une touffe d'herbe (repère local) */
+static bool grass_ground(void *user, float x, float z, float *out)
+{
+    const WorldView *w = user;
+    const float local[3] = {x, 0.0F, z};
+    double world[3];
+    eng_origin_to_world(&w->origin, local, world);
+    return eng_stream_height(&w->stream, world[0], world[2], out);
 }
 
 bool world_view_update(WorldView *w, const double player_world[3], float shift[3])
@@ -555,6 +573,8 @@ bool world_view_update(WorldView *w, const double player_world[3], float shift[3
     w->frame_rebased = rebased;
     if (rebased) {
         world_trees_shift(w->trees, shift);
+        world_grass_shift(&w->grass, shift);
+        world_water_place_floor(&w->water, &w->origin);
         /* les corps Jolt sont recréés au nouveau coin local de leur cellule */
         for (uint32_t i = 0; i < ENG_STREAM_SLOTS; i++) {
             WorldCellView *v = &w->cells[i];
@@ -579,6 +599,7 @@ bool world_view_update(WorldView *w, const double player_world[3], float shift[3
     float local[3];
     eng_origin_to_local(&w->origin, player_world, local);
     world_trees_update_bodies(w->trees, local);
+    world_grass_update(&w->grass, w->map, &w->origin, grass_ground, w);
     for (uint32_t i = 0; i < ENG_STREAM_SLOTS; i++) {
         const WorldCellView *v = &w->cells[i];
         if (v->used && !v->uploaded) {
@@ -663,6 +684,7 @@ void world_view_set_fog(WorldView *w, const EngFog *fog, const EngAtmosphere *at
     if (w != NULL && w->ready) {
         (void)eng_terrain_gpu_set_fog(&w->shared, fog, atmosphere, sky_intensity);
         eng_fog_set_sun(w->shared.fog, true_sun); /* M8-07 : la nuit, pas la lune */
+        world_water_set_sky(&w->water, atmosphere, true_sun, sky_intensity);
     }
 }
 
@@ -724,6 +746,7 @@ void world_view_draw(WorldView *w, EngRenderQueue *queue, mat4 view_proj, const 
                                     &options);
     }
     world_trees_draw(w->trees, queue, view_proj, light, shadow, cull ? &frustum : NULL);
+    world_grass_draw(&w->grass, queue, view_proj, light, shadow);
     if (w->far.ready) { /* vue lointaine : les morceaux dont la cellule détaillée n'est pas là */
         static bool skip[WORLD_FAR_MAX_CHUNKS];
         for (uint32_t k = 0; k < w->far.chunk_count; k++) {
@@ -733,6 +756,7 @@ void world_view_draw(WorldView *w, EngRenderQueue *queue, mat4 view_proj, const 
         world_far_draw(&w->far, queue, w->pipeline, &w->shared, &w->origin, view_proj, light,
                        shadow, cull ? &frustum : NULL, skip);
     }
+    world_water_draw(&w->water, queue, &w->origin, w->shared.fog, view_proj, light);
 }
 
 void world_view_draw_depth(const WorldView *w, EngRenderQueue *queue, mat4 light_view_proj)
@@ -771,6 +795,8 @@ void world_view_note_frame(WorldView *w, float frame_ms, float cpu_ms)
     w->frame_hist[bucket]++;
     w->frames++;
     w->frame_sum_ms += (double)frame_ms;
+    w->water.time_s += (double)frame_ms * 0.001; /* rides de l'eau */
+    w->grass.time_s += (double)frame_ms * 0.001; /* vent dans l'herbe */
     if (frame_ms > 25.0F) {
         w->frames_over_25++;
         ENG_LOG_INFO("monde : image de %.1f ms (CPU %.1f ms) ; mise à jour %.2f ms, %u envoi(s), "
@@ -822,10 +848,16 @@ void world_view_log_summary(const WorldView *w, double travelled_m)
         w->sand_drawn, w->lava_drawn);
     if (w->map != NULL) {
         ENG_LOG_INFO("MONDE : carte du monde : %u arbre(s) chargé(s), %u dessiné(s), %u tronc(s) "
-                     "solide(s) ; vue lointaine : %u morceau(x) dessiné(s)",
-                     w->trees != NULL ? w->trees->loaded : 0U,
+                     "et rocher(s) solide(s) ; vue lointaine : %u morceau(x) dessiné(s)",
+                     w->trees != NULL ? w->trees->loaded - w->trees->loaded_small : 0U,
                      w->trees != NULL ? w->trees->drawn : 0U,
                      w->trees != NULL ? w->trees->body_count : 0U, w->far.drawn);
+        ENG_LOG_INFO("MONDE : décor : %u buisson(s) et rocher(s) chargé(s), %u dessiné(s) autour "
+                     "de la caméra ; herbe : %u touffe(s), %u écartée(s) sous le décor, %u semis "
+                     "refait(s)",
+                     w->trees != NULL ? w->trees->loaded_small : 0U,
+                     w->trees != NULL ? w->trees->near_drawn : 0U, w->grass.tufts, w->grass.blocked,
+                     w->grass.rebuilds);
     }
 }
 
@@ -837,5 +869,10 @@ bool world_view_height(const WorldView *w, float x, float z, float *out)
     const float local[3] = {x, 0.0F, z};
     double world[3];
     eng_origin_to_world(&w->origin, local, world);
-    return eng_stream_height(&w->stream, world[0], world[2], out);
+    if (!eng_stream_height(&w->stream, world[0], world[2], out)) {
+        return false;
+    }
+    const float floor = world_water_floor(&w->water); /* lacs et rivières : le fond de gué */
+    *out = *out < floor ? floor : *out;
+    return true;
 }

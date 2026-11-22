@@ -20,6 +20,11 @@ typedef struct EngWindowDesc {
      * pas avoir à la fois une surface et une swapchain). Voir eng_platform_use_software_surface
      * pour revenir à l'affichage logiciel si le GPU est indisponible. */
     bool no_software_surface;
+    /* Créer la fenêtre CACHÉE et ne l'afficher qu'à eng_platform_show_window, une fois sa première
+     * image prête (écran de chargement) : sous X11, une fenêtre affichée avant d'être dessinée
+     * montre une copie figée de ce qu'elle recouvre. Appliqué seulement avec le pilote vidéo x11
+     * et hors plein écran ; ailleurs la fenêtre est affichée tout de suite, comme avant. */
+    bool hidden_until_shown;
 } EngWindowDesc;
 
 /* Filtre d'événements (M1-12 : l'interface de debug les reçoit avant le jeu). Appelé pour CHAQUE
@@ -35,6 +40,7 @@ typedef struct EngPlatform {
     int width; /* taille courante en pixels (pas en points : compte l'échelle HiDPI) */
     int height;
     bool fullscreen;
+    bool hidden; /* créée cachée (hidden_until_shown) : à afficher par eng_platform_show_window */
     bool vsync; /* synchronisation verticale obtenue (sinon : repli sur une petite pause) */
     bool mouse_captured; /* souris capturée (mode relatif : curseur caché, déplacements infinis) */
     bool debug_draw; /* affichage de debug (lignes, grille...) : F3 le bascule ; actif au départ */
@@ -51,6 +57,10 @@ bool eng_platform_init(EngPlatform *p, const EngWindowDesc *desc);
 
 /* Ferme la fenêtre et SDL. Sans effet sur une structure déjà arrêtée. */
 void eng_platform_shutdown(EngPlatform *p);
+
+/* Affiche la fenêtre créée cachée (hidden_until_shown) et attend que le système l'ait fait (délai
+ * borné par SDL). Sans effet si elle est déjà affichée. */
+void eng_platform_show_window(EngPlatform *p);
 
 /* Traite tous les événements en attente. Retourne false quand il faut quitter. */
 bool eng_platform_pump(EngPlatform *p);

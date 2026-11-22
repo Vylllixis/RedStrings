@@ -105,8 +105,11 @@ int main(int argc, char **argv)
             }
         }
     }
-    printf("  arbres : %u chênes, %u sapins enneigés, %u acacias\n", by_kind[ENG_TREE_OAK],
-           by_kind[ENG_TREE_PINE], by_kind[ENG_TREE_ACACIA]);
+    printf("  décor :");
+    for (int k = 0; k < ENG_TREE_KINDS; k++) {
+        printf(" %u %s%s", by_kind[k], eng_tree_name((EngTreeKind)k),
+               k + 1 < ENG_TREE_KINDS ? "," : "\n");
+    }
     for (uint32_t k = 0; k < g_map.feature_count; k++) { /* pente la plus forte de chaque chemin */
         const EngMapFeature *f = &g_map.features[k];
         if (f->kind != (uint8_t)ENG_MAPF_PATH) {

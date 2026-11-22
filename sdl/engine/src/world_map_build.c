@@ -316,7 +316,10 @@ static void carve_at(EngWorldMap *m, const EngMapFeature *f, size_t at, float x,
         const float u = d / half;
         target = m->water - (f->height * (1.0F - (u * u)));
     } else {
-        target = m->water + (0.45F * (d - half) * (d - half) / BANK_M);
+        /* la berge monte franchement dès la rive (pente de 30 %), puis de plus en plus : la ligne
+         * d'eau est nette (un sol presque plat au ras de l'eau donnerait une rive en escalier) */
+        const float out = d - half;
+        target = m->water + (0.3F * out) + (0.45F * out * out / BANK_M);
         if (d > half + (3.0F * BANK_M)) {
             return;
         }

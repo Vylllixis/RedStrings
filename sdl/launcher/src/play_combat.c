@@ -10,6 +10,7 @@
 
 #include "engine/ambience.h"
 #include "engine/equipment.h"
+#include "engine/ai_avoid.h"
 #include "engine/ai_camp.h"
 #include "engine/ai_debug.h"
 #include "engine/arena.h"
@@ -165,6 +166,15 @@ struct PlayCombat {
     EngWeaponTrail trail[FIGHTERS_MAX]; /* M5-20 : traînée de la lame pendant une attaque */
     int32_t ai_selected;                /* M6-10 : agent choisi au clic, -1 */
     /* grande carte : boss spécial de la zone (cavalier, dragon) et ses boîtes à dessiner */
+    uint32_t lava_ticks;     /* ticks passés dans la lave (une brûlure par PLAY_LAVA_PERIOD) */
+    uint32_t lava_msg_ticks; /* message « La lave brûle » encore affiché */
+    uint32_t lava_burns;     /* brûlures de lave depuis le début (journal, autotest) */
+    bool in_lava;            /* le joueur a les pieds dans la lave (play_combat_set_lava) */
+    /* carte du monde : troncs et rochers que les ennemis évitent (play_combat_set_trees) */
+    EngAvoidCircle trees[PLAY_AVOID_MAX];
+    uint32_t tree_count;
+    EngAvoidState avoid[FIGHTERS_MAX];
+    uint32_t avoid_steers; /* directions corrigées depuis le début (autotest) */
     EngBossKind zone_boss_kind;
     uint32_t creature_count;
     uint32_t cinematic_ticks; /* message de la cinématique encore affiché */
@@ -406,7 +416,14 @@ void play_combat_shift(PlayCombat *c, float dx, float dz)
         for (uint32_t i = 0; i < c->world.count; i++) {
             c->world.obs[i].c[a] += d[a];
         }
+        for (uint32_t i = 0; i < FIGHTERS_MAX; i++) {
+            c->avoid[i].from[a] += d[a];
+        }
         c->nav.origin[a] += d[a];
+    }
+    for (uint32_t i = 0; i < c->tree_count; i++) {
+        c->trees[i].x += dx;
+        c->trees[i].z += dz;
     }
     play_boss_shift(&c->boss, dx, dz);
     for (uint32_t i = 0; i < FIGHTERS_MAX; i++) {
@@ -436,6 +453,8 @@ bool play_combat_load_zone(PlayCombat *c, const EngMapZone *zone, int32_t index,
                    zone != NULL && zone->boss_title != NULL ? zone->boss_title : "");
     eng_aig_init(&c->group, &c->arch, &c->world, &c->nav, PLAYER);
     eng_camp_init(&c->camp);
+    memset(c->avoid, 0,
+           sizeof c->avoid); /* aucun ennemi ne fuit plus un arbre de l'ancienne zone */
     c->zone_hp = zone != NULL ? zone->hp : 0.0F;
     c->zone_damage = zone != NULL ? zone->damage_scale : 1.0F;
     c->zone_size = zone != NULL ? zone->size_scale : 1.0F;
@@ -739,6 +758,119 @@ static void poll_attacks(PlayCombat *c, double now)
 
 static void rig_tick(PlayCombat *c);
 
+/* une brûlure (flammes du dragon, lave) : étincelles, nombre de dégâts, compteur de coups reçus */
+static void burn_feedback(PlayCombat *c, float dealt, const float feet[3], uint32_t attacker)
+{
+    const EngSimEvent burn = {.tick = c->sim.tick,
+                              .attacker = attacker,
+                              .defender = PLAYER,
+                              .kind = ENG_HITKIND_DAMAGE,
+                              .zone = ENG_ZONE_TORSO,
+                              .dealt = dealt,
+                              .killed = c->sim.fighters[PLAYER].vitals.dead,
+                              .point = {feet[0], feet[1] + 1.0F, feet[2]}};
+    (void)eng_vfx_on_event(&c->particles, &burn);
+    (void)eng_dmgnum_spawn(&c->numbers, &burn);
+    c->stats.player_hits_taken++;
+}
+
+/* carte du monde : la lave brûle le joueur qui y marche */
+static void lava_tick(PlayCombat *c, const float feet[3])
+{
+    EngFighter *pf = &c->sim.fighters[PLAYER];
+    if (!c->in_lava || pf->vitals.dead) {
+        c->lava_ticks = 0;
+        return;
+    }
+    if (c->lava_ticks++ % PLAY_LAVA_PERIOD != 0U || c->invincible ||
+        pf->fsm.state == ENG_CS_DODGE) {
+        return; /* entre deux brûlures ; mode créatif ; en pleine esquive */
+    }
+    const float burn = fmaxf(4.0F, pf->vitals.max_hp * PLAY_LAVA_BURN);
+    const EngDamageResult r = eng_damage_apply(&pf->vitals, burn, ENG_ZONE_TORSO, pf->tick);
+    if (r.ignored) {
+        return;
+    }
+    if (r.killed) {
+        (void)eng_fsm_request(&pf->fsm, ENG_CS_DEAD);
+        ENG_LOG_INFO("combat : le joueur est mort dans la lave");
+    }
+    if (c->lava_burns++ == 0U) {
+        ENG_LOG_INFO("combat : la lave brûle le joueur (%.0f PV par brûlure)", (double)r.dealt);
+    }
+    c->lava_msg_ticks = 90U;
+    burn_feedback(c, r.dealt, feet, PLAYER);
+}
+
+void play_combat_set_trees(PlayCombat *c, float (*circles)[3], uint32_t count)
+{
+    if (c == NULL || !c->ready) {
+        return;
+    }
+    c->tree_count = 0;
+    for (uint32_t i = 0; circles != NULL && i < count && c->tree_count < PLAY_AVOID_MAX; i++) {
+        if (isfinite(circles[i][0]) && isfinite(circles[i][1]) && circles[i][2] > 0.0F) {
+            c->trees[c->tree_count++] =
+                (EngAvoidCircle){.x = circles[i][0], .z = circles[i][1], .r = circles[i][2]};
+        }
+    }
+}
+
+uint32_t play_combat_tree_count(const PlayCombat *c)
+{
+    return c != NULL && c->ready ? c->tree_count : 0U;
+}
+
+static float body_radius(const PlayCombat *c, uint32_t fighter)
+{
+    return c->sim.radius[fighter] > 0.0F ? c->sim.radius[fighter] : 0.3F;
+}
+
+/* Les ennemis évitent les troncs et les rochers (idée de Théo, engine/ai_avoid.h) : la direction
+ * voulue par leur IA est corrigée à moins de 1 m d'un obstacle ; au contact, ils s'en éloignent. */
+static void avoid_trees(PlayCombat *c, EngFighterInput *in)
+{
+    for (uint32_t i = 0; c->tree_count > 0U && i < c->group.count; i++) {
+        const uint32_t f = c->group.agents[i].fighter;
+        if (f >= c->sim.count || c->sim.fighters[f].vitals.dead || c->hidden[f]) {
+            continue;
+        }
+        float dir[2] = {in[f].moving ? in[f].move_dir[0] : 0.0F,
+                        in[f].moving ? in[f].move_dir[1] : 0.0F};
+        if (eng_avoid_steer(&c->avoid[f], c->sim.bodies[f].pos, body_radius(c, f), c->trees,
+                            c->tree_count, dir)) {
+            in[f].moving = true;
+            in[f].move_dir[0] = dir[0];
+            in[f].move_dir[1] = dir[1];
+            c->avoid_steers++;
+        }
+    }
+}
+
+/* après le pas : aucun ennemi ne reste dans un tronc (recul d'un coup, poussée d'un voisin) */
+static void keep_out_of_trees(PlayCombat *c)
+{
+    for (uint32_t i = 0; c->tree_count > 0U && i < c->group.count; i++) {
+        const uint32_t f = c->group.agents[i].fighter;
+        if (f < c->sim.count && !c->sim.fighters[f].vitals.dead && !c->hidden[f]) {
+            (void)eng_avoid_push_out(c->sim.bodies[f].pos, body_radius(c, f), c->trees,
+                                     c->tree_count);
+        }
+    }
+}
+
+void play_combat_set_lava(PlayCombat *c, bool in_lava)
+{
+    if (c != NULL && c->ready) {
+        c->in_lava = in_lava;
+    }
+}
+
+bool play_combat_in_lava(const PlayCombat *c)
+{
+    return c != NULL && c->ready && c->in_lava;
+}
+
 void play_combat_tick(PlayCombat *c, const EngInputState *input, const float feet[3], float facing,
                       const float move_dir[2], float camera_yaw, double now_seconds,
                       PlayCombatStep *out)
@@ -826,6 +958,7 @@ void play_combat_tick(PlayCombat *c, const EngInputState *input, const float fee
     const bool moving = (move_dir[0] * move_dir[0] + move_dir[1] * move_dir[1]) > 0.01F;
     const bool attacking = pf->fsm.state == ENG_CS_ATTACK;
     eng_aig_tick(&c->group, &c->sim, attacking ? 12.0F : (moving ? 8.0F : 0.0F), in);
+    avoid_trees(c, in);
 
     /* grande carte : boss spécial : cinématique (tout le monde figé), souffle (dragon figé) */
     const bool cinematic = play_boss_before_step(&c->boss, &c->sim, in, PLAYER);
@@ -833,6 +966,7 @@ void play_combat_tick(PlayCombat *c, const EngInputState *input, const float fee
     rig_tick(c); /* M5-05 / M5-06 : hurtboxes sur les os, lame en main */
     play_boss_rig(&c->boss, &c->sim);
     eng_sim_step(&c->sim, in);
+    keep_out_of_trees(c);
     PlayBossEvent boss_event;
     const bool boss_engaged =
         c->zone_boss && c->group.count > 0U &&
@@ -845,18 +979,9 @@ void play_combat_tick(PlayCombat *c, const EngInputState *input, const float fee
                      c->zone_title);
     }
     if (boss_event.burn_dealt > 0.0F) { /* flammes du dragon : comme une touche */
-        const EngSimEvent burn = {.tick = c->sim.tick,
-                                  .attacker = c->boss.fighter,
-                                  .defender = PLAYER,
-                                  .kind = ENG_HITKIND_DAMAGE,
-                                  .zone = ENG_ZONE_TORSO,
-                                  .dealt = boss_event.burn_dealt,
-                                  .killed = pf->vitals.dead,
-                                  .point = {feet[0], feet[1] + 1.0F, feet[2]}};
-        (void)eng_vfx_on_event(&c->particles, &burn);
-        (void)eng_dmgnum_spawn(&c->numbers, &burn);
-        c->stats.player_hits_taken++;
+        burn_feedback(c, boss_event.burn_dealt, feet, c->boss.fighter);
     }
+    lava_tick(c, feet);
     /* le mannequin est un poteau : ni recul ni poussée */
     (void)eng_sim_place(&c->sim, DUMMY, DUMMY_X, DUMMY_Z, c->sim.bodies[DUMMY].yaw);
     out->push[0] = c->sim.bodies[PLAYER].pos[0] - before[0];
@@ -928,6 +1053,7 @@ void play_combat_tick(PlayCombat *c, const EngInputState *input, const float fee
             if (!c->boss_defeated) {
                 spawn_boss(c); /* M6-09 : le boss aussi, s'il vit encore */
             }
+            out->respawned = true;
             ENG_LOG_INFO("combat : le joueur renaît, le camp est remis à neuf");
         }
     }
@@ -978,6 +1104,9 @@ void play_combat_tick(PlayCombat *c, const EngInputState *input, const float fee
     }
     if (c->cinematic_ticks > 0U) {
         c->cinematic_ticks--;
+    }
+    if (c->lava_msg_ticks > 0U) {
+        c->lava_msg_ticks--;
     }
     c->stats.level = c->progress.level;
     c->stats.total_xp = c->progress.total_xp;
@@ -1806,6 +1935,8 @@ void play_combat_fill_hud(const PlayCombat *c, const PlayMode *play, mat4 view_p
     if (pf->vitals.dead) {
         (void)snprintf(hud->message, sizeof hud->message, "%s",
                        "Tu es tombé... renaissance dans un instant");
+    } else if (c->lava_msg_ticks > 0U) {
+        (void)snprintf(hud->message, sizeof hud->message, "%s", "La lave brûle : sors de là !");
     } else if (c->cinematic_ticks > 0U) {
         (void)snprintf(hud->message, sizeof hud->message, "Le cheval s'effondre : le %s se relève",
                        c->zone_title);
@@ -2333,6 +2464,143 @@ static void decor_selftest(CombatTest *t)
     check(t, walk_east(t, 120) > 6.5F, "décor : retiré, il ne bloque plus (x)", 0.0F);
 }
 
+/* Carte du monde : dans l'eau jusqu'à la taille (pieds à plus de 0,35 m sous la surface), le
+ * joueur marche à 60 % de sa vitesse ; au sec, à sa vitesse normale. */
+static void wade_selftest(CombatTest *t)
+{
+    PlayMode *p = &t->play;
+    const float east = -1.5707963F;
+    put(t, 3.0F, 18.0F, east);
+    const float dry = walk_east(t, 120) - 3.0F;
+    put(t, 3.0F, 18.0F, east);
+    play_mode_set_water_level(p, PLAY_GROUND_TOP + 1.0F); /* de l'eau jusqu'à la taille */
+    const float wet = walk_east(t, 120) - 3.0F;
+    check(t, p->wading, "gué : le joueur est dans l'eau", p->wading ? 1.0F : 0.0F);
+    check(t, dry > 4.0F && wet > 0.5F * dry && wet < 0.7F * dry,
+          "gué : il avance à 60 % de sa vitesse (rapport)", wet / dry);
+    play_mode_set_water_level(p, PLAY_GROUND_TOP + 0.2F); /* de l'eau aux chevilles : rien */
+    put(t, 3.0F, 18.0F, east);
+    const float shallow = walk_east(t, 120) - 3.0F;
+    check(t, !p->wading && shallow > 0.95F * dry, "gué : eau aux chevilles, vitesse normale",
+          shallow / dry);
+    play_mode_set_water_level(p, -INFINITY);
+}
+
+/* Carte du monde : la lave brûle (6 % des PV toutes les 20 ticks), sauf en mode créatif ; mort dans
+ * la lave, le joueur renaît au dernier lieu sûr. */
+static void lava_selftest(CombatTest *t)
+{
+    PlayMode *p = &t->play;
+    PlayCombat *c = p->combat;
+    EngFighter *pf = &c->sim.fighters[PLAYER];
+    put(t, 3.0F, 14.0F, 0.0F); /* 30 ticks au sol, hors de la lave : c'est le lieu sûr */
+    pf->vitals.max_hp = 200.0F;
+    pf->vitals.hp = 200.0F;
+    check(t, p->safe_valid && fabsf(p->safe[0] - 3.0F) < 0.2F && fabsf(p->safe[2] - 14.0F) < 0.2F,
+          "lave : lieu sûr relevé (x)", p->safe[0]);
+    play_combat_set_lava(c, true);
+    for (int i = 0; i < 61; i++) {
+        step(t, 0U, 0U, 0.0F, 0.0F);
+    }
+    check(t, c->lava_burns == 4U && fabsf(pf->vitals.hp - (200.0F - (4.0F * 12.0F))) < 0.01F,
+          "lave : 4 brûlures de 6 % en 61 ticks (PV)", pf->vitals.hp);
+    c->invincible = true; /* mode créatif */
+    const float hp_creative = pf->vitals.hp;
+    for (int i = 0; i < 45; i++) {
+        step(t, 0U, 0U, 0.0F, 0.0F);
+    }
+    check(t, pf->vitals.hp >= hp_creative, "lave : rien en mode créatif (PV)", pf->vitals.hp);
+    c->invincible = false;
+    play_combat_set_lava(c, false);
+    pf->vitals.hp = 200.0F;
+    for (int i = 0; i < 45; i++) {
+        step(t, 0U, 0U, 0.0F, 0.0F);
+    }
+    check(t, pf->vitals.hp == 200.0F, "lave : hors de la lave, plus de brûlure (PV)",
+          pf->vitals.hp);
+    /* il marche dans la lave 6 m plus loin et y meurt : il renaît au lieu sûr */
+    const float lava_spot[3] = {9.0F, PLAY_GROUND_TOP + 0.05F, 14.0F};
+    (void)eng_character_teleport(p->character, lava_spot);
+    play_combat_set_lava(c, true);
+    int ticks = 0;
+    for (; ticks < 900 && !pf->vitals.dead; ticks++) {
+        step(t, 0U, 0U, 0.0F, 0.0F);
+    }
+    check(t, pf->vitals.dead, "lave : le joueur y meurt (ticks)", (float)ticks);
+    for (int i = 0; i < (int)RESPAWN_TICKS + 10 && pf->vitals.dead; i++) {
+        step(t, 0U, 0U, 0.0F, 0.0F);
+    }
+    play_combat_set_lava(c, false); /* le lanceur le constate à l'image suivante */
+    step(t, 0U, 0U, 0.0F, 0.0F);
+    float feet[3] = {0.0F, 0.0F, 0.0F};
+    (void)eng_character_position(p->character, feet);
+    check(t, !pf->vitals.dead && hypotf(feet[0] - 3.0F, feet[2] - 14.0F) < 0.5F,
+          "lave : il renaît au dernier lieu sûr (écart, m)",
+          hypotf(feet[0] - 3.0F, feet[2] - 14.0F));
+}
+
+/* Carte du monde : les ennemis évitent les arbres (engine/ai_avoid.h). Un tronc est posé sur le
+ * chemin du premier ennemi vers le joueur : il le contourne sans jamais y entrer et rejoint le
+ * joueur ; posé de force dans le tronc, il en sort aussitôt et s'en éloigne d'au moins 1 m. */
+static void trees_selftest(CombatTest *t, const EngMapZone *zone)
+{
+    PlayMode *p = &t->play;
+    PlayCombat *c = p->combat;
+    c->zones_beaten = 0;
+    c->invincible = true;
+    put(t, 30.0F, -12.0F, 0.0F);
+    check(t, play_combat_load_zone(c, zone, 0, 12.0F, -12.0F), "arbres : zone chargée", 1.0F);
+    /* le premier ennemi est posé en (19, -12), tourné vers le joueur en (30, -12) : un tronc à
+     * mi-chemin, deux autres de part et d'autre un peu plus loin */
+    float circles[3][3] = {{24.5F, -12.0F, 0.5F}, {27.0F, -9.8F, 0.4F}, {27.0F, -14.2F, 0.4F}};
+    play_combat_set_trees(c, circles, 3U);
+    check(t, play_combat_tree_count(c) == 3U, "arbres : trois troncs donnés au combat", 3.0F);
+    const uint32_t f = c->group.agents[0].fighter;
+    const float r = body_radius(c, f);
+    (void)eng_sim_place(&c->sim, f, 19.0F, -12.0F, -1.5707963F);
+    const uint32_t steers = c->avoid_steers;
+    float closest = INFINITY; /* écart le plus faible de tous les ennemis à un tronc */
+    float nearest = INFINITY; /* distance la plus faible du premier ennemi au joueur */
+    for (int i = 0; i < 900; i++) {
+        step(t, 0U, 0U, 0.0F, 0.0F);
+        for (uint32_t k = 0; k < c->group.count; k++) {
+            const uint32_t e = c->group.agents[k].fighter;
+            closest = fminf(closest, eng_avoid_gap(c->sim.bodies[e].pos, body_radius(c, e),
+                                                   c->trees, c->tree_count, NULL));
+        }
+        nearest = fminf(nearest, hypotf(c->sim.bodies[f].pos[0] - c->sim.bodies[PLAYER].pos[0],
+                                        c->sim.bodies[f].pos[1] - c->sim.bodies[PLAYER].pos[1]));
+    }
+    check(t, c->avoid_steers > steers, "arbres : direction corrigée près d'un tronc (fois)",
+          (float)(c->avoid_steers - steers));
+    check(t, closest >= -1e-3F && closest < 1.0F,
+          "arbres : passés à moins de 1 m, jamais dans un tronc (m)", closest);
+    check(t, nearest < 5.5F, "arbres : le premier ennemi a rejoint le joueur (m)", nearest);
+    /* posé de force dans le tronc : il en sort au tick suivant, puis s'éloigne d'au moins 1 m */
+    (void)eng_sim_place(&c->sim, f, 24.6F, -12.0F, 0.0F);
+    step(t, 0U, 0U, 0.0F, 0.0F);
+    float gap = eng_avoid_gap(c->sim.bodies[f].pos, r, c->trees, c->tree_count, NULL);
+    check(t, gap >= -1e-3F && c->avoid[f].fleeing, "arbres : sorti du tronc, il s'en éloigne (m)",
+          gap);
+    int ticks = 0;
+    for (; ticks < 300 && c->avoid[f].fleeing; ticks++) {
+        step(t, 0U, 0U, 0.0F, 0.0F);
+    }
+    gap = hypotf(c->sim.bodies[f].pos[0] - 24.5F, c->sim.bodies[f].pos[1] + 12.0F) - (0.5F + r);
+    check(t, !c->avoid[f].fleeing && gap >= 0.95F,
+          "arbres : éloigné d'au moins 1 m après le contact (m)", gap);
+    /* sans arbres : plus rien n'est corrigé */
+    play_combat_set_trees(c, NULL, 0U);
+    const uint32_t after = c->avoid_steers;
+    for (int i = 0; i < 60; i++) {
+        step(t, 0U, 0U, 0.0F, 0.0F);
+    }
+    check(t, play_combat_tree_count(c) == 0U && c->avoid_steers == after,
+          "arbres : liste vidée, plus de correction", (float)(c->avoid_steers - after));
+    c->invincible = false;
+    (void)play_combat_load_zone(c, NULL, -1, 12.0F, -12.0F);
+}
+
 bool play_combat_bosses_selftest(void)
 {
     static CombatTest t;
@@ -2356,6 +2624,9 @@ bool play_combat_bosses_selftest(void)
     rider_selftest(&t, &zones[2]);
     dragon_selftest(&t, &zones[11]);
     decor_selftest(&t);
+    trees_selftest(&t, &zones[0]);
+    wade_selftest(&t);
+    lava_selftest(&t);
     const uint32_t ticks = c->sim.tick;
     play_mode_shutdown(&t.play);
     if (t.ok) {

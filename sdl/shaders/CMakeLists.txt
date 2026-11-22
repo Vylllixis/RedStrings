@@ -29,4 +29,5 @@ ow_add_shaders(shaders
     shadow.frag.hlsl
     model_skinned.vert.hlsl
     shadow_skinned.vert.hlsl
-    shadow_instanced.vert.hlsl)
+    shadow_instanced.vert.hlsl
+    splash.frag.hlsl)

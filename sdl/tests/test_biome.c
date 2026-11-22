@@ -278,10 +278,16 @@ UTEST(biome, six_materials_follow_the_biome_the_paths_and_the_lava)
     EXPECT_NEAR(sum, 1.0F, 1e-5F);
     uint8_t a[4];
     uint8_t b[4];
-    eng_splat6_quantize(out, a, b);
+    eng_splat6_quantize(out, 1.0F, a, b);
     EXPECT_EQ(a[0] + a[1] + a[2] + a[3] + b[0] + b[1], 255);
     EXPECT_EQ(b[2] + b[3], 0);
-    eng_splat6_quantize((float[6]){0, 0, 0, 0, 0.5F, 0.5F}, a, b);
+    eng_splat6_quantize((float[6]){0, 0, 0, 0, 0.5F, 0.5F}, 1.0F, a, b);
     EXPECT_EQ(b[0] + b[1], 255);
     EXPECT_EQ(a[0] + a[1] + a[2] + a[3], 0);
+    /* volcan : le basalte est assombri (poids x 0,45), la lave garde tout son éclat */
+    eng_splat6_quantize((float[6]){0, 0.6F, 0, 0, 0, 0.4F}, 0.45F, a, b);
+    EXPECT_EQ(a[1], 69);                                             /* 153 x 0,45 */
+    EXPECT_EQ(b[1], 102);                                            /* lave intacte */
+    eng_splat6_quantize((float[6]){0, 1.0F, 0, 0, 0, 0}, NAN, a, b); /* non fini : pas d'ombre */
+    EXPECT_EQ(a[1], 255);
 }

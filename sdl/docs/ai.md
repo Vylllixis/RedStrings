@@ -13,6 +13,7 @@ Décisions : `docs/adr/0025-ia-machine-a-etats-donnees-et-jetons.md`. Modules (t
 | `ai_group` | cerveau : états Patrol / Alert / Chase / Engage / Return / Flee / Dead, écrit des `EngFighterInput` |
 | `ai_camp` | camps (création, repos du joueur, arène de boss) |
 | `ai_debug` | état, chemin, cône, jeton, sélection par rayon |
+| `ai_avoid` | évitement local des troncs et des rochers (carte du monde) : contournement à moins de 1 m, recul au contact |
 
 ## Archétypes (format)
 
@@ -37,6 +38,25 @@ erreur donne un message avec le numéro de ligne.
 - `eng_camp_cleared_range` : le camp est vaincu même si un boss du même groupe vit.
 - Repos : camp remis à neuf (morts comprises), refusé pendant un combat.
 - Même scénario → même hash (déterminisme, même binaire).
+
+## Évitement des arbres (`ai_avoid`, 2026-11-22)
+
+Idée de Théo, sans calcul de chemin : une règle locale appliquée à la direction de marche que
+l'IA vient de choisir (`play_combat_tick`, après `eng_aig_tick`).
+
+- À plus de 1 m (`ENG_AVOID_MARGIN`) de tout obstacle : rien ne change.
+- À moins de 1 m : la part de la direction qui va VERS l'obstacle est réduite en proportion de la
+  proximité (rien à 1 m, tout au contact) et remplacée par un pas de côté, du côté où l'ennemi
+  allait déjà : il contourne. La vitesse est conservée.
+- Au contact : il s'éloigne droit dehors jusqu'à être revenu à 1 m (`EngAvoidState.fleeing`),
+  quoi que veuille son IA.
+- `eng_avoid_push_out` garantit en plus qu'un corps n'est jamais DANS un obstacle (recul d'un
+  coup, poussée d'un voisin).
+
+Les obstacles sont des cercles (x, z, rayon) : sur la carte du monde, les troncs et les rochers à
+moins de 48 m du camp (`world_trees_obstacles`, redonnés toutes les 30 images). Tests :
+`engine.ai_avoid` (5), autotest `--boss-selftest` (un ennemi contourne un tronc posé sur son
+chemin ; posé dans le tronc, il en sort et s'éloigne de 1 m), `launcher.world_trees_avoid`.
 
 ## Limites
 

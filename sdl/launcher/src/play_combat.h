@@ -30,10 +30,11 @@
 typedef struct PlayCombat PlayCombat;
 
 typedef struct PlayCombatStep {
-    bool locked;   /* le joueur ne peut pas marcher ce tick */
-    float push[2]; /* déplacement (x, z) imposé par le combat ce tick, en mètres */
-    bool face;     /* `facing` doit être appliqué (attaque vers la cible verrouillée) */
-    float facing;  /* lacet voulu */
+    bool locked;    /* le joueur ne peut pas marcher ce tick */
+    float push[2];  /* déplacement (x, z) imposé par le combat ce tick, en mètres */
+    bool respawned; /* le joueur vient de renaître (le mode jouable le ramène en lieu sûr) */
+    bool face;      /* `facing` doit être appliqué (attaque vers la cible verrouillée) */
+    float facing;   /* lacet voulu */
 } PlayCombatStep;
 
 /* `audio` : ouvre le périphérique audio (sinon silencieux). `arena_obstacles` : les ennemis
@@ -73,6 +74,20 @@ bool play_combat_give_gear(PlayCombat *c, uint32_t tier);
 /* Mode créatif : le joueur ne perd plus de PV (remis au maximum avant chaque pas de simulation) ;
  * ses attaques et leurs dégâts ne changent pas. */
 void play_combat_set_invincible(PlayCombat *c, bool invincible);
+/* Carte du monde : le joueur a les pieds dans la lave. Tant que c'est vrai, une brûlure toutes les
+ * PLAY_LAVA_PERIOD ticks retire PLAY_LAVA_BURN de ses PV maximaux (au moins 4) ; rien en mode
+ * créatif ni pendant une esquive. */
+#define PLAY_LAVA_PERIOD 20U
+#define PLAY_LAVA_BURN 0.06F
+void play_combat_set_lava(PlayCombat *c, bool in_lava);
+bool play_combat_in_lava(const PlayCombat *c);
+/* Carte du monde : troncs et rochers près du camp (x, z, rayon ; repère local ; au plus
+ * PLAY_AVOID_MAX, le reste est ignoré). Les ennemis les évitent (engine/ai_avoid.h) : à moins de
+ * 1 m ils les contournent, au contact ils s'en éloignent d'au moins 1 m, et ils ne sont jamais
+ * dedans. REMPLACE la liste précédente ; `circles` NULL ou `count` 0 : plus rien à éviter. */
+#define PLAY_AVOID_MAX 128U
+void play_combat_set_trees(PlayCombat *c, float (*circles)[3], uint32_t count);
+uint32_t play_combat_tree_count(const PlayCombat *c);
 void play_combat_destroy(PlayCombat *c);
 
 /* M6-09 : murs de l'arène du boss (terrain seulement), en boîtes au sol : centre x, z et

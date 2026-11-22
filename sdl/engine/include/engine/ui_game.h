@@ -2,7 +2,8 @@
 #define ENG_UI_GAME_H
 
 /* Interface du jeu (M8-03) et rendu des menus (M8-04), par-dessus la scène, avec Dear ImGui (listes
- * de dessin, pas de fenêtres : la logique des menus est dans game_menu, sans souris). Tailles
+ * de dessin, pas de fenêtres : la logique des menus est dans game_menu ; la souris ne fait que
+ * désigner une ligne, eng_ui_draw_menu renvoie celle qu'elle survole). Tailles
  * proportionnelles à la hauteur de l'écran (référence 1080 px) × l'échelle du texte : lisible en
  * 1080p comme en 4K. Sans OW_UI : ne dessine rien. */
 
@@ -53,8 +54,15 @@ typedef struct EngHud {
 } EngHud;
 
 void eng_ui_draw_hud(EngUi *ui, const EngHud *hud, int width, int height);
-void eng_ui_draw_menu(EngUi *ui, const EngMenu *menu, int width, int height, float text_scale,
-                      bool high_contrast);
+/* Dessine le menu ouvert. Menu principal et emplacements de sauvegarde : une colonne à gauche,
+ * sur un dégradé sombre qui laisse voir le monde à droite, sous le titre du jeu ; pause, options,
+ * contrôles : au centre, sur un voile. Renvoie la ligne survolée par la souris, -1 si aucune (ou
+ * rien de dessiné). */
+int32_t eng_ui_draw_menu(EngUi *ui, const EngMenu *menu, int width, int height, float text_scale,
+                         bool high_contrast);
+/* Voile noir plein écran d'opacité `alpha` (0 à 1), par-dessus tout : fondu d'entrée après l'écran
+ * de chargement. */
+void eng_ui_draw_fade(EngUi *ui, float alpha, int width, int height);
 
 /* Taille de texte en pixels pour une hauteur d'écran (testable sans GPU). */
 float eng_ui_text_px(int height, float text_scale);

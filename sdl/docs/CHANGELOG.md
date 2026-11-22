@@ -66,6 +66,24 @@ livraisons ; les tags sont posés par Théo après ses tests.
   montagne enneigée, désert, volcan) : relief et matières par biome, frontières fondues.
 - Grande carte : 12 zones d'ennemis (farm facile, farm dur, boss dans chaque biome), difficulté
   croissante, camp de réveil sans ennemis ; `--at-zone N` pour commencer devant une zone.
+- Écran de chargement animé (2026-11-22, `docs/splash.md`) : dès que le GPU est prêt, une scène
+  animée (l'aube sur la carte du monde, le chevalier, le fil rouge, le titre) pendant que le
+  chargement s'exécute dans un fil à part ; avant, la fenêtre restait une copie figée de l'écran
+  pendant plusieurs secondes. `--no-splash` pour s'en passer. Texte en champ de distance
+  (`engine/text_sdf`).
+- Menu principal (2026-11-22) : trois emplacements de sauvegarde (Continuer la plus récente,
+  Charger une partie, Nouvelle partie avec choix de l'emplacement et confirmation avant d'écraser),
+  souris dans les menus, colonne à gauche sur le monde, fondu d'entrée. Corrigé : dans le monde
+  ouvert, la sauvegarde enregistrait la position locale du joueur (fausse après un recentrage de
+  l'origine) ; elle enregistre sa position monde et le relief est chargé autour avant de le poser.
+- Carte du monde (2026-11-22) : eau des lacs et de la rivière (surface dessinée de près et de loin,
+  traversée à gué, de l'eau jusqu'à la taille) ; la lave brûle (6 % des PV par tiers de seconde,
+  retour au dernier endroit sûr) ; les ennemis évitent les arbres et les rochers
+  (`engine/ai_avoid`, idée de Théo : contournement à moins de 1 m, recul d'au moins 1 m au
+  contact) ; décor entre les forêts (chênes isolés par groupes de 1 à 3, buissons, quelques
+  rochers teintés par biome) ; herbe de la plaine (touffes animées par le vent, toujours aux mêmes
+  endroits) ; `--at-pos X Z`. Corrigé : le relief proche du joueur était écrêté à ±61 m
+  (montagnes, volcan et falaises aplatis de près, chute au sommet du volcan).
 - Carte du monde dans le jeu (`--world`) : relief de la carte, sol à six matières (sable et lave
   dans une seconde carte de poids : emplacements 9 à 11 du renderer), arbres (chênes, sapins
   enneigés, acacias ; versions simplifiées au loin, troncs solides), vue lointaine de toute la

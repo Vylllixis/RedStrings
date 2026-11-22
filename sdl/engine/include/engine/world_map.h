@@ -23,6 +23,7 @@
 #include "engine/arena.h"
 #include "engine/biome.h"
 #include "engine/map_zones.h"
+#include "engine/model.h"
 
 #define ENG_WORLDMAP_MAX_FEATURES 160U
 #define ENG_WORLDMAP_MAX_POINTS                                                                    \
@@ -64,9 +65,13 @@ typedef struct EngMapFeature {
 } EngMapFeature;
 
 typedef enum EngTreeKind {
-    ENG_TREE_OAK = 0, /* chêne (plaine) */
-    ENG_TREE_PINE,    /* sapin enneigé (montagne) */
-    ENG_TREE_ACACIA,  /* arbre de savane (désert) */
+    ENG_TREE_OAK = 0,   /* chêne (plaine) */
+    ENG_TREE_PINE,      /* sapin enneigé (montagne) */
+    ENG_TREE_ACACIA,    /* arbre de savane (désert) */
+    ENG_TREE_BUSH,      /* buisson (plaine) */
+    ENG_TREE_BUSH_SNOW, /* buisson enneigé (montagne) */
+    ENG_TREE_BUSH_DRY,  /* buisson sec (désert) */
+    ENG_TREE_ROCK,      /* rocher (partout, même au volcan) */
     ENG_TREE_KINDS
 } EngTreeKind;
 
@@ -75,8 +80,9 @@ typedef struct EngMapTree {
     float z;
     float y;      /* sol au pied */
     float yaw;    /* radians */
-    float scale;  /* hauteur approximative en mètres */
+    float scale;  /* taille en mètres : hauteur d'un arbre ou d'un buisson, largeur d'un rocher */
     uint8_t kind; /* EngTreeKind */
+    uint8_t tint[3]; /* teinte (255 : neutre) : variation d'un pied à l'autre, roche du biome */
 } EngMapTree;
 
 typedef struct EngMapRegion {
@@ -142,13 +148,54 @@ float eng_worldmap_lava(const EngWorldMap *map, double x, double z);
  * position donnée par la carte (`zone ...`) quand elle y figure. */
 bool eng_worldmap_zones(const EngWorldMap *map, EngMapZone out[ENG_MAPZONE_COUNT]);
 
-/* Arbres dont le pied est dans le carré [x0 ; x0 + size[ x [z0 ; z0 + size[ (au plus `max`) :
- * forêts et arbres épars de la carte, sur une grille fixe du monde légèrement décalée (même
- * résultat quel que soit le découpage en cellules). Jamais sur un chemin, dans l'eau, sur la lave,
- * dans le volcan, sur une pente raide, ni près du départ ou d'une zone de combat. */
+/* Arbres, buissons et rochers dont le pied est dans le carré [x0 ; x0 + size[ x [z0 ; z0 + size[
+ * (au plus `max`) : forêts et objets épars de la carte (seuls ou par petits groupes), sur une
+ * grille fixe du monde légèrement décalée (même résultat quel que soit le découpage en cellules).
+ * Jamais sur un chemin, dans l'eau, sur la lave, sur une pente raide, ni près du départ ou d'une
+ * zone de combat ; arbres et buissons jamais dans le volcan (les rochers, si). */
 uint32_t eng_worldmap_trees(const EngWorldMap *map, double x0, double z0, double size,
                             EngMapTree *out, uint32_t max);
 const char *eng_tree_name(EngTreeKind kind);
+
+/* ── Herbe de la plaine (2026-11-22) ── */
+
+#define ENG_GRASS_MAX_SLOPE 0.6F /* pas d'herbe sur une pente plus raide (roche) */
+
+typedef struct EngMapTuft {
+    float x; /* monde */
+    float z;
+    float y;     /* sol au pied (interpolé sur la trame) */
+    float yaw;   /* radians */
+    float scale; /* hauteur de la touffe (m) : de 0,55 à 1,4 fois la hauteur demandée */
+    uint8_t
+        tint[3]; /* teinte : taches d'herbe haute plus jaune, variation d'une touffe à l'autre */
+} EngMapTuft;
+
+/* Part d'herbe en (x, z), de 0 à 1 : 1 en pleine plaine ; 0 hors de la plaine, sur un chemin, sur
+ * la lave, dans l'eau (à moins de 25 cm au-dessus) ou sur une pente de plus de
+ * ENG_GRASS_MAX_SLOPE ; entre les deux aux frontières des biomes et sur les pentes. */
+float eng_worldmap_grass_cover(const EngWorldMap *map, double x, double z);
+
+/* Touffes d'herbe à moins de `radius` (au plus 400 m) de (cx, cz), au plus `max` : une grille fixe
+ * du monde de pas `spacing` (>= 0,2 m), chaque nœud décalé dans sa maille ; une touffe est gardée
+ * avec la probabilité eng_worldmap_grass_cover. Les MÊMES touffes (position, taille, teinte)
+ * quel que soit le centre : l'herbe ne change pas quand le joueur avance. `salt` distingue deux
+ * semis (herbe dense de près, herbe clairsemée au loin). `height` : hauteur type (m). */
+uint32_t eng_worldmap_grass(const EngWorldMap *map, double cx, double cz, float radius,
+                            float spacing, float height, uint32_t salt, EngMapTuft *out,
+                            uint32_t max);
+/* Tronc ou rocher : bloque le joueur et les ennemis ; un buisson se traverse. */
+bool eng_tree_is_solid(EngTreeKind kind);
+
+/* Surface de l'eau (lacs, rivières) : maillage compact des cellules de la trame dont un coin est
+ * sous `map->water`, à cette altitude, coordonnées de la carte ; uv.x = profondeur au sommet,
+ * SIGNÉE (négative là où le relief dépasse : water.frag écarte ces fragments, la rive suit le
+ * relief), normale +Y (à dessiner avec water.frag, engine/water.h). Carte sans eau : true,
+ * modèle vide. Tableaux dans `arena`. false : carte non construite ou arène trop petite. */
+bool eng_worldmap_water(const EngWorldMap *map, EngArena *arena, EngModel *out);
+uint32_t eng_worldmap_wet_cells(const EngWorldMap *map);
+/* Y a-t-il de l'eau (relief sous le niveau) à moins de `reach` mètres (en carré) de (x, z) ? */
+bool eng_worldmap_near_water(const EngWorldMap *map, double x, double z, double reach);
 
 /* Aperçu vu de dessus, `size` x `size` pixels RGB (3 octets, ligne 0 = nord) : relief ombré,
  * couleur des biomes, eau, chemins, lave, zones (vert : facile, orange : dur, rouge : boss) et

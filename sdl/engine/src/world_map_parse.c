@@ -98,7 +98,8 @@ static int biome_of(const char *word)
 
 static int tree_of(const char *word)
 {
-    static const char *const names[ENG_TREE_KINDS] = {"chene", "sapin", "acacia"};
+    static const char *const names[ENG_TREE_KINDS] = {
+        "chene", "sapin", "acacia", "buisson", "buisson_neige", "buisson_sec", "rocher"};
     for (int t = 0; t < ENG_TREE_KINDS; t++) {
         if (strcmp(word, names[t]) == 0) {
             return t;
@@ -282,13 +283,15 @@ static bool parse_region_or_zone(EngWorldMap *m, const Line *l, char *err, size_
     return true;
 }
 
-/* foret essence x z rayon espacement | arbres_epars essence biome espacement */
+/* foret essence x z rayon espacement | arbres_epars essence biome espacement [groupe] */
 static bool parse_trees(EngWorldMap *m, const Line *l, char *err, size_t cap)
 {
     const bool forest = strcmp(l->tok[0], "foret") == 0;
     const int tree = l->count > 1U ? tree_of(l->tok[1]) : -1;
     if (tree < 0) {
-        return fail(err, cap, l->number, "essence inconnue (chene, sapin, acacia)");
+        return fail(err, cap, l->number,
+                    "essence inconnue (chene, sapin, acacia, buisson, buisson_neige, "
+                    "buisson_sec, rocher)");
     }
     float v[4] = {0};
     EngMapFeature f = {.tree = (uint8_t)tree};
@@ -303,12 +306,17 @@ static bool parse_trees(EngWorldMap *m, const Line *l, char *err, size_t cap)
         f.a = v[3];
     } else {
         const int biome = l->count > 2U ? biome_of(l->tok[2]) : -1;
-        if (biome < 0 || l->count != 4U || !number(l, 3U, &v[0]) || !(v[0] >= 3.0F)) {
-            return fail(err, cap, l->number, "« arbres_epars essence biome espacement (>= 3 m) »");
+        v[1] = 1.0F; /* groupe : 1 par défaut */
+        if (biome < 0 || (l->count != 4U && l->count != 5U) || !number(l, 3U, &v[0]) ||
+            !(v[0] >= 3.0F) ||
+            (l->count == 5U && (!number(l, 4U, &v[1]) || v[1] < 1.0F || v[1] > 4.0F))) {
+            return fail(err, cap, l->number,
+                        "« arbres_epars essence biome espacement (>= 3 m) [groupe de 1 à 4] »");
         }
         f.kind = (uint8_t)ENG_MAPF_SCATTER;
         f.biome = (uint8_t)biome;
         f.a = v[0];
+        f.b = floorf(v[1]); /* jusqu'à `b` pieds par emplacement */
     }
     return add_feature(m, f, l->number, err, cap);
 }

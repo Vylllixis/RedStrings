@@ -6,6 +6,8 @@
 #include "engine/world_map.h"
 #include "world_far.h"
 #include "world_trees.h"
+#include "world_grass.h"
+#include "world_water.h"
 #include "engine/arena.h"
 #include "engine/atmosphere.h"
 #include "engine/environment.h"
@@ -67,6 +69,8 @@ typedef struct WorldView {
     const EngWorldMap *map;     /* carte du monde dessinée à la main (NULL : bandes de biomes) */
     WorldTrees *trees;          /* arbres de la carte (NULL : aucun) */
     WorldFar far;               /* vue lointaine de la carte (far.ready faux : aucune) */
+    WorldWater water;           /* lacs et rivières de la carte (water.ready faux : aucune) */
+    WorldGrass grass;           /* herbe de la plaine (grass.ready faux : aucune) */
     EngArena map_arena;         /* relief et régions tramés de la carte */
     EngPipelineHandle shadow_pipeline; /* profondeur des modèles statiques */
     EngArena shared_arena;

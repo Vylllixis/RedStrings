@@ -30,12 +30,16 @@ ow_add_test(creature test_creature.c)
 ow_add_test(boss_special test_boss_special.c)
 ow_add_test(zone_decor test_zone_decor.c)
 ow_add_test(world_map test_world_map.c)
+ow_add_test(ai_avoid test_ai_avoid.c)
 ow_add_test(frustum test_frustum.c)
 ow_add_test(atmosphere test_atmosphere.c)
 ow_add_test(fog test_fog.c)
 ow_add_test(rock test_rock.c)
 ow_add_test(placement test_placement.c)
 ow_add_test(grass test_grass.c)
+ow_add_test(text_sdf test_text_sdf.c)
+target_compile_definitions(test_text_sdf PRIVATE
+  OW_FONT_PATH="${CMAKE_SOURCE_DIR}/assets/fonts/NotoSans-Bold.ttf")
 ow_add_test(water test_water.c)
 ow_add_test(physics test_physics.c)
 ow_add_test(physics_layers test_physics_layers.c)
@@ -620,6 +624,60 @@ if(OW_PHYSICS AND OW_SHADERS_OK)
     ENVIRONMENT "SDL_VIDEODRIVER=offscreen"
     FAIL_REGULAR_EXPRESSION "ERROR|non détruite|perdu|TROU|a bougé"
     PASS_REGULAR_EXPRESSION "carte dessinée à la main.*château de départ.*zone 2 « Plaine : château du chevalier » chargée")
+  # Eau et lave de la carte : au milieu du grand lac le joueur est à gué (au sol sur le fond de gué,
+  # dans l'eau) ; sur l'anneau de lave du cratère, la lave le brûle.
+  # ATTENTION : jamais de point-virgule dans une expression attendue : CMake y coupe la liste, et
+  # UNE seule des deux moitiés suffirait à faire passer le test (un « . » le remplace).
+  add_test(NAME launcher.world_water COMMAND launcher --world 7 --combat --new-game
+           --at-pos 1250 780 --no-audio --frames 60 --env-samples 16
+           WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR})
+  set_tests_properties(launcher.world_water PROPERTIES
+    PASS_REGULAR_EXPRESSION "eau au niveau 3.0 m.*MONDE : joueur au sol.*MONDE : eau : [1-9][0-9]* cellules mouillées . joueur dans l'eau, à gué")
+  add_test(NAME launcher.world_lava COMMAND launcher --world 7 --combat --new-game
+           --at-pos 1350 -1245 --no-audio --frames 60 --env-samples 16
+           WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR})
+  set_tests_properties(launcher.world_lava PROPERTIES
+    PASS_REGULAR_EXPRESSION "combat : la lave brûle le joueur")
+  # Décor de la carte (2026-11-22) : au château de départ, des buissons et des rochers chargés et
+  # dessinés autour de la caméra, de l'herbe, et aucune touffe sous les murs du château (des
+  # touffes écartées) ; devant la zone 3 (dans la forêt de sapins), les troncs proches sont donnés
+  # aux ennemis du camp, qui les évitent (engine/ai_avoid.h).
+  add_test(NAME launcher.world_grass COMMAND launcher --world 7 --combat --new-game
+           --no-audio --frames 40 --env-samples 16
+           WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR})
+  set_tests_properties(launcher.world_grass PROPERTIES
+    PASS_REGULAR_EXPRESSION "herbe : [1-9][0-9]* touffes autour de la caméra.*MONDE : décor : [1-9][0-9]* buisson\\(s\\) et rocher\\(s\\) chargé\\(s\\), [1-9][0-9]* dessiné\\(s\\) autour de la caméra . herbe : [1-9][0-9][0-9][0-9]+ touffe\\(s\\), [1-9][0-9]* écartée")
+  # Sauvegarde dans le monde ouvert (2026-11-22) : devant la zone 7 (désert, à 1,5 km du départ),
+  # la partie est enregistrée, le joueur renvoyé au château, puis la partie reprise : il revient à
+  # sa position MONDE (à 0,5 m près), au sol, alors que l'origine a été recentrée entre-temps.
+  add_test(NAME launcher.world_save COMMAND launcher --world 7 --combat --new-game --at-zone 7
+           --no-audio --frames 30 --env-samples 16 --save-selftest
+           --save-dir ${CMAKE_CURRENT_BINARY_DIR}/saves-world
+           WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR})
+  set_tests_properties(launcher.world_save PROPERTIES
+    PASS_REGULAR_EXPRESSION "AUTOTEST SAUVEGARDE MONDE : OK.*MONDE : joueur au sol")
+  add_test(NAME launcher.world_trees_avoid COMMAND launcher --world 7 --combat --new-game
+           --at-zone 3 --no-audio --frames 35 --env-samples 16
+           WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR})
+  set_tests_properties(launcher.world_trees_avoid PROPERTIES
+    PASS_REGULAR_EXPRESSION "monde : [1-9][0-9]* tronc\\(s\\) et rocher\\(s\\) à éviter pour les ennemis du camp")
+  # Écran de chargement animé (2026-11-22). 1) Le chargement réel avec l'écran : les étapes longues
+  # s'exécutent dans le fil de chargement PENDANT que le fil principal anime l'écran (des images
+  # sont présentées pendant le chargement), puis le jeu tourne (joueur au sol), sans erreur ni
+  # ressource perdue. 2) Les images de l'animation, mesurées : fondu, fil, titre, corde, sortie.
+  add_test(NAME launcher.splash COMMAND launcher --world 7 --combat --new-game --no-audio
+           --splash --frames 3 --env-samples 16 WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR})
+  set_tests_properties(launcher.splash PROPERTIES
+    PASS_REGULAR_EXPRESSION "écran de chargement : [1-9][0-9]* image\\(s\\) dont [1-9][0-9]* pendant le chargement \\(4 travaux dans le fil de chargement.*MONDE : joueur au sol")
+  add_test(NAME launcher.splash_shots COMMAND launcher --splash-shots ${CMAKE_CURRENT_BINARY_DIR}
+           WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR})
+  set_tests_properties(launcher.splash_shots PROPERTIES
+    PASS_REGULAR_EXPRESSION "AUTOTEST CHARGEMENT : OK")
+  foreach(t launcher.world_water launcher.world_lava launcher.world_grass
+          launcher.world_trees_avoid launcher.world_save launcher.splash launcher.splash_shots)
+    set_property(TEST ${t} PROPERTY ENVIRONMENT "SDL_VIDEODRIVER=offscreen")
+    set_property(TEST ${t} PROPERTY FAIL_REGULAR_EXPRESSION "ERROR|non détruite|perdu|TROU")
+  endforeach()
   # Décor des zones : devant la zone 2, le château du chevalier (51 boîtes) est posé sur le relief ;
   # le château de départ, à plus de 300 m, ne l'est pas.
   add_test(NAME launcher.world_decor COMMAND launcher --world 7 --combat --at-zone 2
@@ -649,10 +707,12 @@ if(OW_PHYSICS AND OW_SHADERS_OK)
            --no-audio --frames 20 --env-samples 16 WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR})
   set_tests_properties(launcher.world_layers_mountain PROPERTIES
     PASS_REGULAR_EXPRESSION "couches de biome : 0 cellule\\(s\\) avec sable, 0 avec lave.*carte du monde : [1-9][0-9]* arbre\\(s\\) chargé\\(s\\), [1-9][0-9]* dessiné\\(s\\), [1-9][0-9]* tronc")
-  add_test(NAME launcher.world_layers_volcano COMMAND launcher --world 7 --combat --at-zone 11
-           --no-audio --frames 20 --env-samples 16 WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR})
+  # (120 images et « joueur au sol » : à 215 m d'altitude, un relief écrêté ferait tomber le joueur)
+  add_test(NAME launcher.world_layers_volcano COMMAND launcher --world 7 --combat --new-game
+           --at-zone 11 --no-audio --frames 120 --env-samples 16
+           WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR})
   set_tests_properties(launcher.world_layers_volcano PROPERTIES
-    PASS_REGULAR_EXPRESSION "avec sable, [1-9][0-9]* avec lave.*carte du monde : 0 arbre.*vue lointaine : [1-9][0-9]* morceau")
+    PASS_REGULAR_EXPRESSION "joueur à 21[0-9].[0-9] m d'altitude.*avec sable, [1-9][0-9]* avec lave.*carte du monde : 0 arbre.*vue lointaine : [1-9][0-9]* morceau.*MONDE : joueur au sol")
   foreach(t launcher.world_layers_plain launcher.world_layers_desert launcher.world_layers_mountain
           launcher.world_layers_volcano)
     set_property(TEST ${t} PROPERTY ENVIRONMENT "SDL_VIDEODRIVER=offscreen")
@@ -660,7 +720,9 @@ if(OW_PHYSICS AND OW_SHADERS_OK)
   endforeach()
   if(OW_SOFTWARE_VULKAN_ICD)
     foreach(t launcher.world_combat launcher.world_combat_shift launcher.world_decor
-            launcher.world_layers_plain
+            launcher.world_water launcher.world_lava launcher.world_grass
+            launcher.world_trees_avoid launcher.world_save launcher.splash
+            launcher.splash_shots launcher.world_layers_plain
             launcher.world_layers_desert launcher.world_layers_mountain
             launcher.world_layers_volcano)
       set_property(TEST ${t} APPEND PROPERTY ENVIRONMENT_MODIFICATION

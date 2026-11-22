@@ -47,10 +47,14 @@ puis les réduit avec `tools/scripts/gltf_extract.py`).
 
 ## Arbres de la carte du monde (CC0)
 
-- Fichiers : `props/nature/oak`, `acacia`, `pine_snow` et leurs versions simplifiées `*_lod`
-  (`.gltf` + `.bin`), palette commune `props/nature/trees_palette.png`.
+- Fichiers : `props/nature/oak`, `acacia`, `pine_snow` et leurs versions simplifiées `*_lod`,
+  `bush`, `bush_snow`, `bush_dry`, `rock` (`.gltf` + `.bin`), palette commune
+  `props/nature/trees_palette.png`.
 - Fabriqués par `tools/scripts/arbres_make.py` (déterministe) : le chêne et l'acacia sont des
   modèles originaux de ce projet (CC0) ; le sapin enneigé reprend la géométrie de
   `tree_single_B` (KayKit Medieval Hexagon Pack 1.0, CC0, Kay Lousberg), recolorée (neige sur le
   dessus des branches).
-- Utilisation : forêts et arbres épars de la carte du monde (`assets/world/carte.txt`).
+- Les buissons (plaine, enneigé, sec) et le rocher sont aussi des modèles originaux de ce projet
+  (CC0), fabriqués par le même script.
+- Utilisation : forêts, arbres épars, buissons et rochers de la carte du monde
+  (`assets/world/carte.txt`).

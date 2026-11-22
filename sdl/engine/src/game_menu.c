@@ -272,10 +272,36 @@ void eng_menu_set_status(EngMenu *m, const char *text)
 
 const char *eng_menu_title(const EngMenu *m)
 {
-    static const char *const titles[ENG_MENU_SCREEN_COUNT] = {"", "RedStrings", "Pause", "Options",
-                                                              "Contrôles"};
+    static const char *const titles[ENG_MENU_SCREEN_COUNT] = {
+        "",          "RedStrings",           "Pause",           "Options",
+        "Contrôles", "Reprendre une partie", "Nouvelle partie", "Écraser cette partie ?"};
     return m != NULL && (unsigned)m->screen < (unsigned)ENG_MENU_SCREEN_COUNT ? titles[m->screen]
                                                                               : "";
+}
+
+void eng_menu_set_slot(EngMenu *m, uint32_t index, bool used, const char *summary)
+{
+    if (m == NULL || index >= ENG_MENU_SLOTS) {
+        return;
+    }
+    m->slots[index].used = used;
+    (void)snprintf(m->slots[index].summary, sizeof m->slots[index].summary, "%s",
+                   used && summary != NULL ? summary : "");
+}
+
+static bool any_slot_used(const EngMenu *m)
+{
+    for (uint32_t i = 0; i < ENG_MENU_SLOTS; i++) {
+        if (m->slots[i].used) {
+            return true;
+        }
+    }
+    return false;
+}
+
+static int32_t valid_slot(int32_t slot)
+{
+    return slot < 0 ? 0 : (slot >= (int32_t)ENG_MENU_SLOTS ? (int32_t)ENG_MENU_SLOTS - 1 : slot);
 }
 
 static void set_item(EngMenuItem *it, const char *label, const char *value, bool enabled)
@@ -319,10 +345,31 @@ uint32_t eng_menu_items(const EngMenu *m, EngMenuItem *out, uint32_t max)
     const EngGameOptions *o = m->options;
     switch (m->screen) {
     case ENG_MENU_MAIN:
-        set_item(&out[n++], "Continuer", NULL, m->has_save);
+        v[0] = '\0';
+        if (m->has_save && any_slot_used(m)) { /* la partie que « Continuer » reprend */
+            (void)snprintf(v, sizeof v, "partie %d", (int)valid_slot(m->last_slot) + 1);
+        }
+        set_item(&out[n++], "Continuer", v, m->has_save);
         set_item(&out[n++], "Nouvelle partie", NULL, true);
+        set_item(&out[n++], "Charger une partie", NULL, any_slot_used(m));
         set_item(&out[n++], "Options", NULL, o != NULL);
         set_item(&out[n++], "Quitter", NULL, true);
+        break;
+    case ENG_MENU_LOAD:
+    case ENG_MENU_NEW:
+        for (uint32_t i = 0; i < ENG_MENU_SLOTS; i++) {
+            char label[ENG_MENU_LABEL];
+            (void)snprintf(label, sizeof label, "Partie %u", (unsigned)(i + 1U));
+            /* à charger : un emplacement vide est grisé ; pour une nouvelle partie : tous */
+            set_item(&out[n++], label, m->slots[i].used ? m->slots[i].summary : "vide",
+                     m->slots[i].used || m->screen == ENG_MENU_NEW);
+        }
+        set_item(&out[n++], "Retour", NULL, true);
+        break;
+    case ENG_MENU_OVERWRITE:
+        set_item(&out[n++], "Non, revenir", NULL, true);
+        (void)snprintf(v, sizeof v, "Oui, écraser la partie %d", (int)valid_slot(m->slot) + 1);
+        set_item(&out[n++], v, m->slots[valid_slot(m->slot)].summary, true);
         break;
     case ENG_MENU_PAUSE:
         set_item(&out[n++], "Reprendre", NULL, true);
@@ -437,19 +484,64 @@ static EngMenuAction confirm(EngMenu *m, const EngMenuItem *items, uint32_t n)
     const int32_t s = m->selected;
     switch (m->screen) {
     case ENG_MENU_MAIN:
-        if (s == 0) {
+        if (s == 0) { /* la partie la plus récente */
+            m->slot = valid_slot(m->last_slot);
             m->screen = ENG_MENU_CLOSED;
             return ENG_MENU_ACT_CONTINUE;
         }
         if (s == 1) {
-            m->screen = ENG_MENU_CLOSED;
-            return ENG_MENU_ACT_NEW_GAME;
+            if (!any_slot_used(m)) { /* aucune partie : elle commence dans l'emplacement 1 */
+                m->slot = 0;
+                m->screen = ENG_MENU_CLOSED;
+                return ENG_MENU_ACT_NEW_GAME;
+            }
+            eng_menu_open(m, ENG_MENU_NEW);
+            for (uint32_t i = 0; i < ENG_MENU_SLOTS; i++) { /* sur le premier emplacement libre */
+                if (!m->slots[i].used) {
+                    m->selected = (int32_t)i;
+                    break;
+                }
+            }
+            return ENG_MENU_ACT_NONE;
         }
         if (s == 2) {
+            eng_menu_open(m, ENG_MENU_LOAD);
+            m->selected = valid_slot(m->last_slot);
+            return ENG_MENU_ACT_NONE;
+        }
+        if (s == 3) {
             eng_menu_open(m, ENG_MENU_OPTIONS);
             return ENG_MENU_ACT_NONE;
         }
         return ENG_MENU_ACT_QUIT;
+    case ENG_MENU_LOAD:
+        if (s >= (int32_t)ENG_MENU_SLOTS) {
+            eng_menu_open(m, ENG_MENU_MAIN);
+            return ENG_MENU_ACT_NONE;
+        }
+        m->slot = s;
+        m->screen = ENG_MENU_CLOSED;
+        return ENG_MENU_ACT_CONTINUE;
+    case ENG_MENU_NEW:
+        if (s >= (int32_t)ENG_MENU_SLOTS) {
+            eng_menu_open(m, ENG_MENU_MAIN);
+            return ENG_MENU_ACT_NONE;
+        }
+        m->slot = s;
+        if (m->slots[s].used) { /* une partie est là : confirmer avant de l'écraser */
+            eng_menu_open(m, ENG_MENU_OVERWRITE);
+            return ENG_MENU_ACT_NONE;
+        }
+        m->screen = ENG_MENU_CLOSED;
+        return ENG_MENU_ACT_NEW_GAME;
+    case ENG_MENU_OVERWRITE:
+        if (s == 1) {
+            m->screen = ENG_MENU_CLOSED;
+            return ENG_MENU_ACT_NEW_GAME;
+        }
+        eng_menu_open(m, ENG_MENU_NEW);
+        m->selected = valid_slot(m->slot);
+        return ENG_MENU_ACT_NONE;
     case ENG_MENU_PAUSE:
         if (s == 0) {
             m->screen = ENG_MENU_CLOSED;
@@ -496,6 +588,18 @@ static EngMenuAction confirm(EngMenu *m, const EngMenuItem *items, uint32_t n)
         return ENG_MENU_ACT_NONE;
     default:
         return ENG_MENU_ACT_NONE;
+    }
+}
+
+void eng_menu_hover(EngMenu *m, int32_t item)
+{
+    if (m == NULL || m->screen == ENG_MENU_CLOSED || m->remap >= 0 || item < 0) {
+        return;
+    }
+    EngMenuItem items[ENG_MENU_MAX_ITEMS];
+    const uint32_t n = eng_menu_items(m, items, ENG_MENU_MAX_ITEMS);
+    if ((uint32_t)item < n && items[item].enabled) {
+        m->selected = item;
     }
 }
 
@@ -560,6 +664,14 @@ EngMenuAction eng_menu_update(EngMenu *m, const EngInputState *in)
             return ENG_MENU_ACT_NONE;
         case ENG_MENU_CONTROLS:
             eng_menu_open(m, ENG_MENU_OPTIONS);
+            return ENG_MENU_ACT_NONE;
+        case ENG_MENU_LOAD:
+        case ENG_MENU_NEW:
+            eng_menu_open(m, ENG_MENU_MAIN);
+            return ENG_MENU_ACT_NONE;
+        case ENG_MENU_OVERWRITE: /* rien n'est écrasé */
+            eng_menu_open(m, ENG_MENU_NEW);
+            m->selected = valid_slot(m->slot);
             return ENG_MENU_ACT_NONE;
         default:
             return ENG_MENU_ACT_NONE;

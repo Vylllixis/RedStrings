@@ -1,3 +1,4 @@
+#include <SDL3/SDL_filesystem.h>
 #include <SDL3/SDL_mouse.h>
 #include <SDL3/SDL_timer.h>
 #include <SDL3/SDL_video.h>
@@ -42,6 +43,7 @@
 #include "world_bench.h"
 #include "world_view.h"
 #include "skeleton_view.h"
+#include "splash.h"
 #include "avatar_gallery.h"
 
 #define LAUNCHER_SSAO 0.6F /* force du SSAO quand il est activé (finition M8-06) */
@@ -107,6 +109,19 @@ static void usage(const char *prog)
     fprintf(stderr,
             "  --gear N       avec --combat : commence avec le palier d'équipement N (0 à 4 : "
             "butin des boss de la grande carte)\n");
+    fprintf(stderr, "  --at-pos X Z   avec --world : départ au point (x, z) de la carte du monde "
+                    "(mètres ; développement)\n");
+    fprintf(stderr, "  --no-splash    pas d'écran de chargement animé (chargement direct, comme "
+                    "avec --frames et les autotests)\n");
+    fprintf(stderr, "  --splash       (développement) écran de chargement même avec --frames\n");
+    fprintf(stderr, "  --menu-screen load|new  (développement) ouvre directement la liste des "
+                    "parties à charger, ou le choix de l'emplacement d'une nouvelle partie\n");
+    fprintf(stderr, "  --save-dir DOSSIER  parties et options dans ce dossier (au lieu du dossier "
+                    "de préférences)\n");
+    fprintf(stderr, "  --save-selftest  (développement) avec --world --combat --new-game : "
+                    "enregistre, s'éloigne, reprend ; journalise AUTOTEST SAUVEGARDE MONDE\n");
+    fprintf(stderr, "  --splash-shots DOSSIER  (développement) écrit des images de l'écran de "
+                    "chargement en PPM, puis quitte\n");
     fprintf(stderr, "  --at-zone N    avec --world --combat : commence 20 m avant la zone N de la "
                     "grande carte (0 à 11 : farm facile, farm dur, boss de chaque biome)\n");
     fprintf(stderr,
@@ -205,6 +220,110 @@ static bool world_ground(void *user, float x, float z, float *out)
     return world_view_height(user, x, z, out);
 }
 
+/* ── Sauvegarde dans le monde ouvert (game_flow.h : GameFlowWorld) ── */
+
+typedef struct FlowWorld {
+    WorldView *world;
+    PlayMode *play;
+    EngCamera *camera;
+    EngCamera *camera_prev;
+} FlowWorld;
+
+static void flow_to_world(void *user, const float local[3], double world[3])
+{
+    const FlowWorld *h = user;
+    eng_origin_to_world(&h->world->origin, local, world);
+}
+
+/* Charge le relief autour de `at` (monde) en bloquant, répercute le recentrage éventuel de
+ * l'origine sur le jeu et les caméras, puis pose le joueur (au sol s'il était dessous). */
+static bool flow_place(void *user, const double at[3], float yaw)
+{
+    const FlowWorld *h = user;
+    if (!isfinite(at[0]) || !isfinite(at[1]) || !isfinite(at[2])) {
+        return false;
+    }
+    const EngWorldOrigin before = h->world->origin;
+    if (!world_view_prime(h->world, at, 1, 60.0)) {
+        return false;
+    }
+    const float shift[3] = {(float)(before.x - h->world->origin.x),
+                            (float)(before.y - h->world->origin.y),
+                            (float)(before.z - h->world->origin.z)};
+    if (shift[0] != 0.0F || shift[1] != 0.0F || shift[2] != 0.0F) {
+        play_mode_origin_shift(h->play, shift);
+        for (int a = 0; a < 3; a++) {
+            h->camera->position[a] += shift[a];
+            h->camera_prev->position[a] += shift[a];
+        }
+    }
+    float feet[3];
+    eng_origin_to_local(&h->world->origin, at, feet);
+    float ground = 0.0F;
+    if (world_view_height(h->world, feet[0], feet[2], &ground) && feet[1] < ground + 0.05F) {
+        feet[1] = ground + 0.05F;
+    }
+    play_mode_teleport(h->play, feet, yaw);
+    ENG_LOG_INFO("monde : joueur replacé en (%.1f, %.1f) du monde, à %.1f m d'altitude%s", at[0],
+                 at[2], (double)feet[1],
+                 shift[0] != 0.0F || shift[2] != 0.0F ? " (origine recentrée)" : "");
+    return true;
+}
+
+/* --save-selftest (monde ouvert) : la partie est enregistrée où se trouve le joueur, le joueur est
+ * envoyé au château de départ de la carte, puis la partie est reprise : il revient à sa position
+ * MONDE, au sol, alors que l'origine a été recentrée entre-temps. */
+static void world_save_selftest(GameFlow *flow, PlayMode *play, const WorldView *world)
+{
+    float feet[3] = {0.0F, 0.0F, 0.0F};
+    double saved[3];
+    double away[3];
+    double back[3];
+    (void)eng_character_position(play->character, feet);
+    eng_origin_to_world(&world->origin, feet, saved);
+    const uint32_t rebases = world->origin.rebases;
+    const int32_t slot = flow->slot;
+    /* le point de départ du jeu (repère local) doit rester au même endroit du MONDE */
+    double start_before[3];
+    double start_after[3];
+    eng_origin_to_world(&world->origin, play->spawn, start_before);
+    const bool wrote = game_flow_save_now(flow, play);
+    const double castle[3] = {world->map != NULL ? (double)world->map->spawn[0] : 0.0, 0.0,
+                              world->map != NULL ? (double)world->map->spawn[1] : 0.0};
+    const bool sent =
+        flow->world.place != NULL && flow->world.place(flow->world.user, castle, 0.0F);
+    /* mesuré ici, au milieu du trajet : un aller-retour ramène la même origine et masquerait un
+     * recentrage mal répercuté */
+    double start_mid[3];
+    eng_origin_to_world(&world->origin, play->spawn, start_mid);
+    (void)eng_character_position(play->character, feet);
+    eng_origin_to_world(&world->origin, feet, away);
+    const bool loaded = game_flow_load_slot(flow, play, slot);
+    (void)eng_character_position(play->character, feet);
+    eng_origin_to_world(&world->origin, feet, back);
+    float ground = 0.0F;
+    const bool on_ground =
+        world_view_height(world, feet[0], feet[2], &ground) && fabsf(feet[1] - ground) < 0.5F;
+    eng_origin_to_world(&world->origin, play->spawn, start_after);
+    const double start_gap =
+        fmax(hypot(start_after[0] - start_before[0], start_after[2] - start_before[2]),
+             hypot(start_mid[0] - start_before[0], start_mid[2] - start_before[2]));
+    const double moved = hypot(away[0] - saved[0], away[2] - saved[2]);
+    const double gap = hypot(back[0] - saved[0], back[2] - saved[2]);
+    if (wrote && sent && loaded && moved > 600.0 && gap < 0.5 && start_gap < 0.5 && on_ground &&
+        world->origin.rebases > rebases) {
+        ENG_LOG_INFO("AUTOTEST SAUVEGARDE MONDE : OK (parti à %.0f m, revenu à %.2f m de la "
+                     "position enregistrée, au sol, %u recentrage(s) de l'origine)",
+                     moved, gap, world->origin.rebases - rebases);
+    } else {
+        ENG_LOG_ERROR("AUTOTEST SAUVEGARDE MONDE : ÉCHEC (écrit %d, envoyé au château %d, relu %d, "
+                      "parti à %.0f m, écart %.2f m, départ déplacé de %.2f m, au sol %d, "
+                      "recentrages %u)",
+                      (int)wrote, (int)sent, (int)loaded, moved, gap, start_gap, (int)on_ground,
+                      world->origin.rebases - rebases);
+    }
+}
+
 /* Point de départ du monde (coordonnées MONDE, m) : au milieu de la cellule (0, 0). */
 /* carte du monde : plan lointain (m) et brouillard (1/m) : toute la carte visible depuis le château
  */
@@ -217,7 +336,7 @@ static bool world_ground(void *user, float x, float z, float *out)
  * joueur), puis le personnage posé sur le relief. */
 static bool start_world(WorldView *world, PlayMode *play, EngTweaks *tweaks, float sensitivity,
                         bool invert_y, EngRenderer *renderer, const DemoScene *scene, int32_t seed,
-                        const double start[2], long at_zone)
+                        const double start[2], long at_zone, bool start_forced)
 {
     const float spawn[3] = {(float)start[0], 0.0F, (float)start[1]};
     if (!play_mode_init_world(play, tweaks, sensitivity, invert_y, spawn, world_ground, world)) {
@@ -231,7 +350,7 @@ static bool start_world(WorldView *world, PlayMode *play, EngTweaks *tweaks, flo
     }
     double spawn_world[3] = {start[0], 0.0, start[1]};
     EngMapZone zones[ENG_MAPZONE_COUNT];
-    if (world->map != NULL) { /* carte dessinée : départ au château, ou devant la zone demandée */
+    if (world->map != NULL && !start_forced) { /* carte : départ au château, ou devant la zone */
         spawn_world[0] = (double)world->map->spawn[0];
         spawn_world[2] = (double)world->map->spawn[1];
         if (at_zone >= 0 && eng_worldmap_zones(world->map, zones)) {
@@ -305,11 +424,57 @@ static void check_camp_anchor(const WorldView *world, const PlayMode *play, bool
     }
 }
 
+/* Carte du monde : l'eau (le joueur patauge sous son niveau) et la lave (elle brûle le joueur qui a
+ * les pieds dedans, à moins de 0,6 m du sol). */
+static void update_hazards(const WorldView *world, PlayMode *play, const float feet[3])
+{
+    if (world->map == NULL) {
+        return;
+    }
+    const double level_world[3] = {0.0, (double)world->map->water, 0.0};
+    float level[3];
+    eng_origin_to_local(&world->origin, level_world, level);
+    play_mode_set_water_level(play, world->water.ready ? level[1] : -INFINITY);
+    if (play->combat == NULL) {
+        return;
+    }
+    double pw[3];
+    eng_origin_to_world(&world->origin, feet, pw);
+    float ground = 0.0F;
+    const bool on_ground =
+        world_view_height(world, feet[0], feet[2], &ground) && feet[1] - ground < 0.6F;
+    play_combat_set_lava(play->combat,
+                         on_ground && eng_worldmap_lava(world->map, pw[0], pw[2]) > 0.5F);
+}
+
+/* Carte du monde : les troncs et les rochers à moins de 48 m du camp d'ennemis (le carré de 30 m
+ * où ils se déplacent, coins compris) leur sont donnés comme obstacles à éviter. Refait toutes les
+ * 30 images : les cellules voisines et leurs arbres se chargent peu à peu. */
+static void update_tree_obstacles(const WorldView *world, PlayMode *play)
+{
+    static uint32_t wait;
+    static uint32_t known = UINT32_MAX;
+    static float circles[PLAY_AVOID_MAX][3];
+    if (world->trees == NULL || play->combat == NULL || wait++ % 30U != 0U) {
+        return;
+    }
+    float camp[2];
+    const uint32_t n =
+        play_combat_camp_center(play->combat, camp)
+            ? world_trees_obstacles(world->trees, camp, 48.0F, circles, PLAY_AVOID_MAX)
+            : 0U;
+    play_combat_set_trees(play->combat, circles, n);
+    if (n != known) {
+        known = n;
+        ENG_LOG_INFO("monde : %u tronc(s) et rocher(s) à éviter pour les ennemis du camp", n);
+    }
+}
+
 /* Grande carte : le décor (château, piliers, campements) de la zone la plus proche à moins de
  * 300 m, et celui du camp de réveil à moins de 300 m du point de départ. Reposé quand la zone la
  * plus proche change ; réessayé tant que le relief n'est pas chargé sous toutes les boîtes. Avant
  * update_zone : les murs sont des obstacles pour les ennemis de la zone. */
-static void update_decor(const WorldView *world, PlayMode *play, const float feet[3])
+static void update_decor(WorldView *world, PlayMode *play, const float feet[3])
 {
     static EngMapZone zones[ENG_MAPZONE_COUNT];
     static EngDecorBox boxes[ENG_DECOR_MAX];
@@ -353,6 +518,16 @@ static void update_decor(const WorldView *world, PlayMode *play, const float fee
         wanted += n;
         placed += play_mode_add_decor(play, boxes, n, local[0], local[2]);
     }
+    /* pas d'herbe sous les murs et les piliers */
+    static float footprints[PLAY_DECOR_MAX][5];
+    for (uint32_t i = 0; i < play->decor_count; i++) {
+        footprints[i][0] = play->decor_center[i][0];
+        footprints[i][1] = play->decor_center[i][2];
+        footprints[i][2] = play->decor_half[i][0];
+        footprints[i][3] = play->decor_half[i][2];
+        footprints[i][4] = play->decor_yaw[i];
+    }
+    world_grass_set_blockers(&world->grass, footprints, play->decor_count);
     shown = near;
     camp_shown = camp;
     complete = placed == wanted;
@@ -452,13 +627,130 @@ static double world_frame(WorldView *world, PlayMode *play, EngCamera *camera,
             camera_prev->position[a] += shift[a];
         }
     }
+    update_hazards(world, play, feet);
     update_decor(world, play, feet);
     const bool zone_changed = update_zone(world, play, feet);
+    update_tree_obstacles(world, play);
     check_camp_anchor(world, play, shifted, zone_changed);
     for (int a = 0; a < 3; a++) {
         scene->shadow_focus[a] = feet[a];
     }
     return travelled;
+}
+
+/* ── Étapes longues du chargement : exécutées dans un fil à part quand l'écran de chargement est
+ * affiché (splash_run), directement sinon. Elles ne font que créer et remplir des ressources. ── */
+
+typedef struct RendererJob {
+    EngRenderer *renderer;
+    EngGpu *gpu;
+    EngMemory *memory;
+    const EngRendererDesc *desc;
+    DemoScene *scene;
+    const DemoOptions *options;
+} RendererJob;
+
+static bool renderer_job(void *user)
+{
+    const RendererJob *j = user;
+    return eng_renderer_init(j->renderer, j->gpu, &j->memory->permanent, &j->memory->frame,
+                             j->desc) &&
+           demo_scene_init(j->scene, j->renderer, &j->memory->permanent, &j->memory->level,
+                           &j->memory->frame, j->options);
+}
+
+typedef struct WorldJob {
+    WorldView *world;
+    PlayMode *play;
+    EngTweaks *tweaks;
+    float sensitivity;
+    bool invert_y;
+    EngRenderer *renderer;
+    const DemoScene *scene;
+    int32_t seed;
+    const double *start;
+    long at_zone;
+    bool start_forced;
+} WorldJob;
+
+static bool world_job(void *user)
+{
+    const WorldJob *j = user;
+    return start_world(j->world, j->play, j->tweaks, j->sensitivity, j->invert_y, j->renderer,
+                       j->scene, j->seed, j->start, j->at_zone, j->start_forced);
+}
+
+typedef struct CombatJob {
+    PlayMode *play;
+    bool audio;
+} CombatJob;
+
+static bool combat_job(void *user)
+{
+    const CombatJob *j = user;
+    return play_mode_enable_combat(j->play, j->audio);
+}
+
+typedef struct AvatarJob {
+    AvatarLibrary *avatars;
+    EngRenderer *renderer;
+    const EngEnvironment *env;
+} AvatarJob;
+
+static bool avatar_job(void *user)
+{
+    const AvatarJob *j = user;
+    return avatar_library_load_cpu(j->avatars) &&
+           avatar_library_load_gpu(j->avatars, j->renderer, j->env);
+}
+
+/* --splash-shots : des images de l'écran de chargement à des instants choisis, écrites en PPM et
+ * mesurées : le fondu d'entrée, le fil qui se déroule, le titre qui apparaît, la corde qui se
+ * remplit, la sortie. Journalise AUTOTEST CHARGEMENT. */
+static bool splash_shots(Splash *splash, const char *dir, int width, int height)
+{
+    static const float moments[8][3] = {
+        /* temps (s), progression, sortie */
+        {0.25F, 0.03F, 0.0F}, {1.4F, 0.12F, 0.0F}, {1.7F, 0.25F, 0.0F},  {2.9F, 0.45F, 0.0F},
+        {4.5F, 0.7F, 0.0F},   {8.0F, 0.92F, 0.0F}, {10.0F, 1.0F, 0.35F}, {10.3F, 1.0F, 0.9F}};
+    SplashStats m[8];
+    uint32_t written = 0;
+    for (uint32_t i = 0; i < 8U; i++) {
+        char path[1024];
+        (void)snprintf(path, sizeof path, "%s/splash-%02u.ppm", dir, (unsigned)i);
+        memset(&m[i], 0, sizeof m[i]);
+        written += splash_capture(splash, (double)moments[i][0], moments[i][1], moments[i][2],
+                                  (uint32_t)width, (uint32_t)height, path, &m[i])
+                       ? 1U
+                       : 0U;
+        ENG_LOG_INFO("  image %u (t = %.2f s) : luminosité %.3f, titre %.4f (gauche %.4f, droite "
+                     "%.4f), fil %.4f, corde %.4f",
+                     (unsigned)i, (double)moments[i][0], (double)m[i].luma, (double)m[i].title,
+                     (double)m[i].title_left, (double)m[i].title_right, (double)m[i].thread,
+                     (double)m[i].bar);
+    }
+    ENG_LOG_INFO("écran de chargement : %u image(s) écrite(s) dans %s", written, dir);
+    const bool fade_in = m[0].luma < 0.75F * m[4].luma; /* il sort du noir */
+    const bool no_title_yet = m[1].title < 0.002F;      /* pas de titre avant 1,1 s */
+    const bool title = m[4].title > 0.03F;              /* puis les lettres, en clair */
+    /* à 1,7 s le titre n'a que sa moitié gauche ; à 4,5 s il est entier */
+    const bool half_title = m[2].title_left > 0.03F && m[2].title_right < 0.2F * m[2].title_left &&
+                            m[4].title_right > 0.5F * m[4].title_left;
+    const bool no_thread_yet = m[0].thread < 0.0005F; /* le fil n'est pas encore parti */
+    const bool thread = m[4].thread > 0.004F;         /* puis il traverse le ciel */
+    const bool bar = m[5].bar > 3.0F * m[1].bar && m[1].bar > 0.0F; /* la corde se remplit */
+    const bool outro = m[7].luma < 0.25F * m[5].luma;               /* et tout s'éteint */
+    const bool ok = written == 8U && fade_in && no_title_yet && title && half_title &&
+                    no_thread_yet && thread && bar && outro;
+    if (ok) {
+        ENG_LOG_INFO("AUTOTEST CHARGEMENT : OK (8 images : fondu, fil, titre, corde, sortie)");
+    } else {
+        ENG_LOG_ERROR("AUTOTEST CHARGEMENT : ÉCHEC (images %u/8 ; fondu %d, sans titre %d, titre "
+                      "%d, mi-titre %d, sans fil %d, fil %d, corde %d, sortie %d)",
+                      written, (int)fade_in, (int)no_title_yet, (int)title, (int)half_title,
+                      (int)no_thread_yet, (int)thread, (int)bar, (int)outro);
+    }
+    return ok;
 }
 
 static void launcher_debug_hook(void *user, EngDebugLines *lines, mat4 model, bool has_model)
@@ -509,7 +801,14 @@ int main(int argc, char **argv)
     long at_zone = -1;  /* --at-zone N : départ devant la zone N de la grande carte */
     double world_start[2] = {WORLD_SPAWN_X, WORLD_SPAWN_Z};
     int32_t world_seed = 1;
-    bool fog_from_command_line = false; /* --fog-density : la carte du monde ne le remplace pas */
+    bool world_start_forced = false;     /* --at-pos X Z : départ à ce point de la carte */
+    bool fog_from_command_line = false;  /* --fog-density : la carte du monde ne le remplace pas */
+    bool splash_forced = false;          /* --splash : écran de chargement même avec --frames */
+    bool splash_disabled = false;        /* --no-splash */
+    const char *splash_shots_dir = NULL; /* --splash-shots DOSSIER */
+    const char *menu_screen = NULL;      /* --menu-screen load|new : écran ouvert au lancement */
+    const char *save_dir = NULL;         /* --save-dir DOSSIER : parties et options ailleurs */
+    bool save_selftest = false;          /* --save-selftest : sauvegarde dans le monde ouvert */
     double world_autopilot = 0.0;
     const char *screenshot_path = NULL;
     long screenshot_frame = 0;
@@ -564,6 +863,18 @@ int main(int argc, char **argv)
             crash_test = true;
         } else if (strcmp(argv[i], "--new-game") == 0) {
             start_new_game = true;
+        } else if (strcmp(argv[i], "--splash") == 0) {
+            splash_forced = true;
+        } else if (strcmp(argv[i], "--no-splash") == 0) {
+            splash_disabled = true;
+        } else if (strcmp(argv[i], "--splash-shots") == 0 && i + 1 < argc) {
+            splash_shots_dir = argv[++i];
+        } else if (strcmp(argv[i], "--menu-screen") == 0 && i + 1 < argc) {
+            menu_screen = argv[++i];
+        } else if (strcmp(argv[i], "--save-dir") == 0 && i + 1 < argc) {
+            save_dir = argv[++i];
+        } else if (strcmp(argv[i], "--save-selftest") == 0) {
+            save_selftest = true;
         } else if (strcmp(argv[i], "--game-selftest") == 0) {
             game_selftest = true;
         } else if (strcmp(argv[i], "--play-terrain-selftest") == 0 && i + 1 < argc) {
@@ -582,6 +893,17 @@ int main(int argc, char **argv)
                 fprintf(stderr, "--gear : palier d'équipement de 0 à 4 attendu\n");
                 return 2;
             }
+        } else if (strcmp(argv[i], "--at-pos") == 0 && i + 2 < argc) {
+            char *end_x = NULL;
+            char *end_z = NULL;
+            world_start[0] = strtod(argv[++i], &end_x);
+            world_start[1] = strtod(argv[++i], &end_z);
+            if (*end_x != '\0' || *end_z != '\0' || !isfinite(world_start[0]) ||
+                !isfinite(world_start[1])) {
+                fprintf(stderr, "--at-pos : deux nombres attendus (x z, en mètres de la carte)\n");
+                return 2;
+            }
+            world_start_forced = true;
         } else if (strcmp(argv[i], "--at-zone") == 0 && i + 1 < argc) {
             char *end = NULL;
             at_zone = strtol(argv[++i], &end, 10);
@@ -875,14 +1197,27 @@ int main(int argc, char **argv)
     }
     eng_arena_shutdown(&config_scratch);
 
+    /* Écran de chargement animé (splash.h) : pour une partie lancée à la main. Les lancements
+     * automatiques (--frames, autotests, mesures) chargent directement, comme avant ; --splash le
+     * force, --no-splash le retire. */
+    const bool interactive =
+        max_frames < 0 && !editor_selftest && !play_selftest && !combat_selftest &&
+        !boss_selftest && !game_selftest && terrain_selftest_path == NULL &&
+        combat_terrain_selftest_path == NULL && world_bench_km <= 0.0 && post_bench_frames == 0 &&
+        !crash_test && !stress_resize && !assert_test;
+    const bool splash_wanted = !splash_disabled && !force_software &&
+                               (interactive || splash_forced || splash_shots_dir != NULL);
     EngWindowDesc desc = {
         .title = "Open World",
         .width = config.window_width,
         .height = config.window_height,
         .resizable = true,
-        .fullscreen = config.fullscreen,
+        /* le plein écran des options du jeu dès l'ouverture (pas au milieu du chargement) */
+        .fullscreen = config.fullscreen || (interactive && play_enabled && combat_enabled &&
+                                            game_flow_saved_fullscreen()),
         .vsync = config.vsync,
         .no_software_surface = !force_software, /* la fenêtre ira au GPU, sauf repli */
+        .hidden_until_shown = splash_wanted && splash_shots_dir == NULL,
     };
     EngPlatform platform;
     if (!eng_platform_init(&platform, &desc)) {
@@ -914,6 +1249,24 @@ int main(int argc, char **argv)
             eng_platform_use_software_surface(&platform, config.vsync);
         }
     }
+
+    /* Écran de chargement animé (splash.h) : dès que le GPU est prêt. */
+    static Splash splash;
+    if (use_gpu && splash_wanted && splash_init(&splash, &gpu, &platform)) {
+        if (splash_shots_dir != NULL) {
+            const bool shots_ok =
+                splash_shots(&splash, splash_shots_dir, platform.width, platform.height);
+            splash_shutdown(&splash);
+            eng_gpu_shutdown(&gpu);
+            eng_platform_shutdown(&platform);
+            eng_log_shutdown();
+            return shots_ok ? 0 : 1;
+        }
+    }
+    /* la fenêtre créée cachée apparaît maintenant, et sa première image suit aussitôt */
+    eng_platform_show_window(&platform);
+    splash_frame(&splash, &platform);
+    splash_frame(&splash, &platform);
 
     EngMemory memory;
     const EngMemoryConfig memory_config = {
@@ -995,10 +1348,8 @@ int main(int argc, char **argv)
              * moins de 45 m du centre (ils n'ont pas de collision) */
             demo_options.placement_clearing_m = 45.0F;
         }
-        use_renderer =
-            eng_renderer_init(&renderer, &gpu, &memory.permanent, &memory.frame, &renderer_desc) &&
-            demo_scene_init(&scene, &renderer, &memory.permanent, &memory.level, &memory.frame,
-                            &demo_options);
+        RendererJob job = {&renderer, &gpu, &memory, &renderer_desc, &scene, &demo_options};
+        use_renderer = splash_run(&splash, &platform, renderer_job, &job, 0.5F);
         if (!use_renderer) {
             (void)eng_renderer_shutdown(&renderer);
             ENG_LOG_WARN("renderer indisponible : l'image sera seulement effacée");
@@ -1027,6 +1378,7 @@ int main(int argc, char **argv)
             ENG_LOG_WARN("interface de debug indisponible");
         }
     }
+    splash_frame(&splash, &platform); /* entre deux étapes : l'animation ne s'arrête pas */
     /* Terrain (--terrain) : point de vue au-dessus du centre, plan lointain et vitesse adaptés à un
      * terrain de l'ordre du kilomètre (la diagonale de 1025 m en fait 1450). */
     float terrain_position[3];
@@ -1111,15 +1463,20 @@ int main(int argc, char **argv)
     PlayHook play_hook = {0};
     bool use_debug_hook = false;
     static WorldView world; /* M7 : ~1,3 Mo, hors pile */
+    static FlowWorld flow_world;
     WorldHook world_hook = {&world, &play_hook, &scene};
     double world_travelled = 0.0;
     if (play_enabled) {
         if (!use_renderer || use_editor) {
             ENG_LOG_WARN("mode jouable indisponible %s",
                          use_editor ? "avec l'éditeur" : "sans rendu GPU");
-        } else if (world_mode ? start_world(&world, &play, &tweaks, config.camera_sensitivity,
-                                            config.camera_invert_y, &renderer, &scene, world_seed,
-                                            world_start, at_zone)
+        } else if (world_mode
+                       ? splash_run(&splash, &platform, world_job,
+                                    &(WorldJob){&world, &play, &tweaks, config.camera_sensitivity,
+                                                config.camera_invert_y, &renderer, &scene,
+                                                world_seed, world_start, at_zone,
+                                                world_start_forced},
+                                    0.85F)
                    : demo_options.terrain_path != NULL
                        ? play_mode_init_terrain(&play, &tweaks, config.camera_sensitivity,
                                                 config.camera_invert_y, demo_options.terrain_path)
@@ -1142,12 +1499,23 @@ int main(int argc, char **argv)
                 ENG_LOG_INFO("mode jouable : %u/%u obstacle(s) du décor (troncs, rochers)",
                              obstacle_added, obstacle_total);
             }
-            if (combat_enabled && !play_mode_enable_combat(&play, combat_audio)) {
+            if (combat_enabled && !splash_run(&splash, &platform, combat_job,
+                                              &(CombatJob){&play, combat_audio}, 0.92F)) {
                 ENG_LOG_WARN("combat indisponible : mode jouable sans combat");
             }
             play.autoplay = combat_autoplay;
+            splash_frame(&splash, &platform);
             /* M8 : menus, sauvegarde, options ; la démonstration automatique saute le menu */
-            use_flow = play.combat != NULL && game_flow_init(&flow, &play, &platform.input, NULL);
+            if (save_dir != NULL) {
+                (void)SDL_CreateDirectory(save_dir);
+            }
+            use_flow =
+                play.combat != NULL && game_flow_init(&flow, &play, &platform.input, save_dir);
+            if (use_flow && world_mode) { /* sauvegarde : position monde, relief rechargé */
+                flow_world = (FlowWorld){&world, &play, &camera, &camera_prev};
+                game_flow_set_world(&flow,
+                                    &(GameFlowWorld){&flow_world, flow_to_world, flow_place});
+            }
             if (use_flow && flow.options.fullscreen != platform.fullscreen) {
                 /* B19 : le plein écran enregistré, appliqué au lancement (ensuite les options
                  * suivent l'état de la fenêtre, image par image) */
@@ -1155,6 +1523,9 @@ int main(int argc, char **argv)
             }
             if (use_flow && (start_new_game || combat_autoplay)) {
                 game_flow_start_new(&flow, &play);
+            } else if (use_flow && menu_screen != NULL) { /* développement : captures du menu */
+                eng_menu_open(&flow.menu,
+                              strcmp(menu_screen, "new") == 0 ? ENG_MENU_NEW : ENG_MENU_LOAD);
             }
             float gate[3];
             if (at_boss && play.combat != NULL && play_combat_boss_gate(play.combat, gate)) {
@@ -1180,10 +1551,12 @@ int main(int argc, char **argv)
             use_debug_hook = true;
             play_mode_view(&play, &camera);
             camera_prev = camera;
+            splash_frame(&splash, &platform);
             /* M4 : chevalier et squelettes animés à la place des capsules */
-            if (avatar_library_load_cpu(&avatars) &&
-                avatar_library_load_gpu(&avatars, &renderer,
-                                        scene.has_environment ? &scene.environment : NULL) &&
+            if (splash_run(&splash, &platform, avatar_job,
+                           &(AvatarJob){&avatars, &renderer,
+                                        scene.has_environment ? &scene.environment : NULL},
+                           0.98F) &&
                 play_mode_attach_avatars(&play, &avatars)) {
                 demo_scene_set_model_hook(&scene, launcher_model_hook, &play_hook);
                 platform.debug_draw = false; /* capsules et grille : F3 */
@@ -1193,6 +1566,7 @@ int main(int argc, char **argv)
             }
         }
     }
+    splash_frame(&splash, &platform);
     if (world.ready) { /* le monde dessine le sol ; personnages en plus s'ils sont chargés */
         demo_scene_set_model_hook(&scene, world_model_hook, &world_hook);
         scene.world_mode = true;
@@ -1325,6 +1699,18 @@ int main(int argc, char **argv)
     uint64_t binds_last_frame = 0;
     uint64_t uniforms_last_frame = 0;
 
+    /* Fin de l'écran de chargement : le titre finit d'apparaître, la scène s'éteint. Une touche
+     * pressée pendant l'animation ne doit pas agir sur le menu qui suit. */
+    if (splash.ready) {
+        splash_finish(&splash, &platform);
+        eng_input_release_all(&platform.input);
+        EngInputState discarded;
+        eng_input_begin_tick(&platform.input, &discarded);
+        if (use_flow) {
+            game_flow_fade_in(&flow); /* l'écran de chargement finit au noir : le menu en sort */
+        }
+    }
+
     /* Échauffement : SDL alloue paresseusement sa file d'événements. On la sollicite une fois
      * hors du compteur. */
     bool alive = eng_platform_pump(&platform);
@@ -1378,6 +1764,9 @@ int main(int argc, char **argv)
         alive = eng_platform_pump(&platform);
         if (use_flow) {
             flow.options.fullscreen = platform.fullscreen;
+        }
+        if (save_selftest && use_flow && world.ready && frame == 8U) {
+            world_save_selftest(&flow, &play, &world);
         }
         if (stress_resize && use_gpu) {
             /* taille différente à chaque image, sans attendre que la précédente soit prise en
@@ -1753,6 +2142,10 @@ int main(int argc, char **argv)
                 } else {
                     ENG_LOG_ERROR("MONDE : TROU sous le joueur (%.2f m du sol)", (double)gap);
                 }
+            }
+            if (use_play && world.water.ready) { /* carte du monde : lacs et rivières */
+                ENG_LOG_INFO("MONDE : eau : %u cellules mouillées ; joueur %s",
+                             world.water.wet_cells, play.wading ? "dans l'eau, à gué" : "au sec");
             }
             if (use_play && play.combat != NULL) { /* M7 : le camp dans le monde */
                 PlayCombatStats cs;

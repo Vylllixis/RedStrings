@@ -100,6 +100,11 @@ float3 water_normal(float2 p)
 float4 main(float3 normal : TEXCOORD0, float2 uv : TEXCOORD1, float4 color : TEXCOORD2,
             float3 world_position : TEXCOORD3, float4 tangent : TEXCOORD4) : SV_Target0
 {
+    // Profondeur SIGNÉE (carte du monde, eng_worldmap_water) : négative là où le relief dépasse de
+    // l'eau ; le fragment est alors écarté, et la rive suit le relief sans marches d'escalier même
+    // quand le maillage du terrain est simplifié au loin. eng_water_build borne la profondeur à 0 :
+    // rien n'y est écarté.
+    clip(uv.x + 0.05f);
     float depth = max(uv.x, 0.0f);
     float t = 1.0f - exp(-water_zenith.w * depth);
     float3 body = lerp(water_shallow.rgb, water_deep.rgb, t);

@@ -53,12 +53,16 @@ Une instruction par ligne, `#` commence un commentaire. Les erreurs donnent leur
 | `riviere largeur profondeur x z ...` | lit creusé le long d'une ligne |
 | `lave largeur x z ...` | coulée de lave (sillon de 1,5 m), jamais sur un chemin |
 | `foret essence x z rayon espacement` | forêt (`chene`, `sapin`, `acacia`) : grille fixe décalée, lisière moins dense |
-| `arbres_epars essence biome espacement` | arbres épars partout où le biome domine (acacias du désert) |
+| `arbres_epars essence biome espacement [groupe]` | objets épars partout où le biome domine : arbres (`chene`, `sapin`, `acacia`), buissons (`buisson`, `buisson_neige`, `buisson_sec`) ou `rocher` ; `groupe` (1 à 4, 1 par défaut) : jusqu'à ce nombre de pieds par emplacement, à moins de 7 m les uns des autres |
 | `zone biome facile\|dur\|boss x z` | place d'une zone de combat |
 
 Ordre de construction : régions et relief de base des biomes, formes en relief, bordure ; aires
 aplanies ; chemins ; lacs et rivières ; lave. Une aire aplanie placée après une colline aplanit
 donc la colline.
+
+**Ordre des lignes d'arbres.** Le placement d'une ligne `foret` ou `arbres_epars` dépend de son
+rang parmi les formes du fichier : une nouvelle ligne s'ajoute APRÈS les lignes d'arbres
+existantes (une ligne insérée au milieu déplacerait les arbres des lignes suivantes).
 
 ## Dans le jeu (`--world`)
 
@@ -70,11 +74,39 @@ donc la colline.
   terre battue ; la lave rayonne (émissive, visible la nuit).
 - **Arbres** (`eng_worldmap_trees`, `launcher/src/world_trees.c`) : chênes (forêts de la plaine),
   sapins enneigés (forêts de la montagne), acacias épars dans le désert, aucun dans le volcan ;
-  environ 11 000 sur la carte. Jamais sur un chemin, dans l'eau, sur la lave, sur une pente de plus
+  environ 12 000 sur la carte avec les arbres isolés. Jamais sur un chemin, dans l'eau, sur la lave, sur une pente de plus
   de 35 degrés, à moins de 70 m du départ ni de 32 m d'une zone de combat. Placement fixe : même
   résultat quel que soit le découpage en cellules. Dessin instancié par essence et par cellule ;
   version simplifiée (28 à 64 triangles) au-delà de 220 m ; ombre jusqu'à 200 m ; troncs solides
   (capsules) à moins de 40 m du joueur.
+- **Petit décor** (2026-11-22) : entre les forêts, des chênes isolés (seuls, par deux ou par
+  trois), des buissons (verts en plaine, enneigés en montagne, secs dans le désert) et quelques
+  rochers (gris en plaine, clairs en montagne, ocre au désert, basalte sombre au volcan : la teinte
+  suit le biome). Environ 9 700 buissons et 3 500 rochers sur la carte, soit un rocher pour
+  90 m x 90 m de plaine. Buissons et rochers ne sont dessinés qu'autour de la caméra (170 m et
+  260 m), dans une liste refaite tous les 4 m ; chaque pied grandit de zéro à sa taille en
+  approchant : rien n'apparaît d'un coup. Les rochers sont solides, les buissons se traversent.
+- **Herbe** (2026-11-22, `eng_worldmap_grass`, `launcher/src/world_grass.c`) : des touffes de six
+  brins animées par le vent (`engine/grass.h`), toujours aux mêmes endroits (grille fixe du monde),
+  en deux semis autour de la caméra : dense de près (une touffe tous les 0,45 m, jusqu'à 22 m),
+  clairsemé et plus haut au loin (tous les 1,3 m, jusqu'à 46 m). Elles rapetissent puis
+  disparaissent avec la distance dans le shader. Seulement dans la plaine ; pas sur les chemins, la
+  roche (pente de plus de 0,6), dans l'eau, sur la lave ni sous les murs du décor ; des taches
+  d'herbe haute plus jaune et d'herbe rase.
+- **Eau** (2026-11-22, `eng_worldmap_water`, `launcher/src/world_water.c`) : la surface des lacs
+  et de la rivière (un maillage des cellules mouillées, profondeur signée par sommet : le shader
+  d'eau du moteur efface ce qui dépasse du relief), visible de près comme de loin. Le joueur
+  traverse à gué : un fond physique à 0,7 m sous la surface (de l'eau jusqu'à la taille), et il y
+  marche à 60 % de sa vitesse.
+- **Lave** (2026-11-22) : elle brûle. Les pieds dans la lave, le joueur perd 6 % de ses PV (au
+  moins 4) toutes les 20 ticks (un tiers de seconde) : environ 5 secondes pour mourir. Rien en mode
+  créatif ni pendant une esquive. S'il y meurt, il renaît au dernier endroit sûr (au sol, hors de
+  la lave), pas au château.
+- **Ennemis et arbres** (2026-11-22, `engine/ai_avoid.h`, idée de Théo) : les troncs et les
+  rochers à moins de 48 m du camp sont donnés aux ennemis. À moins de 1 m d'un obstacle, la part
+  de leur direction qui va vers lui diminue (rien à 1 m, tout au contact) et devient un pas de
+  côté : ils contournent ; au contact, ils s'éloignent d'au moins 1 m ; ils ne sont jamais dans un
+  tronc.
 - **Vue lointaine** (`launcher/src/world_far.c`) : toute la carte, un sommet tous les 32 m, en
   morceaux de 256 m dessinés là où la cellule détaillée n'est pas chargée ; plan lointain 6 km,
   brouillard 0,00035 /m : depuis la colline on voit les montagnes, le désert et le volcan.
@@ -84,11 +116,16 @@ donc la colline.
 - **Zones** : positions lues dans la carte (`eng_worldmap_zones`), le reste (noms, PV, butin) dans
   `engine/map_zones`.
 
-Modèles d'arbres : `tools/scripts/arbres_make.py` (chêne et acacia originaux, sapin enneigé tiré du
-sapin KayKit CC0) ; voir `assets/LICENCES.md`.
+Modèles : `tools/scripts/arbres_make.py` (chêne, acacia, buissons et rocher originaux, sapin
+enneigé tiré du sapin KayKit CC0) ; voir `assets/LICENCES.md`.
+
+Essayer : `--at-pos X Z` place le joueur à ce point de la carte (par exemple `--at-pos 1250 780`
+au milieu du grand lac, `--at-pos 330 -30` au bord de la rivière).
 
 ## État
 
-Fait : carte, relief, matières, arbres, vue lointaine, château de départ, zones. Limites : pas
-d'eau dessinée (lacs et rivières sont des creux) ; la lave ne blesse pas ; pas de pont sur les
-gués ; les ennemis ne contournent pas les arbres (les zones de combat en sont dégagées).
+Fait : carte, relief, matières, arbres, vue lointaine, château de départ, zones, eau (à gué), lave
+qui brûle, petit décor (arbres isolés, buissons, rochers), herbe, ennemis qui évitent les arbres.
+Limites : pas de nage ni de pont (tous les cours d'eau se traversent à gué) ; l'herbe ne pousse que
+dans la plaine et ne se couche pas sous les pas ; les ennemis évitent les troncs un par un (pas de
+calcul de chemin à travers une forêt dense).

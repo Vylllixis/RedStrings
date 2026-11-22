@@ -190,7 +190,8 @@ bool eng_worldmap_render(const EngWorldMap *map, uint32_t size, uint8_t *rgb)
     }
     static EngMapTree trees[16384]; /* aperçu : un point sombre par arbre, par bandes de 512 m */
     static const uint8_t tree_color[ENG_TREE_KINDS][3] = {
-        {28, 70, 22}, {20, 60, 45}, {95, 110, 40}};
+        {28, 70, 22},    {20, 60, 45},   {95, 110, 40}, {58, 105, 38},
+        {196, 210, 222}, {150, 134, 72}, {96, 94, 90}};
     const int blocks = (int)ceil(map->side / 512.0);
     for (int jz = 0; jz < blocks; jz++) {
         for (int jx = 0; jx < blocks; jx++) {

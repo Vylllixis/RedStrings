@@ -62,5 +62,17 @@ EngModelMaterial eng_grass_default_material(void);
 uint32_t eng_grass_blade_vertex_count(uint32_t segments);
 uint32_t eng_grass_blade_triangle_count(uint32_t segments);
 
+/* Touffe d'herbe (2026-11-22) : `blades` brins (3 à 12) partant d'un même pied et s'écartant en
+ * éventail, courbés vers l'extérieur, hauts de 0,55 à 1 m (le premier fait 1 m : l'échelle de
+ * l'instance est la hauteur de la touffe). Deux faces par brin ; les normales sont tournées vers
+ * le haut (l'herbe s'éclaire comme le sol). La couleur va de `root` au pied à `tip` à la pointe
+ * (RGB linéaire), par une image 1 x 16 : le modèle a UNE image, à libérer avec eng_model_free.
+ * `seed` fixe la forme : même graine, même touffe. Paramètres invalides ou arène pleine : false
+ * (journalisé), modèle à zéro, arène restituée. */
+bool eng_grass_tuft_build(EngArena *arena, uint32_t blades, uint32_t seed, const float root[3],
+                          const float tip[3], EngModel *model);
+uint32_t eng_grass_tuft_vertex_count(uint32_t blades);   /* 10 par brin */
+uint32_t eng_grass_tuft_triangle_count(uint32_t blades); /* 6 par brin */
+
 /* Pipeline des brins : eng_instanced_pipeline_desc avec le vertex shader grass.vert. */
 void eng_grass_pipeline_desc(EngPipelineDesc *desc);

@@ -1,11 +1,13 @@
 #!/usr/bin/env python3
 """Arbres de la carte du monde (2026-11-21) : chêne, acacia (modèles originaux, CC0 du projet) et
 sapin enneigé (géométrie du sapin KayKit tree_single_B, CC0, recoloré : neige sur le dessus des
-branches). Style low-poly à faces plates, couleurs d'une petite palette commune.
+branches). Depuis le 2026-11-22 : buissons (plaine, enneigé, sec) et rocher, originaux eux aussi.
+Style low-poly à faces plates, couleurs d'une petite palette commune.
 
     python3 tools/scripts/arbres_make.py
 
-Écrit dans assets/props/nature/ : oak, acacia, pine_snow (.gltf + .bin) et trees_palette.png.
+Écrit dans assets/props/nature/ : oak, acacia, pine_snow, bush, bush_snow, bush_dry, rock
+(.gltf + .bin), les versions simplifiées *_lod des arbres, et trees_palette.png.
 Déterministe : mêmes fichiers à chaque exécution (graine fixe). Dépend de Pillow."""
 import base64, json, math, random, struct, os
 from PIL import Image
@@ -15,7 +17,7 @@ PALETTE = [  # sRGB
     (92, 160, 58), (70, 135, 45), (50, 105, 38), (110, 75, 50),      # chêne : feuilles x3, écorce
     (138, 146, 56), (108, 120, 44), (125, 95, 65), (238, 244, 250),  # acacia x2, écorce ; neige
     (205, 218, 232), (30, 100, 70), (22, 80, 58), (95, 62, 45),      # neige ombrée ; sapin x2, écorce
-    (0, 0, 0), (0, 0, 0), (0, 0, 0), (0, 0, 0)]
+    (184, 158, 92), (168, 164, 156), (134, 130, 124), (102, 99, 96)]  # paille ; roche x3
 GRID, CELL = 4, 16  # palette 64 x 64 : 16 cases de 16 pixels
 
 
@@ -111,6 +113,49 @@ def acacia():
     prism(m, (0.03, 0.4, 0), (0.0, 0.63, 0.15), 0.025, 0.018, 6)
     for c, r in (((0.18, 0.68, 0.02), 0.3), ((-0.15, 0.66, -0.03), 0.27), ((0.0, 0.7, 0.15), 0.24)):
         blob(m, rng, c, r, 0.28, (4, 4, 5), wobble=0.08)
+    return m
+
+
+def bush(colors, seed):
+    """Buisson : quelques touffes basses qui se chevauchent, légèrement enfoncées dans le sol."""
+    m, rng = Mesh(), random.Random(seed)
+    for c, r in (((0, 0.2, 0), 0.3), ((0.25, 0.15, 0.06), 0.22), ((-0.21, 0.15, -0.1), 0.21),
+                 ((0.02, 0.16, 0.24), 0.19)):
+        blob(m, rng, c, r, 0.8, colors)
+    return m
+
+
+def bush_dry():
+    """Buisson sec du désert : des brindilles en éventail, quelques touffes de paille au bout."""
+    m, rng = Mesh(), random.Random(53)
+    for i in range(9):
+        a = 2 * math.pi * (i + 0.5 * rng.random()) / 9
+        reach, rise = 0.2 + 0.2 * rng.random(), 0.3 + 0.22 * rng.random()
+        tip = (reach * math.cos(a), rise, reach * math.sin(a))
+        prism(m, (0.03 * math.cos(a), -0.05, 0.03 * math.sin(a)), tip, 0.022, 0.008, 6, sides=3)
+        if i % 2 == 0:
+            blob(m, rng, tip, 0.1 + 0.04 * rng.random(), 0.6, (12, 12, 5), wobble=0.2)
+    blob(m, rng, (0, 0.1, 0), 0.16, 0.6, (12, 5, 5), wobble=0.2)
+    return m
+
+
+def rock():
+    """Rocher : un bloc bosselé et aplati (1 unité de large), un plus petit accolé ; le dessus est
+    clair, le dessous sombre. Enfoncé de 12 % dans le sol : il reste posé sur une pente."""
+    m, rng = Mesh(), random.Random(67)
+    for center, radius, squash, subdiv in (((0.0, 0.2, 0.0), 0.5, 0.62, 1),
+                                           ((0.36, 0.06, 0.2), 0.24, 0.7, 0)):
+        v, f = icosphere(subdiv)
+        jit = [1.0 + 0.24 * (rng.random() - 0.5) * 2 for _ in v]
+        pts = [(center[0] + p[0]*radius*j, center[1] + p[1]*radius*squash*j,
+                center[2] + p[2]*radius*j) for p, j in zip(v, jit)]
+        for a, b, c in f:
+            n = m.tri(pts[a], pts[b], pts[c], 14)
+            color = 13 if n[1] > 0.55 else (15 if n[1] < -0.1 else 14)
+            if rng.random() < 0.15:
+                color = 14
+            for q in range(3):
+                m.uv[-1 - q] = uv(color)
     return m
 
 
@@ -256,3 +301,7 @@ if __name__ == '__main__':
     write('oak_lod', lod_oak())      # versions simplifiées, au loin
     write('acacia_lod', lod_acacia())
     write('pine_snow_lod', lod_pine())
+    write('bush', bush((0, 1, 2), 41))        # petit décor, dessiné de près seulement
+    write('bush_snow', bush((7, 9, 10), 43))  # neige dessus, vert dessous
+    write('bush_dry', bush_dry())
+    write('rock', rock())

@@ -160,57 +160,118 @@ void eng_ui_draw_hud(EngUi *ui, const EngHud *hud, int width, int height)
     }
 }
 
-void eng_ui_draw_menu(EngUi *ui, const EngMenu *menu, int width, int height, float text_scale,
-                      bool hc)
+/* le menu principal et ses écrans de sauvegarde : colonne à gauche, le monde visible à droite */
+static bool left_layout(EngMenuScreen screen)
+{
+    return screen == ENG_MENU_MAIN || screen == ENG_MENU_LOAD || screen == ENG_MENU_NEW ||
+           screen == ENG_MENU_OVERWRITE;
+}
+
+int32_t eng_ui_draw_menu(EngUi *ui, const EngMenu *menu, int width, int height, float text_scale,
+                         bool hc)
 {
     if (ui == NULL || !ui->frame_open || menu == NULL || !eng_menu_is_open(menu) || width <= 0 ||
         height <= 0) {
-        return;
+        return -1;
     }
     ImDrawList *dl = igGetForegroundDrawList_Nil();
     const float px = eng_ui_text_px(height, text_scale);
     const float u = px / 24.0F;
-    ImDrawList_AddRectFilled(dl, (ImVec2_c){0, 0}, (ImVec2_c){(float)width, (float)height},
-                             rgba(0.02F, 0.03F, 0.05F, 0.72F), 0, 0);
+    const bool left = left_layout(menu->screen);
+    const float w = (float)width;
+    const float h = (float)height;
     const char *title = eng_menu_title(menu);
-    const float tpx = px * 2.2F;
-    text(dl, tpx, ((float)width - text_width(tpx, title)) * 0.5F, (float)height * 0.16F,
-         rgba(1, 1, 1, 1), title, true);
+    const float row = px * 1.7F;
+    float col_w = 760.0F * u;
+    float x0 = (w - col_w) * 0.5F;
+    float y = (h * 0.16F) + (px * 2.2F * 1.8F);
+    if (left) {
+        /* dégradé : sombre à gauche (lisible), transparent à droite (le monde) ; opaque en
+         * contraste élevé */
+        const ImU32 dark = rgba(0.015F, 0.012F, 0.03F, hc ? 0.97F : 0.9F);
+        const ImU32 clear = rgba(0.015F, 0.012F, 0.03F, hc ? 0.9F : 0.0F);
+        ImDrawList_AddRectFilledMultiColor(dl, (ImVec2_c){0, 0}, (ImVec2_c){w * 0.62F, h}, dark,
+                                           clear, clear, dark);
+        if (hc) {
+            ImDrawList_AddRectFilled(dl, (ImVec2_c){w * 0.62F, 0}, (ImVec2_c){w, h}, clear, 0, 0);
+        }
+        x0 = w * 0.07F;
+        col_w = fminf(620.0F * u, w * 0.5F);
+        /* le titre du jeu, son trait rouge, puis le nom de l'écran */
+        const float tpx = px * 3.1F;
+        const float ty = h * 0.14F;
+        text(dl, tpx, x0, ty, rgba(1.0F, 0.96F, 0.9F, 1), "RED STRINGS", true);
+        const float tw = text_width(tpx, "RED STRINGS");
+        ImDrawList_AddRectFilled(dl, (ImVec2_c){x0, ty + (tpx * 1.22F)},
+                                 (ImVec2_c){x0 + tw, ty + (tpx * 1.22F) + (4.0F * u)},
+                                 rgba(0.95F, 0.12F, 0.14F, 1), 2.0F * u, 0);
+        y = ty + (tpx * 1.22F) + (30.0F * u);
+        if (menu->screen != ENG_MENU_MAIN) {
+            text(dl, px * 1.25F, x0, y, rgba(1.0F, 0.8F, 0.75F, 1), title, true);
+            y += px * 1.25F * 1.7F;
+        } else {
+            y += px * 0.6F;
+        }
+    } else {
+        ImDrawList_AddRectFilled(dl, (ImVec2_c){0, 0}, (ImVec2_c){w, h},
+                                 rgba(0.02F, 0.03F, 0.05F, 0.72F), 0, 0);
+        const float tpx = px * 2.2F;
+        text(dl, tpx, (w - text_width(tpx, title)) * 0.5F, h * 0.16F, rgba(1, 1, 1, 1), title,
+             true);
+    }
     EngMenuItem items[ENG_MENU_MAX_ITEMS];
     const uint32_t n = eng_menu_items(menu, items, ENG_MENU_MAX_ITEMS);
-    const float row = px * 1.7F;
-    const float col_w = 760.0F * u;
-    const float x0 = ((float)width - col_w) * 0.5F;
-    float y = (float)height * 0.16F + tpx * 1.8F;
+    const ImVec2_c mouse = igGetIO_Nil()->MousePos;
+    int32_t hovered = -1;
     for (uint32_t i = 0; i < n; i++) {
         const bool sel = (int32_t)i == menu->selected;
+        const float top = y - (row * 0.18F);
+        const float bottom = y + (row * 0.82F);
+        if (mouse.x >= x0 - (16.0F * u) && mouse.x <= x0 + col_w + (16.0F * u) && mouse.y >= top &&
+            mouse.y < bottom) {
+            hovered = (int32_t)i;
+        }
         if (sel) {
-            ImDrawList_AddRectFilled(dl, (ImVec2_c){x0 - 16.0F * u, y - row * 0.18F},
-                                     (ImVec2_c){x0 + col_w + 16.0F * u, y + row * 0.82F},
-                                     hc ? rgba(1, 1, 1, 0.95F) : rgba(0.85F, 0.25F, 0.2F, 0.85F),
-                                     6.0F * u, 0);
+            ImDrawList_AddRectFilled(
+                dl, (ImVec2_c){x0 - (16.0F * u), top}, (ImVec2_c){x0 + col_w + (16.0F * u), bottom},
+                hc ? rgba(1, 1, 1, 0.95F) : rgba(0.85F, 0.16F, 0.17F, 0.9F), 6.0F * u, 0);
         }
         const ImU32 fg = sel && hc          ? rgba(0, 0, 0, 1)
                          : items[i].enabled ? rgba(1, 1, 1, 1)
                                             : rgba(0.55F, 0.55F, 0.55F, 1);
         text(dl, px, x0, y, fg, items[i].label, !sel || !hc);
         if (items[i].value[0] != '\0') {
-            text(dl, px, x0 + col_w - text_width(px, items[i].value), y, fg, items[i].value,
-                 !sel || !hc);
+            /* à gauche : la valeur est un résumé (partie, niveau, temps), en plus petit */
+            const float vpx = left ? px * 0.8F : px;
+            const ImU32 vfg =
+                left && !(sel && hc) && items[i].enabled ? rgba(1.0F, 0.86F, 0.8F, 0.95F) : fg;
+            text(dl, vpx, x0 + col_w - text_width(vpx, items[i].value), y + ((px - vpx) * 0.6F),
+                 vfg, items[i].value, !sel || !hc);
         }
         y += row;
     }
     const char *help =
         menu->screen == ENG_MENU_OPTIONS
             ? "haut/bas : choisir   gauche/droite : régler   Espace/A : valider   Ctrl/B : retour"
-            : "haut/bas : choisir   Espace/A : valider   Ctrl/B : retour";
+            : "haut/bas ou souris : choisir   Espace/A ou clic : valider   Ctrl/B : retour";
     const float hpx = px * 0.7F;
-    text(dl, hpx, ((float)width - text_width(hpx, help)) * 0.5F, (float)height - 60.0F * u,
+    text(dl, hpx, left ? x0 : (w - text_width(hpx, help)) * 0.5F, h - (60.0F * u),
          rgba(1, 1, 1, 0.8F), help, true);
     if (menu->status[0] != '\0') {
-        text(dl, px, ((float)width - text_width(px, menu->status)) * 0.5F, y + row * 0.5F,
+        text(dl, px, left ? x0 : (w - text_width(px, menu->status)) * 0.5F, y + (row * 0.5F),
              rgba(0.6F, 1, 0.6F, 1), menu->status, true);
     }
+    return hovered;
+}
+
+void eng_ui_draw_fade(EngUi *ui, float alpha, int width, int height)
+{
+    if (ui == NULL || !ui->frame_open || !(alpha > 0.0F) || width <= 0 || height <= 0) {
+        return;
+    }
+    ImDrawList_AddRectFilled(igGetForegroundDrawList_Nil(), (ImVec2_c){0, 0},
+                             (ImVec2_c){(float)width, (float)height},
+                             rgba(0, 0, 0, alpha > 1.0F ? 1.0F : alpha), 0, 0);
 }
 
 #else
@@ -223,8 +284,8 @@ void eng_ui_draw_hud(EngUi *ui, const EngHud *hud, int width, int height)
     (void)height;
 }
 
-void eng_ui_draw_menu(EngUi *ui, const EngMenu *menu, int width, int height, float text_scale,
-                      bool high_contrast)
+int32_t eng_ui_draw_menu(EngUi *ui, const EngMenu *menu, int width, int height, float text_scale,
+                         bool high_contrast)
 {
     (void)ui;
     (void)menu;
@@ -232,6 +293,15 @@ void eng_ui_draw_menu(EngUi *ui, const EngMenu *menu, int width, int height, flo
     (void)height;
     (void)text_scale;
     (void)high_contrast;
+    return -1;
+}
+
+void eng_ui_draw_fade(EngUi *ui, float alpha, int width, int height)
+{
+    (void)ui;
+    (void)alpha;
+    (void)width;
+    (void)height;
 }
 
 #endif
