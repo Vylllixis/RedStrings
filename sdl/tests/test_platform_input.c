@@ -1,4 +1,5 @@
 #include <SDL3/SDL.h>
+#include <string.h>
 
 #include "engine/platform.h"
 #include "utest.h"
@@ -228,6 +229,46 @@ UTEST(eng_platform_input, f1_toggles_the_debug_ui_and_it_starts_hidden)
     EXPECT_TRUE(p.debug_draw); /* F1 ne touche pas à F3 */
     EXPECT_FALSE(p.mouse_captured);
     EXPECT_FALSE(p.fullscreen);
+    eng_platform_shutdown(&p);
+}
+
+/* Ouvre une fenêtre du pilote vidéo « offscreen » (un écran de 1024 x 768 en mémoire). La consigne
+ * du pilote est redonnée à CHAQUE ouverture : SDL_Quit l'oublie, et sans elle la fenêtre suivante
+ * s'ouvrirait sur le vrai écran de la machine. */
+static bool open_offscreen(EngPlatform *p, const EngWindowDesc *desc)
+{
+    SDL_SetHint(SDL_HINT_VIDEO_DRIVER, "offscreen");
+    return eng_platform_init(p, desc) && strcmp(SDL_GetCurrentVideoDriver(), "offscreen") == 0;
+}
+
+/* Le plein écran est demandé À LA CRÉATION de la fenêtre : elle naît en plein écran, à la taille
+ * de l'écran (et non à la taille demandée), sans passer par une fenêtre ordinaire. */
+UTEST(eng_platform_input, a_fullscreen_window_is_fullscreen_from_its_creation)
+{
+    const EngWindowDesc desc = {.title = "test",
+                                .width = 64,
+                                .height = 48,
+                                .fullscreen = true,
+                                .no_software_surface = true};
+    EngPlatform p;
+    ASSERT_TRUE(open_offscreen(&p, &desc));
+    EXPECT_TRUE(p.fullscreen);
+    const bool flagged = (SDL_GetWindowFlags(p.window) & SDL_WINDOW_FULLSCREEN) != 0U;
+    EXPECT_TRUE(flagged);
+    SDL_Rect screen = {0, 0, 0, 0};
+    ASSERT_TRUE(SDL_GetDisplayBounds(SDL_GetDisplayForWindow(p.window), &screen));
+    EXPECT_GT(screen.w, 64);
+    EXPECT_EQ(screen.w, p.width); /* la taille de l'écran, pas les 64 x 48 demandés */
+    EXPECT_EQ(screen.h, p.height);
+    eng_platform_shutdown(&p);
+    /* sans plein écran : la taille demandée, pas le drapeau */
+    const EngWindowDesc plain = {
+        .title = "test", .width = 64, .height = 48, .no_software_surface = true};
+    ASSERT_TRUE(open_offscreen(&p, &plain));
+    EXPECT_FALSE(p.fullscreen);
+    const bool windowed = (SDL_GetWindowFlags(p.window) & SDL_WINDOW_FULLSCREEN) == 0U;
+    EXPECT_TRUE(windowed);
+    EXPECT_EQ(64, p.width);
     eng_platform_shutdown(&p);
 }
 

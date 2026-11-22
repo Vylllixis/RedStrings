@@ -18,6 +18,8 @@ typedef enum EngAction {
     ENG_ACTION_LOCK_ON,
     ENG_ACTION_PAUSE,
     ENG_ACTION_SWITCH_WEAPON, /* M8-08 */
+    ENG_ACTION_FLY_FASTER,    /* vol du mode créatif : accélérer (2026-11-22) */
+    ENG_ACTION_FLY_SLOWER,    /* vol du mode créatif : ralentir */
     ENG_ACTION_COUNT,         /* au plus 32 : les états sont des masques de bits */
 } EngAction;
 
@@ -56,6 +58,11 @@ typedef struct EngInputState {
     float wheel; /* crans de molette depuis le pas précédent : vers l'avant (haut) > 0 */
     uint32_t menu_pressed; /* touches de menu pressées depuis le pas précédent (ENG_MENU_KEY_*) */
     uint32_t menu_held;    /* touches de menu enfoncées maintenant */
+    /* Actions liées à la molette (un bit par action). Un cran de molette « presse » ces actions
+     * (pressed et released ensemble, jamais held) ; `wheel` garde quand même les crans bruts. Le
+     * jeu sait ainsi à qui va la molette : si une action qu'il écoute y est liée, il ne s'en sert
+     * pas pour autre chose (le zoom de la caméra) ; sinon elle reste libre. */
+    uint32_t wheel_bound;
 } EngInputState;
 
 static inline bool eng_action_pressed(const EngInputState *in, EngAction action)

@@ -12,7 +12,11 @@ void eng_input_init(EngInput *input)
 
 bool eng_input_bind_button(EngInput *input, EngAction action, EngBindKind kind, int code)
 {
-    if ((int)action < 0 || action >= ENG_ACTION_COUNT || kind == ENG_BIND_NONE) {
+    if ((int)action < 0 || action >= ENG_ACTION_COUNT || (int)kind <= ENG_BIND_NONE ||
+        kind > ENG_BIND_MOUSE_WHEEL) {
+        return false;
+    }
+    if (kind == ENG_BIND_MOUSE_WHEEL && code != ENG_WHEEL_UP && code != ENG_WHEEL_DOWN) {
         return false;
     }
     for (int i = 0; i < ENG_MAX_BUTTON_BINDINGS; i++) {
@@ -59,6 +63,7 @@ static bool source_down(const EngInput *input, EngButtonBinding binding)
     case ENG_BIND_PAD_TRIGGER:
         return binding.code >= 0 && binding.code < ENG_PAD_AXIS_COUNT &&
                input->pad_axis[binding.code] > ENG_TRIGGER_THRESHOLD;
+    case ENG_BIND_MOUSE_WHEEL: /* jamais « enfoncée » : des impulsions (eng_input_begin_tick) */
     case ENG_BIND_NONE:
         break;
     }
@@ -149,9 +154,44 @@ void eng_input_mouse_motion(EngInput *input, float dx, float dy)
     input->mouse_dy += dy;
 }
 
+/* un cran entier de plus dans ce sens : une pression (remappage), et une impulsion à livrer ; un
+ * cran dans l'autre sens annule d'abord un cran en attente */
+static void wheel_notch(EngInput *input, int direction)
+{
+    note_press(input, ENG_BIND_MOUSE_WHEEL, direction);
+    if (direction == ENG_WHEEL_UP && input->wheel_pending < ENG_WHEEL_PENDING_MAX) {
+        input->wheel_pending++;
+    } else if (direction == ENG_WHEEL_DOWN && input->wheel_pending > -ENG_WHEEL_PENDING_MAX) {
+        input->wheel_pending--;
+    }
+}
+
 void eng_input_mouse_wheel(EngInput *input, float notches)
 {
+    if (!isfinite(notches) || notches == 0.0F) {
+        return;
+    }
     input->wheel += notches;
+    /* un changement de sens repart de zéro : le reste de l'autre sens ne retarde pas ce cran */
+    if ((notches > 0.0F) != (input->wheel_fraction > 0.0F)) {
+        input->wheel_fraction = 0.0F;
+    }
+    const float limit = (float)ENG_WHEEL_PENDING_MAX;
+    input->wheel_fraction += notches > limit ? limit : (notches < -limit ? -limit : notches);
+    while (input->wheel_fraction >= 1.0F) {
+        input->wheel_fraction -= 1.0F;
+        wheel_notch(input, ENG_WHEEL_UP);
+    }
+    while (input->wheel_fraction <= -1.0F) {
+        input->wheel_fraction += 1.0F;
+        wheel_notch(input, ENG_WHEEL_DOWN);
+    }
+}
+
+void eng_input_drop_wheel(EngInput *input)
+{
+    input->wheel_fraction = 0.0F;
+    input->wheel_pending = 0;
 }
 
 void eng_input_pad_button(EngInput *input, int button, bool down)
@@ -187,6 +227,7 @@ void eng_input_release_all(EngInput *input)
     memset(input->mouse_down, 0, sizeof input->mouse_down);
     memset(input->pad_down, 0, sizeof input->pad_down);
     memset(input->pad_axis, 0, sizeof input->pad_axis);
+    eng_input_drop_wheel(input);
     refresh(input);
 }
 
@@ -280,4 +321,22 @@ void eng_input_begin_tick(EngInput *input, EngInputState *out)
     out->menu_pressed = input->menu_latch;
     out->menu_held = input->menu_held;
     input->menu_latch = 0;
+
+    /* La molette : un cran en attente presse, pour ce pas, les actions liées à son sens. */
+    const int direction =
+        input->wheel_pending > 0 ? ENG_WHEEL_UP : (input->wheel_pending < 0 ? ENG_WHEEL_DOWN : -1);
+    input->wheel_pending += input->wheel_pending > 0 ? -1 : (input->wheel_pending < 0 ? 1 : 0);
+    uint32_t bound = 0;
+    uint32_t fired = 0;
+    for (int a = 0; a < ENG_ACTION_COUNT; a++) {
+        for (int i = 0; i < ENG_MAX_BUTTON_BINDINGS; i++) {
+            if (input->buttons[a][i].kind == ENG_BIND_MOUSE_WHEEL) {
+                bound |= 1U << a;
+                fired |= input->buttons[a][i].code == direction ? 1U << a : 0U;
+            }
+        }
+    }
+    out->wheel_bound = bound;
+    out->pressed |= fired;
+    out->released |= fired & ~out->held; /* tenue par une touche en même temps : pas relâchée */
 }

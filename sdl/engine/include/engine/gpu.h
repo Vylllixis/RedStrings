@@ -107,6 +107,16 @@ typedef struct EngGpu {
  * alors se rabattre sur l'affichage logiciel. */
 bool eng_gpu_init(EngGpu *gpu, struct SDL_Window *window, const EngGpuDesc *desc);
 
+/* La même initialisation en deux temps, pour qu'un écran d'attente vive pendant que le pilote
+ * démarre (engine/boot_screen.h). eng_gpu_create crée le périphérique sans toucher à la fenêtre :
+ * c'est la partie LONGUE quand la carte graphique dort (2,7 s mesurées à froid sur la carte dédiée
+ * d'un portable, 0,2 s à chaud), et elle peut s'exécuter dans un autre fil. eng_gpu_attach lui
+ * rattache ensuite la fenêtre, depuis le fil qui l'a créée ; en cas d'échec il détruit le
+ * périphérique. Il refuse une fenêtre absente ou qui a encore une surface logicielle (une fenêtre
+ * n'a pas à la fois une surface et une swapchain). `desc` est le même pour les deux appels. */
+bool eng_gpu_create(EngGpu *gpu, const EngGpuDesc *desc);
+bool eng_gpu_attach(EngGpu *gpu, struct SDL_Window *window, const EngGpuDesc *desc);
+
 /* Attend la fin du travail GPU puis libère tout. Sans effet sur une structure déjà arrêtée (true).
  * Retourne true si toutes les barrières et toutes les cibles créées ont été rendues (M1-18) ;
  * false, et une erreur au journal, si l'une d'elles manque. */

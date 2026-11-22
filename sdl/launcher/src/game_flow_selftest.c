@@ -540,6 +540,31 @@ bool game_flow_selftest(void)
     check(wrote && !flow.options.fullscreen, "options enregistrées « fenêtre » : respectées",
           (double)flow.options.fullscreen);
     (void)SDL_RemovePath(path);
+
+    /* ── rappel des commandes : les touches de la vitesse de vol, telles qu'elles sont reliées ──
+     */
+    char fly[72];
+    eng_input_set_default_bindings(&input);
+    game_flow_fly_keys(&input, fly, sizeof fly);
+    check(strcmp(fly, "molette") == 0, "vitesse de vol : par défaut, « molette »",
+          (double)strlen(fly));
+    eng_input_clear_action(&input, ENG_ACTION_FLY_FASTER);
+    (void)eng_input_bind_button(&input, ENG_ACTION_FLY_FASTER, ENG_BIND_KEY, ENG_KEY_UP);
+    game_flow_fly_keys(&input, fly, sizeof fly);
+    check(strcmp(fly, "Fl\xC3\xA8"
+                      "che haut / molette bas") == 0,
+          "vitesse de vol : une action sur une touche : les deux sont nommées",
+          (double)strlen(fly));
+    eng_input_clear_action(&input, ENG_ACTION_FLY_SLOWER);
+    game_flow_fly_keys(&input, fly, sizeof fly);
+    check(strcmp(fly, "Fl\xC3\xA8"
+                      "che haut / aucune") == 0,
+          "vitesse de vol : une action sans liaison : « aucune »", (double)strlen(fly));
+    game_flow_fly_keys(NULL, fly, sizeof fly);
+    check(fly[0] == '\0', "vitesse de vol : sans liaisons, rien", (double)strlen(fly));
+    char untouched[4] = "abc";
+    game_flow_fly_keys(&input, untouched, 0U);
+    check(strcmp(untouched, "abc") == 0, "vitesse de vol : tampon vide laissé tel quel", 0);
     ENG_LOG_INFO("AUTOTEST PARTIE : %s", g_ok ? "OK" : "ÉCHEC");
     play_mode_shutdown(&play);
     return g_ok;

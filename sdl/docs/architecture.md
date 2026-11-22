@@ -168,7 +168,9 @@ Cas particulier : sous Linux, le profileur Tracy rend `dlclose` inopérant. L'h�
   (`EngAxis`), jamais des touches. Chaque pas reçoit un `EngInputState` : appuyé / maintenu /
   relâché pour les boutons, valeurs pour les axes (zone morte radiale). Les appuis sont
   verrouillés entre deux pas : aucun appui court n'est perdu. La perte de focus relâche tout et libère
-  la souris. La molette est cumulée par pas (`EngInputState.wheel`). Caméra libre de debug :
+  la souris. La molette est cumulée par pas (`EngInputState.wheel`) ; elle est aussi une source de
+  liaison (`ENG_BIND_MOUSE_WHEEL`) : chaque cran presse un instant les actions qui lui sont liées
+  (par défaut la vitesse du vol créatif), un cran par pas. Caméra libre de debug :
   `docs/camera.md`.
 - **Configuration** : `config.ini` à côté de l'exécutable, lu au lancement, valeurs par défaut
   si absent, lignes invalides signalées puis ignorées. Pas de rechargement à chaud.

@@ -95,26 +95,51 @@ suit le regard) et ses **dégâts ne changent pas** (mêmes attaques, mêmes val
 combat est dans le plan : en vol au-dessus d'un ennemi, les coups portent encore.
 
 **Vitesse de vol réglable** (demande de Théo du 2026-11-22, soir) : de **0,1 à 1000 m/s**, 25 m/s
-au départ. En vol, **la molette** la règle : chaque cran la multiplie ou la divise par 1,25 (41
-crans d'un bout à l'autre) ; elle ne recule alors plus la caméra. C'est la vitesse atteinte à fond
-de stick, à l'horizontale comme en montée (Espace) ; le sprint la dépasse comme à pied. Elle
-s'affiche à côté du nom de l'arme (« MODE CRÉATIF · 25 m/s », avec une décimale sous 10 m/s) et la
-ligne d'aide du bas de l'écran rappelle la molette. `--creative-speed V` choisit la vitesse de
-départ. Les poussées du combat (recul d'un coup, patte du dragon) ne sont pas multipliées par
-cette vitesse.
+au départ. Deux actions la règlent, **« accélérer »** et **« ralentir »**
+(`ENG_ACTION_FLY_FASTER`, `ENG_ACTION_FLY_SLOWER`) : chaque pression la multiplie ou la divise par
+1,25 (41 crans d'un bout à l'autre). C'est la vitesse atteinte à fond de stick, à l'horizontale
+comme en montée (Espace) ; le sprint la dépasse comme à pied. Elle s'affiche à côté du nom de
+l'arme (« MODE CRÉATIF · 25 m/s », avec une décimale sous 10 m/s). `--creative-speed V` choisit la
+vitesse de départ. Les poussées du combat (recul d'un coup, patte du dragon) ne sont pas
+multipliées par cette vitesse.
+
+**Ses touches** (retour de Théo, qui jouait sans souris : « dans contrôle on peut aussi modifier
+les contrôles créatif comme accélérer et décélérer ») :
+
+- Par défaut : **la molette** (vers le haut : accélérer ; vers le bas : ralentir), et la croix de
+  la manette (haut / bas). La molette ne recule alors plus la caméra.
+- Elles se relient dans **Options > Contrôles**, lignes « Vol créatif : accélérer » et « Vol
+  créatif : ralentir » : une touche du clavier (les flèches comprises), un bouton de souris ou de
+  manette, une gâchette, ou un cran de molette.
+- Sur une **touche** : une pression = un cran ; tenue plus de 0,25 s, la touche fait ensuite défiler
+  les crans en continu, 10 par seconde (de 25 à 1000 m/s en moins de 2 s). Les deux touches tenues
+  ensemble s'annulent. La molette, libérée, recule de nouveau la caméra.
+- La ligne d'aide du bas de l'écran nomme les touches en place (« molette », ou « Flèche haut /
+  Flèche bas »).
+
+La molette est devenue une source de liaison comme une autre (`ENG_BIND_MOUSE_WHEEL`,
+`engine/input.h`) : chaque cran entier presse l'action un instant, un cran par pas de simulation ;
+les fractions de cran d'un pavé tactile s'additionnent. Dans `config.ini` : `wheel:up`,
+`wheel:down`.
 
 L'autotest du combat le vérifie (`play_mode_set_creative`, `play_mode_set_creative_speed` : même
 dégât par coup, PV remis, montée de 25 m en 1 s, pas de chute, 25 m/s à fond de stick, trois crans
-de molette : 48,8 m/s, caméra immobile, vitesse dans le HUD, plafond à 1000 m/s (995 m parcourus
-en 1 s), plancher à 0,1 m/s (10 cm de montée en 1 s), valeur non finie ignorée, retour au sol en
-repassant en aventure, où la molette règle de nouveau la caméra). Tests de bout en bout :
-`launcher.creative_speed` (de vrais crans de molette : 39,06 m/s), `launcher.creative_speed_start`
-(`--creative-speed 400` puis deux crans : 625 m/s).
+de molette : 48,8 m/s, caméra immobile, vitesse dans le HUD ; sur des touches : une pression
+31,25 m/s, tenue 0,25 s un seul cran, tenue 1,25 s onze crans (291 m/s), les deux ensemble rien,
+et la molette recule alors la caméra ; plafond à 1000 m/s (933 m parcourus en 1 s), plancher à
+0,1 m/s (10 cm de montée en 1 s), valeur non finie ignorée, retour au sol en repassant en
+aventure, où la molette règle la caméra et où « accélérer » ne change rien). Tests de bout en
+bout : `launcher.creative_speed` (de vrais crans de molette : 39,06 m/s),
+`launcher.creative_speed_start` (`--creative-speed 400` puis deux crans : 625 m/s),
+`launcher.creative_keys` (de vraies touches : pause, Options, Contrôles, les deux actions reliées
+aux flèches, retour au jeu, flèche du haut tenue 36 pas : 68,24 m/s ; liaisons relues dans le
+fichier d'options). Tests unitaires : `engine.input` (la molette en source de liaison),
+`engine.game_systems` (les deux lignes du menu), `engine.config` (`wheel:up`).
 
 Limites : la vitesse de vol n'est pas enregistrée avec la partie (25 m/s à chaque lancement) ;
-pas de touche du clavier ni de bouton de manette pour la régler (la molette seulement, ou le pavé
-tactile à deux doigts) ; à très grande vitesse le relief détaillé se charge après le passage du
-joueur (on survole la vue lointaine).
+relier une action remplace toutes ses liaisons par une seule (la croix de la manette disparaît de
+l'action reliée au clavier) ; à très grande vitesse le relief détaillé se charge après le passage
+du joueur (on survole la vue lointaine).
 
 ## Équipement (M8-08)
 

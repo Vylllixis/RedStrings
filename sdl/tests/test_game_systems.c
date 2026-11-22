@@ -852,6 +852,13 @@ UTEST(game_menu, option_rows_describe_their_widget_and_bindings_have_readable_na
     eng_binding_name(ENG_BIND_PAD_TRIGGER, ENG_PAD_AXIS_RIGHT_TRIGGER, name, sizeof name);
     EXPECT_STREQ(name, "g\xC3\xA2"
                        "chette droite");
+    eng_binding_name(ENG_BIND_MOUSE_WHEEL, ENG_WHEEL_UP, name, sizeof name);
+    EXPECT_STREQ(name, "molette haut");
+    eng_binding_name(ENG_BIND_MOUSE_WHEEL, ENG_WHEEL_DOWN, name, sizeof name);
+    EXPECT_STREQ(name, "molette bas");
+    eng_binding_name(ENG_BIND_KEY, ENG_KEY_UP, name, sizeof name);
+    EXPECT_STREQ(name, "Fl\xC3\xA8"
+                       "che haut");
     eng_menu_open(&m, ENG_MENU_CONTROLS);
     (void)eng_menu_items(&m, items, ENG_MENU_MAX_ITEMS);
     EXPECT_STREQ(items[0].value, "clic gauche, manette X"); /* attaque légère */
@@ -880,7 +887,9 @@ UTEST(game_menu, every_action_can_be_remapped_from_the_controls_screen)
     eng_menu_open(&m, ENG_MENU_CONTROLS);
     EngMenuItem items[ENG_MENU_MAX_ITEMS];
     const uint32_t n = eng_menu_items(&m, items, ENG_MENU_MAX_ITEMS);
-    EXPECT_EQ(n, 11U); /* 9 actions (dont « Changer d'arme », M8-08) + Par défaut + Retour */
+    /* 11 actions (dont « Changer d'arme », M8-08, et les deux vitesses du vol créatif) + Par
+     * défaut + Retour */
+    EXPECT_EQ(n, 13U);
     for (int32_t a = 0; a < 8; a++) {
         m.selected = a;
         eng_input_key(&input, 44 /* espace : la touche qui valide */, true);
@@ -918,8 +927,8 @@ UTEST(game_menu, every_action_can_be_remapped_from_the_controls_screen)
     EXPECT_TRUE(o2.invert_y);
     EXPECT_EQ(in2.buttons[ENG_ACTION_PAUSE][0].code, 37);
     EXPECT_EQ(in2.buttons[ENG_ACTION_PAUSE][1].kind, ENG_BIND_NONE);
-    /* « Par défaut » (après les 9 actions) */
-    m.selected = 9;
+    /* « Par défaut » (après les 11 actions) */
+    m.selected = 11;
     EngInputState in = none_in();
     in.pressed = 1U << ENG_ACTION_JUMP;
     EXPECT_EQ(eng_menu_update(&m, &in), ENG_MENU_ACT_REMAPPED);
@@ -929,6 +938,168 @@ UTEST(game_menu, every_action_can_be_remapped_from_the_controls_screen)
         &o2, NULL, "volume.master = 7\nvolume.music = 0.25\nbogus = 1\nnot a line\n"));
     EXPECT_NEAR(o2.master, 0.3F, 1e-3F);
     EXPECT_NEAR(o2.volume[ENG_BUS_MUSIC], 0.25F, 1e-6F);
+}
+
+/* un pas du menu avec les VRAIES entrées de `input` (touches, molette), comme dans le jeu */
+static EngMenuAction real_tick(EngMenu *m, EngInput *input)
+{
+    EngInputState in;
+    eng_input_begin_tick(input, &in);
+    return eng_menu_update(m, &in);
+}
+
+/* Demande de Théo (2026-11-22) : « dans contrôle on peut aussi modifier les contrôles créatif comme
+ * accélérer et décélérer, là je le mettrai sur les flèches directionnelles du clavier mais par
+ * défaut laisse molette vers le haut pour accélérer, et molette du bas pour décélérer ». */
+UTEST(game_menu, fly_speed_lives_on_the_wheel_and_can_be_moved_to_the_arrow_keys)
+{
+    EngGameOptions opt;
+    eng_options_default(&opt);
+    static EngInput input;
+    eng_input_set_default_bindings(&input);
+    EngMenu m;
+    eng_menu_init(&m, &opt, &input);
+    eng_menu_open(&m, ENG_MENU_CONTROLS);
+    EngMenuItem items[ENG_MENU_MAX_ITEMS];
+    ASSERT_EQ(eng_menu_items(&m, items, ENG_MENU_MAX_ITEMS), 13U);
+    /* par défaut : la molette (et la croix de la manette) */
+    EXPECT_STREQ(items[9].label, "Vol cr\xC3\xA9"
+                                 "atif : acc\xC3\xA9"
+                                 "l\xC3\xA9"
+                                 "rer");
+    EXPECT_STREQ(items[9].value, "molette haut, croix haut");
+    EXPECT_STREQ(items[10].label, "Vol cr\xC3\xA9"
+                                  "atif : ralentir");
+    EXPECT_STREQ(items[10].value, "molette bas, croix bas");
+    EXPECT_STREQ(eng_action_label(ENG_ACTION_FLY_FASTER), items[9].label);
+    EXPECT_STREQ(eng_action_label(ENG_ACTION_FLY_SLOWER), items[10].label);
+
+    /* « accélérer » sur la flèche du haut : la flèche est aussi une touche de menu, mais ici elle
+     * devient la liaison, et la sélection ne bouge pas tant qu'elle reste enfoncée */
+    m.selected = 9;
+    (void)menu_key(&m, ENG_MENU_KEY_OK);
+    ASSERT_EQ(m.remap, 9);
+    (void)eng_menu_items(&m, items, ENG_MENU_MAX_ITEMS);
+    EXPECT_NE(strstr(items[9].value, "appuie"), NULL);
+    eng_input_key(&input, ENG_KEY_UP, true);
+    EXPECT_EQ(real_tick(&m, &input), ENG_MENU_ACT_REMAPPED);
+    EXPECT_EQ(m.remap, -1);
+    EXPECT_EQ(input.buttons[ENG_ACTION_FLY_FASTER][0].kind, ENG_BIND_KEY);
+    EXPECT_EQ(input.buttons[ENG_ACTION_FLY_FASTER][0].code, ENG_KEY_UP);
+    EXPECT_EQ(input.buttons[ENG_ACTION_FLY_FASTER][1].kind,
+              ENG_BIND_NONE);      /* la molette n'y est plus */
+    for (int i = 0; i < 40; i++) { /* la flèche tenue 40 pas de plus */
+        EXPECT_EQ(real_tick(&m, &input), ENG_MENU_ACT_NONE);
+        ASSERT_EQ(m.selected, 9);
+    }
+    eng_input_key(&input, ENG_KEY_UP, false);
+    (void)real_tick(&m, &input);
+    EXPECT_EQ(m.selected, 9);
+    eng_input_key(&input, ENG_KEY_UP,
+                  true); /* relâchée puis pressée : la flèche navigue de nouveau */
+    (void)real_tick(&m, &input);
+    EXPECT_EQ(m.selected, 8);
+    eng_input_key(&input, ENG_KEY_UP, false);
+    (void)real_tick(&m, &input);
+    (void)eng_menu_items(&m, items, ENG_MENU_MAX_ITEMS);
+    EXPECT_STREQ(items[9].value, "Fl\xC3\xA8"
+                                 "che haut");
+
+    /* « ralentir » sur la flèche du bas */
+    m.selected = 10;
+    (void)menu_key(&m, ENG_MENU_KEY_OK);
+    ASSERT_EQ(m.remap, 10);
+    eng_input_key(&input, ENG_KEY_DOWN, true);
+    EXPECT_EQ(real_tick(&m, &input), ENG_MENU_ACT_REMAPPED);
+    eng_input_key(&input, ENG_KEY_DOWN, false);
+    (void)real_tick(&m, &input);
+    EXPECT_EQ(m.selected, 10);
+    EXPECT_EQ(input.buttons[ENG_ACTION_FLY_SLOWER][0].kind, ENG_BIND_KEY);
+    EXPECT_EQ(input.buttons[ENG_ACTION_FLY_SLOWER][0].code, ENG_KEY_DOWN);
+    /* en jeu, ces flèches pressent maintenant les deux actions */
+    eng_input_key(&input, ENG_KEY_UP, true);
+    EngInputState play;
+    eng_input_begin_tick(&input, &play);
+    EXPECT_TRUE(eng_action_pressed(&play, ENG_ACTION_FLY_FASTER));
+    EXPECT_TRUE(eng_action_held(&play, ENG_ACTION_FLY_FASTER));
+    EXPECT_FALSE(eng_action_held(&play, ENG_ACTION_FLY_SLOWER));
+    EXPECT_EQ(0U, play.wheel_bound); /* et plus rien n'est lié à la molette */
+    eng_input_key(&input, ENG_KEY_UP, false);
+    eng_input_begin_tick(&input, &play);
+
+    /* les liaisons s'enregistrent et se relisent (fichier d'options) */
+    static char text[4096];
+    ASSERT_GT(eng_options_save(&opt, &input, text, sizeof text), 50U);
+    EXPECT_NE(strstr(text, "bind 9 1 82\n"), NULL); /* accélérer : touche (1), flèche haut (82) */
+    EXPECT_NE(strstr(text, "bind 10 1 81\n"), NULL); /* ralentir : flèche bas (81) */
+    static EngInput loaded;
+    eng_input_set_default_bindings(&loaded);
+    EngGameOptions o2;
+    eng_options_default(&o2);
+    ASSERT_TRUE(eng_options_load(&o2, &loaded, text));
+    EXPECT_EQ(loaded.buttons[ENG_ACTION_FLY_FASTER][0].code, ENG_KEY_UP);
+    EXPECT_EQ(loaded.buttons[ENG_ACTION_FLY_SLOWER][0].code, ENG_KEY_DOWN);
+    EXPECT_EQ(loaded.buttons[ENG_ACTION_FLY_SLOWER][1].kind, ENG_BIND_NONE);
+
+    /* retour à la molette par le menu : un cran vers le bas pour « ralentir ». Une fraction de
+     * cran (pavé tactile) ne suffit pas ; le cran qui a servi à choisir ne presse pas l'action. */
+    m.selected = 10;
+    (void)menu_key(&m, ENG_MENU_KEY_OK);
+    ASSERT_EQ(m.remap, 10);
+    eng_input_mouse_wheel(&input, -0.4F);
+    EXPECT_EQ(real_tick(&m, &input), ENG_MENU_ACT_NONE);
+    EXPECT_EQ(m.remap, 10);
+    eng_input_mouse_wheel(&input, -0.7F);
+    EXPECT_EQ(real_tick(&m, &input), ENG_MENU_ACT_REMAPPED);
+    EXPECT_EQ(input.buttons[ENG_ACTION_FLY_SLOWER][0].kind, ENG_BIND_MOUSE_WHEEL);
+    EXPECT_EQ(input.buttons[ENG_ACTION_FLY_SLOWER][0].code, ENG_WHEEL_DOWN);
+    eng_input_begin_tick(&input, &play);
+    EXPECT_FALSE(eng_action_pressed(&play, ENG_ACTION_FLY_SLOWER));
+    const uint32_t slower_bit = 1U << ENG_ACTION_FLY_SLOWER;
+    EXPECT_EQ(slower_bit, play.wheel_bound);
+    (void)eng_menu_items(&m, items, ENG_MENU_MAX_ITEMS);
+    EXPECT_STREQ(items[10].value, "molette bas");
+    ASSERT_GT(eng_options_save(&opt, &input, text, sizeof text), 50U);
+    EXPECT_NE(strstr(text, "bind 10 5 1\n"), NULL); /* molette (5), vers le bas (1) */
+    eng_input_set_default_bindings(&loaded);
+    eng_input_clear_action(&loaded, ENG_ACTION_FLY_SLOWER);
+    ASSERT_TRUE(eng_options_load(&o2, &loaded, text));
+    EXPECT_EQ(loaded.buttons[ENG_ACTION_FLY_SLOWER][0].kind, ENG_BIND_MOUSE_WHEEL);
+    EXPECT_EQ(loaded.buttons[ENG_ACTION_FLY_SLOWER][0].code, ENG_WHEEL_DOWN);
+
+    /* trois crans d'un coup pour relier « Saut » (une action qui VALIDE dans les menus) : les
+     * crans restants ne valident pas la ligne de nouveau */
+    m.selected = 3;
+    (void)menu_key(&m, ENG_MENU_KEY_OK);
+    ASSERT_EQ(m.remap, 3);
+    eng_input_mouse_wheel(&input, 3.0F);
+    EXPECT_EQ(real_tick(&m, &input), ENG_MENU_ACT_REMAPPED);
+    EXPECT_EQ(input.buttons[ENG_ACTION_JUMP][0].kind, ENG_BIND_MOUSE_WHEEL);
+    EXPECT_EQ(input.buttons[ENG_ACTION_JUMP][0].code, ENG_WHEEL_UP);
+    for (int i = 0; i < 5; i++) {
+        EXPECT_EQ(real_tick(&m, &input), ENG_MENU_ACT_NONE);
+        ASSERT_EQ(m.remap, -1);
+    }
+
+    /* fichier abîmé : un sens de molette ou un genre inconnu est ignoré sans effacer la liaison */
+    eng_input_set_default_bindings(&loaded);
+    ASSERT_TRUE(eng_options_load(&o2, &loaded, "bind 9 5 7\nbind 10 6 0\nbind 10 0 3\n"));
+    EXPECT_EQ(loaded.buttons[ENG_ACTION_FLY_FASTER][0].kind, ENG_BIND_MOUSE_WHEEL);
+    EXPECT_EQ(loaded.buttons[ENG_ACTION_FLY_FASTER][0].code, ENG_WHEEL_UP);
+    EXPECT_EQ(loaded.buttons[ENG_ACTION_FLY_SLOWER][0].kind, ENG_BIND_MOUSE_WHEEL);
+    EXPECT_EQ(loaded.buttons[ENG_ACTION_FLY_SLOWER][0].code, ENG_WHEEL_DOWN);
+    /* un ancien fichier, écrit avant ces deux actions (il n'en parle pas) : elles gardent la
+     * molette */
+    eng_input_set_default_bindings(&loaded);
+    ASSERT_TRUE(eng_options_load(&o2, &loaded, "bind 0 2 1\nbind 8 1 21\n"));
+    EXPECT_EQ(loaded.buttons[ENG_ACTION_FLY_FASTER][0].kind, ENG_BIND_MOUSE_WHEEL);
+    EXPECT_EQ(loaded.buttons[ENG_ACTION_FLY_SLOWER][0].kind, ENG_BIND_MOUSE_WHEEL);
+
+    /* « Par défaut » remet la molette pour les deux */
+    m.selected = 11;
+    EXPECT_EQ(menu_key(&m, ENG_MENU_KEY_OK), ENG_MENU_ACT_REMAPPED);
+    EXPECT_EQ(input.buttons[ENG_ACTION_FLY_FASTER][0].kind, ENG_BIND_MOUSE_WHEEL);
+    EXPECT_EQ(input.buttons[ENG_ACTION_FLY_FASTER][0].code, ENG_WHEEL_UP);
 }
 
 UTEST(game_menu, graphics_options_toggle_persist_and_controls_returns_to_its_line)
@@ -1030,7 +1201,7 @@ UTEST(game_menu, graphics_options_toggle_persist_and_controls_returns_to_its_lin
     m.selected = (int32_t)n - 2;
     EXPECT_EQ(press(&m, ENG_ACTION_JUMP), ENG_MENU_ACT_NONE);
     EXPECT_EQ(m.screen, ENG_MENU_CONTROLS);
-    m.selected = 10; /* Retour (9 actions remappables, Par défaut, Retour) */
+    m.selected = 12; /* Retour (11 actions remappables, Par défaut, Retour) */
     EXPECT_EQ(press(&m, ENG_ACTION_JUMP), ENG_MENU_ACT_NONE);
     EXPECT_EQ(m.screen, ENG_MENU_OPTIONS);
     EXPECT_EQ(m.selected, (int32_t)n - 2);

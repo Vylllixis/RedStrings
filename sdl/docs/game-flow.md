@@ -30,9 +30,13 @@ fenêtre.
 - Un clic ne valide que la ligne sous la souris (avant : il validait la ligne choisie, où que soit
   la souris).
 - Le jeu est figé quand un menu est ouvert (la souris est alors libérée).
-- Remapper : valider une action, puis presser la nouvelle touche (clavier, souris ou manette) ; elle
-  remplace les anciennes ; Échap annule. Les liaisons s'affichent par leur nom (« Espace, manette
-  A »), dans la disposition du clavier (AZERTY : « Z » pour avancer).
+- Remapper : valider une action, puis presser la nouvelle entrée (touche du clavier, **flèche
+  comprise**, bouton de souris ou de manette, gâchette, ou **cran de molette**) ; elle remplace les
+  anciennes ; Échap annule. Les liaisons s'affichent par leur nom (« Espace, manette A », « molette
+  haut », « Flèche bas »), dans la disposition du clavier (AZERTY : « Z » pour avancer).
+- L'entrée choisie n'agit pas aussitôt sur le menu : une flèche (touche de menu, encore enfoncée)
+  ne déplace pas la sélection tant qu'elle n'est pas relâchée, et le cran de molette qui a servi à
+  choisir ne presse pas l'action.
 
 ## Écrans — `game_menu` (logique), `menu_motion` (animation), `ui_menu` (dessin)
 
@@ -45,7 +49,7 @@ fenêtre.
 | Supprimer cette partie ? | Non, garder la partie (choisi par défaut) ; Oui, supprimer |
 | Pause | Reprendre, Sauvegarder, Options, Sauvegarder et quitter |
 | Options | Volume général, effets, musique, ambiance, interface ; sensibilité ; inverser Y ; taille du texte ; contraste élevé ; anticrénelage (FXAA) ; halo lumineux (bloom) ; synchronisation verticale ; plein écran ; qualité des ombres ; distance de vue ; SSAO ; échelle de résolution ; Contrôles... ; Retour |
-| Contrôles | une ligne par action, Par défaut, Retour |
+| Contrôles | une ligne par action (onze : les neuf du combat, puis « Vol créatif : accélérer » et « Vol créatif : ralentir »), Par défaut, Retour |
 
 ## Gestion des parties (2026-11-22) : comme la liste des mondes de Minecraft
 

@@ -24,7 +24,9 @@
  *   Suppression confirmation ; le choix par défaut garde la partie.
  *   Pause       Reprendre, Sauvegarder, Options, Sauvegarder et quitter (vers le menu principal).
  *   Options, Contrôles : réglages, remappage (une ligne par action ; valider attend la prochaine
- *               touche pressée, Échap annule ; « Par défaut »).
+ *               entrée pressée — touche, flèche comprise, bouton, gâchette ou cran de molette —,
+ *               Échap annule ; « Par défaut »). Les deux dernières actions règlent la vitesse du
+ *               vol en mode créatif (par défaut : la molette).
  *
  * L'action renvoyée vise toujours l'emplacement `slot` ; c'est l'appelant (game_flow) qui lit et
  * écrit les fichiers, puis décrit les emplacements avec eng_menu_set_slot. */
@@ -134,6 +136,7 @@ typedef struct EngMenu {
     int32_t remap;       /* action en attente d'une touche, -1 sinon */
     uint32_t remap_serial;
     uint32_t nav_cooldown; /* ticks avant la prochaine répétition */
+    bool nav_wait_release; /* après un remappage : pas de déplacement avant le relâchement */
     float nav_prev_y;
     float nav_prev_x;
     /* saisie du nom (écran Nom) */

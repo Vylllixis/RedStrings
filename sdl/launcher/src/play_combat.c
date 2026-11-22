@@ -1947,7 +1947,7 @@ void play_combat_fill_hud(const PlayCombat *c, const PlayMode *play, mat4 view_p
     hud->posture = pf->posture;
     hud->posture_max = pf->params.max_posture;
     hud->level = c->progress.level;
-    char mode[48] = ""; /* mode créatif : annoncé avec la vitesse de vol (réglée à la molette) */
+    char mode[48] = ""; /* mode créatif : annoncé avec la vitesse de vol */
     if (c->invincible) {
         const float speed = play_mode_creative_speed(play);
         (void)snprintf(mode, sizeof mode,
@@ -2204,13 +2204,48 @@ static void step(CombatTest *t, uint32_t pressed, uint32_t held, float mx, float
     play_mode_tick(&t->play, &in, 1.0F / 60.0F);
 }
 
-/* un tick où la molette tourne de `notches` crans */
+#define FLY_ACTIONS ((1U << ENG_ACTION_FLY_FASTER) | (1U << ENG_ACTION_FLY_SLOWER))
+
+/* un tick où la molette tourne de `notches` crans sans qu'aucune action n'y soit liée */
 static void wheel(CombatTest *t, float notches)
 {
     EngInputState in;
     memset(&in, 0, sizeof in);
     in.wheel = notches;
     play_mode_tick(&t->play, &in, 1.0F / 60.0F);
+}
+
+/* `count` crans de molette quand « accélérer » et « ralentir » y sont liées (le réglage par
+ * défaut) : comme les entrées du moteur les livrent, un cran par pas, l'action pressée et
+ * relâchée au même pas, les crans bruts au premier */
+static void fly_wheel(CombatTest *t, EngAction action, uint32_t count)
+{
+    for (uint32_t i = 0; i < count; i++) {
+        EngInputState in;
+        memset(&in, 0, sizeof in);
+        in.pressed = 1U << action;
+        in.released = 1U << action;
+        in.wheel_bound = FLY_ACTIONS;
+        in.wheel = i > 0U ? 0.0F : (action == ENG_ACTION_FLY_FASTER ? 1.0F : -1.0F) * (float)count;
+        play_mode_tick(&t->play, &in, 1.0F / 60.0F);
+    }
+}
+
+/* les touches `actions` (masque) tenues pendant `ticks` pas : pressées au premier ; ces actions
+ * sont reliées au clavier (rien sur la molette) */
+static void fly_hold(CombatTest *t, uint32_t actions, uint32_t ticks)
+{
+    for (uint32_t i = 0; i < ticks; i++) {
+        EngInputState in;
+        memset(&in, 0, sizeof in);
+        in.pressed = i == 0U ? actions : 0U;
+        in.held = actions;
+        play_mode_tick(&t->play, &in, 1.0F / 60.0F);
+    }
+    EngInputState up; /* puis relâchées */
+    memset(&up, 0, sizeof up);
+    up.released = actions;
+    play_mode_tick(&t->play, &up, 1.0F / 60.0F);
 }
 
 static void put(CombatTest *t, float x, float z, float yaw)
@@ -3430,9 +3465,10 @@ bool play_combat_selftest(bool rig)
           walked > 2.0F &&
               fabsf(flown - (walked * PLAY_CREATIVE_SPEED_DEFAULT / run_speed)) < 0.03F * flown,
           "créatif : vol à 25 m/s à fond de stick (m en 1 s)", flown);
-    /* la molette règle la vitesse de vol, de 0,1 à 1000 m/s ; elle ne recule plus la caméra */
+    /* « accélérer » et « ralentir » règlent la vitesse de vol, de 0,1 à 1000 m/s. Par défaut elles
+     * sont sur la molette, qui ne recule alors plus la caméra. */
     const float zoom = t.play.orbit.distance;
-    wheel(&t, 3.0F);
+    fly_wheel(&t, ENG_ACTION_FLY_FASTER, 3U);
     check(&t, fabsf(play_mode_creative_speed(&t.play) - (25.0F * 1.25F * 1.25F * 1.25F)) < 0.01F,
           "créatif : trois crans de molette : vitesse x 1,25 trois fois (m/s)",
           play_mode_creative_speed(&t.play));
@@ -3442,7 +3478,45 @@ bool play_combat_selftest(bool rig)
     play_combat_fill_hud(c, &t.play, no_view, 1280, 720, &speed_hud);
     check(&t, strstr(speed_hud.weapon, "49 m/s") != NULL, "créatif : la vitesse est dans le HUD",
           (float)strlen(speed_hud.weapon));
-    wheel(&t, 100.0F);
+    fly_wheel(&t, ENG_ACTION_FLY_SLOWER, 1U);
+    check(&t, fabsf(play_mode_creative_speed(&t.play) - (25.0F * 1.25F * 1.25F)) < 0.01F,
+          "créatif : un cran de molette vers le bas : vitesse / 1,25 (m/s)",
+          play_mode_creative_speed(&t.play));
+    /* reliées à des TOUCHES (les flèches de Théo) : une pression = un cran ; tenue, la touche ne
+     * fait rien de plus pendant 0,25 s (15 pas), puis 10 crans par seconde */
+    play_mode_set_creative_speed(&t.play, PLAY_CREATIVE_SPEED_DEFAULT);
+    fly_hold(&t, 1U << ENG_ACTION_FLY_FASTER, 1U);
+    check(&t, fabsf(play_mode_creative_speed(&t.play) - 31.25F) < 0.01F,
+          "créatif : une pression de la touche « accélérer » : x 1,25 (m/s)",
+          play_mode_creative_speed(&t.play));
+    fly_hold(&t, 1U << ENG_ACTION_FLY_SLOWER, 15U);
+    check(&t, fabsf(play_mode_creative_speed(&t.play) - 25.0F) < 0.01F,
+          "créatif : « ralentir » tenue 0,25 s : un seul cran (m/s)",
+          play_mode_creative_speed(&t.play));
+    fly_hold(&t, 1U << ENG_ACTION_FLY_FASTER, 75U); /* 15 pas d'attente, puis 60 pas : 10 crans */
+    const float held_speed = 25.0F * powf(1.25F, 11.0F);
+    check(&t, fabsf(play_mode_creative_speed(&t.play) - held_speed) < 0.005F * held_speed,
+          "créatif : « accélérer » tenue 1,25 s : 11 crans, soit 291 m/s",
+          play_mode_creative_speed(&t.play));
+    fly_hold(&t, 1U << ENG_ACTION_FLY_SLOWER, 45U); /* 1 cran, puis 30 pas : 5 crans */
+    const float eased_speed = held_speed / powf(1.25F, 6.0F);
+    check(&t, fabsf(play_mode_creative_speed(&t.play) - eased_speed) < 0.005F * eased_speed,
+          "créatif : « ralentir » tenue 0,75 s : 6 crans de moins, soit 76 m/s",
+          play_mode_creative_speed(&t.play));
+    fly_hold(&t, FLY_ACTIONS, 90U);
+    check(&t, fabsf(play_mode_creative_speed(&t.play) - eased_speed) < 1e-3F,
+          "créatif : les deux touches tenues ensemble s'annulent (m/s)",
+          play_mode_creative_speed(&t.play));
+    /* la molette est alors libre : elle recule de nouveau la caméra, sans toucher à la vitesse */
+    const float zoom_keys = t.play.orbit.distance;
+    wheel(&t, -2.0F);
+    check(&t,
+          t.play.orbit.distance > zoom_keys + 0.05F &&
+              fabsf(play_mode_creative_speed(&t.play) - eased_speed) < 1e-3F,
+          "créatif : la vitesse sur des touches, la molette recule la caméra (m)",
+          t.play.orbit.distance);
+    wheel(&t, 2.0F);
+    fly_wheel(&t, ENG_ACTION_FLY_FASTER, 100U);
     check(&t, fabsf(play_mode_creative_speed(&t.play) - PLAY_CREATIVE_SPEED_MAX) < 1e-3F,
           "créatif : vitesse plafonnée à 1000 m/s", play_mode_creative_speed(&t.play));
     (void)eng_character_position(t.play.character, from);
@@ -3457,7 +3531,7 @@ bool play_combat_selftest(bool rig)
     const float fast = hypotf(to[0] - from[0], to[2] - from[2]);
     check(&t, fast > 700.0F && fabsf(fast - (walked * 1000.0F / run_speed)) < 0.03F * fast,
           "créatif : à 1000 m/s, près d'un kilomètre en 1 s (m)", fast);
-    wheel(&t, -200.0F);
+    fly_wheel(&t, ENG_ACTION_FLY_SLOWER, 200U);
     check(&t, fabsf(play_mode_creative_speed(&t.play) - PLAY_CREATIVE_SPEED_MIN) < 1e-6F,
           "créatif : vitesse plancher à 0,1 m/s", play_mode_creative_speed(&t.play));
     (void)eng_character_position(t.play.character, from);
@@ -3478,14 +3552,17 @@ bool play_combat_selftest(bool rig)
     play_mode_set_creative(&t.play, false);
     check(&t, !t.play.creative && !c->invincible,
           "retour en aventure : plus de vol ni d'invincibilité", t.play.creative ? 1.0F : 0.0F);
-    const float zoom_before = t.play.orbit.distance; /* en aventure, la molette recule la caméra */
-    wheel(&t, -2.0F);
+    /* en aventure, la molette recule la caméra même si la vitesse de vol y est liée, et
+     * « accélérer » ne change rien */
+    const float zoom_before = t.play.orbit.distance;
+    fly_wheel(&t, ENG_ACTION_FLY_SLOWER, 2U);
+    fly_hold(&t, 1U << ENG_ACTION_FLY_FASTER, 40U);
     check(&t,
           t.play.orbit.distance > zoom_before + 0.05F &&
               fabsf(play_mode_creative_speed(&t.play) - PLAY_CREATIVE_SPEED_DEFAULT) < 1e-5F,
           "aventure : la molette règle la caméra, pas la vitesse de vol (m)",
           t.play.orbit.distance);
-    wheel(&t, 2.0F);
+    fly_wheel(&t, ENG_ACTION_FLY_FASTER, 2U);
     for (int i = 0; i < 180; i++) {
         step(&t, 0U, 0U, 0.0F, 0.0F);
     }

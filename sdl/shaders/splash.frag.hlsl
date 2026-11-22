@@ -7,6 +7,13 @@
 // Temps : fondu depuis le noir, le fil se déroule, le titre apparaît derrière l'aiguille, puis la
 // scène vit en boucle (nuages, fumée, braises, dragon, herbe) tant que le chargement dure ; la
 // corde du bas se remplit avec la progression ; à la fin, éclat du soleil puis fondu au noir.
+//
+// Écran d'attente logiciel (engine/boot_screen.h) : pendant que le pilote de la carte graphique
+// démarre, le processeur dessine déjà LA CORDE DU BAS, sur fond noir, avec les formules de la
+// section « La corde du bas » ci-dessous et de la fin de main (vignette, courbe de ton, gamma).
+// anim.w est la durée de cette attente : la corde continue alors où elle en était (sa vibration,
+// son fondu) pendant que la scène, elle, apparaît en fondu. Toute retouche de ces formules se fait
+// aussi dans engine/src/boot_screen.c ; --splash-shots compare les deux images.
 // Repère : p.x vers la droite, p.y vers le HAUT, hauteur de l'écran = 1 (p.y de -0,5 à 0,5).
 Texture2D<float4> text_tex : register(t0, space2);
 SamplerState text_smp : register(s0, space2);
@@ -14,7 +21,8 @@ SamplerState text_smp : register(s0, space2);
 cbuffer Splash : register(b0, space3)
 {
     float4 screen;     // xy : taille (pixels) ; z : temps (s) ; w : progression lissée [0, 1]
-    float4 anim;       // x : sortie [0, 1] ; y : apparition du titre [0, 1] ; z : graine ; w : libre
+    float4 anim;       // x : sortie [0, 1] ; y : apparition du titre [0, 1] ; z : graine ;
+                       // w : secondes d'écran d'attente logiciel déjà montrées (0 : aucun)
     float4 title_rect; // uv du titre dans l'image (u0, v0, u1, v1)
     float4 label_rect; // uv de la légende
     float4 text_info;  // x : largeur / hauteur du titre ; y : largeur / hauteur de la légende
@@ -459,42 +467,50 @@ float4 main(Input input) : SV_Target0
     col += float3(1.0f, 0.85f, 0.7f) * exp(-abs(p.x - sweep) * 26.0f) * halo * 1.3f *
            (1.0f - smoothstep(0.9f, 1.0f, title_in)); // l'éclat qui écrit
 
+    // ── Entrée : la scène apparaît en fondu depuis le noir. Après un écran d'attente logiciel, la
+    // corde est déjà là : elle garde son propre fondu (`lead`) et son propre temps (`bar_t`). ──
+    float intro = smoothstep(0.0f, 0.9f, t);
+    float bar_t = t + anim.w;
+    float lead = anim.w > 0.0f ? smoothstep(0.0f, 0.3f, bar_t) : intro;
+    col *= intro;
+
     // ── La corde du bas : elle se remplit avec le chargement, et vibre ──
     float bar_half = min(0.36f, aspect * 0.32f);
     float u_bar = (p.x + bar_half) / (2.0f * bar_half);
     float in_bar = step(0.0f, u_bar) * step(u_bar, 1.0f);
-    float pluck = sin(u_bar * PI) * sin(t * 13.0f) * 0.0022f * exp(-frac(t * 0.5f) * 3.0f);
+    float pluck = sin(u_bar * PI) * sin(bar_t * 13.0f) * 0.0022f * exp(-frac(bar_t * 0.5f) * 3.0f);
     float bar_d = abs(p.y - (-0.435f + pluck));
     float filled = smoothstep(progress + 0.004f, progress - 0.004f, u_bar);
     // écran-titre : la corde s'efface, le menu dessine la sienne au même endroit
     float loading = 1.0f - smoothstep(0.0f, 0.35f, menu.x);
     float string_core = smoothstep(0.0022f + aa, 0.0022f - aa, bar_d) * in_bar * loading;
-    col = lerp(col, float3(0.2f, 0.03f, 0.05f), string_core * 0.9f * (1.0f - filled));
-    col += THREAD * (string_core + exp(-bar_d * 150.0f) * 0.5f * in_bar * loading) * filled;
+    col = lerp(col, float3(0.2f, 0.03f, 0.05f) * lead, string_core * 0.9f * (1.0f - filled));
+    col += THREAD * (string_core + exp(-bar_d * 150.0f) * 0.5f * in_bar * loading) * filled * lead;
     float pegs = min(length(p - float2(-bar_half, -0.435f)), length(p - float2(bar_half, -0.435f))) - 0.0055f;
-    col = lerp(col, float3(0.75f, 0.55f, 0.45f), smoothstep(aa, -aa, pegs) * loading); // les chevilles
+    col = lerp(col, float3(0.75f, 0.55f, 0.45f) * lead, smoothstep(aa, -aa, pegs) * loading); // les chevilles
     float2 bead = float2(-bar_half + progress * 2.0f * bar_half, -0.435f + pluck);
-    col += float3(1.0f, 0.55f, 0.45f) * exp(-length(p - bead) * 150.0f) * 1.3f * loading; // le nœud qui avance
+    col += float3(1.0f, 0.55f, 0.45f) * exp(-length(p - bead) * 150.0f) * 1.3f * loading * lead; // le nœud qui avance
     // la légende, sous la corde
     float2 label_half = float2(0.0f, 0.0125f);
     label_half.x = label_half.y * max(text_info.y, 0.01f);
     float label = text_field(p, float2(0.0f, -0.467f), label_half, label_rect);
     float label_edge = fwidth(label) * 0.75f + 0.004f;
-    col = lerp(col, float3(0.95f, 0.8f, 0.72f),
-               smoothstep(0.5f - label_edge, 0.5f + label_edge, label) * (0.55f + 0.2f * sin(t * 2.2f)) * loading);
+    col = lerp(col, float3(0.95f, 0.8f, 0.72f) * lead,
+               smoothstep(0.5f - label_edge, 0.5f + label_edge, label) * (0.55f + 0.2f * sin(bar_t * 2.2f)) * loading);
 
-    // ── Sortie : le soleil éclate, puis tout s'éteint ; entrée : fondu depuis le noir ──
+    // ── Sortie : le soleil éclate, puis tout s'éteint (l'entrée est plus haut, avant la corde) ──
     float flare = sin(saturate(outro / 0.6f) * PI); // l'éclat monte puis retombe
     col += float3(1.0f, 0.62f, 0.3f) * exp(-sun_d * lerp(5.0f, 2.2f, flare)) * flare * 1.1f;
     float dusk = smoothstep(0.35f, 1.0f, outro);     // puis la scène rougit et s'éteint
     col *= lerp(float3(1.0f, 1.0f, 1.0f), float3(1.0f, 0.22f, 0.26f), dusk) * (1.0f - dusk);
-    col *= smoothstep(0.0f, 0.9f, t) * saturate(menu.z);
+    col *= saturate(menu.z);
 
-    // vignette, grain, courbe de ton, encodage sRGB (la swapchain n'est pas sRGB)
+    // vignette, grain, courbe de ton, encodage sRGB (la swapchain n'est pas sRGB). Le grain arrive
+    // avec la scène : sur le noir du début, il ferait un voile gris que l'écran d'attente n'a pas.
     float2 v = input.uv - 0.5f;
     col *= 1.0f - dot(v, v) * 0.85f;
     col = 1.0f - exp(-col * 1.25f);
-    col += (hash21(input.uv * res + frac(t) * 61.0f) - 0.5f) / 255.0f * 2.0f;
+    col += (hash21(input.uv * res + frac(t) * 61.0f) - 0.5f) / 255.0f * 2.0f * intro;
     col = pow(saturate(col), 1.0f / 2.2f);
     return float4(col, 1.0f);
 }

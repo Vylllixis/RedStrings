@@ -1,4 +1,5 @@
 #include <SDL3/SDL.h>
+#include <math.h>
 #include <string.h>
 
 #include "engine/input.h"
@@ -294,6 +295,172 @@ UTEST(eng_input, out_of_range_codes_are_ignored_and_binding_limits_enforced)
     EXPECT_FALSE(eng_input_bind_button(&empty, ENG_ACTION_COUNT, ENG_BIND_KEY, 1));
     EngAxisBinding bad = {.deadzone = 1.0F};
     EXPECT_FALSE(eng_input_bind_axis(&empty, ENG_AXIS_MOVE, &bad));
+}
+
+#define FASTER ENG_ACTION_FLY_FASTER
+#define SLOWER ENG_ACTION_FLY_SLOWER
+#define FLY_BITS ((1U << FASTER) | (1U << SLOWER))
+
+/* La molette presse les actions qui lui sont liées (par défaut : la vitesse du vol créatif), un
+ * cran par pas : trois crans arrivés ensemble comptent trois fois. */
+UTEST(eng_input, wheel_notches_press_their_actions_one_per_tick)
+{
+    EngInput in;
+    setup(&in);
+    EngInputState s = tick(&in);
+    EXPECT_EQ(FLY_BITS, s.wheel_bound); /* seules ces deux actions sont sur la molette */
+    EXPECT_EQ(0U, s.pressed);
+
+    eng_input_mouse_wheel(&in, 3.0F);
+    for (int i = 0; i < 3; i++) {
+        s = tick(&in);
+        EXPECT_TRUE(eng_action_pressed(&s, FASTER));
+        EXPECT_TRUE(eng_action_released(&s, FASTER)); /* jamais « enfoncée » */
+        EXPECT_FALSE(eng_action_held(&s, FASTER));
+        EXPECT_FALSE(eng_action_pressed(&s, SLOWER));
+        /* les crans bruts, eux, arrivent tous au premier pas (zoom de la caméra) */
+        EXPECT_NEAR(i == 0 ? 3.0F : 0.0F, s.wheel, 1e-6F);
+    }
+    s = tick(&in);
+    EXPECT_EQ(0U, s.pressed | s.released);
+
+    eng_input_mouse_wheel(&in, -2.0F); /* vers le bas : l'autre action */
+    for (int i = 0; i < 2; i++) {
+        s = tick(&in);
+        EXPECT_TRUE(eng_action_pressed(&s, SLOWER));
+        EXPECT_FALSE(eng_action_pressed(&s, FASTER));
+    }
+    s = tick(&in);
+    EXPECT_EQ(0U, s.pressed);
+
+    /* un cran dans l'autre sens annule un cran pas encore livré */
+    eng_input_mouse_wheel(&in, 3.0F);
+    eng_input_mouse_wheel(&in, -1.0F);
+    uint32_t up = 0;
+    uint32_t down = 0;
+    for (int i = 0; i < 6; i++) {
+        s = tick(&in);
+        up += eng_action_pressed(&s, FASTER) ? 1U : 0U;
+        down += eng_action_pressed(&s, SLOWER) ? 1U : 0U;
+    }
+    EXPECT_EQ(2U, up);
+    EXPECT_EQ(0U, down);
+}
+
+/* Pavé tactile : la molette arrive par fractions de cran ; elles s'additionnent jusqu'à faire un
+ * cran. Un changement de sens repart de zéro. */
+UTEST(eng_input, wheel_fractions_add_up_to_whole_notches)
+{
+    EngInput in;
+    setup(&in);
+    uint32_t serial = in.last_serial;
+    eng_input_mouse_wheel(&in, 0.4F);
+    eng_input_mouse_wheel(&in, 0.4F);
+    EngInputState s = tick(&in);
+    EXPECT_FALSE(eng_action_pressed(&s, FASTER));
+    EXPECT_EQ(serial, in.last_serial); /* pas encore un cran : pas une « pression » (remappage) */
+    eng_input_mouse_wheel(&in, 0.4F);  /* 1,2 cran : un cran, reste 0,2 */
+    EXPECT_EQ(serial + 1U, in.last_serial);
+    EXPECT_EQ(ENG_BIND_MOUSE_WHEEL, in.last_kind);
+    EXPECT_EQ(ENG_WHEEL_UP, in.last_code);
+    s = tick(&in);
+    EXPECT_TRUE(eng_action_pressed(&s, FASTER));
+    s = tick(&in);
+    EXPECT_FALSE(eng_action_pressed(&s, FASTER));
+    eng_input_mouse_wheel(&in, 0.75F); /* 0,95 : toujours pas */
+    s = tick(&in);
+    EXPECT_FALSE(eng_action_pressed(&s, FASTER));
+    /* demi-tour : le reste (0,95 vers le haut) est oublié, 0,6 vers le bas ne fait pas un cran */
+    eng_input_mouse_wheel(&in, -0.6F);
+    s = tick(&in);
+    EXPECT_EQ(0U, s.pressed);
+    serial = in.last_serial;
+    eng_input_mouse_wheel(&in, -0.5F); /* 1,1 vers le bas : un cran */
+    EXPECT_EQ(serial + 1U, in.last_serial);
+    EXPECT_EQ(ENG_WHEEL_DOWN, in.last_code);
+    s = tick(&in);
+    EXPECT_TRUE(eng_action_pressed(&s, SLOWER));
+    EXPECT_FALSE(eng_action_pressed(&s, FASTER));
+}
+
+/* Bornes et cas limites de la molette : grand coup de molette plafonné, valeurs non finies,
+ * perte du focus, action tenue par une touche en même temps, molette libre. */
+UTEST(eng_input, wheel_binding_limits_and_edge_cases)
+{
+    EngInput in;
+    setup(&in);
+    /* molette libre : au plus ENG_WHEEL_PENDING_MAX crans en attente, même en plusieurs coups */
+    eng_input_mouse_wheel(&in, 1000.0F);
+    eng_input_mouse_wheel(&in, 40.0F);
+    uint32_t pulses = 0;
+    for (int i = 0; i < 200; i++) {
+        const EngInputState s = tick(&in);
+        pulses += eng_action_pressed(&s, FASTER) ? 1U : 0U;
+    }
+    EXPECT_EQ((uint32_t)ENG_WHEEL_PENDING_MAX, pulses);
+    eng_input_mouse_wheel(&in, -1000.0F);
+    eng_input_mouse_wheel(&in, -40.0F);
+    pulses = 0;
+    for (int i = 0; i < 200; i++) {
+        const EngInputState s = tick(&in);
+        pulses += eng_action_pressed(&s, SLOWER) ? 1U : 0U;
+    }
+    EXPECT_EQ((uint32_t)ENG_WHEEL_PENDING_MAX, pulses);
+
+    eng_input_mouse_wheel(&in, NAN); /* valeurs absurdes : ignorées, la molette brute aussi */
+    eng_input_mouse_wheel(&in, INFINITY);
+    EngInputState s = tick(&in);
+    EXPECT_EQ(0U, s.pressed);
+    EXPECT_EQ(0.0F, s.wheel);
+
+    eng_input_mouse_wheel(&in, 5.0F); /* la fenêtre perd le focus : les crans en attente tombent */
+    eng_input_release_all(&in);
+    s = tick(&in);
+    EXPECT_FALSE(eng_action_pressed(&s, FASTER));
+    eng_input_mouse_wheel(&in, 2.0F); /* eng_input_drop_wheel aussi (le menu, après un remappage) */
+    eng_input_drop_wheel(&in);
+    s = tick(&in);
+    EXPECT_FALSE(eng_action_pressed(&s, FASTER));
+
+    /* une action tenue par une touche ET pressée par la molette : pressée de nouveau, pas relâchée
+     */
+    ASSERT_TRUE(eng_input_bind_button(&in, FASTER, ENG_BIND_KEY, SDL_SCANCODE_UP));
+    eng_input_key(&in, SDL_SCANCODE_UP, true);
+    s = tick(&in);
+    EXPECT_TRUE(eng_action_pressed(&s, FASTER) && eng_action_held(&s, FASTER));
+    eng_input_mouse_wheel(&in, 1.0F);
+    s = tick(&in);
+    EXPECT_TRUE(eng_action_pressed(&s, FASTER));
+    EXPECT_TRUE(eng_action_held(&s, FASTER));
+    EXPECT_FALSE(eng_action_released(&s, FASTER));
+    eng_input_key(&in, SDL_SCANCODE_UP, false);
+    s = tick(&in);
+
+    /* une liaison de molette n'accepte que ses deux sens ; un genre inconnu est refusé */
+    EXPECT_FALSE(eng_input_bind_button(&in, FASTER, ENG_BIND_MOUSE_WHEEL, 2));
+    EXPECT_FALSE(eng_input_bind_button(&in, FASTER, ENG_BIND_MOUSE_WHEEL, -1));
+    EXPECT_FALSE(eng_input_bind_button(&in, FASTER, (EngBindKind)(ENG_BIND_MOUSE_WHEEL + 1), 0));
+    EXPECT_FALSE(eng_input_bind_button(&in, FASTER, (EngBindKind)-1, 0));
+
+    /* reliées ailleurs, les deux actions libèrent la molette : plus de bit, plus d'impulsion */
+    eng_input_clear_action(&in, FASTER);
+    eng_input_clear_action(&in, SLOWER);
+    ASSERT_TRUE(eng_input_bind_button(&in, FASTER, ENG_BIND_KEY, SDL_SCANCODE_UP));
+    eng_input_mouse_wheel(&in, 2.0F);
+    s = tick(&in);
+    EXPECT_EQ(0U, s.wheel_bound);
+    EXPECT_EQ(0U, s.pressed);
+    EXPECT_NEAR(2.0F, s.wheel, 1e-6F); /* la molette brute reste disponible (zoom) */
+    /* n'importe quelle action peut aller sur la molette */
+    ASSERT_TRUE(
+        eng_input_bind_button(&in, ENG_ACTION_SWITCH_WEAPON, ENG_BIND_MOUSE_WHEEL, ENG_WHEEL_DOWN));
+    s = tick(&in); /* (le cran encore en attente part ici, vers le haut : sans effet) */
+    s = tick(&in);
+    eng_input_mouse_wheel(&in, -1.0F);
+    s = tick(&in);
+    EXPECT_TRUE(eng_action_pressed(&s, ENG_ACTION_SWITCH_WEAPON));
+    const uint32_t weapon_bit = 1U << ENG_ACTION_SWITCH_WEAPON;
+    EXPECT_EQ(weapon_bit, s.wheel_bound);
 }
 
 UTEST(eng_input, unbound_input_does_nothing)

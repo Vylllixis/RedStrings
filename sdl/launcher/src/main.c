@@ -116,12 +116,17 @@ static void usage(const char *prog)
     fprintf(stderr, "  --no-splash    pas d'écran de chargement animé (chargement direct, comme "
                     "avec --frames et les autotests)\n");
     fprintf(stderr, "  --splash       (développement) écran de chargement même avec --frames\n");
+    fprintf(stderr, "  --no-wait-screen  pas d'écran d'attente : la fenêtre attend la carte "
+                    "graphique sans image, comme avant (l'écran de chargement reste)\n");
+    fprintf(stderr, "  --gpu-delay MS (développement) fait attendre le démarrage de la carte "
+                    "graphique de MS millisecondes de plus : pour voir l'écran d'attente\n");
     fprintf(stderr, "  --windowed     fenêtre au lieu du plein écran (le jeu s'ouvre en plein "
                     "écran par défaut)\n");
     fprintf(stderr, "  --creative     avec --new-game : la partie est en mode créatif (invincible, "
                     "vol) ; sinon le mode se choisit au menu, à la création de la partie\n");
     fprintf(stderr, "  --creative-speed V  vitesse de vol du mode créatif au départ, de 0.1 à 1000 "
-                    "m/s (25 par défaut ; en jeu : la molette)\n");
+                    "m/s (25 par défaut ; en jeu : « accélérer » et « ralentir », la molette par "
+                    "défaut, remappables dans Options > Contrôles)\n");
     fprintf(stderr,
             "  --look-at X Z  (développement) la caméra regarde le point (x, z) de la carte "
             "au départ ; --look-pitch D : inclinée de D degrés (positif : vers le haut)\n");
@@ -131,7 +136,9 @@ static void usage(const char *prog)
                     "image (60 par seconde de jeu) : captures et tests du vol du dragon\n");
     fprintf(stderr, "  --menu-script S  (développement) joue des touches dans le menu : "
                     "« image:touche,... » avec up, down, left, right, ok, back, esc (événement "
-                    "Échap), bs (effacer), text=MOT, mouse=X/Y, click\n");
+                    "Échap), bs (effacer), text=MOT, mouse=X/Y, click, wheel=N (molette), key=NOM "
+                    "/ hold=NOM / release=NOM (vraie touche : up, down, left, right, space, "
+                    "pageup, pagedown)\n");
     fprintf(stderr, "  --shots DOSSIER N1,N2,...  (développement) écrit les images n° N1, N2... "
                     "en PPM dans DOSSIER\n");
     fprintf(stderr, "  --save-dir DOSSIER  parties et options dans ce dossier (au lieu du dossier "
@@ -319,8 +326,18 @@ static void flow_place_name(void *user, const double at[3], char *out, size_t ca
  * des images données. Touches : up, down, left, right, ok, back ; bs efface un caractère ;
  * text=MOT tape MOT ; mouse=X/Y place la souris (fractions de l'écran, de 0 à 1) ; click clique ;
  * esc envoie un vrai événement Échap à la fenêtre, et type=MOT un vrai événement de texte : ils
- * passent par la plateforme, comme au clavier. */
+ * passent par la plateforme, comme au clavier. wheel=N tourne la molette de N crans. key=NOM
+ * presse et relâche une vraie touche (up, down, left, right, space, pageup, pagedown) ; hold=NOM
+ * l'enfonce et release=NOM la relâche : pour relier une action à une touche puis la tenir en jeu.
+ */
 #define MENU_SCRIPT_MAX 96U
+
+typedef enum ScriptKeyMode {
+    SCRIPT_KEY_NONE = 0,
+    SCRIPT_KEY_TAP,    /* enfoncée puis relâchée */
+    SCRIPT_KEY_HOLD,   /* enfoncée */
+    SCRIPT_KEY_RELEASE /* relâchée */
+} ScriptKeyMode;
 
 typedef struct MenuScript {
     struct {
@@ -332,11 +349,38 @@ typedef struct MenuScript {
         bool escape; /* événement clavier Échap, traité par la plateforme à l'image suivante */
         bool typed;  /* `text` part en événement de texte (plateforme) au lieu d'aller au menu */
         float wheel; /* crans de molette (0 : aucun) */
+        ScriptKeyMode key_mode; /* vraie touche du clavier (key=, hold=, release=) */
+        int scancode;
+        uint32_t keycode;
     } step[MENU_SCRIPT_MAX];
     uint32_t count;
     uint32_t next;
     uint32_t pending; /* touches en attente du prochain tick */
 } MenuScript;
+
+/* key=NOM, hold=NOM, release=NOM : la touche `name` (de longueur `len`) ; false si inconnue */
+static bool script_key(const char *name, size_t len, int *scancode, uint32_t *keycode)
+{
+    static const struct {
+        const char *name;
+        SDL_Scancode scancode;
+        SDL_Keycode keycode;
+    } keys[] = {{"up", SDL_SCANCODE_UP, SDLK_UP},
+                {"down", SDL_SCANCODE_DOWN, SDLK_DOWN},
+                {"left", SDL_SCANCODE_LEFT, SDLK_LEFT},
+                {"right", SDL_SCANCODE_RIGHT, SDLK_RIGHT},
+                {"space", SDL_SCANCODE_SPACE, SDLK_SPACE},
+                {"pageup", SDL_SCANCODE_PAGEUP, SDLK_PAGEUP},
+                {"pagedown", SDL_SCANCODE_PAGEDOWN, SDLK_PAGEDOWN}};
+    for (size_t k = 0; k < sizeof keys / sizeof keys[0]; k++) {
+        if (strlen(keys[k].name) == len && strncmp(name, keys[k].name, len) == 0) {
+            *scancode = (int)keys[k].scancode;
+            *keycode = (uint32_t)keys[k].keycode;
+            return true;
+        }
+    }
+    return false;
+}
 
 static bool menu_script_parse(MenuScript *s, const char *spec)
 {
@@ -364,6 +408,24 @@ static bool menu_script_parse(MenuScript *s, const char *spec)
             s->step[s->count].escape = true;
         } else if (len > 6U && strncmp(key, "wheel=", 6) == 0) {
             s->step[s->count].wheel = strtof(key + 6, NULL);
+        } else if (len > 4U && strncmp(key, "key=", 4) == 0) {
+            s->step[s->count].key_mode = SCRIPT_KEY_TAP;
+            if (!script_key(key + 4, len - 4U, &s->step[s->count].scancode,
+                            &s->step[s->count].keycode)) {
+                return false;
+            }
+        } else if (len > 5U && strncmp(key, "hold=", 5) == 0) {
+            s->step[s->count].key_mode = SCRIPT_KEY_HOLD;
+            if (!script_key(key + 5, len - 5U, &s->step[s->count].scancode,
+                            &s->step[s->count].keycode)) {
+                return false;
+            }
+        } else if (len > 8U && strncmp(key, "release=", 8) == 0) {
+            s->step[s->count].key_mode = SCRIPT_KEY_RELEASE;
+            if (!script_key(key + 8, len - 8U, &s->step[s->count].scancode,
+                            &s->step[s->count].keycode)) {
+                return false;
+            }
         } else if (len > 5U && strncmp(key, "type=", 5) == 0) {
             (void)snprintf(s->step[s->count].text, sizeof s->step[s->count].text, "%.*s",
                            (int)(len - 5U), key + 5);
@@ -420,6 +482,21 @@ static void menu_script_frame(MenuScript *s, GameFlow *flow, uint64_t frame, Eng
         }
         if (s->step[s->next].wheel != 0.0F) {
             eng_input_mouse_wheel(&platform->input, s->step[s->next].wheel);
+        }
+        const ScriptKeyMode mode = s->step[s->next].key_mode;
+        for (int down = 1; down >= 0 && mode != SCRIPT_KEY_NONE; down--) {
+            /* de vrais événements du clavier : ils passent par la plateforme à l'image suivante */
+            if ((down != 0 && mode == SCRIPT_KEY_RELEASE) ||
+                (down == 0 && mode == SCRIPT_KEY_HOLD)) {
+                continue;
+            }
+            SDL_Event ev;
+            SDL_zero(ev);
+            ev.type = down != 0 ? SDL_EVENT_KEY_DOWN : SDL_EVENT_KEY_UP;
+            ev.key.scancode = (SDL_Scancode)s->step[s->next].scancode;
+            ev.key.key = (SDL_Keycode)s->step[s->next].keycode;
+            ev.key.down = down != 0;
+            (void)SDL_PushEvent(&ev);
         }
         if (s->step[s->next].escape) {
             for (int down = 1; down >= 0; down--) {
@@ -846,6 +923,23 @@ static double world_frame(WorldView *world, PlayMode *play, EngCamera *camera,
 /* ── Étapes longues du chargement : exécutées dans un fil à part quand l'écran de chargement est
  * affiché (splash_run), directement sinon. Elles ne font que créer et remplir des ressources. ── */
 
+/* Démarrage du pilote graphique : la partie longue quand la carte dort (eng_gpu_create). Pendant
+ * l'écran d'attente (splash_prelude_run) : dans un fil à part ; il ne touche pas à la fenêtre. */
+typedef struct GpuStartJob {
+    EngGpu *gpu;
+    const EngGpuDesc *desc;
+    long delay_ms; /* --gpu-delay : attente ajoutée, pour voir l'écran d'attente */
+} GpuStartJob;
+
+static bool gpu_start_job(void *user)
+{
+    const GpuStartJob *j = user;
+    if (j->delay_ms > 0) {
+        SDL_Delay((Uint32)j->delay_ms);
+    }
+    return eng_gpu_create(j->gpu, j->desc);
+}
+
 typedef struct RendererJob {
     EngRenderer *renderer;
     EngGpu *gpu;
@@ -909,9 +1003,47 @@ static bool avatar_job(void *user)
            avatar_library_load_gpu(j->avatars, j->renderer, j->env);
 }
 
+/* Le relais entre l'écran d'attente (dessiné par le processeur) et la scène (dessinée par le
+ * GPU) : la dernière image de l'un et la première de l'autre doivent être LA MÊME, à deux niveaux
+ * près, sinon la corde sauterait à l'écran. Trois attentes : très courte (carte déjà chaude, la
+ * corde est encore en fondu), longue (carte endormie), et longue pendant une vibration de la
+ * corde. Les rares pixels qui s'écartent, de quelques niveaux, sont au bord des lettres de la
+ * légende (le GPU ne filtre pas l'image du texte avec la même précision). */
+static bool splash_shots_handover(Splash *splash, const char *dir, int width, int height)
+{
+    static const struct {
+        const char *name;
+        double prelude_s;
+        float progress;
+    } cases[3] = {{"court", 0.15, 0.008F}, {"long", 2.7, 0.068F}, {"vibre", 4.06, 0.076F}};
+    SplashText text;
+    if (!splash_text_build(&text)) {
+        ENG_LOG_ERROR("relais : texte de l'écran indisponible");
+        return false;
+    }
+    bool ok = true;
+    for (uint32_t i = 0; i < 3U; i++) {
+        SplashHandover h = {0U, 0U, 0U, 0U};
+        const bool done =
+            splash_handover(splash, &text, cases[i].prelude_s, cases[i].progress, (uint32_t)width,
+                            (uint32_t)height, dir, cases[i].name, &h);
+        /* la corde est bien dessinée (des pixels éclairés), partout à 2 niveaux près, sauf au
+         * bord des lettres : moins d'un pixel sur 10 000, et jamais plus de 12 niveaux */
+        const bool same =
+            done && h.lit > 200U && h.worst <= 12U && h.differing * 10000U <= h.pixels;
+        ENG_LOG_INFO("  relais « %s » (attente de %.2f s) : %u pixel(s) éclairé(s), écart maximal "
+                     "%u / 255, %u pixel(s) sur %u au-delà de 2 / 255 : %s",
+                     cases[i].name, cases[i].prelude_s, h.lit, h.worst, h.differing, h.pixels,
+                     same ? "identiques" : "DIFFÉRENTES");
+        ok = ok && same;
+    }
+    splash_text_free(&text);
+    return ok;
+}
+
 /* --splash-shots : des images de l'écran de chargement à des instants choisis, écrites en PPM et
  * mesurées : le fondu d'entrée, le fil qui se déroule, le titre qui apparaît, la corde qui se
- * remplit, la sortie. Journalise AUTOTEST CHARGEMENT. */
+ * remplit, la sortie ; puis le relais avec l'écran d'attente. Journalise AUTOTEST CHARGEMENT. */
 static bool splash_shots(Splash *splash, const char *dir, int width, int height)
 {
     static const float moments[8][3] = {
@@ -945,15 +1077,17 @@ static bool splash_shots(Splash *splash, const char *dir, int width, int height)
     const bool thread = m[4].thread > 0.004F;         /* puis il traverse le ciel */
     const bool bar = m[5].bar > 3.0F * m[1].bar && m[1].bar > 0.0F; /* la corde se remplit */
     const bool outro = m[7].luma < 0.25F * m[5].luma;               /* et tout s'éteint */
+    const bool handover = splash_shots_handover(splash, dir, width, height);
     const bool ok = written == 8U && fade_in && no_title_yet && title && half_title &&
-                    no_thread_yet && thread && bar && outro;
+                    no_thread_yet && thread && bar && outro && handover;
     if (ok) {
-        ENG_LOG_INFO("AUTOTEST CHARGEMENT : OK (8 images : fondu, fil, titre, corde, sortie)");
+        ENG_LOG_INFO("AUTOTEST CHARGEMENT : OK (8 images : fondu, fil, titre, corde, sortie ; "
+                     "relais de l'écran d'attente sans saut)");
     } else {
         ENG_LOG_ERROR("AUTOTEST CHARGEMENT : ÉCHEC (images %u/8 ; fondu %d, sans titre %d, titre "
-                      "%d, mi-titre %d, sans fil %d, fil %d, corde %d, sortie %d)",
+                      "%d, mi-titre %d, sans fil %d, fil %d, corde %d, sortie %d, relais %d)",
                       written, (int)fade_in, (int)no_title_yet, (int)title, (int)half_title,
-                      (int)no_thread_yet, (int)thread, (int)bar, (int)outro);
+                      (int)no_thread_yet, (int)thread, (int)bar, (int)outro, (int)handover);
     }
     return ok;
 }
@@ -1011,6 +1145,8 @@ int main(int argc, char **argv)
     bool splash_forced = false;          /* --splash : écran de chargement même avec --frames */
     bool splash_disabled = false;        /* --no-splash */
     const char *splash_shots_dir = NULL; /* --splash-shots DOSSIER */
+    long gpu_delay_ms = 0;               /* --gpu-delay MS : pilote graphique retardé (dév.) */
+    bool wait_screen_disabled = false; /* --no-wait-screen : pas d'écran d'attente avant le GPU */
     const char *menu_script_spec = NULL; /* --menu-script : touches jouées dans le menu */
     const char *shots_dir = NULL;        /* --shots DOSSIER LISTE : images écrites en PPM */
     const char *shots_list = NULL;
@@ -1082,6 +1218,14 @@ int main(int argc, char **argv)
             splash_forced = true;
         } else if (strcmp(argv[i], "--no-splash") == 0) {
             splash_disabled = true;
+        } else if (strcmp(argv[i], "--no-wait-screen") == 0) {
+            wait_screen_disabled = true;
+        } else if (strcmp(argv[i], "--gpu-delay") == 0 && i + 1 < argc) {
+            gpu_delay_ms = strtol(argv[++i], NULL, 10);
+            if (gpu_delay_ms < 0 || gpu_delay_ms > 20000) {
+                fprintf(stderr, "--gpu-delay : durée de 0 à 20000 ms attendue\n");
+                return 2;
+            }
         } else if (strcmp(argv[i], "--splash-shots") == 0 && i + 1 < argc) {
             splash_shots_dir = argv[++i];
         } else if (strcmp(argv[i], "--menu-script") == 0 && i + 1 < argc) {
@@ -1468,7 +1612,6 @@ int main(int argc, char **argv)
                                             combat_enabled && game_flow_saved_fullscreen(true)),
         .vsync = config.vsync,
         .no_software_surface = !force_software, /* la fenêtre ira au GPU, sauf repli */
-        .hidden_until_shown = splash_wanted && splash_shots_dir == NULL,
     };
     EngPlatform platform;
     if (!eng_platform_init(&platform, &desc)) {
@@ -1489,6 +1632,7 @@ int main(int argc, char **argv)
      * on se rabat sur l'affichage logiciel provisoire. */
     EngGpu gpu = {0};
     bool use_gpu = false;
+    static SplashPrelude prelude;
     if (!force_software) {
         const EngGpuDesc gpu_desc = {
 #ifndef NDEBUG
@@ -1497,7 +1641,17 @@ int main(int argc, char **argv)
             .present_mode = config.vsync ? ENG_PRESENT_VSYNC : ENG_PRESENT_IMMEDIATE,
             .frames_in_flight = frames_in_flight,
         };
-        use_gpu = eng_gpu_init(&gpu, platform.window, &gpu_desc);
+        if (splash_wanted && splash_shots_dir == NULL && !wait_screen_disabled) {
+            /* Écran d'attente (splash.h) : la fenêtre est peinte tout de suite par le processeur
+             * et la corde de chargement s'y anime, pendant que le pilote de la carte graphique
+             * démarre dans un fil à part (2,7 s à froid sur un portable). La fenêtre n'est
+             * rattachée au GPU qu'ensuite, depuis ce fil-ci. */
+            GpuStartJob start = {.gpu = &gpu, .desc = &gpu_desc, .delay_ms = gpu_delay_ms};
+            use_gpu = splash_prelude_run(&prelude, &platform, gpu_start_job, &start) &&
+                      eng_gpu_attach(&gpu, platform.window, &gpu_desc);
+        } else {
+            use_gpu = eng_gpu_init(&gpu, platform.window, &gpu_desc);
+        }
         if (use_gpu && screenshot_path != NULL) {
             gpu.capture_path = screenshot_path;
             gpu.capture_frame = screenshot_frame > 0 ? (uint64_t)screenshot_frame : 1U;
@@ -1510,9 +1664,10 @@ int main(int argc, char **argv)
         }
     }
 
-    /* Écran de chargement animé (splash.h) : dès que le GPU est prêt. */
+    /* Écran de chargement animé (splash.h) : dès que le GPU est prêt ; il reprend la corde de
+     * l'écran d'attente au même point. */
     static Splash splash;
-    if (use_gpu && splash_wanted && splash_init(&splash, &gpu, &platform)) {
+    if (use_gpu && splash_wanted && splash_init(&splash, &gpu, &platform, &prelude)) {
         if (splash_shots_dir != NULL) {
             const bool shots_ok =
                 splash_shots(&splash, splash_shots_dir, platform.width, platform.height);
@@ -1523,8 +1678,7 @@ int main(int argc, char **argv)
             return shots_ok ? 0 : 1;
         }
     }
-    /* la fenêtre créée cachée apparaît maintenant, et sa première image suit aussitôt */
-    eng_platform_show_window(&platform);
+    splash_prelude_shutdown(&prelude); /* son texte est maintenant sur le GPU */
     splash_frame(&splash, &platform);
     splash_frame(&splash, &platform);
 
@@ -2490,8 +2644,10 @@ int main(int argc, char **argv)
                      flow.started && !game_flow_in_title(&flow) ? " (en jeu)" : "",
                      (unsigned long long)title.frames);
         if (flow.creative && play_enabled) {
-            ENG_LOG_INFO("CRÉATIF : vitesse de vol %.2f m/s",
-                         (double)play_mode_creative_speed(&play));
+            char fly_keys[72];
+            game_flow_fly_keys(&platform.input, fly_keys, sizeof fly_keys);
+            ENG_LOG_INFO("CRÉATIF : vitesse de vol %.2f m/s (accélérer / ralentir : %s)",
+                         (double)play_mode_creative_speed(&play), fly_keys);
         }
     }
     if (use_ui) {

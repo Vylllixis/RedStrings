@@ -21,10 +21,9 @@ static SDL_GPUPresentMode to_sdl(EngPresentMode mode)
     }
 }
 
-bool eng_gpu_init(EngGpu *gpu, SDL_Window *window, const EngGpuDesc *desc)
+bool eng_gpu_create(EngGpu *gpu, const EngGpuDesc *desc)
 {
     *gpu = (EngGpu){0};
-    gpu->window = window;
     gpu->clear_color[0] = 0.094F; /* même fond que l'affichage logiciel provisoire */
     gpu->clear_color[1] = 0.110F;
     gpu->clear_color[2] = 0.157F;
@@ -47,7 +46,23 @@ bool eng_gpu_init(EngGpu *gpu, SDL_Window *window, const EngGpuDesc *desc)
         ENG_LOG_WARN("GPU : aucun périphérique utilisable : %s", SDL_GetError());
         return false;
     }
+    return true;
+}
 
+bool eng_gpu_attach(EngGpu *gpu, SDL_Window *window, const EngGpuDesc *desc)
+{
+    if (gpu->device == NULL) {
+        return false;
+    }
+    /* une fenêtre ne peut pas avoir à la fois une surface logicielle et une swapchain : l'écran
+     * d'attente rend la sienne avant de passer la main (sans fenêtre : SDL refuse plus bas) */
+    if (SDL_WindowHasSurface(window)) {
+        ENG_LOG_ERROR("GPU : rattachement refusé (la fenêtre a encore sa surface logicielle)");
+        SDL_DestroyGPUDevice(gpu->device);
+        *gpu = (EngGpu){0};
+        return false;
+    }
+    gpu->window = window;
     if (!SDL_ClaimWindowForGPUDevice(gpu->device, window)) {
         ENG_LOG_ERROR("GPU : rattachement à la fenêtre impossible : %s", SDL_GetError());
         SDL_DestroyGPUDevice(gpu->device);
@@ -84,6 +99,11 @@ bool eng_gpu_init(EngGpu *gpu, SDL_Window *window, const EngGpuDesc *desc)
                  desc->debug ? ", validation demandée" : "");
     ENG_LOG_INFO("GPU : %u image(s) en vol au plus", (unsigned)gpu->frames_in_flight);
     return true;
+}
+
+bool eng_gpu_init(EngGpu *gpu, SDL_Window *window, const EngGpuDesc *desc)
+{
+    return eng_gpu_create(gpu, desc) && eng_gpu_attach(gpu, window, desc);
 }
 
 /* ── Barrières ── */

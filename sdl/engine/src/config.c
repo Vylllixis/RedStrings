@@ -120,6 +120,11 @@ static const NamedCode TRIGGER_NAMES[] = {
     {"right", ENG_PAD_AXIS_RIGHT_TRIGGER},
 };
 
+static const NamedCode WHEEL_NAMES[] = {
+    {"up", ENG_WHEEL_UP},
+    {"down", ENG_WHEEL_DOWN},
+};
+
 static const char *const ACTION_NAMES[ENG_ACTION_COUNT] = {
     [ENG_ACTION_ATTACK] = "attack",
     [ENG_ACTION_HEAVY_ATTACK] = "heavy_attack",
@@ -130,6 +135,8 @@ static const char *const ACTION_NAMES[ENG_ACTION_COUNT] = {
     [ENG_ACTION_LOCK_ON] = "lock_on",
     [ENG_ACTION_PAUSE] = "pause",
     [ENG_ACTION_SWITCH_WEAPON] = "switch_weapon",
+    [ENG_ACTION_FLY_FASTER] = "fly_faster",
+    [ENG_ACTION_FLY_SLOWER] = "fly_slower",
 };
 
 static bool lookup(const NamedCode *table, size_t count, const char *name, int *code)
@@ -179,6 +186,11 @@ bool eng_config_parse_binding(const char *text, EngButtonBinding *out)
     if (SDL_strcasecmp(kind, "trigger") == 0 &&
         lookup(TRIGGER_NAMES, sizeof TRIGGER_NAMES / sizeof TRIGGER_NAMES[0], name, &code)) {
         *out = (EngButtonBinding){ENG_BIND_PAD_TRIGGER, code};
+        return true;
+    }
+    if (SDL_strcasecmp(kind, "wheel") == 0 &&
+        lookup(WHEEL_NAMES, sizeof WHEEL_NAMES / sizeof WHEEL_NAMES[0], name, &code)) {
+        *out = (EngButtonBinding){ENG_BIND_MOUSE_WHEEL, code};
         return true;
     }
     return false;

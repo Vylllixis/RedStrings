@@ -22,8 +22,8 @@ typedef struct SplashUniforms { /* cbuffer Splash de splash.frag : huit float4 *
 
 /* Le pipeline (triangle plein écran, splash.frag) et l'échantillonneur. */
 bool splash_build_pipeline(Splash *s, EngGpu *gpu, EngArena *scratch);
-/* Le titre et la légende en champ de distance, dans une image à un canal. */
-bool splash_build_text(Splash *s, EngArena *scratch);
+/* L'image du titre et de la légende (splash_text_build), envoyée au GPU. */
+bool splash_build_text(Splash *s, const SplashText *text);
 /* Uniforms de l'instant `time_s` pour une cible de `width` x `height` pixels. */
 void splash_fill_uniforms(const Splash *s, SplashUniforms *u, double time_s, float progress,
                           float outro, uint32_t width, uint32_t height);

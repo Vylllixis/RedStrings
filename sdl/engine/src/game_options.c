@@ -129,8 +129,12 @@ bool eng_options_load(EngGameOptions *o, EngInput *input, const char *text)
         int kind = 0;
         int code = 0;
         if (sscanf(line, "bind %u %d %d", &a, &kind, &code) == 3) {
+            /* une ligne illisible (action, genre ou sens de molette inconnus) est ignorée sans
+             * toucher aux liaisons de l'action */
+            const bool wheel_ok =
+                kind != ENG_BIND_MOUSE_WHEEL || code == ENG_WHEEL_UP || code == ENG_WHEEL_DOWN;
             if (input != NULL && a < ENG_ACTION_COUNT && kind > ENG_BIND_NONE &&
-                kind <= ENG_BIND_PAD_TRIGGER) {
+                kind <= ENG_BIND_MOUSE_WHEEL && wheel_ok) {
                 if (!cleared[a]) {
                     eng_input_clear_action(input, (EngAction)a);
                     cleared[a] = true;

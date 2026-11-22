@@ -562,6 +562,11 @@ EngMenuAction eng_menu_update(EngMenu *m, const EngInputState *in)
             eng_input_clear_action(m->input, a);
             (void)eng_input_bind_button(m->input, a, m->input->last_kind, m->input->last_code);
             m->remap = -1;
+            /* L'entrée choisie ne doit pas agir aussitôt sur le menu : une flèche (touche de
+             * menu, encore enfoncée) ne déplace pas la sélection tant qu'elle n'est pas relâchée,
+             * et le cran de molette qui a servi à choisir ne presse pas l'action. */
+            m->nav_wait_release = true;
+            eng_input_drop_wheel(m->input);
             eng_menu_set_status(m, "Touche enregistrée");
             return ENG_MENU_ACT_REMAPPED;
         }
@@ -599,6 +604,14 @@ EngMenuAction eng_menu_update(EngMenu *m, const EngInputState *in)
         x = -1.0F;
     } else if ((in->menu_held & ENG_MENU_KEY_RIGHT) != 0U) {
         x = 1.0F;
+    }
+    if (m->nav_wait_release) { /* après un remappage : attendre que tout soit relâché */
+        if (fabsf(x) > NAV_DEAD || fabsf(y) > NAV_DEAD) {
+            x = 0.0F;
+            y = 0.0F;
+        } else {
+            m->nav_wait_release = false;
+        }
     }
     const bool fresh_y = fabsf(y) > NAV_DEAD && fabsf(m->nav_prev_y) <= NAV_DEAD;
     const bool fresh_x = fabsf(x) > NAV_DEAD && fabsf(m->nav_prev_x) <= NAV_DEAD;

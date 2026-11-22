@@ -484,6 +484,34 @@ void game_flow_text(GameFlow *f, const char *utf8)
     }
 }
 
+/* Les touches de la vitesse de vol, telles qu'elles sont reliées : « molette » si les deux actions
+ * y sont (le réglage par défaut), sinon « accélérer / ralentir » par leur première liaison. */
+void game_flow_fly_keys(const EngInput *input, char *out, size_t capacity)
+{
+    if (out == NULL || capacity == 0U) {
+        return;
+    }
+    out[0] = '\0';
+    if (input == NULL) {
+        return;
+    }
+    const EngButtonBinding *faster = &input->buttons[ENG_ACTION_FLY_FASTER][0];
+    const EngButtonBinding *slower = &input->buttons[ENG_ACTION_FLY_SLOWER][0];
+    if (faster->kind == ENG_BIND_MOUSE_WHEEL && slower->kind == ENG_BIND_MOUSE_WHEEL) {
+        (void)snprintf(out, capacity, "molette");
+        return;
+    }
+    char up[32] = "aucune";
+    char down[32] = "aucune";
+    if (faster->kind != ENG_BIND_NONE) {
+        eng_binding_name(faster->kind, faster->code, up, sizeof up);
+    }
+    if (slower->kind != ENG_BIND_NONE) {
+        eng_binding_name(slower->kind, slower->code, down, sizeof down);
+    }
+    (void)snprintf(out, capacity, "%s / %s", up, down);
+}
+
 void game_flow_draw(GameFlow *f, EngUi *ui, const PlayMode *play, const EngCamera *camera,
                     float aspect, int width, int height, float dt)
 {
@@ -503,12 +531,18 @@ void game_flow_draw(GameFlow *f, EngUi *ui, const PlayMode *play, const EngCamer
         eng_camera_projection(camera, aspect, proj);
         glm_mat4_mul(proj, view, vp);
         play_combat_fill_hud(play->combat, play, vp, width, height, &hud);
-        (void)snprintf(hud.hint, sizeof hud.hint, "%s",
-                       f->creative
-                           ? "clic : attaque   Ctrl : esquive   Espace : monter   molette : "
-                             "vitesse de vol   Échap : menu"
-                           : "clic : attaque   clic droit : lourde   Ctrl : esquive   E : garde   "
-                             "A/Q : cible   R : arme   Échap : menu");
+        if (f->creative) { /* la vitesse de vol : ses vraies touches (remappables) */
+            char fly[72];
+            game_flow_fly_keys(f->input, fly, sizeof fly);
+            (void)snprintf(hud.hint, sizeof hud.hint,
+                           "clic : attaque   Ctrl : esquive   Espace : monter   %s : vitesse de "
+                           "vol   Échap : menu",
+                           fly);
+        } else {
+            (void)snprintf(hud.hint, sizeof hud.hint, "%s",
+                           "clic : attaque   clic droit : lourde   Ctrl : esquive   E : garde   "
+                           "A/Q : cible   R : arme   Échap : menu");
+        }
         (void)eng_daynight_format(&f->daynight, hud.clock, sizeof hud.clock);
         eng_ui_draw_hud(ui, &hud, width, height);
     }

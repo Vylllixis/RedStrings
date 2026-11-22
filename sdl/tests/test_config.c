@@ -167,6 +167,14 @@ UTEST(eng_config, parses_binding_sources)
     ASSERT_TRUE(eng_config_parse_binding("trigger:left", &b));
     EXPECT_EQ(b.kind, ENG_BIND_PAD_TRIGGER);
     EXPECT_EQ(b.code, ENG_PAD_AXIS_LEFT_TRIGGER);
+    ASSERT_TRUE(eng_config_parse_binding("wheel:up", &b)); /* la molette, par son sens */
+    EXPECT_EQ(b.kind, ENG_BIND_MOUSE_WHEEL);
+    EXPECT_EQ(b.code, ENG_WHEEL_UP);
+    ASSERT_TRUE(eng_config_parse_binding("Wheel : DOWN", &b));
+    EXPECT_EQ(b.kind, ENG_BIND_MOUSE_WHEEL);
+    EXPECT_EQ(b.code, ENG_WHEEL_DOWN);
+    EXPECT_FALSE(eng_config_parse_binding("wheel:left", &b));
+    EXPECT_FALSE(eng_config_parse_binding("wheel:", &b));
 
     EXPECT_FALSE(eng_config_parse_binding("Space", &b));        /* pas de « : » */
     EXPECT_FALSE(eng_config_parse_binding("joystick:1", &b));   /* type inconnu */
@@ -212,6 +220,35 @@ UTEST(eng_config, bind_replaces_the_default_bindings_of_that_action_only)
     eng_input_key(&other, SDL_SCANCODE_E, true); /* les autres actions gardent leurs défauts */
     eng_input_begin_tick(&other, &s);
     EXPECT_TRUE(eng_action_pressed(&s, ENG_ACTION_INTERACT));
+}
+
+/* Les deux actions de vitesse du vol créatif se relient aussi par le fichier de configuration. */
+UTEST(eng_config, fly_speed_actions_can_be_bound_from_the_file)
+{
+    int issues = -1;
+    EngConfig c =
+        parsed("bind.fly_faster = key:Up\nbind.fly_slower = key:Down, wheel:down\n", &issues);
+    EXPECT_EQ(0, issues);
+    EngInput input;
+    eng_input_set_default_bindings(&input);
+    eng_config_apply_input(&c, &input);
+    EXPECT_EQ(ENG_BIND_KEY, input.buttons[ENG_ACTION_FLY_FASTER][0].kind);
+    EXPECT_EQ((int)SDL_SCANCODE_UP, input.buttons[ENG_ACTION_FLY_FASTER][0].code);
+    EXPECT_EQ(ENG_BIND_NONE, input.buttons[ENG_ACTION_FLY_FASTER][1].kind);
+    EXPECT_EQ((int)SDL_SCANCODE_DOWN, input.buttons[ENG_ACTION_FLY_SLOWER][0].code);
+    EXPECT_EQ(ENG_BIND_MOUSE_WHEEL, input.buttons[ENG_ACTION_FLY_SLOWER][1].kind);
+    EXPECT_EQ(ENG_WHEEL_DOWN, input.buttons[ENG_ACTION_FLY_SLOWER][1].code);
+    /* la flèche presse l'action ; la molette vers le haut ne fait plus rien */
+    eng_input_key(&input, SDL_SCANCODE_UP, true);
+    eng_input_mouse_wheel(&input, 1.0F);
+    EngInputState s;
+    eng_input_begin_tick(&input, &s);
+    EXPECT_TRUE(eng_action_held(&s, ENG_ACTION_FLY_FASTER));
+    EXPECT_FALSE(eng_action_pressed(&s, ENG_ACTION_FLY_SLOWER));
+    /* un sens de molette inconnu : la ligne est signalée, l'action garde ses liaisons */
+    c = parsed("bind.fly_faster = wheel:sideways\n", &issues);
+    EXPECT_EQ(1, issues);
+    EXPECT_FALSE(c.action_overridden[ENG_ACTION_FLY_FASTER]);
 }
 
 UTEST(eng_config, several_sources_and_none)

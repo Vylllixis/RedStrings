@@ -20,7 +20,7 @@ typedef struct JobRun {
     bool result;
 } JobRun;
 
-bool splash_init(Splash *s, EngGpu *gpu, EngPlatform *platform)
+bool splash_init(Splash *s, EngGpu *gpu, EngPlatform *platform, const SplashPrelude *prelude)
 {
     memset(s, 0, sizeof *s);
     if (gpu == NULL || gpu->device == NULL || platform == NULL || platform->window == NULL) {
@@ -32,7 +32,16 @@ bool splash_init(Splash *s, EngGpu *gpu, EngPlatform *platform)
     if (!eng_arena_init(&scratch, "chargement", (size_t)8 << 20)) {
         return false;
     }
-    const bool ok = splash_build_pipeline(s, gpu, &scratch) && splash_build_text(s, &scratch);
+    /* le texte : celui de l'écran d'attente s'il l'a construit, sinon on le construit ici */
+    SplashText own;
+    memset(&own, 0, sizeof own);
+    const SplashText *text =
+        prelude != NULL && prelude->text.pixels != NULL ? &prelude->text : NULL;
+    if (text == NULL && splash_text_build(&own)) {
+        text = &own;
+    }
+    const bool ok = splash_build_pipeline(s, gpu, &scratch) && splash_build_text(s, text);
+    splash_text_free(&own);
     eng_arena_shutdown(&scratch);
     if (!ok) {
         ENG_LOG_WARN("écran de chargement indisponible (shader, police ou texture) : %s",
@@ -40,10 +49,21 @@ bool splash_init(Splash *s, EngGpu *gpu, EngPlatform *platform)
         splash_shutdown(s);
         return false;
     }
+    if (prelude != NULL &&
+        prelude->shown) { /* la corde continue où l'écran d'attente l'a laissée */
+        s->prelude_s = prelude->time_s > 0.0 ? prelude->time_s : 0.0;
+        s->progress = prelude->progress;
+        s->target = prelude->progress;
+    }
     s->last_ns = SDL_GetTicksNS();
     s->ready = true;
     ENG_LOG_INFO("écran de chargement : prêt (animation sur le fil principal, chargement dans un "
                  "fil à part)");
+    if (s->prelude_s > 0.0) {
+        ENG_LOG_INFO("écran de chargement : la corde de l'écran d'attente continue (à %.1f %%, "
+                     "après %.2f s d'attente)",
+                     (double)s->progress * 100.0, s->prelude_s);
+    }
     return true;
 }
 
@@ -78,7 +98,7 @@ void splash_fill_uniforms(const Splash *s, SplashUniforms *u, double time_s, flo
     u->anim[0] = outro;
     u->anim[1] = (float)(reveal < 0.0 ? 0.0 : (reveal > 1.0 ? 1.0 : reveal));
     u->anim[2] = 7.0F;
-    u->anim[3] = 0.0F;
+    u->anim[3] = (float)s->prelude_s;
     memcpy(u->title_rect, s->title_rect, sizeof u->title_rect);
     memcpy(u->label_rect, s->label_rect, sizeof u->label_rect);
     memcpy(u->text_info, s->text_info, sizeof u->text_info);

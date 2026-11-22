@@ -73,6 +73,19 @@ livraisons ; les tags sont posés par Théo après ses tests.
 - Vitesse de vol du mode créatif réglable (2026-11-22, soir) : de 0,1 à 1000 m/s à la molette
   (x 1,25 par cran), affichée au HUD ; `--creative-speed V`. Les poussées du combat ne sont plus
   multipliées par la vitesse de vol.
+- Touches de la vitesse de vol (2026-11-22, 20 h ; Théo jouait sans souris) : deux actions,
+  « Vol créatif : accélérer » et « Vol créatif : ralentir », remappables dans Options > Contrôles ;
+  par défaut la molette (haut / bas) et la croix de la manette. Sur une touche (les flèches, par
+  exemple) : une pression = un cran, tenue = 10 crans par seconde. La molette devient une source de
+  liaison pour toutes les actions (`ENG_BIND_MOUSE_WHEEL`, `wheel:up` / `wheel:down` dans
+  `config.ini`) ; le rappel des commandes nomme les touches en place.
+- Écran d'attente au lancement (2026-11-22, 20 h ; « 5 secondes de vide, où il y a mon fond
+  d'écran ») : la fenêtre est peinte par le processeur dès qu'elle s'ouvre et la corde de chargement
+  s'y anime pendant que le pilote de la carte graphique démarre dans un fil à part (2,7 s à froid
+  sur un portable) ; la scène apparaît ensuite en fondu derrière la corde, sans saut
+  (`engine/boot_screen`, `splash_prelude_run`, `eng_gpu_create` / `eng_gpu_attach`). La fenêtre
+  s'ouvre directement en plein écran. `--gpu-delay MS` pour le voir, `--no-wait-screen` pour s'en
+  passer.
 - Dragon de lave colossal et volant (2026-11-22, soir ; « dix fois plus grand, et qu'il vole ») :
   dessiné treize fois le modèle (tête à 44 m, 160 m d'envergure en vol) ; au sol il pivote
   lentement, piétine, mord au sol loin devant lui, souffle un jet de 100 m ; on frappe ses pattes,

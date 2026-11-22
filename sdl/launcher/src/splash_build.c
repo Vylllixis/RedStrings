@@ -16,7 +16,7 @@ static bool read_font(EngArena *scratch, const char *relative, EngFileData *out)
 }
 
 /* le titre (gras, lettres espacées) au-dessus de la légende, dans une image à un canal */
-bool splash_build_text(Splash *s, EngArena *scratch)
+static bool text_compose(EngArena *scratch, SplashText *text)
 {
     EngFileData bold;
     EngFileData regular;
@@ -32,11 +32,10 @@ bool splash_build_text(Splash *s, EngArena *scratch)
     }
     const uint32_t width = title.width > label.width ? title.width : label.width;
     const uint32_t height = title.height + label.height;
-    uint8_t *pixels = ENG_ARENA_NEW_ARRAY(scratch, uint8_t, (size_t)width * height);
+    uint8_t *pixels = SDL_calloc((size_t)width * height, 1U);
     if (pixels == NULL) {
         return false;
     }
-    memset(pixels, 0, (size_t)width * height);
     for (uint32_t y = 0; y < title.height; y++) {
         memcpy(&pixels[(size_t)y * width], &title.pixels[(size_t)y * title.width], title.width);
     }
@@ -44,16 +43,56 @@ bool splash_build_text(Splash *s, EngArena *scratch)
         memcpy(&pixels[(size_t)(title.height + y) * width], &label.pixels[(size_t)y * label.width],
                label.width);
     }
-    s->title_rect[0] = 0.0F;
-    s->title_rect[1] = 0.0F;
-    s->title_rect[2] = (float)title.width / (float)width;
-    s->title_rect[3] = (float)title.height / (float)height;
-    s->label_rect[0] = 0.0F;
-    s->label_rect[1] = (float)title.height / (float)height;
-    s->label_rect[2] = (float)label.width / (float)width;
-    s->label_rect[3] = 1.0F;
-    s->text_info[0] = (float)title.width / (float)title.height;
-    s->text_info[1] = (float)label.width / (float)label.height;
+    text->pixels = pixels;
+    text->width = width;
+    text->height = height;
+    text->title_rect[0] = 0.0F;
+    text->title_rect[1] = 0.0F;
+    text->title_rect[2] = (float)title.width / (float)width;
+    text->title_rect[3] = (float)title.height / (float)height;
+    text->label_rect[0] = 0.0F;
+    text->label_rect[1] = (float)title.height / (float)height;
+    text->label_rect[2] = (float)label.width / (float)width;
+    text->label_rect[3] = 1.0F;
+    text->text_info[0] = (float)title.width / (float)title.height;
+    text->text_info[1] = (float)label.width / (float)label.height;
+    return true;
+}
+
+bool splash_text_build(SplashText *text)
+{
+    if (text == NULL) {
+        return false;
+    }
+    memset(text, 0, sizeof *text);
+    EngArena scratch;
+    if (!eng_arena_init(&scratch, "titre", (size_t)8 << 20)) {
+        return false;
+    }
+    const bool ok = text_compose(&scratch, text);
+    eng_arena_shutdown(&scratch);
+    return ok;
+}
+
+void splash_text_free(SplashText *text)
+{
+    if (text != NULL) {
+        SDL_free(text->pixels);
+        memset(text, 0, sizeof *text);
+    }
+}
+
+bool splash_build_text(Splash *s, const SplashText *text)
+{
+    if (text == NULL || text->pixels == NULL) {
+        return false;
+    }
+    const uint32_t width = text->width;
+    const uint32_t height = text->height;
+    const uint8_t *pixels = text->pixels;
+    memcpy(s->title_rect, text->title_rect, sizeof s->title_rect);
+    memcpy(s->label_rect, text->label_rect, sizeof s->label_rect);
+    memcpy(s->text_info, text->text_info, sizeof s->text_info);
 
     SDL_GPUTextureCreateInfo info;
     SDL_zero(info);

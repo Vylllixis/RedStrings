@@ -27,7 +27,14 @@
  *  - une pression qui commence et finit entre deux pas est livrée (pressed et released, held à 0).
  *
  * Codes bruts : ceux de SDL (SDL_Scancode, SDL_BUTTON_*, SDL_GamepadButton, SDL_GamepadAxis).
- * Les liaisons par défaut sont dans input_defaults.c ; elles viendront d'un fichier en M0-20. */
+ * Les liaisons par défaut sont dans input_defaults.c ; elles viendront d'un fichier en M0-20.
+ *
+ * LA MOLETTE est aussi une source de liaison (2026-11-22 : « accélérer » et « ralentir » du vol
+ * créatif, par défaut sur la molette, remappables) : ENG_BIND_MOUSE_WHEEL, vers le haut ou vers
+ * le bas. Elle n'est jamais « enfoncée » : chaque cran entier presse l'action un instant (pressed
+ * et released au même pas). Plusieurs crans arrivés ensemble sont livrés UN PAR PAS, pour que
+ * l'action compte chacun d'eux ; les fractions de cran (pavé tactile) s'additionnent jusqu'à faire
+ * un cran, et un changement de sens repart de zéro. */
 
 #define ENG_MAX_BUTTON_BINDINGS 4
 #define ENG_KEY_CODE_COUNT 512
@@ -44,6 +51,13 @@
 #define ENG_PAD_AXIS_RIGHT_TRIGGER 5
 
 #define ENG_TRIGGER_THRESHOLD 0.5f
+
+/* Codes d'une liaison ENG_BIND_MOUSE_WHEEL : le sens de la molette. */
+#define ENG_WHEEL_UP 0   /* vers l'avant (crans > 0) */
+#define ENG_WHEEL_DOWN 1 /* vers soi (crans < 0) */
+/* Crans entiers en attente, au plus : un grand coup de molette libre ne laisse pas une longue
+ * traîne d'impulsions (64 pas = un peu plus d'une seconde). */
+#define ENG_WHEEL_PENDING_MAX 64
 
 /* Codes des touches de menu (ENG_MENU_KEY_* de input_state.h) : valeurs de SDL_Scancode et de
  * SDL_GamepadButton, vérifiées à la compilation dans input_defaults.c. */
@@ -65,6 +79,8 @@ typedef enum EngBindKind {
     ENG_BIND_MOUSE_BUTTON, /* code = SDL_BUTTON_* */
     ENG_BIND_PAD_BUTTON,   /* code = SDL_GamepadButton */
     ENG_BIND_PAD_TRIGGER,  /* code = ENG_PAD_AXIS_LEFT_TRIGGER ou ..._RIGHT_TRIGGER */
+    ENG_BIND_MOUSE_WHEEL,  /* code = ENG_WHEEL_UP ou ENG_WHEEL_DOWN (toujours en dernier : ces
+                              valeurs sont écrites dans le fichier d'options) */
 } EngBindKind;
 
 typedef struct EngButtonBinding {
@@ -100,7 +116,9 @@ typedef struct EngInput {
     float pad_axis[ENG_PAD_AXIS_COUNT]; /* sticks dans [-1, 1], gâchettes dans [0, 1] */
     float mouse_dx;                     /* cumulés depuis le dernier pas */
     float mouse_dy;
-    float wheel; /* crans de molette cumulés depuis le dernier pas */
+    float wheel;           /* crans de molette cumulés depuis le dernier pas */
+    float wheel_fraction;  /* part de cran pas encore entière (signée) */
+    int32_t wheel_pending; /* crans entiers à livrer, un par pas (> 0 : haut, < 0 : bas) */
 
     uint32_t held;
     uint32_t pressed_latch;
@@ -120,7 +138,8 @@ typedef struct EngInput {
 void eng_input_init(EngInput *input); /* aucune liaison */
 void eng_input_set_default_bindings(EngInput *input);
 
-/* false si l'action a déjà ENG_MAX_BUTTON_BINDINGS liaisons ou si les paramètres sont invalides */
+/* false si l'action a déjà ENG_MAX_BUTTON_BINDINGS liaisons ou si les paramètres sont invalides
+ * (action ou genre inconnus ; molette : code autre que ENG_WHEEL_UP et ENG_WHEEL_DOWN) */
 bool eng_input_bind_button(EngInput *input, EngAction action, EngBindKind kind, int code);
 bool eng_input_bind_axis(EngInput *input, EngAxis axis, const EngAxisBinding *binding);
 /* Retire toutes les liaisons de boutons d'une action (avant de la relier autrement). */
@@ -130,8 +149,13 @@ void eng_input_clear_action(EngInput *input, EngAction action);
 void eng_input_key(EngInput *input, int scancode, bool down);
 void eng_input_mouse_button(EngInput *input, int button, bool down);
 void eng_input_mouse_motion(EngInput *input, float dx, float dy);
-/* Crans de molette (vers l'avant/le haut > 0), cumulés jusqu'au prochain pas. */
+/* Crans de molette (vers l'avant/le haut > 0), cumulés jusqu'au prochain pas. Chaque cran entier
+ * compte comme une pression (remappage : last_kind = ENG_BIND_MOUSE_WHEEL) et presse, un par pas,
+ * les actions liées à ce sens de la molette. Une valeur non finie est ignorée. */
 void eng_input_mouse_wheel(EngInput *input, float notches);
+/* Oublie les crans de molette pas encore livrés (le menu vient de relier une action à la molette :
+ * le cran qui a servi à choisir ne doit pas déclencher l'action). */
+void eng_input_drop_wheel(EngInput *input);
 void eng_input_pad_button(EngInput *input, int button, bool down);
 /* `value` dans l'échelle de SDL : -32768..32767 (sticks), 0..32767 (gâchettes). */
 void eng_input_pad_axis(EngInput *input, int axis, int16_t value);

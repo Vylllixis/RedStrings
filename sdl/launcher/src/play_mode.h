@@ -77,8 +77,10 @@ typedef struct PlayMode {
     float cinematic_blend; /* caméra : 0 sur le joueur, 1 sur la cinématique */
     /* carte du monde : eau (le joueur patauge sous ce niveau, plus lentement) et dernier lieu sûr
      * (au sol, hors de la lave) où il renaît */
-    float water_level;    /* niveau de l'eau, repère local ; -INFINITY : pas d'eau */
-    float creative_speed; /* m/s : vitesse de vol du mode créatif ; 0 : celle par défaut */
+    float water_level;     /* niveau de l'eau, repère local ; -INFINITY : pas d'eau */
+    float creative_speed;  /* m/s : vitesse de vol du mode créatif ; 0 : celle par défaut */
+    uint32_t faster_ticks; /* ticks depuis lesquels « accélérer » est tenue (0 : relâchée) */
+    uint32_t slower_ticks; /* ... « ralentir » */
     float safe[3];
     uint32_t safe_ticks;
     uint32_t wall_count;
@@ -205,9 +207,12 @@ void play_mode_draw_models(const PlayMode *play, EngRenderQueue *queue, mat4 vie
  * : il n'y a plus de touche pour le basculer. Repasser en aventure en plein vol fait retomber. */
 void play_mode_set_creative(PlayMode *play, bool creative);
 /* Vitesse de vol du mode créatif (m/s, à fond de stick, à l'horizontale comme en montée) : de
- * PLAY_CREATIVE_SPEED_MIN à PLAY_CREATIVE_SPEED_MAX. En vol, chaque cran de molette la multiplie
- * ou la divise par 1,25 (la molette ne règle alors plus le recul de la caméra). Une valeur hors
- * bornes est ramenée dans les bornes ; une valeur non finie est ignorée. */
+ * PLAY_CREATIVE_SPEED_MIN à PLAY_CREATIVE_SPEED_MAX. En vol, les actions « accélérer » et
+ * « ralentir » (ENG_ACTION_FLY_FASTER / _SLOWER : par défaut la molette, remappables dans le menu
+ * Contrôles) la multiplient ou la divisent par 1,25 à chaque pression ou cran ; une touche tenue
+ * la fait défiler en continu. Tant que la molette sert à la vitesse, elle ne règle plus le recul
+ * de la caméra. Une valeur hors bornes est ramenée dans les bornes ; une valeur non finie est
+ * ignorée. */
 #define PLAY_CREATIVE_SPEED_DEFAULT 25.0F
 #define PLAY_CREATIVE_SPEED_MIN 0.1F
 #define PLAY_CREATIVE_SPEED_MAX 1000.0F

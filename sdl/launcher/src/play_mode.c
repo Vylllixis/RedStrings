@@ -6,8 +6,14 @@
 #include "engine/log.h"
 
 #define STATIC_MASK (1U << ENG_LAYER_STATIC)
-#define PLAY_OBSTACLE_MIN_HALF 0.01F   /* m : demi-cylindre minimal d'une capsule d'obstacle (B8) */
-#define PLAY_CREATIVE_SPEED_STEP 1.25F /* mode créatif : un cran de molette = vitesse x 1,25 */
+#define PLAY_OBSTACLE_MIN_HALF 0.01F /* m : demi-cylindre minimal d'une capsule d'obstacle (B8) */
+/* Mode créatif, vitesse de vol : « accélérer » et « ralentir » (ENG_ACTION_FLY_FASTER / _SLOWER,
+ * par défaut la molette, remappables). Une pression ou un cran de molette = un cran de vitesse
+ * (x 1,25). Une touche TENUE plus de 0,25 s fait ensuite défiler les crans en continu, 10 par
+ * seconde (x 9,3 par seconde) : de 25 à 1000 m/s en moins de 2 s, sans marteler la touche. */
+#define PLAY_CREATIVE_SPEED_STEP 1.25F
+#define PLAY_CREATIVE_HOLD_TICKS 15U
+#define PLAY_CREATIVE_HOLD_RATE 10.0F
 #define GROUND_HALF 28.0F
 #define GRID_HALF 3
 #define GRID_SPACING 8.0F
@@ -417,6 +423,23 @@ static float creative_scale(const PlayMode *play)
     return play_mode_creative_speed(play) / run;
 }
 
+/* crans de vitesse demandés par `action` pendant ce pas : un à la pression, puis, la touche tenue
+ * plus de PLAY_CREATIVE_HOLD_TICKS, PLAY_CREATIVE_HOLD_RATE par seconde */
+static float speed_notches(const EngInputState *input, EngAction action, uint32_t *held_ticks,
+                           float dt)
+{
+    float notches = eng_action_pressed(input, action) ? 1.0F : 0.0F;
+    if (eng_action_held(input, action)) {
+        (*held_ticks)++;
+        if (*held_ticks > PLAY_CREATIVE_HOLD_TICKS) {
+            notches += PLAY_CREATIVE_HOLD_RATE * dt;
+        }
+    } else {
+        *held_ticks = 0;
+    }
+    return notches;
+}
+
 void play_mode_tick(PlayMode *play, const EngInputState *input, float dt)
 {
     if (play == NULL || !play->ready || input == NULL || !(dt > 0.0F) || dt > 0.1F) {
@@ -442,12 +465,23 @@ void play_mode_tick(PlayMode *play, const EngInputState *input, float dt)
         pivot[2] += (focus[1] - feet[2]) * k;
     }
     EngInputState camera_input = *input;
-    if (play->creative) { /* en vol, la molette règle la vitesse (pas le recul de la caméra) */
-        if (isfinite(input->wheel) && input->wheel != 0.0F) {
+    if (play->creative) {
+        /* vitesse de vol : accélérer et ralentir ; les deux ensemble s'annulent */
+        const float notches = speed_notches(input, ENG_ACTION_FLY_FASTER, &play->faster_ticks, dt) -
+                              speed_notches(input, ENG_ACTION_FLY_SLOWER, &play->slower_ticks, dt);
+        if (notches != 0.0F) {
             play_mode_set_creative_speed(play, play_mode_creative_speed(play) *
-                                                   powf(PLAY_CREATIVE_SPEED_STEP, input->wheel));
+                                                   powf(PLAY_CREATIVE_SPEED_STEP, notches));
         }
-        camera_input.wheel = 0.0F;
+        /* la molette ne recule pas la caméra tant qu'elle sert à la vitesse ; reliées à des
+         * touches, ces deux actions la lui rendent */
+        const uint32_t fly = (1U << ENG_ACTION_FLY_FASTER) | (1U << ENG_ACTION_FLY_SLOWER);
+        if ((input->wheel_bound & fly) != 0U) {
+            camera_input.wheel = 0.0F;
+        }
+    } else {
+        play->faster_ticks = 0;
+        play->slower_ticks = 0;
     }
     (void)eng_orbit_camera_update(&play->orbit, &camera_input, dt, pivot);
     (void)eng_orbit_camera_collide(&play->orbit, play->world, STATIC_MASK,

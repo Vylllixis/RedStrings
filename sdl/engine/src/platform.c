@@ -26,11 +26,10 @@ bool eng_platform_init(EngPlatform *p, const EngWindowDesc *desc)
     if (desc->resizable) {
         flags |= SDL_WINDOW_RESIZABLE;
     }
-    const char *driver = SDL_GetCurrentVideoDriver();
-    if (desc->hidden_until_shown && !desc->fullscreen && driver != NULL &&
-        SDL_strcmp(driver, "x11") == 0) {
-        flags |= SDL_WINDOW_HIDDEN; /* affichée par eng_platform_show_window */
-        p->hidden = true;
+    if (desc->fullscreen) {
+        /* Plein écran DÈS LA CRÉATION : la fenêtre apparaît directement à sa place, au lieu de
+         * naître en fenêtre puis de basculer (un instant de plus sans image). */
+        flags |= SDL_WINDOW_FULLSCREEN;
     }
 
     p->window = SDL_CreateWindow(desc->title, desc->width, desc->height, flags);
@@ -41,12 +40,11 @@ bool eng_platform_init(EngPlatform *p, const EngWindowDesc *desc)
     }
 
     if (desc->fullscreen) {
-        SDL_SetWindowFullscreen(p->window, true);
         p->fullscreen = true;
-        /* La bascule est asynchrone (X11, Wayland) : sans attendre, la taille lue ci-dessous est
-         * celle de la fenêtre d'avant (2494 x 1531 au lieu de 2560 x 1600, vu sur la machine de
-         * Théo) et la swapchain naît à la mauvaise taille. SDL_SyncWindow attend la fin de la
-         * transition (avec un délai maximal côté SDL). */
+        /* La mise en plein écran est asynchrone (X11, Wayland) : sans attendre, la taille lue
+         * ci-dessous est celle de la fenêtre d'avant (2494 x 1531 au lieu de 2560 x 1600, vu sur
+         * la machine de Théo) et la swapchain naît à la mauvaise taille. SDL_SyncWindow attend la
+         * fin de la transition (avec un délai maximal côté SDL). */
         (void)SDL_SyncWindow(p->window);
     }
     SDL_GetWindowSizeInPixels(p->window, &p->width, &p->height);
@@ -56,20 +54,6 @@ bool eng_platform_init(EngPlatform *p, const EngWindowDesc *desc)
     ENG_LOG_INFO("fenêtre ouverte : %d x %d px, pilote vidéo %s", p->width, p->height,
                  SDL_GetCurrentVideoDriver());
     return true;
-}
-
-void eng_platform_show_window(EngPlatform *p)
-{
-    if (p == NULL || p->window == NULL || !p->hidden) {
-        return;
-    }
-    p->hidden = false;
-    if (!SDL_ShowWindow(p->window)) {
-        ENG_LOG_ERROR("fenêtre : affichage impossible : %s", SDL_GetError());
-        return;
-    }
-    (void)SDL_SyncWindow(p->window);
-    SDL_GetWindowSizeInPixels(p->window, &p->width, &p->height);
 }
 
 void eng_platform_use_software_surface(EngPlatform *p, bool vsync)

@@ -86,6 +86,11 @@ bool game_flow_saved_fullscreen(bool fallback);
 /* `dir` : dossier des fichiers (NULL : dossier de préférences). Ouvre l'écran-titre. Lit et
  * applique les options et les liaisons ; `fullscreen_default` : plein écran quand les options
  * enregistrées n'en disent rien (vrai pour un lancement à la main). */
+/* Les touches de la vitesse du vol créatif, telles qu'elles sont reliées, pour le rappel des
+ * commandes : « molette » si « accélérer » et « ralentir » y sont toutes deux (réglage par
+ * défaut), sinon « Flèche haut / Flèche bas ». Vide sans liaisons. */
+void game_flow_fly_keys(const EngInput *input, char *out, size_t capacity);
+
 bool game_flow_init(GameFlow *f, PlayMode *play, EngInput *input, const char *dir,
                     bool fullscreen_default);
 

@@ -8,9 +8,9 @@
 #include "game_menu_internal.h"
 
 static const EngAction REMAPPABLE[] = {
-    ENG_ACTION_ATTACK,  ENG_ACTION_HEAVY_ATTACK, ENG_ACTION_DODGE,
-    ENG_ACTION_JUMP,    ENG_ACTION_INTERACT,     ENG_ACTION_SPRINT,
-    ENG_ACTION_LOCK_ON, ENG_ACTION_PAUSE,        ENG_ACTION_SWITCH_WEAPON};
+    ENG_ACTION_ATTACK,        ENG_ACTION_HEAVY_ATTACK, ENG_ACTION_DODGE,     ENG_ACTION_JUMP,
+    ENG_ACTION_INTERACT,      ENG_ACTION_SPRINT,       ENG_ACTION_LOCK_ON,   ENG_ACTION_PAUSE,
+    ENG_ACTION_SWITCH_WEAPON, ENG_ACTION_FLY_FASTER,   ENG_ACTION_FLY_SLOWER};
 #define REMAP_COUNT (sizeof REMAPPABLE / sizeof REMAPPABLE[0])
 
 uint32_t eng_menu_remap_count(void)
@@ -44,6 +44,10 @@ const char *eng_action_label(EngAction a)
         return "Changer d'arme";
     case ENG_ACTION_PAUSE:
         return "Pause";
+    case ENG_ACTION_FLY_FASTER:
+        return "Vol créatif : accélérer";
+    case ENG_ACTION_FLY_SLOWER:
+        return "Vol créatif : ralentir";
     default:
         return "?";
     }
@@ -145,6 +149,9 @@ void eng_binding_name(EngBindKind kind, int code, char *out, size_t capacity)
         break;
     case ENG_BIND_PAD_TRIGGER:
         name = code == ENG_PAD_AXIS_LEFT_TRIGGER ? "gâchette gauche" : "gâchette droite";
+        break;
+    case ENG_BIND_MOUSE_WHEEL:
+        name = code == ENG_WHEEL_UP ? "molette haut" : "molette bas";
         break;
     default:
         name = "";

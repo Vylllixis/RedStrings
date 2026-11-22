@@ -29,6 +29,7 @@ ow_add_test(gear test_gear.c)
 ow_add_test(creature test_creature.c)
 ow_add_test(boss_special test_boss_special.c)
 ow_add_test(dragon_flight test_dragon_flight.c)
+ow_add_test(boot_screen test_boot_screen.c)
 ow_add_test(zone_decor test_zone_decor.c)
 ow_add_test(world_map test_world_map.c)
 target_compile_definitions(test_world_map PRIVATE
@@ -669,10 +670,29 @@ if(OW_PHYSICS AND OW_SHADERS_OK)
   # s'exécutent dans le fil de chargement PENDANT que le fil principal anime l'écran (des images
   # sont présentées pendant le chargement), puis le jeu tourne (joueur au sol), sans erreur ni
   # ressource perdue. 2) Les images de l'animation, mesurées : fondu, fil, titre, corde, sortie.
+  # Écran d'attente (retour de Théo, 2026-11-22 : « 5 secondes de vide au lancement ») : AVANT que
+  # le GPU soit prêt, la fenêtre est déjà peinte par le processeur (au moins une image : ici le
+  # pilote logiciel démarre en quelques centièmes de seconde), le pilote graphique démarre dans un
+  # fil à part, puis l'écran de chargement prend le relais.
   add_test(NAME launcher.splash COMMAND launcher --world 7 --combat --new-game --no-audio
            --splash --frames 3 --env-samples 16 WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR})
   set_tests_properties(launcher.splash PROPERTIES
-    PASS_REGULAR_EXPRESSION "écran de chargement : [1-9][0-9]* image\\(s\\) dont [1-9][0-9]* pendant le chargement \\(4 travaux dans le fil de chargement.*MONDE : joueur au sol")
+    PASS_REGULAR_EXPRESSION "écran d'attente : [1-9][0-9]* image\\(s\\) pendant le démarrage de la carte graphique.*écran de chargement : prêt.*écran de chargement : [1-9][0-9]* image\\(s\\) dont [1-9][0-9]* pendant le chargement \\(4 travaux dans le fil de chargement.*MONDE : joueur au sol")
+  # 3) Un pilote graphique lent à démarrer (--gpu-delay : 0,6 s de plus, comme une carte qui
+  # dort) : l'écran d'attente s'anime pendant tout ce temps (des dizaines d'images, la corde
+  # avance), puis le jeu se lance normalement.
+  add_test(NAME launcher.splash_wait COMMAND launcher --combat --new-game --no-audio
+           --splash --gpu-delay 600 --frames 3 --env-samples 16
+           WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR})
+  set_tests_properties(launcher.splash_wait PROPERTIES
+    PASS_REGULAR_EXPRESSION "écran d'attente : [1-9][0-9]+ image\\(s\\) pendant le démarrage de la carte graphique \\([0-9]+.[0-9][0-9] s\\).*corde à [1-9] %.*la corde de l'écran d'attente continue \\(à [1-9].[0-9] %, après [0-9]+.[0-9][0-9] s d'attente\\).*arrêt propre après 3 images")
+  # 4) --no-wait-screen : le repli. Pas d'écran d'attente (la ligne n'apparaît pas), mais l'écran
+  # de chargement et le jeu se lancent comme d'habitude.
+  add_test(NAME launcher.splash_no_wait COMMAND launcher --combat --new-game --no-audio
+           --splash --no-wait-screen --gpu-delay 300 --frames 3 --env-samples 16
+           WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR})
+  set_tests_properties(launcher.splash_no_wait PROPERTIES
+    PASS_REGULAR_EXPRESSION "écran de chargement : prêt.*écran de chargement : [1-9][0-9]* image\\(s\\).*arrêt propre après 3 images")
   add_test(NAME launcher.splash_shots COMMAND launcher --splash-shots ${CMAKE_CURRENT_BINARY_DIR}
            WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR})
   set_tests_properties(launcher.splash_shots PROPERTIES
@@ -720,13 +740,24 @@ if(OW_PHYSICS AND OW_SHADERS_OK)
                    sh ${CMAKE_CURRENT_BINARY_DIR}/saves-speed $<TARGET_FILE:launcher>
            WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR})
   set_tests_properties(launcher.creative_speed PROPERTIES
-    PASS_REGULAR_EXPRESSION "en mode créatif \\(en jeu\\).*CRÉATIF : vitesse de vol 39.06 m/s")
+    PASS_REGULAR_EXPRESSION "en mode créatif \\(en jeu\\).*CRÉATIF : vitesse de vol 39.06 m/s \\(accélérer / ralentir : molette\\)")
   add_test(NAME launcher.creative_speed_start
            COMMAND sh -c "rm -rf \"$1\" && \"$2\" --combat --new-game --creative --creative-speed 400 --no-audio --frames 12 --env-samples 16 --save-dir \"$1\" --menu-script '5:wheel=2'"
                    sh ${CMAKE_CURRENT_BINARY_DIR}/saves-speed-start $<TARGET_FILE:launcher>
            WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR})
   set_tests_properties(launcher.creative_speed_start PROPERTIES
     PASS_REGULAR_EXPRESSION "CRÉATIF : vitesse de vol 625.00 m/s")
+  # Retour de Théo (2026-11-22, sans souris) : « accélérer » et « ralentir » se relient dans
+  # Options > Contrôles. De bout en bout, avec de vraies touches : pause, Options, Contrôles,
+  # « Vol créatif : accélérer » sur la flèche du haut, « ralentir » sur celle du bas, retour au jeu,
+  # puis la flèche du haut TENUE 36 pas : un cran, 15 pas d'attente, puis 10 crans par seconde,
+  # soit 4,5 crans : 25 x 1,25^4,5 = 68,24 m/s. Les liaisons sont dans le fichier d'options.
+  add_test(NAME launcher.creative_keys
+           COMMAND sh -c "rm -rf \"$1\" && \"$2\" --combat --new-game --creative --no-audio --frames 130 --env-samples 16 --save-dir \"$1\" --menu-script '10:esc,14:down,18:down,22:ok,26:up,30:up,34:ok,38:up,42:up,46:up,50:up,54:ok,58:key=up,62:down,66:ok,70:key=down,74:back,78:back,82:back,86:hold=up,122:release=up' && grep -c '^bind 9 1 82$' \"$1/options.txt\" && grep -c '^bind 10 1 81$' \"$1/options.txt\""
+                   sh ${CMAKE_CURRENT_BINARY_DIR}/saves-speed-keys $<TARGET_FILE:launcher>
+           WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR})
+  set_tests_properties(launcher.creative_keys PROPERTIES
+    PASS_REGULAR_EXPRESSION "CRÉATIF : vitesse de vol 68.24 m/s \\(accélérer / ralentir : Flèche haut / Flèche bas\\).*\n1\n1")
   # « Plus de petits mobs, pour les farmer » : le pilote automatique devant la meute n° 5 de la
   # carte (zone 17) : cinq osselets, il en vainc, la meute revient. Avec les vrais personnages :
   # l'épée atteint bien ces petits ennemis.
@@ -752,12 +783,15 @@ if(OW_PHYSICS AND OW_SHADERS_OK)
     PASS_REGULAR_EXPRESSION "décor posé : 22 boîte\\(s\\) \\(zone 11\\).*zone 11 « Volcan : antre du dragon » chargée")
   foreach(t launcher.world_water launcher.world_lava launcher.world_grass
           launcher.world_trees_avoid launcher.world_save launcher.splash launcher.splash_shots
+          launcher.splash_wait launcher.splash_no_wait
           launcher.title_menu launcher.menu_plain launcher.menu_mouse launcher.creative_flag
-          launcher.creative_speed launcher.creative_speed_start launcher.world_pack
-          launcher.world_dragon launcher.world_dragon_far)
+          launcher.creative_speed launcher.creative_speed_start launcher.creative_keys
+          launcher.world_pack launcher.world_dragon launcher.world_dragon_far)
     set_property(TEST ${t} PROPERTY ENVIRONMENT "SDL_VIDEODRIVER=offscreen")
     set_property(TEST ${t} PROPERTY FAIL_REGULAR_EXPRESSION "ERROR|non détruite|perdu|TROU")
   endforeach()
+  set_property(TEST launcher.splash_no_wait PROPERTY
+    FAIL_REGULAR_EXPRESSION "ERROR|non détruite|perdu|TROU|écran d'attente :")
   # Décor des zones : devant la zone 2, le château du chevalier (51 boîtes) est posé sur le relief ;
   # le château de départ, à plus de 300 m, ne l'est pas.
   add_test(NAME launcher.world_decor COMMAND launcher --world 7 --combat --at-zone 2
@@ -804,8 +838,10 @@ if(OW_PHYSICS AND OW_SHADERS_OK)
     foreach(t launcher.world_combat launcher.world_combat_shift launcher.world_decor
             launcher.world_water launcher.world_lava launcher.world_grass
             launcher.world_trees_avoid launcher.world_save launcher.splash
-            launcher.splash_shots launcher.title_menu launcher.menu_plain launcher.menu_mouse
+            launcher.splash_shots launcher.splash_wait launcher.splash_no_wait
+            launcher.title_menu launcher.menu_plain launcher.menu_mouse
             launcher.creative_flag launcher.creative_speed launcher.creative_speed_start
+            launcher.creative_keys
             launcher.world_pack launcher.world_dragon launcher.world_dragon_far
             launcher.world_layers_plain
             launcher.world_layers_desert launcher.world_layers_mountain
@@ -895,3 +931,14 @@ if(UNIX AND EXISTS ${CMAKE_SOURCE_DIR}/engine/src/crash.c)
     ENVIRONMENT "SDL_VIDEODRIVER=dummy;ASAN_OPTIONS=handle_segv=0:handle_abort=0"
     PASS_REGULAR_EXPRESSION "CRASH_REPORT_OK")
 endif()
+
+# Garde-fou : AUCUN test ne doit ouvrir de fenêtre sur le vrai écran de la machine (le 2026-11-22,
+# un test qui ouvrait deux fenêtres de suite a oublié de redonner la consigne du pilote vidéo
+# avant la seconde : SDL_Quit l'efface, et une vraie fenêtre de 64 x 48 px est apparue un instant).
+# Les tests s'exécutent donc sans accès à l'écran réel : une ouverture hors des pilotes « dummy »
+# et « offscreen » échoue au lieu de s'afficher.
+get_property(ow_all_tests DIRECTORY PROPERTY TESTS)
+foreach(t ${ow_all_tests})
+  set_property(TEST ${t} APPEND PROPERTY ENVIRONMENT_MODIFICATION
+    "DISPLAY=unset:" "WAYLAND_DISPLAY=unset:")
+endforeach()

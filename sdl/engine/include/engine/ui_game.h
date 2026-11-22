@@ -41,7 +41,7 @@ typedef struct EngHud {
     EngHudNumber numbers[ENG_HUD_NUMBERS];
     uint32_t number_count;
     char message[96]; /* centré en bas (« Tu es mort », « Camp vaincu ») */
-    char hint[128];   /* rappel des commandes, en bas à gauche */
+    char hint[192];   /* rappel des commandes, en bas à gauche */
     char clock[8];    /* heure du jour « HH:MM », en haut à droite (vide : rien) */
     uint32_t level;   /* niveau du joueur (0 : rien d'affiché) */
     char weapon[64];  /* M8-08 : arme en main, et « MODE CRÉATIF » (vide : rien) */

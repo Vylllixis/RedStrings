@@ -86,6 +86,64 @@ UTEST(eng_gpu, init_names_the_driver_and_shutdown_is_repeatable)
     eng_gpu_shutdown(&f.gpu); /* deuxième arrêt : sans effet, sans crash */
 }
 
+/* L'initialisation en deux temps (écran d'attente : le pilote démarre dans un fil, la fenêtre est
+ * rattachée ensuite) donne le même GPU que eng_gpu_init. */
+UTEST(eng_gpu, two_step_init_gives_a_working_gpu)
+{
+    SDL_SetHint(SDL_HINT_VIDEO_DRIVER, "offscreen");
+    const EngWindowDesc window = {
+        .title = "test gpu", .width = 320, .height = 200, .no_software_surface = true};
+    Fixture f = {0};
+    ASSERT_TRUE(eng_platform_init(&f.platform, &window));
+    const EngGpuDesc desc = {.debug = false, .present_mode = ENG_PRESENT_VSYNC};
+    if (!eng_gpu_create(&f.gpu, &desc)) {
+        EXPECT_FALSE(gpu_required());
+        eng_platform_shutdown(&f.platform);
+        return;
+    }
+    EXPECT_TRUE(f.gpu.device != NULL);
+    EXPECT_TRUE(f.gpu.window == NULL); /* pas encore de fenêtre */
+    ASSERT_TRUE(eng_gpu_attach(&f.gpu, f.platform.window, &desc));
+    EXPECT_TRUE(f.gpu.window == f.platform.window);
+    EXPECT_EQ(f.gpu.present_mode, ENG_PRESENT_VSYNC);
+    EXPECT_EQ(f.gpu.frames_in_flight, ENG_GPU_DEFAULT_FRAMES_IN_FLIGHT);
+    EXPECT_TRUE(run_frames(&f, 3));
+    EXPECT_EQ(f.gpu.frames_submitted, 3U);
+    close_fixture(&f);
+}
+
+/* Le rattachement refuse une fenêtre qui a encore sa surface logicielle (celle de l'écran
+ * d'attente) ou pas de fenêtre du tout, et détruit alors le périphérique. */
+UTEST(eng_gpu, attach_refuses_a_window_that_still_has_its_software_surface)
+{
+    SDL_SetHint(SDL_HINT_VIDEO_DRIVER, "offscreen");
+    SDL_SetHint(SDL_HINT_FRAMEBUFFER_ACCELERATION,
+                "0"); /* la surface native, sans moteur de rendu */
+    const EngWindowDesc window = {.title = "test gpu", .width = 320, .height = 200};
+    Fixture f = {0};
+    ASSERT_TRUE(eng_platform_init(&f.platform, &window)); /* avec sa surface logicielle */
+    ASSERT_TRUE(SDL_WindowHasSurface(f.platform.window));
+    const EngGpuDesc desc = {.debug = false, .present_mode = ENG_PRESENT_VSYNC};
+    if (!eng_gpu_create(&f.gpu, &desc)) {
+        EXPECT_FALSE(gpu_required());
+        eng_platform_shutdown(&f.platform);
+        return;
+    }
+    EXPECT_FALSE(eng_gpu_attach(&f.gpu, f.platform.window, &desc));
+    EXPECT_TRUE(f.gpu.device == NULL);                              /* détruit : rien ne fuit */
+    EXPECT_FALSE(eng_gpu_attach(&f.gpu, f.platform.window, &desc)); /* sans périphérique : refus */
+    /* pas de fenêtre : refus aussi, périphérique détruit */
+    ASSERT_TRUE(eng_gpu_create(&f.gpu, &desc));
+    EXPECT_FALSE(eng_gpu_attach(&f.gpu, NULL, &desc));
+    EXPECT_TRUE(f.gpu.device == NULL);
+    /* la surface rendue, la même fenêtre est acceptée */
+    ASSERT_TRUE(SDL_DestroyWindowSurface(f.platform.window));
+    ASSERT_TRUE(eng_gpu_create(&f.gpu, &desc));
+    ASSERT_TRUE(eng_gpu_attach(&f.gpu, f.platform.window, &desc));
+    EXPECT_TRUE(run_frames(&f, 2));
+    close_fixture(&f);
+}
+
 UTEST(eng_gpu, frames_are_cleared_submitted_and_counted)
 {
     Fixture f = {0};
