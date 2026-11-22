@@ -36,6 +36,7 @@ flowchart LR
 | `launcher` | exécutable | boucle principale, assemble moteur et jeu | `engine` |
 | `game` | bibliothèque dynamique | règles et contenu du jeu | **rien** (voir §2) |
 | `tools/assetc` | exécutable | cuisson d'assets (M2) | `engine` |
+| `tools/treebake` | exécutable | conversion d'un arbre scanné en arbre de jeu (`docs/arbres-realistes.md`) | `engine` |
 | `tests/*` | exécutables CTest | un exécutable par module | `engine` |
 
 Règle de dépendance : `game` ne dépend d'aucune bibliothèque du projet. Il inclut seulement des

@@ -79,6 +79,18 @@ livraisons ; les tags sont posés par Théo après ses tests.
   exemple) : une pression = un cran, tenue = 10 crans par seconde. La molette devient une source de
   liaison pour toutes les actions (`ENG_BIND_MOUSE_WHEEL`, `wheel:up` / `wheel:down` dans
   `config.ini`) ; le rappel des commandes nomme les touches en place.
+- Arbres réalistes (2026-11-22, nuit ; « un rendu ultra réaliste, seulement des arbres »,
+  `docs/arbres-realistes.md`) : chênes, sapins et arbres du désert sont de vrais arbres scannés
+  (Poly Haven, CC0 : jacaranda, sapin, arbre à carquois ; 3,9 et 4,2 millions de triangles pour
+  les deux premiers), convertis par le nouvel outil `treebake` : tronc allégé par effondrement
+  d'arêtes (9 000 triangles de près, 2 300 à mi-distance), feuillage en cartes photographiées,
+  vue lointaine en quatre rectangles (`engine/tree_bake`, `tools/src/treebake*.c`,
+  `tools/scripts/arbres_realistes.sh`). Nouveaux shaders `tree.*` et `tree_shadow.*`
+  (`engine/tree_render`) : vent, feuillage découpé et tramé, lumière qui traverse les feuilles,
+  ombre du houppier sur lui-même, ombre portée découpée, brouillard du terrain. Niveau de détail
+  par arbre (38 m, 95 m). Le lecteur glTF lit `alphaMode: MASK`, `alphaCutoff`, `doubleSided` et
+  garde le module de `tangente.w`. Les arbres simples restent : `--trees simple` ou
+  `OW_TREES=simple` (les tests). +23 Mo d'assets. Vérifié en rendu logiciel seulement.
 - Écran d'attente au lancement (2026-11-22, 20 h ; « 5 secondes de vide, où il y a mon fond
   d'écran ») : la fenêtre est peinte par le processeur dès qu'elle s'ouvre et la corde de chargement
   s'y anime pendant que le pilote de la carte graphique démarre dans un fil à part (2,7 s à froid
