@@ -37,9 +37,9 @@ typedef struct InstancedUniforms {
 /* Uniforms du fragment shader model.frag : trente-deux float4, mêmes types et ordre que son
  * cbuffer. Les couleurs sont déjà multipliées par leur intensité. */
 typedef struct FragmentUniforms {
-    float sun_direction[4];   /* xyz : vers le soleil, unitaire */
-    float sun_radiance[4];    /* rgb : couleur * intensité */
-    float ambient[4];         /* rgb : couleur * intensité */
+    float sun_direction[4]; /* xyz : vers le soleil, unitaire ; w : seuil de découpe du matériau */
+    float sun_radiance[4];  /* rgb : couleur * intensité ; w : 1 si le matériau a deux faces */
+    float ambient[4];       /* rgb : couleur * intensité */
     float camera_position[4]; /* xyz */
     float material[4];        /* métal, rugosité, échelle de la normale, force de l'occlusion */
     float emissive[4];        /* rgb : facteur ; w : 1 si le matériau a une normal map */
@@ -339,6 +339,8 @@ static bool create_impl(EngModelGpu *gpu, EngRenderer *renderer, EngArena *arena
         dst->roughness = src->roughness;
         dst->normal_scale = src->normal_scale;
         dst->occlusion_strength = src->occlusion_strength;
+        dst->alpha_cutoff = src->alpha_cutoff;
+        dst->double_sided = src->double_sided;
         dst->has_normal_map = src->normal_image >= 0;
         dst->texture = src->image >= 0 ? gpu->textures[src->image] : gpu->white;
         dst->metallic_roughness_texture = src->metallic_roughness_image >= 0
@@ -608,6 +610,9 @@ uint32_t eng_model_gpu_draw_ex(const EngModelGpu *gpu, EngRenderQueue *queue,
             fragment.emissive[c] = material->emissive[c] + opt->emissive_add[c];
         }
         fragment.emissive[3] = material->has_normal_map ? 1.0F : 0.0F;
+        /* matière découpée, deux faces : lus par tree.frag, ignorés par model.frag */
+        fragment.sun_direction[3] = material->alpha_cutoff;
+        fragment.sun_radiance[3] = material->double_sided ? 1.0F : 0.0F;
         fragment.environment[0] = gpu->environment.prefiltered_levels > 1U
                                       ? (float)(gpu->environment.prefiltered_levels - 1U)
                                       : 0.0F;

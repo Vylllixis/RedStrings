@@ -41,13 +41,21 @@ if (eng_model_load(&level_arena, &scratch, "assets/models/demo.gltf", &model)) {
   0 de `EngModel` est un matériau par défaut (blanc) pour les primitives sans matériau ; le matériau
   glTF *n* est `materials[n + 1]`. Seules les images utilisées par un matériau sont décodées.
 
+- **Matières découpées** (2026-11-22, `docs/arbres-realistes.md`) : `alphaMode: MASK` donne
+  `EngModelMaterial.alpha_cutoff` (`alphaCutoff`, 0,5 par défaut, ramené dans ]0, 1]) ; `doubleSided`
+  donne `double_sided`. Un matériau opaque a un seuil de 0. Seuls les shaders des arbres
+  (`engine/tree_render.h`) en tiennent compte : `model.frag` dessine tout, d'un seul côté.
+- **Module de `TANGENT.w`** : un fichier ordinaire donne +1 ou -1 (le signe de la bitangente). Un
+  module strictement entre 0 et 1 est conservé, signe compris : l'outil `treebake` y range la part
+  du ciel vue par chaque sommet d'un arbre. Tout autre module redevient 1.
+
 ## Ce qui est ignoré ou refusé
 
 | Cas | Comportement |
 |---|---|
 | modes autres que triangles (lignes, points, bandes, éventails) | primitive ignorée + avertissement ; si rien d'autre : échec |
 | animations, skins, morph targets, caméras, lumières | ignorés (message d'information) |
-| double face, `alphaMode` (masque, mélange), `KHR_texture_transform`, autres extensions de matériau | ignorés |
+| `alphaMode: BLEND` (mélange), `KHR_texture_transform`, autres extensions de matériau | ignorés (un matériau BLEND est lu comme opaque) |
 | TEXCOORD_1 et au-delà, sampler glTF (adressage, filtres) | ignorés : sampler par défaut (répétition, trilinéaire) |
 | index hors limites, tampon trop court, nombre d'index non multiple de 3 | **refusé** |
 | extensions obligatoires Draco, meshopt, basisu | **refusé** |

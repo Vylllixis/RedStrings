@@ -42,7 +42,11 @@ typedef struct EngModelVertex {
      * bitangente = cross(normale, tangente) * w, en haut de l'image pour un UV non inversé (le v
      * de glTF va vers le bas). Lue dans le fichier si TANGENT existe, sinon calculée par sommet
      * (somme des tangentes des triangles, puis orthogonalisation) ; sans UV, un axe quelconque
-     * orthogonal à la normale. */
+     * orthogonal à la normale.
+     * Exception (2026-11-22) : si le fichier donne un w de module strictement entre 0 et 1, ce
+     * module est CONSERVÉ (le signe reste celui de la bitangente). Les arbres de l'outil treebake
+     * y rangent la part du ciel vue par le sommet, lue par les shaders des arbres
+     * (engine/tree_render.h) ; un tel modèle n'est pas fait pour model.frag. */
     float tangent[4];
 } EngModelVertex;
 
@@ -65,6 +69,12 @@ typedef struct EngModelMaterial {
     int32_t occlusion_image;      /* occlusion ambiante dans R (linéaire) */
     float emissive[3];            /* facteur, linéaire, déjà multiplié par l'intensité (KHR) */
     int32_t emissive_image;       /* émissif (RGB sRGB) */
+    /* Matière DÉCOUPÉE (glTF alphaMode « MASK », 2026-11-22 : le feuillage des arbres) : seuil
+     * d'alpha (alphaCutoff, ]0, 1]) sous lequel un pixel n'est pas dessiné ; 0 : matière opaque
+     * (l'alpha de la texture est ignoré). Seuls les shaders des arbres (engine/tree_render.h) en
+     * tiennent compte ; model.frag dessine tout. alphaMode « BLEND » est lu comme opaque. */
+    float alpha_cutoff;
+    bool double_sided; /* glTF doubleSided : visible des deux côtés */
 } EngModelMaterial;
 
 typedef struct EngModelPart {
