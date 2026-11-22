@@ -283,6 +283,23 @@ static bool parse_region_or_zone(EngWorldMap *m, const Line *l, char *err, size_
     return true;
 }
 
+/* meute x z : une meute de petits monstres (ceux du biome qui domine à cet endroit) */
+static bool parse_pack(EngWorldMap *m, const Line *l, char *err, size_t cap)
+{
+    float v[2] = {0};
+    if (l->count != 3U || !numbers(l, 1U, 2U, v)) {
+        return fail(err, cap, l->number, "« meute x z »");
+    }
+    if (m->pack_count >= ENG_WORLDMAP_MAX_PACKS) {
+        return fail(err, cap, l->number, "trop de meutes (au plus %u)",
+                    (unsigned)ENG_WORLDMAP_MAX_PACKS);
+    }
+    m->packs[m->pack_count][0] = v[0];
+    m->packs[m->pack_count][1] = v[1];
+    m->pack_count++;
+    return true;
+}
+
 /* foret essence x z rayon espacement | arbres_epars essence biome espacement [groupe] */
 static bool parse_trees(EngWorldMap *m, const Line *l, char *err, size_t cap)
 {
@@ -346,6 +363,9 @@ static bool parse_one(EngWorldMap *m, const Line *l, char *err, size_t cap)
     }
     if (strcmp(w, "region") == 0 || strcmp(w, "zone") == 0) {
         return parse_region_or_zone(m, l, err, cap);
+    }
+    if (strcmp(w, "meute") == 0) {
+        return parse_pack(m, l, err, cap);
     }
     return parse_setting(m, l, err, cap);
 }

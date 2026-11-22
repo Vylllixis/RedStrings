@@ -504,8 +504,11 @@ void game_flow_draw(GameFlow *f, EngUi *ui, const PlayMode *play, const EngCamer
         glm_mat4_mul(proj, view, vp);
         play_combat_fill_hud(play->combat, play, vp, width, height, &hud);
         (void)snprintf(hud.hint, sizeof hud.hint, "%s",
-                       "clic : attaque   clic droit : lourde   Ctrl : esquive   E : garde   A/Q : "
-                       "cible   R : arme   Échap : menu");
+                       f->creative
+                           ? "clic : attaque   Ctrl : esquive   Espace : monter   molette : "
+                             "vitesse de vol   Échap : menu"
+                           : "clic : attaque   clic droit : lourde   Ctrl : esquive   E : garde   "
+                             "A/Q : cible   R : arme   Échap : menu");
         (void)eng_daynight_format(&f->daynight, hud.clock, sizeof hud.clock);
         eng_ui_draw_hud(ui, &hud, width, height);
     }

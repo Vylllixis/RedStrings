@@ -55,6 +55,7 @@ Une instruction par ligne, `#` commence un commentaire. Les erreurs donnent leur
 | `foret essence x z rayon espacement` | forêt (`chene`, `sapin`, `acacia`) : grille fixe décalée, lisière moins dense |
 | `arbres_epars essence biome espacement [groupe]` | objets épars partout où le biome domine : arbres (`chene`, `sapin`, `acacia`), buissons (`buisson`, `buisson_neige`, `buisson_sec`) ou `rocher` ; `groupe` (1 à 4, 1 par défaut) : jusqu'à ce nombre de pieds par emplacement, à moins de 7 m les uns des autres |
 | `zone biome facile\|dur\|boss x z` | place d'une zone de combat |
+| `meute x z` | une meute de petits monstres à farmer (cinq osselets) : ceux du biome qui domine à cet endroit ; au plus 96 |
 
 Ordre de construction : régions et relief de base des biomes, formes en relief, bordure ; aires
 aplanies ; chemins ; lacs et rivières ; lave. Une aire aplanie placée après une colline aplanit
@@ -112,9 +113,21 @@ existantes (une ligne insérée au milieu déplacerait les arbres des lignes sui
   brouillard 0,00035 /m : depuis la colline on voit les montagnes, le désert et le volcan.
 - **Départ** : au château de départ, sur la colline (0, 0) : remparts de 2,4 m (on voit par-dessus),
   une porte sur chaque côté, donjon, bivouac. `--at-zone N` place le joueur sur le chemin depuis
-  le château, 20 m avant la zone (34 m avant un boss).
+  le château, 20 m avant la zone (34 m avant un boss, 150 m avant le dragon, qui est colossal).
 - **Zones** : positions lues dans la carte (`eng_worldmap_zones`), le reste (noms, PV, butin) dans
   `engine/map_zones`.
+- **Meutes** (2026-11-22, soir ; demande de Théo : « plus de petits mobs, pour les farmer et
+  monter de niveau ») : 63 meutes posées dans toute la carte (26 en plaine, 11 en montagne, 15 au
+  désert, 11 au volcan), une ligne `meute x z` chacune (`eng_worldmap_packs`). Voir
+  [world-streaming.md](world-streaming.md#meutes-de-petits-monstres). `--at-pack N` commence 20 m
+  avant la meute N (0 : la première ligne `meute` du fichier).
+
+**Poser une meute.** Les règles sont écrites dans `carte.txt` et vérifiées par le test
+`engine.world_map` (qui lit la vraie carte et nomme la meute fautive) : au sec (pas d'eau à moins
+de 25 m, pas de lave), sur un terrain praticable (moins de 14 m de dénivelé dans un disque de
+20 m), pas au milieu d'un chemin, à plus de 150 m du château de départ, et sans recouvrir la portée
+d'une autre meute (170 m entre deux meutes) ni celle d'une zone (195 m ; 505 m de l'antre du
+dragon). Le biome n'est pas écrit : déplacer la ligne suffit.
 
 Modèles : `tools/scripts/arbres_make.py` (chêne, acacia, buissons et rocher originaux, sapin
 enneigé tiré du sapin KayKit CC0) ; voir `assets/LICENCES.md`.
@@ -125,7 +138,8 @@ au milieu du grand lac, `--at-pos 330 -30` au bord de la rivière).
 ## État
 
 Fait : carte, relief, matières, arbres, vue lointaine, château de départ, zones, eau (à gué), lave
-qui brûle, petit décor (arbres isolés, buissons, rochers), herbe, ennemis qui évitent les arbres.
+qui brûle, petit décor (arbres isolés, buissons, rochers), herbe, ennemis qui évitent les arbres,
+meutes de petits monstres.
 Limites : pas de nage ni de pont (tous les cours d'eau se traversent à gué) ; l'herbe ne pousse que
 dans la plaine et ne se couche pas sous les pas ; les ennemis évitent les troncs un par un (pas de
 calcul de chemin à travers une forêt dense).

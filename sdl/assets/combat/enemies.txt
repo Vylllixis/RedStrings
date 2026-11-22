@@ -37,6 +37,22 @@ archetype archer
  plan light 3 6 90 3 1
  plan heavy 4 7 200 1 1
 end
+# Meutes de la grande carte (demande de Théo, 2026-11-22) : l'osselet, petit squelette vif (dessiné
+# à 0,62 fois la taille d'un soldat), fragile, aux coups faibles : de quoi monter de niveau. Les PV
+# et les dégâts sont ceux du biome de la meute (engine/src/map_zones.c).
+archetype imp
+ hp 12
+ speed 1.3
+ radius 0.3
+ sight 16
+ fov 160
+ hearing 10
+ alert 15
+ standoff 3
+ light imp_jab
+ heavy imp_jab
+ plan light 0 1.5 70 3 1
+end
 # M6-09 : le boss de l'arène murée (terrain seulement) : enchaînement scripté léger, léger, lourd ;
 # sous la moitié de ses PV, attaques plus vives, plus rapide, recharges raccourcies.
 archetype boss
@@ -54,19 +70,22 @@ archetype boss
  plan pattern 0 2.8 420 2 LLH
  phase 0.5 boss_l2 boss_h2 1.25 0.7
 end
-# Grande carte : le Dragon de lave (boss final, volcan). Ses hurtboxes et ses coups suivent son
-# corps en boîtes (launcher/src/play_boss.c) : griffes de 1,5 à 4 m devant lui, morsure jusqu'à 7 m.
+# Grande carte : le Dragon de lave (boss final, volcan), colossal : 60 m de corps, tête à 44 m
+# (demande de Théo du 2026-11-22 : dix fois plus grand, et il vole). Ses hurtboxes et ses coups
+# suivent son corps en boîtes (launcher/src/play_boss.c). Les portées se comptent depuis son
+# CENTRE : il piétine quand le joueur est à moins de 28 m (ses pattes sont à 20 m), mord de 28 à
+# 78 m (sa tête s'abat là où se tient le joueur, de 30 à 73 m devant lui) ; son souffle (de 66 à
+# 172 m) et son vol sont dans play_boss.c.
 archetype dragon
  hp 1000
- speed 0.55
+ speed 1.6
  radius 2.0
- sight 30
- fov 200
- hearing 20
- standoff 8
+ sight 260
+ fov 360
+ hearing 120
+ standoff 76
  light dragon_claw
  heavy dragon_bite
- plan light 0 5.0 90 3 1
- plan heavy 0 6.5 180 2 1
- plan pattern 0 5.5 420 2 LLH
+ plan light 0 28 150 3 1
+ plan heavy 28 78 240 2 1
 end

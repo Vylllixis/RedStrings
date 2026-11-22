@@ -120,3 +120,40 @@ UTEST(boss_special, the_flame_cone_reaches_only_in_front_between_near_and_far)
     EXPECT_FALSE(eng_flame_reaches(src, NAN, (float[2]){10.0F, 12.0F}, 3.0F, 14.0F, half));
     EXPECT_FALSE(eng_flame_reaches(NULL, 0.0F, (float[2]){10.0F, 12.0F}, 3.0F, 14.0F, half));
 }
+
+/* Le souffle au sol du dragon géant : une bande devant lui, de plus en plus large. */
+UTEST(boss_special, the_flame_strip_widens_from_the_mouth_to_the_end_of_the_jet)
+{
+    const float src[2] = {10.0F, 20.0F};
+    /* cap 0 : il regarde -Z ; bande de 60 à 160 m, large de 2 x 5 m puis 2 x 20 m */
+    EXPECT_TRUE(eng_flame_strip(src, 0.0F, (float[2]){10.0F, -90.0F}, 60.0F, 160.0F, 5.0F, 20.0F));
+    EXPECT_TRUE(eng_flame_strip(src, 0.0F, (float[2]){10.0F, -40.0F}, 60.0F, 160.0F, 5.0F, 20.0F));
+    EXPECT_FALSE(eng_flame_strip(src, 0.0F, (float[2]){10.0F, -39.0F}, 60.0F, 160.0F, 5.0F, 20.0F));
+    EXPECT_TRUE(eng_flame_strip(src, 0.0F, (float[2]){10.0F, -140.0F}, 60.0F, 160.0F, 5.0F, 20.0F));
+    EXPECT_FALSE(
+        eng_flame_strip(src, 0.0F, (float[2]){10.0F, -141.0F}, 60.0F, 160.0F, 5.0F, 20.0F));
+    EXPECT_FALSE(eng_flame_strip(src, 0.0F, (float[2]){10.0F, 110.0F}, 60.0F, 160.0F, 5.0F,
+                                 20.0F)); /* dans son dos */
+    /* près de la gueule : 5 m de chaque côté ; au bout : 20 m ; au milieu : 12,5 m */
+    EXPECT_TRUE(eng_flame_strip(src, 0.0F, (float[2]){14.9F, -40.0F}, 60.0F, 160.0F, 5.0F, 20.0F));
+    EXPECT_FALSE(eng_flame_strip(src, 0.0F, (float[2]){15.2F, -40.0F}, 60.0F, 160.0F, 5.0F, 20.0F));
+    EXPECT_TRUE(eng_flame_strip(src, 0.0F, (float[2]){-9.9F, -140.0F}, 60.0F, 160.0F, 5.0F, 20.0F));
+    EXPECT_FALSE(
+        eng_flame_strip(src, 0.0F, (float[2]){-10.2F, -140.0F}, 60.0F, 160.0F, 5.0F, 20.0F));
+    EXPECT_TRUE(eng_flame_strip(src, 0.0F, (float[2]){22.4F, -90.0F}, 60.0F, 160.0F, 5.0F, 20.0F));
+    EXPECT_FALSE(eng_flame_strip(src, 0.0F, (float[2]){22.6F, -90.0F}, 60.0F, 160.0F, 5.0F, 20.0F));
+    /* cap pi/2 : il regarde -X */
+    EXPECT_TRUE(
+        eng_flame_strip(src, 1.5707963F, (float[2]){-90.0F, 22.0F}, 60.0F, 160.0F, 5.0F, 20.0F));
+    EXPECT_FALSE(
+        eng_flame_strip(src, 1.5707963F, (float[2]){10.0F, -90.0F}, 60.0F, 160.0F, 5.0F, 20.0F));
+    /* arguments absents, non finis, bande vide */
+    EXPECT_FALSE(
+        eng_flame_strip(NULL, 0.0F, (float[2]){10.0F, -90.0F}, 60.0F, 160.0F, 5.0F, 20.0F));
+    EXPECT_FALSE(eng_flame_strip(src, 0.0F, NULL, 60.0F, 160.0F, 5.0F, 20.0F));
+    EXPECT_FALSE(eng_flame_strip(src, NAN, (float[2]){10.0F, -90.0F}, 60.0F, 160.0F, 5.0F, 20.0F));
+    EXPECT_FALSE(eng_flame_strip(src, 0.0F, (float[2]){NAN, -90.0F}, 60.0F, 160.0F, 5.0F, 20.0F));
+    EXPECT_FALSE(
+        eng_flame_strip(src, 0.0F, (float[2]){10.0F, -90.0F}, 160.0F, 160.0F, 5.0F, 20.0F));
+    EXPECT_FALSE(eng_flame_strip(src, 0.0F, (float[2]){10.0F, -90.0F}, 60.0F, 160.0F, NAN, 20.0F));
+}

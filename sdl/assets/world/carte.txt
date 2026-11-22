@@ -125,3 +125,76 @@ zone desert boss -1300 1350
 zone volcan facile 800 -750
 zone volcan dur 1050 -1000
 zone volcan boss 1350 -1350
+
+# ── Meutes de petits monstres (osselets) : cinq petits squelettes fragiles, qui reviennent 6 s
+#    après avoir été vaincus : de quoi monter de niveau. meute x z : les ennemis sont ceux du biome
+#    qui domine à cet endroit. Garder 200 m entre deux meutes et 210 m avec une zone de combat
+#    (leurs portées ne doivent pas se recouvrir), 520 m avec l'antre du dragon, et les poser sur un
+#    terrain praticable, hors de l'eau, de la lave et des chemins. ──
+# Plaine (26)
+meute 40 -1360
+meute 20 -780
+meute 620 -620
+meute -700 -520
+meute -500 -460
+meute 240 -240
+meute -220 -180
+meute -980 -120
+meute 1260 -120
+meute 640 -100
+meute 360 -80
+meute -1440 40
+meute -140 80
+meute 120 120
+meute -240 280
+meute -960 380
+meute 940 380
+meute 1500 460
+meute -400 480
+meute 100 820
+meute -480 920
+meute 700 920
+meute 820 1120
+meute -60 1440
+meute 460 1500
+meute 1240 1500
+# Montagne (11)
+meute -1420 -1500
+meute -420 -1480
+meute -840 -1240
+meute -340 -1120
+meute -560 -1060
+meute -800 -1020
+meute -600 -800
+meute -1180 -780
+meute -1300 -580
+meute -1180 -360
+meute -1420 -280
+# Désert (15)
+meute -1500 260
+meute -1340 400
+meute -1500 540
+meute -1140 540
+meute -880 600
+meute -1320 640
+meute -1500 740
+meute -1040 760
+meute -540 1120
+meute -760 1140
+meute -300 1160
+meute -480 1340
+meute -860 1500
+meute -640 1500
+meute -300 1500
+# Volcan (11)
+meute 380 -1500
+meute 640 -1500
+meute 440 -1280
+meute 680 -1260
+meute 420 -1040
+meute 760 -960
+meute 1500 -660
+meute 1280 -640
+meute 1060 -600
+meute 1320 -420
+meute 1500 -200

@@ -36,7 +36,11 @@ static const char MAP[] = "# petite carte d'essai\n"
                           "foret sapin -300 -200 90 8\n"
                           "arbres_epars acacia desert 30\n"
                           "zone plaine facile 100 0\n"
-                          "zone volcan boss 300 -300\n";
+                          "zone volcan boss 300 -300\n"
+                          "meute 60 -40\n"
+                          "meute -280 -280\n"
+                          "meute -280 280\n"
+                          "meute 280 -280\n";
 
 static EngArena g_arena;
 
@@ -73,6 +77,9 @@ UTEST(world_map, it_reads_the_description_and_rejects_mistakes_with_the_line_num
         "monde 1024 4\n",                                      /* aucune région */
         "monde 1024 4\nregion plaine 0 0 300\nzone plaine boss 0 0\nzone plaine boss 1 1\n",
         "monde 1024 4\nregion plaine 0 0 300\ncolline 0 0 10 5 20\n", /* plateau > rayon */
+        "monde 1024 4\nregion plaine 0 0 300\nmeute 10\n",            /* meute sans z */
+        "monde 1024 4\nregion plaine 0 0 300\nmeute 10 20 30\n",      /* meute : un mot de trop */
+        "monde 1024 4\nregion plaine 0 0 300\nmeute 10 loin\n",       /* meute : z illisible */
         "monde 1024 4\nregion plaine 0 0 300\nlac 0 0 x 5\n",         /* nombre illisible */
     };
     for (size_t i = 0; i < sizeof bad / sizeof bad[0]; i++) {
@@ -498,6 +505,122 @@ UTEST(world_map, zones_take_their_place_from_the_map)
     EXPECT_STREQ(zones[11].boss_title, "Dragon de lave"); /* le reste vient de map_zones */
     EXPECT_FALSE(eng_worldmap_zones(NULL, zones));
 }
+
+/* Meutes de petits monstres : lues dans l'ordre du fichier ; chacune prend les ennemis du biome qui
+ * domine à sa place. */
+UTEST(world_map, packs_are_read_from_the_map_and_take_the_biome_of_their_place)
+{
+    ASSERT_TRUE(build(&g_map, MAP));
+    ASSERT_EQ(g_map.pack_count, 4U);
+    EngMapZone packs[8];
+    memset(packs, 0, sizeof packs);
+    ASSERT_EQ(eng_worldmap_packs(&g_map, packs, 8U), 4U);
+    static const double at[4][2] = {
+        {60.0, -40.0}, {-280.0, -280.0}, {-280.0, 280.0}, {280.0, -280.0}};
+    for (uint32_t i = 0; i < 4U; i++) {
+        EXPECT_EQ(packs[i].kind, ENG_MAPZONE_PACK);
+        EXPECT_EQ((uint32_t)packs[i].biome, i); /* plaine, montagne, désert, volcan */
+        EXPECT_NEAR(packs[i].x, at[i][0], 1e-9);
+        EXPECT_NEAR(packs[i].z, at[i][1], 1e-9);
+        EXPECT_EQ(packs[i].enemy_count, ENG_MAPZONE_PACK_SIZE);
+        if (i > 0U) {
+            EXPECT_GT(packs[i].hp, packs[i - 1U].hp);
+        }
+    }
+    EXPECT_EQ(packs[4].enemy_count, 0U); /* rien d'écrit au-delà */
+    EXPECT_EQ(eng_worldmap_packs(&g_map, packs, 2U), 2U);
+    EXPECT_EQ(eng_worldmap_packs(&g_map, packs, 0U), 0U);
+    EXPECT_EQ(eng_worldmap_packs(&g_map, NULL, 8U), 0U);
+    EXPECT_EQ(eng_worldmap_packs(NULL, packs, 8U), 0U);
+    char err[160];
+    ASSERT_TRUE(eng_worldmap_parse(&g_again, MAP, strlen(MAP), err, sizeof err));
+    EXPECT_EQ(eng_worldmap_packs(&g_again, packs, 8U), 0U); /* trame pas construite */
+    /* au plus ENG_WORLDMAP_MAX_PACKS meutes : une de plus est refusée, avec son numéro de ligne */
+    static char many[64 + (ENG_WORLDMAP_MAX_PACKS + 1U) * 16U];
+    size_t n = (size_t)snprintf(many, sizeof many, "monde 1024 4\nregion plaine 0 0 300\n");
+    for (uint32_t i = 0; i < ENG_WORLDMAP_MAX_PACKS; i++) {
+        n += (size_t)snprintf(many + n, sizeof many - n, "meute %u 0\n", i);
+    }
+    ASSERT_TRUE(eng_worldmap_parse(&g_again, many, n, err, sizeof err));
+    EXPECT_EQ(g_again.pack_count, ENG_WORLDMAP_MAX_PACKS);
+    EXPECT_NEAR(g_again.packs[ENG_WORLDMAP_MAX_PACKS - 1U][0], (float)(ENG_WORLDMAP_MAX_PACKS - 1U),
+                1e-6F);
+    n += (size_t)snprintf(many + n, sizeof many - n, "meute 500 0\n");
+    err[0] = '\0';
+    EXPECT_FALSE(eng_worldmap_parse(&g_again, many, n, err, sizeof err));
+    EXPECT_TRUE(strstr(err, "ligne 99") != NULL && strstr(err, "meutes") != NULL);
+}
+
+#ifdef OW_WORLD_MAP_FILE
+/* La vraie carte du jeu (assets/world/carte.txt) : ses meutes suivent les règles écrites dans le
+ * fichier. Ce test protège la carte dessinée à la main : une meute déplacée dans l'eau, dans la
+ * lave, sur une zone ou trop près d'une autre est signalée ici, avec son numéro. */
+static EngWorldMap g_real;
+
+UTEST(world_map, the_packs_of_the_real_map_are_dry_spread_out_and_away_from_the_zones)
+{
+    FILE *f = fopen(OW_WORLD_MAP_FILE, "rb");
+    ASSERT_TRUE(f != NULL);
+    static char text[1 << 16];
+    const size_t len = fread(text, 1, sizeof text - 1U, f);
+    (void)fclose(f);
+    ASSERT_GT(len, 1000U);
+    ASSERT_LT(len, sizeof text - 1U);
+    text[len] = '\0';
+    ASSERT_TRUE(build(&g_real, text));
+    EngMapZone zones[ENG_MAPZONE_COUNT];
+    ASSERT_TRUE(eng_worldmap_zones(&g_real, zones));
+    static EngMapZone packs[ENG_WORLDMAP_MAX_PACKS];
+    const uint32_t n = eng_worldmap_packs(&g_real, packs, ENG_WORLDMAP_MAX_PACKS);
+    EXPECT_EQ(n, g_real.pack_count);
+    EXPECT_GE(n, 48U); /* « plus de petits mobs » : des dizaines, dans toute la carte */
+    uint32_t per_biome[ENG_BIOME_COUNT] = {0};
+    for (uint32_t i = 0; i < n; i++) {
+        const EngMapZone *p = &packs[i];
+        const int earlier = *utest_result; /* pour nommer chaque meute fautive, pas la première */
+        *utest_result = UTEST_TEST_PASSED;
+        per_biome[p->biome]++;
+        const float h = eng_worldmap_height(&g_real, p->x, p->z);
+        EXPECT_GT(h, g_real.water + 1.0F); /* au sec */
+        EXPECT_FALSE(eng_worldmap_near_water(&g_real, p->x, p->z, 25.0));
+        float low = h;
+        float high = h;
+        float lava = eng_worldmap_lava(&g_real, p->x, p->z);
+        for (int a = 0; a < 16; a++) { /* le terrain où l'on se bat : un disque de 20 m */
+            const double ang = 6.283185307 * (double)a / 16.0;
+            const double radius = (a % 2) == 0 ? 20.0 : 10.0;
+            const double x = p->x + (radius * cos(ang));
+            const double z = p->z + (radius * sin(ang));
+            const float here = eng_worldmap_height(&g_real, x, z);
+            const float l = eng_worldmap_lava(&g_real, x, z);
+            low = here < low ? here : low;
+            high = here > high ? here : high;
+            lava = l > lava ? l : lava;
+        }
+        EXPECT_LT(high - low, 14.0F); /* praticable : pas une falaise */
+        EXPECT_LT(lava, 0.02F);
+        float path = 1.0F;
+        float w[ENG_BIOME_COUNT];
+        eng_worldmap_weights(&g_real, p->x, p->z, w, &path);
+        EXPECT_LT(path, 0.25F); /* pas au milieu d'un chemin */
+        EXPECT_GT(hypot(p->x - (double)g_real.spawn[0], p->z - (double)g_real.spawn[1]), 150.0);
+        for (uint32_t k = 0; k < ENG_MAPZONE_COUNT; k++) { /* les portées ne se recouvrent pas */
+            EXPECT_GT(hypot(p->x - zones[k].x, p->z - zones[k].z), zones[k].reach + p->reach);
+        }
+        for (uint32_t j = 0; j < i; j++) {
+            EXPECT_GT(hypot(p->x - packs[j].x, p->z - packs[j].z), p->reach + packs[j].reach);
+        }
+        if (*utest_result != UTEST_TEST_PASSED) {
+            printf("    meute %u en (%.0f, %.0f) : règle non respectée\n", (unsigned)i, p->x, p->z);
+        } else {
+            *utest_result = earlier;
+        }
+    }
+    for (uint32_t b = 0; b < (uint32_t)ENG_BIOME_COUNT; b++) {
+        EXPECT_GE(per_biome[b], 8U); /* de quoi monter de niveau dans chaque biome */
+    }
+}
+#endif
 
 UTEST(world_map, the_water_surface_covers_the_lake_and_the_river_and_nothing_else)
 {

@@ -66,6 +66,22 @@ livraisons ; les tags sont posés par Théo après ses tests.
   montagne enneigée, désert, volcan) : relief et matières par biome, frontières fondues.
 - Grande carte : 12 zones d'ennemis (farm facile, farm dur, boss dans chaque biome), difficulté
   croissante, camp de réveil sans ennemis ; `--at-zone N` pour commencer devant une zone.
+- Meutes de petits monstres (2026-11-22, soir ; « plus de petits mobs, pour les farmer ») : 63
+  meutes de cinq osselets posées dans toute la carte (`meute x z` dans `carte.txt`), fragiles (12 PV
+  en plaine, 60 au volcan), qui reviennent 6 s après leur défaite ; `--at-pack N`. Chaque zone a sa
+  portée (zone 110 m, meute 85 m, antre du dragon 420 m). Jusqu'à 5 ennemis à la fois (3 avant).
+- Vitesse de vol du mode créatif réglable (2026-11-22, soir) : de 0,1 à 1000 m/s à la molette
+  (x 1,25 par cran), affichée au HUD ; `--creative-speed V`. Les poussées du combat ne sont plus
+  multipliées par la vitesse de vol.
+- Dragon de lave colossal et volant (2026-11-22, soir ; « dix fois plus grand, et qu'il vole ») :
+  dessiné treize fois le modèle (tête à 44 m, 160 m d'envergure en vol) ; au sol il pivote
+  lentement, piétine, mord au sol loin devant lui, souffle un jet de 100 m ; on frappe ses pattes,
+  ou sa tête quand elle est au sol ; il décolle après 35 s, fond sur le joueur en brûlant une
+  bande de sol (axe figé : on s'en écarte ; deux passages par vol quand il a perdu la moitié de
+  ses PV), revient se poser dans une onde de choc
+  (`engine/dragon_flight`, `engine/creature`, `launcher/src/play_boss.c`). Dans son domaine, le
+  lieu où l'on renaît n'est plus relevé. Options de développement : `--warp N`, `--look-at X Z`,
+  `--look-at-boss`.
 - Mode de jeu choisi à la création de la partie (2026-11-22) : Aventure ou Créatif, enregistré avec
   la partie (drapeaux de la section META), affiché sur sa carte, impossible à changer en jeu (la
   touche « , » et l'action `creative` disparaissent) ; `--new-game --creative`. Vol créatif deux

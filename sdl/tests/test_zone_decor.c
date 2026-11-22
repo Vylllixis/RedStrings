@@ -149,7 +149,23 @@ UTEST(zone_decor, every_zone_has_a_decor_that_leaves_its_fight_area_clear)
     for (uint32_t i = 0; i < nv; i++) {
         fires += b[i].color == (uint8_t)ENG_DECOR_FIRE ? 1U : 0U;
     }
-    EXPECT_EQ(fires, 4U);
+    EXPECT_EQ(fires, 6U);
+    /* l'antre d'un dragon de 60 m : rien à moins de 70 m du centre (ses pattes sont à 20 m, sa
+     * tête s'abat à 57 m), des pics de 18 m sur le pourtour */
+    float tallest = 0.0F;
+    for (uint32_t i = 0; i < nv; i++) {
+        const float reach = b[i].half[0] > b[i].half[2] ? b[i].half[0] : b[i].half[2];
+        EXPECT_GT(hypotf(b[i].x, b[i].z) - reach, 70.0F);
+        EXPECT_LT(hypotf(b[i].x, b[i].z) + reach, 104.0F); /* dans l'anneau de lave (105 m) */
+        tallest = fmaxf(tallest, 2.0F * b[i].half[1]);
+    }
+    EXPECT_NEAR(tallest, 18.0F, 0.01F);
+    /* le chemin du château arrive par le sud-ouest (-x, +z) : cette diagonale est libre sur 12 m
+     * de large, jusqu'au centre */
+    for (int i = 0; i <= 150; i++) {
+        const float along = (float)i;
+        EXPECT_FALSE(blocked(b, nv, -0.7071068F * along, 0.7071068F * along, 6.0F));
+    }
 }
 
 UTEST(zone_decor, the_spawn_castle_has_four_gates_and_a_free_courtyard)

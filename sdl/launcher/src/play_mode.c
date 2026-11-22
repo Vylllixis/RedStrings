@@ -6,10 +6,8 @@
 #include "engine/log.h"
 
 #define STATIC_MASK (1U << ENG_LAYER_STATIC)
-#define PLAY_OBSTACLE_MIN_HALF 0.01F /* m : demi-cylindre minimal d'une capsule d'obstacle (B8) */
-/* mode créatif : deux fois plus rapide qu'avant le 2026-11-22 (c'était x 3 et 12 m/s) */
-#define PLAY_CREATIVE_SPEED 6.0F  /* vitesse horizontale x 6 */
-#define PLAY_CREATIVE_CLIMB 24.0F /* m/s : montée (Espace) et vol dans l'axe du regard */
+#define PLAY_OBSTACLE_MIN_HALF 0.01F   /* m : demi-cylindre minimal d'une capsule d'obstacle (B8) */
+#define PLAY_CREATIVE_SPEED_STEP 1.25F /* mode créatif : un cran de molette = vitesse x 1,25 */
 #define GROUND_HALF 28.0F
 #define GRID_HALF 3
 #define GRID_SPACING 8.0F
@@ -412,6 +410,13 @@ bool play_mode_enable_combat(PlayMode *play, bool audio)
 
 /* ── Pas fixe ── */
 
+/* vol créatif : facteur qui porte la vitesse de course du personnage à la vitesse de vol réglée */
+static float creative_scale(const PlayMode *play)
+{
+    const float run = play->loco.params.max_speed > 0.1F ? play->loco.params.max_speed : 0.1F;
+    return play_mode_creative_speed(play) / run;
+}
+
 void play_mode_tick(PlayMode *play, const EngInputState *input, float dt)
 {
     if (play == NULL || !play->ready || input == NULL || !(dt > 0.0F) || dt > 0.1F) {
@@ -436,7 +441,15 @@ void play_mode_tick(PlayMode *play, const EngInputState *input, float dt)
         pivot[0] += (focus[0] - feet[0]) * k;
         pivot[2] += (focus[1] - feet[2]) * k;
     }
-    (void)eng_orbit_camera_update(&play->orbit, input, dt, pivot);
+    EngInputState camera_input = *input;
+    if (play->creative) { /* en vol, la molette règle la vitesse (pas le recul de la caméra) */
+        if (isfinite(input->wheel) && input->wheel != 0.0F) {
+            play_mode_set_creative_speed(play, play_mode_creative_speed(play) *
+                                                   powf(PLAY_CREATIVE_SPEED_STEP, input->wheel));
+        }
+        camera_input.wheel = 0.0F;
+    }
+    (void)eng_orbit_camera_update(&play->orbit, &camera_input, dt, pivot);
     (void)eng_orbit_camera_collide(&play->orbit, play->world, STATIC_MASK,
                                    ENG_ORBIT_COLLISION_RADIUS, dt);
 
@@ -484,6 +497,10 @@ void play_mode_tick(PlayMode *play, const EngInputState *input, float dt)
             velocity[0] = 0.0F;
             velocity[2] = 0.0F;
         }
+        if (play->creative) { /* vol : la vitesse réglée ; les poussées du combat, elles, non */
+            velocity[0] *= creative_scale(play);
+            velocity[2] *= creative_scale(play);
+        }
         velocity[0] += step.push[0] / dt; /* esquive, recul, séparation : vitesse de ce pas */
         velocity[2] += step.push[1] / dt;
         if (step.respawned && play->safe_valid) { /* mort (lave...) : retour au dernier lieu sûr */
@@ -493,6 +510,10 @@ void play_mode_tick(PlayMode *play, const EngInputState *input, float dt)
             return;
         }
     }
+    if (play->combat == NULL && play->creative) {
+        velocity[0] *= creative_scale(play);
+        velocity[2] *= creative_scale(play);
+    }
     /* carte du monde : dans l'eau jusqu'à la taille, on patauge */
     play->wading = feet[1] < play->water_level - 0.35F;
     if (play->wading && !play->creative) {
@@ -500,8 +521,10 @@ void play_mode_tick(PlayMode *play, const EngInputState *input, float dt)
         velocity[2] *= PLAY_WADE_SPEED;
     }
     /* dernier lieu sûr : au sol, vivant, hors de la lave ; relevé deux fois par seconde */
+    /* ... et hors du domaine du dragon : mort sous ses flammes, on renaît là où l'on était avant */
     if (++play->safe_ticks >= 30U && grounded && !play->creative &&
-        (play->combat == NULL || !play_combat_in_lava(play->combat))) {
+        (play->combat == NULL ||
+         (!play_combat_in_lava(play->combat) && !play_combat_hunted(play->combat)))) {
         play->safe_ticks = 0;
         memcpy(play->safe, feet, sizeof play->safe);
         play->safe_valid = true;
@@ -510,13 +533,16 @@ void play_mode_tick(PlayMode *play, const EngInputState *input, float dt)
         /* vol libre : le personnage est déplacé sans gravité ni collision (jamais sous le sol) ;
          * avancer suit le regard (monte ou descend avec lui), Espace monte */
         const float forward = isfinite(move.y) ? move.y : 0.0F;
-        const float climb = (eng_action_held(input, ENG_ACTION_JUMP) ? PLAY_CREATIVE_CLIMB : 0.0F) +
-                            (forward * sinf(play->orbit.pitch) * PLAY_CREATIVE_CLIMB);
+        /* la vitesse de vol (molette : de 0,1 à 1000 m/s) est celle atteinte à fond de stick,
+         * à l'horizontale comme en montée ; le sprint la dépasse comme à pied */
+        const float speed = play_mode_creative_speed(play);
+        const float climb = (eng_action_held(input, ENG_ACTION_JUMP) ? speed : 0.0F) +
+                            (forward * sinf(play->orbit.pitch) * speed);
         float fly[3];
         (void)eng_character_position(play->character, fly);
-        fly[0] += velocity[0] * PLAY_CREATIVE_SPEED * dt;
+        fly[0] += velocity[0] * dt; /* déjà à la vitesse de vol (creative_scale) */
         fly[1] += climb * dt;
-        fly[2] += velocity[2] * PLAY_CREATIVE_SPEED * dt;
+        fly[2] += velocity[2] * dt;
         const float floor_y = play_mode_ground(play, fly[0], fly[2]) + 0.05F;
         if (fly[1] < floor_y) {
             fly[1] = floor_y;
@@ -527,6 +553,23 @@ void play_mode_tick(PlayMode *play, const EngInputState *input, float dt)
     }
     (void)eng_physics_step(play->world, dt);
     (void)eng_character_update(play->character, dt, velocity);
+}
+
+float play_mode_creative_speed(const PlayMode *play)
+{
+    /* jamais réglée (structure à zéro) : la vitesse par défaut */
+    return play != NULL && play->creative_speed > 0.0F ? play->creative_speed
+                                                       : PLAY_CREATIVE_SPEED_DEFAULT;
+}
+
+void play_mode_set_creative_speed(PlayMode *play, float speed)
+{
+    if (play == NULL || !isfinite(speed)) {
+        return;
+    }
+    play->creative_speed = speed < PLAY_CREATIVE_SPEED_MIN   ? PLAY_CREATIVE_SPEED_MIN
+                           : speed > PLAY_CREATIVE_SPEED_MAX ? PLAY_CREATIVE_SPEED_MAX
+                                                             : speed;
 }
 
 void play_mode_set_creative(PlayMode *play, bool creative)

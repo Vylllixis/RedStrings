@@ -205,11 +205,26 @@ attack boss_h2
  anim chop_2h 1.33 0
  hitbox hand_r 0 0 0.3 0 0 2.8 0.32
 end
+# Grande carte : l'osselet d'une meute : un coup de lame court et faible, annoncé 0,3 s (mêmes
+# durées que g_slash : le pic du geste `slash_d` tombe dans la fenêtre active).
+attack imp_jab
+ startup 18
+ active 4
+ recovery 24
+ damage 5
+ posture 5
+ stamina 5
+ hitstop 2
+ anim slash_d 1.0 0.075
+ hitbox hand_r 0 0 0.3 0 0 1.2 0.15
+end
 # Grande carte : le dragon (les capsules d'arme viennent de play_boss.c, pas de `hand_r`).
+# dragon_claw : le PIÉTINEMENT : il se cabre 0,9 s puis retombe ; touche à 8 m de ses pattes.
+# dragon_bite : la MORSURE : la gueule s'ouvre 1,1 s, puis la tête s'abat au sol loin devant lui.
 attack dragon_claw
- startup 26
- active 6
- recovery 26
+ startup 54
+ active 8
+ recovery 50
  damage 14
  posture 22
  stamina 5
@@ -217,9 +232,9 @@ attack dragon_claw
  hitbox hand_r 0 0 0.3 0 0 2.6 0.3
 end
 attack dragon_bite
- startup 38
- active 7
- recovery 36
+ startup 66
+ active 8
+ recovery 70
  damage 22
  posture 35
  stamina 5

@@ -16,6 +16,9 @@ Module : `engine/progression.h` (fonctions pures, `tests/test_progression.c`).
   monter.
 - Une montée de niveau soigne complètement (PV et endurance) et affiche « Niveau N ! » au centre
   de l'écran pendant 3 s. Le HUD montre « Niv. N » et une barre d'XP sous les barres du joueur.
+- **Farmer** (2026-11-22) : 63 meutes de cinq petits monstres sur la carte, qui reviennent 6 s
+  après leur défaite (50 XP par meute en plaine, 150 au volcan) : voir
+  [world-streaming.md](world-streaming.md#meutes-de-petits-monstres).
 - La mort garde le niveau (renaissance au maximum de PV du niveau). Le camp réapparaît après sa
   défaite : on peut donc gagner de l'XP en boucle (pas de plafond par camp, choix assumé pour la
   démo).

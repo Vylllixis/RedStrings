@@ -94,3 +94,87 @@ UTEST(eng_map_zones, the_nearest_zone_is_found_within_the_distance_only)
     EXPECT_EQ(eng_mapzones_nearest(z, mid - 5.0, 128.0, 1000.0), 0);
     EXPECT_EQ(eng_mapzones_nearest(z, mid + 30.0, 128.0, 1000.0), 1);
 }
+
+/* Meutes (demande de Théo, 2026-11-22) : cinq petits monstres bien plus fragiles que l'ennemi
+ * facile du biome, sans butin, de plus en plus solides d'un biome à l'autre. */
+UTEST(eng_map_zones, a_pack_is_five_small_weak_enemies_of_its_biome)
+{
+    EngMapZone z[ENG_MAPZONE_COUNT];
+    ASSERT_TRUE(eng_mapzones_build(NULL, z));
+    EXPECT_EQ((uint32_t)ENG_MAPZONE_KINDS, 3U); /* les zones fixes : toujours trois par biome */
+    EXPECT_EQ((uint32_t)ENG_MAPZONE_COUNT, 12U);
+    float before = 0.0F;
+    for (uint32_t b = 0; b < (uint32_t)ENG_BIOME_COUNT; b++) {
+        const EngMapZone *easy = &z[(size_t)b * ENG_MAPZONES_PER_BIOME];
+        EngMapZone p;
+        memset(&p, 0x5A, sizeof p);
+        ASSERT_TRUE(eng_mapzones_pack((EngBiome)b, 100.0 + (double)b, -50.0, &p));
+        EXPECT_EQ(p.kind, ENG_MAPZONE_PACK);
+        EXPECT_EQ((uint32_t)p.biome, b);
+        EXPECT_NEAR(p.x, 100.0 + (double)b, 1e-9);
+        EXPECT_NEAR(p.z, -50.0, 1e-9);
+        EXPECT_NEAR(p.reach, 85.0, 1e-9);
+        ASSERT_EQ(p.enemy_count, 5U);
+        EXPECT_LE(p.enemy_count, ENG_MAPZONE_MAX_ENEMIES);
+        for (uint32_t e = 0; e < p.enemy_count; e++) {
+            EXPECT_STREQ(p.arch[e], "imp");
+        }
+        EXPECT_NEAR(p.hp, 0.4F * easy->hp, 0.01F * easy->hp); /* 12, 22, 38 et 60 PV */
+        EXPECT_GT(p.hp, before);
+        before = p.hp;
+        EXPECT_NEAR(p.damage_scale, easy->damage_scale, 1e-6F);
+        EXPECT_NEAR(p.size_scale, 1.0F, 1e-6F);
+        EXPECT_EQ(p.reward, 0U);
+        EXPECT_EQ(p.boss_kind, ENG_BOSSKIND_NONE);
+        EXPECT_TRUE(p.boss_title == NULL);
+        EXPECT_TRUE(p.name != NULL && strstr(p.name, "meute") != NULL);
+    }
+    EngMapZone plain;
+    ASSERT_TRUE(eng_mapzones_pack(ENG_BIOME_PLAIN, 0.0, 0.0, &plain));
+    EXPECT_NEAR(plain.hp, 12.0F, 1e-6F); /* deux attaques légères de 10 au niveau 1 */
+    EXPECT_FALSE(eng_mapzones_pack(ENG_BIOME_PLAIN, 0.0, 0.0, NULL));
+    EXPECT_FALSE(eng_mapzones_pack(ENG_BIOME_COUNT, 0.0, 0.0, &plain));
+    EXPECT_FALSE(eng_mapzones_pack((EngBiome)-1, 0.0, 0.0, &plain));
+    EXPECT_FALSE(eng_mapzones_pack(ENG_BIOME_PLAIN, NAN, 0.0, &plain));
+    EXPECT_FALSE(eng_mapzones_pack(ENG_BIOME_PLAIN, 0.0, INFINITY, &plain));
+    EXPECT_STREQ(eng_mapzone_kind_name(ENG_MAPZONE_PACK), "meute");
+}
+
+/* Chaque zone a sa portée : 110 m pour une zone fixe, 85 m pour une meute, 420 m pour l'antre du
+ * dragon (dix fois plus grand, il vole : on le voit de loin). La zone active est la plus proche de
+ * celles dont le joueur est à portée. */
+UTEST(eng_map_zones, the_active_zone_is_the_nearest_one_within_its_own_reach)
+{
+    EngMapZone built[ENG_MAPZONE_COUNT];
+    ASSERT_TRUE(eng_mapzones_build(NULL, built));
+    for (uint32_t i = 0; i < ENG_MAPZONE_COUNT; i++) {
+        EXPECT_NEAR(built[i].reach, i == 11U ? 420.0 : 110.0, 1e-9);
+    }
+    EngMapZone z[3];
+    z[0] = built[0]; /* zone fixe en (0, 0) */
+    z[0].x = 0.0;
+    z[0].z = 0.0;
+    ASSERT_TRUE(eng_mapzones_pack(ENG_BIOME_PLAIN, 150.0, 0.0, &z[1])); /* meute à 150 m */
+    z[2] = built[11]; /* antre du dragon à 1000 m */
+    z[2].x = 1000.0;
+    z[2].z = 0.0;
+    EXPECT_EQ(eng_mapzones_active(z, 3U, 0.0, 0.0), 0);
+    EXPECT_EQ(eng_mapzones_active(z, 3U, 60.0, 0.0), 0); /* meute à 90 m : hors de sa portée */
+    EXPECT_EQ(eng_mapzones_active(z, 3U, 70.0, 0.0), 0); /* les deux à portée : la zone à 70 m */
+    EXPECT_EQ(eng_mapzones_active(z, 3U, 80.0, 0.0), 1); /* les deux à portée : la meute à 70 m */
+    EXPECT_EQ(eng_mapzones_active(z, 3U, 120.0, 30.0), 1); /* zone fixe à 124 m : hors de portée */
+    EXPECT_EQ(eng_mapzones_active(z, 3U, 235.0, 0.0), 1);  /* pile à 85 m de la meute */
+    EXPECT_EQ(eng_mapzones_active(z, 3U, 236.0, 0.0), -1);
+    EXPECT_EQ(eng_mapzones_active(z, 3U, 579.0, 0.0), -1); /* à 421 m du dragon */
+    EXPECT_EQ(eng_mapzones_active(z, 3U, 580.0, 0.0), 2);  /* à 420 m : on le voit */
+    EXPECT_EQ(eng_mapzones_active(z, 3U, 1000.0, 300.0), 2);
+    EXPECT_EQ(eng_mapzones_active(z, 2U, 1000.0, 0.0), -1); /* le dragon n'est pas dans la liste */
+    EXPECT_EQ(eng_mapzones_active(z, 0U, 0.0, 0.0), -1);
+    EXPECT_EQ(eng_mapzones_active(NULL, 3U, 0.0, 0.0), -1);
+    EXPECT_EQ(eng_mapzones_active(z, 3U, NAN, 0.0), -1);
+    EXPECT_EQ(eng_mapzones_active(z, 3U, 0.0, INFINITY), -1);
+    z[0].reach = NAN; /* portée absurde : la zone ne s'active jamais */
+    EXPECT_EQ(eng_mapzones_active(z, 3U, 0.0, 0.0), -1);
+    z[0].reach = -1.0;
+    EXPECT_EQ(eng_mapzones_active(z, 3U, 0.0, 0.0), -1);
+}

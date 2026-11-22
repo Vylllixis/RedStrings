@@ -115,18 +115,55 @@ mis à l'échelle par la zone :
 | Volcan | 150 PV | 300 PV | 1 000 PV | x 3 |
 
 - Le joueur se réveille dans un **camp sans ennemis** (le mannequin d'entraînement y reste).
-- Le lanceur charge la zone la plus proche à moins de 110 m (`play_combat_load_zone` : ennemis, PV,
-  dégâts, taille, grille de navigation reconstruite autour de la zone sur le relief chargé) ; il ne
-  change pas de zone en plein combat, sauf si le joueur est déjà à plus de 150 m de l'ancienne.
+- Chaque zone a sa **portée** (`EngMapZone.reach`) : 110 m pour une zone, 85 m pour une meute,
+  420 m pour l'antre du dragon (colossal, il vole : on le voit de loin). Le lanceur charge la zone
+  la plus proche de celles dont le joueur est à portée (`eng_mapzones_active`, puis
+  `play_combat_load_zone` : ennemis, PV, dégâts, taille, grille de navigation reconstruite autour
+  de la zone sur le relief chargé) ; il ne change pas de zone en plein combat, sauf si le joueur
+  est déjà 40 m au-delà de la portée de l'ancienne. Une seule zone est chargée à la fois.
 - Rien n'est verrouillé : on peut aller droit au volcan, à ses risques.
 - Un **boss de zone** ne réapparaît pas ; sa victoire donne un palier de butin (1 à 4) ; les zones de
   farm réapparaissent 10 s après avoir été vidées. Le nom de la zone s'affiche à son chargement.
-- `--at-zone N` (0 à 11) fait commencer 20 m avant la zone N. Le pilote automatique suit le chemin
-  quand il n'a personne à combattre.
-- Tests : `engine.map_zones` (ordre, bande de chaque zone, 3 / 6 / 20 coups en plaine, difficulté
-  croissante, zone la plus proche) ; `launcher.world_combat` (départ devant la zone 0 : elle se
-  charge, ses ennemis s'engagent) ; `launcher.world_combat_shift` (traversée : zones 0, 1, 2 chargées
-  dans l'ordre, camp en place après recentrage).
+- `--at-zone N` (0 à 11) fait commencer 20 m avant la zone N (34 m avant un boss, 150 m avant le
+  dragon). Le pilote automatique suit le chemin quand il n'a personne à combattre.
+- Tests : `engine.map_zones` (5 : ordre, bande de chaque zone, 3 / 6 / 20 coups en plaine,
+  difficulté croissante, zone la plus proche, meutes, portée de chaque zone) ;
+  `launcher.world_combat` (départ devant la zone 0 : elle se charge, ses ennemis s'engagent) ;
+  `launcher.world_combat_shift` (traversée : zones 0, 1, 2 chargées dans l'ordre, camp en place
+  après recentrage).
+
+### Meutes de petits monstres
+
+Demande de Théo du 2026-11-22 : « plus de petits mobs, le but c'est de pouvoir les farmer pour
+monter de niveau ».
+
+- Une **meute** : cinq **osselets** (archétype `imp` de `assets/combat/enemies.txt` : petits
+  squelettes dessinés à 0,62 fois la taille d'un soldat, un sur deux encapuchonné, vifs, un coup de
+  lame court et faible). Leurs PV valent 0,4 fois ceux de l'ennemi facile du biome :
+
+  | Biome | PV d'un osselet | XP par osselet | XP par meute |
+  |---|---|---|---|
+  | Plaine | 12 (deux coups au niveau 1) | 10 | 50 |
+  | Montagne | 22 | 11 | 55 |
+  | Désert | 38 | 19 | 95 |
+  | Volcan | 60 | 30 | 150 |
+
+- La meute vaincue **revient 6 s plus tard** (un camp : 10 s), autant de fois qu'on veut : deux
+  meutes de la plaine font passer du niveau 1 au niveau 2. Tant qu'il reste un osselet, les
+  vaincus ne reviennent pas.
+- **63 meutes** sur la carte dessinée (lignes `meute x z` de `carte.txt`, voir
+  [world-map.md](world-map.md)) ; aucune dans le monde procédural (`--world` sans carte).
+- La simulation compte maintenant jusqu'à 7 combattants (joueur, mannequin, 5 ennemis) : un camp
+  de trois range les deux places libres hors de la scène (jamais comptées comme des victoires).
+- Tests : `engine.map_zones` (meute de chaque biome, portées), `engine.world_map` (lecture des
+  lignes `meute`, biome de la place, 96 au plus ; la vraie carte : 48 meutes au moins, 8 par biome,
+  au sec, praticables, sans recouvrement), `launcher.bosses` (cinq osselets, 12 PV, 10 XP chacun,
+  retour après 6 s et pas avant, deux meutes : 100 XP ; un camp ensuite : 10 s, aucune XP offerte),
+  `launcher.world_pack` (le pilote automatique, avec les vrais personnages, vainc la meute et elle
+  revient : l'épée atteint bien ces petits ennemis).
+- Limites : pas de décor propre aux meutes (pas de nid, pas de feu) ; une seule zone ou meute est
+  chargée à la fois, on ne voit donc les osselets qu'à moins de 85 m ; ils ont l'apparence des
+  squelettes du jeu en plus petit, pas un modèle à eux.
 
 ![Zones : brute géante, boss de la plaine, de la montagne, du volcan](devlog/img/zones.png)
 
@@ -153,14 +190,14 @@ des ennemis (vue, chemin, collision) ; elles suivent le recentrage de l'origine.
 | Boss de la plaine | le **château** : cour de 44 m, murs de 5 m, tours d'angle, porte à l'ouest (entrée) et à l'est (sortie vers la montagne), donjon au nord-est, bannières |
 | Boss de la montagne | cercle de 10 piliers de glace, autel |
 | Boss du désert | arène en ruine : 12 colonnes de grès, 4 pans de mur |
-| Boss du volcan | 8 pics de basalte, 4 brasiers |
+| Boss du volcan | l'antre du dragon : 10 pics de basalte de 12 à 18 m à 96 m du centre, 6 brasiers à 84 m (rien à moins de 70 m : le dragon y tient) ; l'entrée du sud-ouest, par où arrive le chemin, est libre |
 | Farm facile | campement : 3 tentes, un feu |
 | Farm dur | palissade en arc, grand feu |
 | Camp de réveil | tente, couchage, feu, caisses |
 
 L'aire de combat reste dégagée (12 m autour d'un boss, 6 m autour d'un camp) et le chemin d'ouest
-en est libre. `--at-zone N` démarre 34 m avant un boss (hors de son décor), 20 m avant une zone de
-farm. Tests : `engine.zone_decor` (3), `launcher.bosses` (10 mesures de décor : le mur arrête le
+en est libre. `--at-zone N` démarre 34 m avant un boss (hors de son décor), 150 m avant le dragon,
+20 m avant une zone de farm. Tests : `engine.zone_decor` (3), `launcher.bosses` (10 mesures de décor : le mur arrête le
 joueur, suit l'origine, se retire), `launcher.world_decor`. Limites : pas d'arbres ni de rochers
 dans le monde ouvert ; le décor apparaît d'un coup à 300 m ; pas de toit en pente ni de porte qui
 s'ouvre.
@@ -194,25 +231,80 @@ autotest du combat (palier 2 : dégâts x 1,8, armure x 0,65, garde 0,1).
   Cheval mort : **cinématique** de 4 s (bandes noires, la caméra glisse vers lui, le cheval se
   couche, le chevalier tombe puis se relève ; ni lui ni le joueur n'agissent ni ne prennent de
   coup, un coup énorme ne traverse pas le cheval), puis combat **à pied** avec les 60 % restants.
-- **Dragon de lave** (volcan, zone 11, boss final, archétype `dragon`) : corps de 5 m, tête à
-  4,4 m, 10 m d'envergure. Ses hurtboxes (ventre, tête, pattes) et ses coups (griffes de 1,5 à 4 m
-  devant lui, morsure jusqu'à 7 m : la tête s'abat) suivent son corps. **Souffle** : dès qu'il voit
-  le joueur entre 4 et 14 m devant lui, la gueule s'ouvre 1,2 s (télégraphe), puis un cône de
-  flammes (24 degrés de chaque côté, jusqu'à 16 m) brûle 1,8 s : une brûlure tous les 12 ticks
-  (8 x les dégâts de la zone, réduite par l'armure et la garde, évitée par l'esquive et le mode
-  créatif), puis 5 s de récupération. Il ne bouge pas pendant le souffle : on s'écarte du cône.
+- **Dragon de lave** (volcan, zone 11, boss final, archétype `dragon`) : voir ci-dessous.
 
 Le cheval et le dragon sont **construits en code, en boîtes** (question Q13) : aucun modèle CC0
 animé utilisable n'a été trouvé et ni Blender ni assimp ne sont installés. Ventre, yeux et flammes
 sont émissifs.
 
-Tests : `engine.boss_special` (3), `engine.creature` (2), `launcher.bosses` (`--boss-selftest`,
-34 mesures : phases du cavalier, cinématique, souffle, corps à corps, butin).
+Tests : `engine.boss_special` (4), `engine.creature` (3), `engine.dragon_flight` (9),
+`launcher.bosses` (`--boss-selftest`, 107 mesures : phases du cavalier, cinématique, dragon au sol
+et en vol, meutes, décor, butin), `launcher.world_dragon`, `launcher.world_dragon_far`.
 
 Limites : les boss de la montagne et du désert sont encore le guerrier squelette avec plus de PV ;
 à cheval, les coups du chevalier partent du sol (son épée est dessinée 1,9 m plus haut) ; les
 pièces du butin n'ont pas de modèle propre (même épée, même bouclier) ; pas de son propre au cheval
 ni au dragon.
+
+### Le Dragon de lave : colossal, et il vole
+
+Demande de Théo du 2026-11-22 : « agrandis le dragon de bien 10 fois plus, et donne-lui la
+possibilité de voler ».
+
+![Une meute d'osselets ; le dragon qui décolle de son antre ; le dragon en vol](devlog/img/meutes-dragon.png)
+
+*Captures hors écran (rendu logiciel) : une meute dans la plaine ; le dragon, face au joueur
+(à 150 m), qui prend son vol ; le dragon au-dessus du joueur, pattes repliées.*
+
+**Taille.** Le modèle (`engine/creature.h`, écrit à l'échelle 1) est dessiné **treize fois plus
+grand** (`PLAY_DRAGON_SCALE` ; il l'était 1,3 fois : dix fois plus) : 52 m de corps, 140 m du
+museau au bout de la queue, tête à 44 m, 120 m d'envergure au sol et 160 m en vol. Son antre est
+le fond du cratère (110 m de rayon). La zone s'active à 420 m, et le décor de l'antre est posé
+dès 480 m : on le voit de loin.
+
+**Au sol.** Il reste au centre de son antre et **pivote lentement** vers le joueur (0,45 rad/s :
+un demi-tour lui prend 7 s). Il traque tout joueur vivant entré dans son **domaine** (230 m autour
+de l'antre), même caché derrière un pilier.
+
+| Ce qu'il fait | Où (distance à son centre) | Comment l'éviter |
+|---|---|---|
+| **Piétinement** : il se cabre 0,9 s, puis retombe | joueur à moins de 28 m ; touche à 8 m de ses pattes | s'éloigner des pattes pendant qu'il se cabre, ou esquiver |
+| **Morsure** : la gueule s'ouvre 1,1 s, puis la tête s'abat au sol, là où se tient le joueur | joueur de 28 à 78 m ; touche à 7 m de l'endroit où la tête tombe (de 30 à 73 m devant lui) | il vise jusqu'à la fin de l'anticipation, puis ne corrige plus : s'écarter (ou courir sous son cou) quand la tête commence à tomber, ou esquiver |
+| **Souffle** : il baisse la tête 1,2 s, puis brûle 1,8 s | une bande de 66 à 172 m devant lui, large de 10 m près de la gueule, 36 m au bout | sortir de la bande : il ne bouge plus pendant qu'il souffle |
+
+On passe **sous son ventre** (13 m plus haut) et entre ses pattes, qui repoussent le joueur (5 m
+autour de chaque patte posée). On le blesse en frappant ses **pattes** (des colonnes de 9 m), ou sa
+**tête** quand elle est au sol : après une morsure, et pendant tout son souffle (se placer sous sa
+tête, derrière la gueule : on n'y est pas brûlé).
+
+**En vol** (`engine/dragon_flight.h`, logique pure). Après 35 s de combat au sol il **décolle**
+(3 s), tourne au-dessus de l'antre à 75 m d'altitude et 42 m/s, puis **fond sur le joueur** (une
+fois par vol ; **deux fois** quand il a perdu la moitié de ses PV) : trop près de lui, il prend
+d'abord de l'élan ; à l'approche il **fige le point visé**
+(message « Le Dragon de lave fond sur toi : écarte-toi de son axe ! »), descend à 36 m et souffle
+vers le sol. Son feu touche le sol 140 m devant lui et brûle un disque de 11 m de rayon qui avance
+avec lui, de 60 m avant à 60 m après le point visé ; il met au moins 2 s à l'atteindre : en
+s'écartant de 11 m de son axe, on n'est pas brûlé. En vol, l'épée ne l'atteint pas. Puis il
+**revient se poser** au centre de l'antre (4 s) : une **onde de choc** frappe ce qui est à moins de
+34 m (16 x les dégâts de la zone). Un vol dure de 20 à 40 s (40 à 60 s à deux passages). Sans
+joueur dans son domaine, il alterne 20 s de repos et 30 s de ronde. Tué en vol, il tombe.
+
+**Renaître hors de portée.** Dans le domaine du dragon, le « dernier lieu sûr » (où l'on renaît)
+n'est plus relevé : mort sous ses flammes, le joueur renaît là où il était avant d'y entrer.
+
+Brûlures (souffle au sol comme en vol) : une tous les 12 ticks, 8 x les dégâts de la zone,
+réduites par l'armure et la garde, évitées par l'esquive et le mode créatif.
+
+Essayer : `--world 7 --combat --new-game --creative --at-zone 11` (à 150 m de lui, invincible) ;
+`--warp 2130` avance le jeu de 35 s : il décolle aussitôt ; `--look-at-boss` garde la caméra sur
+lui.
+
+Limites : il ne marche pas (il pivote au centre de son antre) ; son altitude se compte depuis le
+sol de l'antre : au-dessus d'un relief plus haut il s'élève d'un coup pour garder 20 m sous ses
+pieds, et ses ailes ou sa tête peuvent traverser une pente ; les flammes sont des boîtes
+pleines, pas des particules ; pas de son (ni rugissement, ni battement d'ailes) ;
+la caméra ne se recule pas pour le cadrer en entier ; rien n'a été vu sur l'écran de Théo (tout
+est contrôlé par des captures hors écran et des mesures).
 
 ## Streaming (M7-03) — `world_stream`
 

@@ -28,8 +28,11 @@ ow_add_test(map_zones test_map_zones.c)
 ow_add_test(gear test_gear.c)
 ow_add_test(creature test_creature.c)
 ow_add_test(boss_special test_boss_special.c)
+ow_add_test(dragon_flight test_dragon_flight.c)
 ow_add_test(zone_decor test_zone_decor.c)
 ow_add_test(world_map test_world_map.c)
+target_compile_definitions(test_world_map PRIVATE
+  OW_WORLD_MAP_FILE="${CMAKE_SOURCE_DIR}/assets/world/carte.txt")
 ow_add_test(ai_avoid test_ai_avoid.c)
 ow_add_test(frustum test_frustum.c)
 ow_add_test(atmosphere test_atmosphere.c)
@@ -709,9 +712,49 @@ if(OW_PHYSICS AND OW_SHADERS_OK)
            WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR})
   set_tests_properties(launcher.menu_mouse PROPERTIES
     PASS_REGULAR_EXPRESSION "nouvelle partie « Souris » dans l'emplacement 1.*MENU : écran 0, ligne [0-9] . 1 emplacement\\(s\\) occupé\\(s\\) . partie en cours « Souris » \\(en jeu\\)")
+  # Demande de Théo du 2026-11-22 (soir) : vitesse de vol du mode créatif réglable de 0,1 à
+  # 1000 m/s. La molette (de vrais crans, par la plateforme) : trois crans, puis un cran en
+  # arrière : 25 x 1,25 x 1,25 = 39,06 m/s ; --creative-speed 400 puis deux crans : 625 m/s.
+  add_test(NAME launcher.creative_speed
+           COMMAND sh -c "rm -rf \"$1\" && \"$2\" --combat --new-game --creative --no-audio --frames 14 --env-samples 16 --save-dir \"$1\" --menu-script '5:wheel=3,9:wheel=-1'"
+                   sh ${CMAKE_CURRENT_BINARY_DIR}/saves-speed $<TARGET_FILE:launcher>
+           WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR})
+  set_tests_properties(launcher.creative_speed PROPERTIES
+    PASS_REGULAR_EXPRESSION "en mode créatif \\(en jeu\\).*CRÉATIF : vitesse de vol 39.06 m/s")
+  add_test(NAME launcher.creative_speed_start
+           COMMAND sh -c "rm -rf \"$1\" && \"$2\" --combat --new-game --creative --creative-speed 400 --no-audio --frames 12 --env-samples 16 --save-dir \"$1\" --menu-script '5:wheel=2'"
+                   sh ${CMAKE_CURRENT_BINARY_DIR}/saves-speed-start $<TARGET_FILE:launcher>
+           WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR})
+  set_tests_properties(launcher.creative_speed_start PROPERTIES
+    PASS_REGULAR_EXPRESSION "CRÉATIF : vitesse de vol 625.00 m/s")
+  # « Plus de petits mobs, pour les farmer » : le pilote automatique devant la meute n° 5 de la
+  # carte (zone 17) : cinq osselets, il en vainc, la meute revient. Avec les vrais personnages :
+  # l'épée atteint bien ces petits ennemis.
+  add_test(NAME launcher.world_pack COMMAND launcher --world 7 --combat-autoplay --at-pack 5
+           --no-audio --frames 300 --env-samples 16 WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR})
+  set_tests_properties(launcher.world_pack PROPERTIES TIMEOUT 900
+    PASS_REGULAR_EXPRESSION "12 zones sur la carte et [1-9][0-9] meute\\(s\\) de petits monstres.*zone 17 « Plaine : meute d'osselets » chargée \\(plaine, meute, 5 ennemi\\(s\\), 12 PV.*meute vaincue, elle revient.*monde : combat : [1-9][0-9]* ennemi\\(s\\) engagé\\(s\\) au plus, [0-9]+ coup\\(s\\) reçu\\(s\\), [1-9][0-9]* ennemi\\(s\\) vaincu")
+  # Le dragon, dix fois plus grand, et qui vole : devant son antre (zone 11, à 150 m), 87 s de jeu
+  # jouées d'un coup (--warp) : 35 s au sol, il décolle, fait ses passages, revient se poser.
+  add_test(NAME launcher.world_dragon
+           COMMAND sh -c "rm -rf \"$1\" && \"$2\" --world 7 --combat --new-game --creative --at-zone 11 --no-audio --frames 8 --warp 5200 --env-samples 16 --save-dir \"$1\""
+                   sh ${CMAKE_CURRENT_BINARY_DIR}/saves-dragon $<TARGET_FILE:launcher>
+           WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR})
+  set_tests_properties(launcher.world_dragon PROPERTIES TIMEOUT 900
+    PASS_REGULAR_EXPRESSION "joueur à 22[0-9].[0-9] m d'altitude.*zone 11 « Volcan : antre du dragon » chargée \\(volcan, boss, 1 ennemi.*le Dragon de lave décolle.*le Dragon de lave se pose")
+  # On le voit de loin : à 400 m de l'antre (au nord-est, hors de toute autre zone), sa zone est
+  # chargée (portée de 420 m) et le décor de l'antre est posé.
+  add_test(NAME launcher.world_dragon_far
+           COMMAND sh -c "rm -rf \"$1\" && \"$2\" --world 7 --combat --new-game --creative --at-pos 1633 -1633 --no-audio --frames 12 --env-samples 16 --save-dir \"$1\""
+                   sh ${CMAKE_CURRENT_BINARY_DIR}/saves-dragon-far $<TARGET_FILE:launcher>
+           WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR})
+  set_tests_properties(launcher.world_dragon_far PROPERTIES TIMEOUT 600
+    PASS_REGULAR_EXPRESSION "décor posé : 22 boîte\\(s\\) \\(zone 11\\).*zone 11 « Volcan : antre du dragon » chargée")
   foreach(t launcher.world_water launcher.world_lava launcher.world_grass
           launcher.world_trees_avoid launcher.world_save launcher.splash launcher.splash_shots
-          launcher.title_menu launcher.menu_plain launcher.menu_mouse launcher.creative_flag)
+          launcher.title_menu launcher.menu_plain launcher.menu_mouse launcher.creative_flag
+          launcher.creative_speed launcher.creative_speed_start launcher.world_pack
+          launcher.world_dragon launcher.world_dragon_far)
     set_property(TEST ${t} PROPERTY ENVIRONMENT "SDL_VIDEODRIVER=offscreen")
     set_property(TEST ${t} PROPERTY FAIL_REGULAR_EXPRESSION "ERROR|non détruite|perdu|TROU")
   endforeach()
@@ -745,8 +788,10 @@ if(OW_PHYSICS AND OW_SHADERS_OK)
   set_tests_properties(launcher.world_layers_mountain PROPERTIES
     PASS_REGULAR_EXPRESSION "couches de biome : 0 cellule\\(s\\) avec sable, 0 avec lave.*carte du monde : [1-9][0-9]* arbre\\(s\\) chargé\\(s\\), [1-9][0-9]* dessiné\\(s\\), [1-9][0-9]* tronc")
   # (120 images et « joueur au sol » : à 215 m d'altitude, un relief écrêté ferait tomber le joueur)
+  # Départ dans le cratère, à 34 m du centre de l'antre (là où --at-zone 11 posait le joueur avant
+  # que le dragon devienne colossal : --at-zone 11 commence maintenant à 150 m, sur la pente).
   add_test(NAME launcher.world_layers_volcano COMMAND launcher --world 7 --combat --new-game
-           --at-zone 11 --no-audio --frames 120 --env-samples 16
+           --at-pos 1326 -1326 --no-audio --frames 120 --env-samples 16
            WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR})
   set_tests_properties(launcher.world_layers_volcano PROPERTIES
     PASS_REGULAR_EXPRESSION "joueur à 21[0-9].[0-9] m d'altitude.*avec sable, [1-9][0-9]* avec lave.*carte du monde : 0 arbre.*vue lointaine : [1-9][0-9]* morceau.*MONDE : joueur au sol")
@@ -760,7 +805,8 @@ if(OW_PHYSICS AND OW_SHADERS_OK)
             launcher.world_water launcher.world_lava launcher.world_grass
             launcher.world_trees_avoid launcher.world_save launcher.splash
             launcher.splash_shots launcher.title_menu launcher.menu_plain launcher.menu_mouse
-            launcher.creative_flag
+            launcher.creative_flag launcher.creative_speed launcher.creative_speed_start
+            launcher.world_pack launcher.world_dragon launcher.world_dragon_far
             launcher.world_layers_plain
             launcher.world_layers_desert launcher.world_layers_mountain
             launcher.world_layers_volcano)

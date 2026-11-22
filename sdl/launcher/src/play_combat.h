@@ -81,6 +81,10 @@ void play_combat_set_invincible(PlayCombat *c, bool invincible);
 #define PLAY_LAVA_BURN 0.06F
 void play_combat_set_lava(PlayCombat *c, bool in_lava);
 bool play_combat_in_lava(const PlayCombat *c);
+/* Le dragon traque le joueur (vivant, dans son domaine) : tant que c'est vrai, le « dernier lieu
+ * sûr » n'est plus relevé : mort, le joueur renaît hors de portée de ses flammes, pas sous sa
+ * gueule. */
+bool play_combat_hunted(const PlayCombat *c);
 /* Carte du monde : troncs et rochers près du camp (x, z, rayon ; repère local ; au plus
  * PLAY_AVOID_MAX, le reste est ignoré). Les ennemis les évitent (engine/ai_avoid.h) : à moins de
  * 1 m ils les contournent, au contact ils s'en éloignent d'au moins 1 m, et ils ne sont jamais
@@ -145,6 +149,10 @@ void play_combat_update_visuals(PlayCombat *c, const struct PlayMode *play, doub
 /* Grande carte : boîtes du cheval ou du dragon du boss spécial (boîte unité -> monde, couleur
  * EngCreatureColor), calculées par play_combat_update_visuals. Renvoie leur nombre. */
 uint32_t play_combat_creature(const PlayCombat *c, const mat4 **places, const uint8_t **colors);
+/* Boss spécial de la zone (cheval, dragon) : centre de son corps dans la simulation (x, z) et
+ * altitude de ses pieds au-dessus du sol de son antre (0 au sol). false : aucun. Sert aux captures
+ * de développement (la caméra le suit) et aux tests. */
+bool play_combat_boss_point(const PlayCombat *c, float xz[2], float *altitude);
 /* La cinématique du cavalier est en cours ; `focus` (peut être NULL) : où il est (x, z). */
 bool play_combat_cinematic(const PlayCombat *c, float focus[2]);
 void play_combat_draw_models(const PlayCombat *c, const AvatarLibrary *lib, EngRenderQueue *queue,

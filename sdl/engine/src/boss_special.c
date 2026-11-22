@@ -158,3 +158,23 @@ bool eng_flame_reaches(const float src[2], float yaw, const float target[2], flo
     const float along = ((dx * -sinf(yaw)) + (dz * -cosf(yaw))) / dist;
     return along >= cosf(half_angle);
 }
+
+bool eng_flame_strip(const float src[2], float yaw, const float target[2], float near_m,
+                     float far_m, float half_near, float half_far)
+{
+    if (src == NULL || target == NULL || !isfinite(yaw) || !isfinite(near_m) || !isfinite(far_m) ||
+        !isfinite(half_near) || !isfinite(half_far) || !(far_m > near_m)) {
+        return false;
+    }
+    const float dx = target[0] - src[0];
+    const float dz = target[1] - src[1];
+    const float fx = -sinf(yaw);
+    const float fz = -cosf(yaw);
+    const float along = (dx * fx) + (dz * fz);
+    const float side = fabsf((dx * fz) - (dz * fx));
+    if (!isfinite(along) || !isfinite(side) || along < near_m || along > far_m) {
+        return false;
+    }
+    const float u = (along - near_m) / (far_m - near_m);
+    return side <= half_near + ((half_far - half_near) * u);
+}

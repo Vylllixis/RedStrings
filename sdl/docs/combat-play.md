@@ -90,13 +90,31 @@ sauvegarde), affiché sur sa carte (pastille « CRÉATIF ») et **ne se change p
 liaisons).
 
 En mode créatif le joueur est **invincible** (ses PV sont remis au maximum avant chaque pas de
-simulation), il **vole** (sans gravité ni collision, jamais sous le sol : Espace monte à 24 m/s,
-avancer suit le regard, vitesse horizontale x 6 ; c'était 12 m/s et x 3 avant le 2026-11-22) et ses
-**dégâts ne changent pas** (mêmes attaques, mêmes valeurs). « MODE CRÉATIF » s'affiche à côté du
-nom de l'arme. La simulation de combat est dans le plan : en vol au-dessus d'un ennemi, les coups
-portent encore. L'autotest du combat le vérifie (`play_mode_set_creative` : même dégât par coup, PV
-remis, montée de 24 m en 1 s, pas de chute, vol six fois plus rapide que la marche, retour au sol en
-repassant en aventure).
+simulation), il **vole** (sans gravité ni collision, jamais sous le sol : Espace monte, avancer
+suit le regard) et ses **dégâts ne changent pas** (mêmes attaques, mêmes valeurs). La simulation de
+combat est dans le plan : en vol au-dessus d'un ennemi, les coups portent encore.
+
+**Vitesse de vol réglable** (demande de Théo du 2026-11-22, soir) : de **0,1 à 1000 m/s**, 25 m/s
+au départ. En vol, **la molette** la règle : chaque cran la multiplie ou la divise par 1,25 (41
+crans d'un bout à l'autre) ; elle ne recule alors plus la caméra. C'est la vitesse atteinte à fond
+de stick, à l'horizontale comme en montée (Espace) ; le sprint la dépasse comme à pied. Elle
+s'affiche à côté du nom de l'arme (« MODE CRÉATIF · 25 m/s », avec une décimale sous 10 m/s) et la
+ligne d'aide du bas de l'écran rappelle la molette. `--creative-speed V` choisit la vitesse de
+départ. Les poussées du combat (recul d'un coup, patte du dragon) ne sont pas multipliées par
+cette vitesse.
+
+L'autotest du combat le vérifie (`play_mode_set_creative`, `play_mode_set_creative_speed` : même
+dégât par coup, PV remis, montée de 25 m en 1 s, pas de chute, 25 m/s à fond de stick, trois crans
+de molette : 48,8 m/s, caméra immobile, vitesse dans le HUD, plafond à 1000 m/s (995 m parcourus
+en 1 s), plancher à 0,1 m/s (10 cm de montée en 1 s), valeur non finie ignorée, retour au sol en
+repassant en aventure, où la molette règle de nouveau la caméra). Tests de bout en bout :
+`launcher.creative_speed` (de vrais crans de molette : 39,06 m/s), `launcher.creative_speed_start`
+(`--creative-speed 400` puis deux crans : 625 m/s).
+
+Limites : la vitesse de vol n'est pas enregistrée avec la partie (25 m/s à chaque lancement) ;
+pas de touche du clavier ni de bouton de manette pour la régler (la molette seulement, ou le pavé
+tactile à deux doigts) ; à très grande vitesse le relief détaillé se charge après le passage du
+joueur (on survole la vue lointaine).
 
 ## Équipement (M8-08)
 

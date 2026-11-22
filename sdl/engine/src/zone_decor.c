@@ -123,13 +123,16 @@ uint32_t eng_zone_decor(const EngMapZone *zone, EngDecorBox *out, uint32_t max)
             break;
         case ENG_BIOME_VOLCANO: /* pics de basalte, brasiers sur leurs socles */
         default:
-            ring(&b, ENG_DECOR_BASALT, 8U, 24.0F, 1.6F, 6.0F, 1.2F);
-            for (int i = 0; i < 4; i++) {
-                const float a = 0.7853982F + (1.5707963F * (float)i);
-                const float x = 15.0F * cosf(a);
-                const float z = 15.0F * sinf(a);
-                add(&b, ENG_DECOR_BASALT, true, x, z, 0.6F, 0.7F, 0.6F, 0.0F, 0.0F);
-                add(&b, ENG_DECOR_FIRE, false, x, z, 0.45F, 0.35F, 0.45F, 1.4F, 0.5F);
+            /* l'antre d'un dragon de 60 m : les pics (12 à 18 m de haut) et les brasiers bordent
+             * l'arène, à 96 et 84 m du centre, loin de ses pattes. Dix pics : aucun n'est sur
+             * une diagonale (le chemin du château arrive par le sud-ouest). */
+            ring(&b, ENG_DECOR_BASALT, 10U, 96.0F, 3.2F, 12.0F, 2.0F);
+            for (int i = 0; i < 6; i++) {
+                const float a = 0.5235988F + (1.0471976F * (float)i);
+                const float x = 84.0F * cosf(a);
+                const float z = 84.0F * sinf(a);
+                add(&b, ENG_DECOR_BASALT, true, x, z, 1.6F, 1.2F, 1.6F, 0.0F, 0.0F);
+                add(&b, ENG_DECOR_FIRE, false, x, z, 1.2F, 0.9F, 1.2F, 2.4F, 0.5F);
             }
             break;
         }

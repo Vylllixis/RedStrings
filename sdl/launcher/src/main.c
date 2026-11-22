@@ -120,6 +120,15 @@ static void usage(const char *prog)
                     "écran par défaut)\n");
     fprintf(stderr, "  --creative     avec --new-game : la partie est en mode créatif (invincible, "
                     "vol) ; sinon le mode se choisit au menu, à la création de la partie\n");
+    fprintf(stderr, "  --creative-speed V  vitesse de vol du mode créatif au départ, de 0.1 à 1000 "
+                    "m/s (25 par défaut ; en jeu : la molette)\n");
+    fprintf(stderr,
+            "  --look-at X Z  (développement) la caméra regarde le point (x, z) de la carte "
+            "au départ ; --look-pitch D : inclinée de D degrés (positif : vers le haut)\n");
+    fprintf(stderr, "  --look-at-boss (développement) la caméra suit le boss spécial de la zone "
+                    "(le dragon en vol)\n");
+    fprintf(stderr, "  --warp N       (développement) joue N ticks de jeu d'un coup à la troisième "
+                    "image (60 par seconde de jeu) : captures et tests du vol du dragon\n");
     fprintf(stderr, "  --menu-script S  (développement) joue des touches dans le menu : "
                     "« image:touche,... » avec up, down, left, right, ok, back, esc (événement "
                     "Échap), bs (effacer), text=MOT, mouse=X/Y, click\n");
@@ -133,6 +142,9 @@ static void usage(const char *prog)
                     "chargement en PPM, puis quitte\n");
     fprintf(stderr, "  --at-zone N    avec --world --combat : commence 20 m avant la zone N de la "
                     "grande carte (0 à 11 : farm facile, farm dur, boss de chaque biome)\n");
+    fprintf(stderr,
+            "  --at-pack N    avec --world --combat : commence 20 m avant la meute de petits "
+            "monstres N de la carte dessinée (0 : la première ligne « meute »)\n");
     fprintf(stderr,
             "  --post-bench N mesure le coût de chaque effet (FXAA, bloom, SSAO, échelle) : N "
             "images par configuration, sans vsync, puis quitte\n");
@@ -319,6 +331,7 @@ typedef struct MenuScript {
         bool click;
         bool escape; /* événement clavier Échap, traité par la plateforme à l'image suivante */
         bool typed;  /* `text` part en événement de texte (plateforme) au lieu d'aller au menu */
+        float wheel; /* crans de molette (0 : aucun) */
     } step[MENU_SCRIPT_MAX];
     uint32_t count;
     uint32_t next;
@@ -349,6 +362,8 @@ static bool menu_script_parse(MenuScript *s, const char *spec)
             s->step[s->count].click = true;
         } else if (len == 3U && strncmp(key, "esc", 3) == 0) {
             s->step[s->count].escape = true;
+        } else if (len > 6U && strncmp(key, "wheel=", 6) == 0) {
+            s->step[s->count].wheel = strtof(key + 6, NULL);
         } else if (len > 5U && strncmp(key, "type=", 5) == 0) {
             (void)snprintf(s->step[s->count].text, sizeof s->step[s->count].text, "%.*s",
                            (int)(len - 5U), key + 5);
@@ -402,6 +417,9 @@ static void menu_script_frame(MenuScript *s, GameFlow *flow, uint64_t frame, Eng
         if (s->step[s->next].click) {
             eng_input_mouse_button(&platform->input, SDL_BUTTON_LEFT, true);
             eng_input_mouse_button(&platform->input, SDL_BUTTON_LEFT, false);
+        }
+        if (s->step[s->next].wheel != 0.0F) {
+            eng_input_mouse_wheel(&platform->input, s->step[s->next].wheel);
         }
         if (s->step[s->next].escape) {
             for (int down = 1; down >= 0; down--) {
@@ -490,6 +508,22 @@ static void world_save_selftest(GameFlow *flow, PlayMode *play, const WorldView 
 #define WORLD_SPAWN_X 128.0
 #define WORLD_SPAWN_Z 128.0
 
+/* Zones de combat de la grande carte : les ENG_MAPZONE_COUNT zones fixes, puis les meutes de petits
+ * monstres de la carte dessinée (lignes « meute x z »). Retourne leur nombre (0 : carte invalide).
+ */
+#define WORLD_ZONES_MAX (ENG_MAPZONE_COUNT + ENG_WORLDMAP_MAX_PACKS)
+static uint32_t world_zones(const WorldView *world, EngMapZone out[WORLD_ZONES_MAX])
+{
+    if (world->map == NULL) {
+        return eng_mapzones_build(&world->gen.biomes, out) ? ENG_MAPZONE_COUNT : 0U;
+    }
+    if (!eng_worldmap_zones(world->map, out)) {
+        return 0U;
+    }
+    const uint32_t fixed = ENG_MAPZONE_COUNT; /* les meutes suivent les zones fixes */
+    return ENG_MAPZONE_COUNT + eng_worldmap_packs(world->map, out + fixed, ENG_WORLDMAP_MAX_PACKS);
+}
+
 /* --world : monde physique vide, streaming, chargement initial bloquant (les 9 cellules autour du
  * joueur), puis le personnage posé sur le relief. */
 static bool start_world(WorldView *world, PlayMode *play, EngTweaks *tweaks, float sensitivity,
@@ -507,17 +541,20 @@ static bool start_world(WorldView *world, PlayMode *play, EngTweaks *tweaks, flo
         return false;
     }
     double spawn_world[3] = {start[0], 0.0, start[1]};
-    EngMapZone zones[ENG_MAPZONE_COUNT];
+    static EngMapZone zones[WORLD_ZONES_MAX];
     if (world->map != NULL && !start_forced) { /* carte : départ au château, ou devant la zone */
         spawn_world[0] = (double)world->map->spawn[0];
         spawn_world[2] = (double)world->map->spawn[1];
-        if (at_zone >= 0 && eng_worldmap_zones(world->map, zones)) {
+        if (at_zone >= 0 && (uint32_t)at_zone < world_zones(world, zones)) {
             /* sur le chemin depuis le château : 20 m avant la zone, 34 m avant un boss */
             const EngMapZone *z = &zones[at_zone];
             const double dx = spawn_world[0] - z->x;
             const double dz = spawn_world[2] - z->z;
             const double len = hypot(dx, dz) > 1.0 ? hypot(dx, dz) : 1.0;
-            const double back = z->kind == ENG_MAPZONE_BOSS ? 34.0 : 20.0;
+            /* le dragon est colossal : 150 m, pour le voir en entier sans être sous sa gueule */
+            const double back = z->boss_kind == ENG_BOSSKIND_DRAGON
+                                    ? 150.0
+                                    : (z->kind == ENG_MAPZONE_BOSS ? 34.0 : 20.0);
             spawn_world[0] = z->x + (back * dx / len);
             spawn_world[2] = z->z + (back * dz / len);
         }
@@ -649,7 +686,13 @@ static void update_decor(WorldView *world, PlayMode *play, const float feet[3])
     }
     double pw[3];
     eng_origin_to_world(&world->origin, feet, pw);
-    const int32_t near = eng_mapzones_nearest(zones, pw[0], pw[2], 300.0);
+    int32_t near = eng_mapzones_nearest(zones, pw[0], pw[2], 300.0);
+    for (int32_t k = 0; near < 0 && k < (int32_t)ENG_MAPZONE_COUNT; k++) {
+        /* une zone qui s'active de plus loin (l'antre du dragon : 420 m) a son décor avant elle */
+        if (hypot(zones[k].x - pw[0], zones[k].z - pw[2]) <= zones[k].reach + 60.0) {
+            near = k;
+        }
+    }
     /* le château de départ est au départ de la CARTE (pas celui de --at-zone) */
     float home[3] = {play->spawn[0], 0.0F, play->spawn[2]};
     if (world->map != NULL) {
@@ -695,21 +738,22 @@ static void update_decor(WorldView *world, PlayMode *play, const float feet[3])
     }
 }
 
-/* Grande carte : la zone d'ennemis la plus proche du joueur (110 m) remplace la zone chargée, sauf
- * en plein combat (à moins que le joueur soit déjà à plus de 150 m de l'ancienne). Au départ : le
- * camp de réveil, sans ennemis. Un boss vaincu ne revient pas. Renvoie true si la zone a changé. */
+/* Grande carte : la zone d'ennemis à portée du joueur (zone fixe : 110 m ; meute de petits
+ * monstres : 85 m ; antre du dragon : 420 m ; la plus proche l'emporte) remplace la zone chargée,
+ * sauf en plein combat (à moins que le joueur soit déjà 40 m au-delà de la portée de l'ancienne).
+ * Au départ : le camp de réveil, sans ennemis. Un boss vaincu ne revient pas. Renvoie true si la
+ * zone a changé. */
 static bool update_zone(const WorldView *world, PlayMode *play, const float feet[3])
 {
-    static EngMapZone zones[ENG_MAPZONE_COUNT];
-    static bool built;
+    static EngMapZone zones[WORLD_ZONES_MAX];
+    static uint32_t count;
     static int32_t active = -2; /* -2 : rien chargé ; -1 : camp de réveil */
     if (play->combat == NULL) {
         return false;
     }
-    if (!built) {
-        built = world->map != NULL ? eng_worldmap_zones(world->map, zones)
-                                   : eng_mapzones_build(&world->gen.biomes, zones);
-        if (!built) {
+    if (count == 0U) {
+        count = world_zones(world, zones);
+        if (count == 0U) {
             return false;
         }
     }
@@ -717,17 +761,19 @@ static bool update_zone(const WorldView *world, PlayMode *play, const float feet
     if (active == -2) {
         changed = play_combat_load_zone(play->combat, NULL, -1, play->spawn[0], play->spawn[2]);
         active = -1;
-        ENG_LOG_INFO("monde : camp de réveil (aucun ennemi) ; %u zones sur la carte",
-                     (unsigned)ENG_MAPZONE_COUNT);
+        ENG_LOG_INFO("monde : camp de réveil (aucun ennemi) ; %u zones sur la carte et %u "
+                     "meute(s) de petits monstres",
+                     (unsigned)ENG_MAPZONE_COUNT, (unsigned)(count - ENG_MAPZONE_COUNT));
     }
     double pw[3];
     eng_origin_to_world(&world->origin, feet, pw);
-    const int32_t near = eng_mapzones_nearest(zones, pw[0], pw[2], 110.0);
+    const int32_t near = eng_mapzones_active(zones, count, pw[0], pw[2]);
     if (near < 0 || near == active) {
         return changed;
     }
     const bool far_from_active =
-        active < 0 || hypot(zones[active].x - pw[0], zones[active].z - pw[2]) > 150.0;
+        active < 0 ||
+        hypot(zones[active].x - pw[0], zones[active].z - pw[2]) > zones[active].reach + 40.0;
     if (play_combat_busy(play->combat) && !far_from_active) {
         return changed;
     }
@@ -738,11 +784,12 @@ static bool update_zone(const WorldView *world, PlayMode *play, const float feet
     if (play_combat_load_zone(play->combat, &zone, near, local[0], local[2])) {
         active = near;
         changed = true;
-        ENG_LOG_INFO("monde : zone %d « %s » chargée (%s, %u ennemi(s), %.0f PV, dégâts x %.1f)%s",
-                     (int)near, zone.name, eng_biome_name(zone.biome), zone.enemy_count,
-                     (double)zone.hp, (double)zone.damage_scale,
-                     play_combat_zone_beaten(play->combat, near) ? " : boss déjà vaincu, vide"
-                                                                 : "");
+        ENG_LOG_INFO(
+            "monde : zone %d « %s » chargée (%s, %s, %u ennemi(s), %.0f PV, dégâts x "
+            "%.1f)%s",
+            (int)near, zone.name, eng_biome_name(zone.biome), eng_mapzone_kind_name(zone.kind),
+            zone.enemy_count, (double)zone.hp, (double)zone.damage_scale,
+            play_combat_zone_beaten(play->combat, near) ? " : boss déjà vaincu, vide" : "");
     } else {
         ENG_LOG_ERROR("monde : zone %d « %s » impossible à charger", (int)near, zone.name);
     }
@@ -969,6 +1016,12 @@ int main(int argc, char **argv)
     const char *shots_list = NULL;
     bool windowed = false;       /* --windowed : pas de plein écran par défaut */
     bool creative_game = false;  /* --creative : avec --new-game, partie en mode créatif */
+    double creative_speed = 0.0; /* --creative-speed V : vitesse de vol au départ (m/s) */
+    bool look_at_set = false;    /* --look-at X Z : la caméra regarde ce point de la carte */
+    double look_at[2] = {0.0, 0.0};
+    double look_pitch = 0.0; /* --look-pitch D : degrés (positif : vers le haut) */
+    long warp_ticks = 0;     /* --warp N : N ticks de jeu joués d'un coup à la troisième image */
+    bool look_at_boss = false;   /* --look-at-boss : la caméra suit le boss spécial de la zone */
     const char *save_dir = NULL; /* --save-dir DOSSIER : parties et options ailleurs */
     bool save_selftest = false;  /* --save-selftest : sauvegarde dans le monde ouvert */
     double world_autopilot = 0.0;
@@ -1040,6 +1093,22 @@ int main(int argc, char **argv)
             windowed = true;
         } else if (strcmp(argv[i], "--creative") == 0) {
             creative_game = true;
+        } else if (strcmp(argv[i], "--creative-speed") == 0 && i + 1 < argc) {
+            creative_speed = strtod(argv[++i], NULL);
+        } else if (strcmp(argv[i], "--look-at") == 0 && i + 2 < argc) {
+            look_at[0] = strtod(argv[++i], NULL);
+            look_at[1] = strtod(argv[++i], NULL);
+            look_at_set = isfinite(look_at[0]) && isfinite(look_at[1]);
+        } else if (strcmp(argv[i], "--look-at-boss") == 0) {
+            look_at_boss = true;
+        } else if (strcmp(argv[i], "--look-pitch") == 0 && i + 1 < argc) {
+            look_pitch = strtod(argv[++i], NULL);
+        } else if (strcmp(argv[i], "--warp") == 0 && i + 1 < argc) {
+            warp_ticks = strtol(argv[++i], NULL, 10);
+            if (warp_ticks < 0 || warp_ticks > 200000) {
+                fprintf(stderr, "--warp : nombre de ticks de 0 à 200000 attendu\n");
+                return 2;
+            }
         } else if (strcmp(argv[i], "--save-dir") == 0 && i + 1 < argc) {
             save_dir = argv[++i];
         } else if (strcmp(argv[i], "--save-selftest") == 0) {
@@ -1085,8 +1154,19 @@ int main(int argc, char **argv)
             }
             /* avant la zone, sur le chemin : 20 m, ou 34 m devant un boss (hors de son décor) */
             world_start[0] =
-                zones[at_zone].x - (zones[at_zone].kind == ENG_MAPZONE_BOSS ? 34.0 : 20.0);
+                zones[at_zone].x - (zones[at_zone].boss_kind == ENG_BOSSKIND_DRAGON
+                                        ? 150.0
+                                        : (zones[at_zone].kind == ENG_MAPZONE_BOSS ? 34.0 : 20.0));
             world_start[1] = zones[at_zone].z;
+        } else if (strcmp(argv[i], "--at-pack") == 0 && i + 1 < argc) {
+            char *end = NULL; /* devant la meute N de la carte dessinée (0 : la première ligne) */
+            const long pack = strtol(argv[++i], &end, 10);
+            if (*end != '\0' || pack < 0 || pack >= (long)ENG_WORLDMAP_MAX_PACKS) {
+                fprintf(stderr, "--at-pack : numéro de meute de 0 à %u attendu\n",
+                        (unsigned)ENG_WORLDMAP_MAX_PACKS - 1U);
+                return 2;
+            }
+            at_zone = (long)ENG_MAPZONE_COUNT + pack;
         } else if (strcmp(argv[i], "--post-bench") == 0 && i + 1 < argc) {
             char *end = NULL;
             post_bench_frames = strtol(argv[++i], &end, 10);
@@ -1715,6 +1795,24 @@ int main(int argc, char **argv)
             if (use_flow && (start_new_game || combat_autoplay)) {
                 game_flow_start_new(&flow, &play, creative_game);
             }
+            if (creative_speed > 0.0) { /* vitesse de vol du mode créatif (sinon : la molette) */
+                play_mode_set_creative_speed(&play, (float)creative_speed);
+            }
+            if (look_at_set) { /* développement : la caméra regarde un point de la carte */
+                float at[3] = {0.0F, 0.0F, 0.0F};
+                (void)eng_character_position(play.character, at);
+                double from[3] = {(double)at[0], (double)at[1], (double)at[2]};
+                if (world_mode) {
+                    eng_origin_to_world(&world.origin, at, from);
+                }
+                const float yaw =
+                    atan2f(-(float)(look_at[0] - from[0]), -(float)(look_at[1] - from[2]));
+                const float pitch = (float)(look_pitch * 0.017453292519943295);
+                play.orbit.yaw = yaw;
+                play.orbit.want_yaw = yaw;
+                play.orbit.pitch = pitch;
+                play.orbit.want_pitch = pitch;
+            }
             float gate[3];
             if (at_boss && play.combat != NULL && play_combat_boss_gate(play.combat, gate)) {
                 gate[1] = play_mode_ground(&play, gate[0], gate[2]) + 0.05F; /* M6-09 */
@@ -2000,6 +2098,9 @@ int main(int argc, char **argv)
         if (menu_script.count > 0U) {
             steps = 1; /* --menu-script : un tick par image, le même déroulé sur toute machine */
         }
+        if (warp_ticks > 0 && frame == 2U) { /* --warp : le temps du jeu avance d'un coup */
+            steps += (uint32_t)warp_ticks;
+        }
         ENG_PROF_PLOT("pas de simulation", steps);
         ENG_PROF_ZONE(z_sim, "simulation");
         uint32_t frozen_steps = 0; /* F6 : ticks avancés pendant le gel (animations) */
@@ -2026,6 +2127,25 @@ int main(int argc, char **argv)
                 if (run_tick &&
                     (!use_flow || game_flow_tick(&flow, &play, &input, (float)loop.tick_seconds))) {
                     play_mode_tick(&play, &input, (float)loop.tick_seconds);
+                }
+                float boss_xz[2];
+                float boss_alt = 0.0F;
+                if (look_at_boss && play.combat != NULL &&
+                    play_combat_boss_point(play.combat, boss_xz, &boss_alt)) {
+                    /* développement : la caméra suit le boss (captures du dragon en vol) */
+                    float at[3] = {0.0F, 0.0F, 0.0F};
+                    (void)eng_character_position(play.character, at);
+                    const float dx = boss_xz[0] - at[0];
+                    const float dz = boss_xz[1] - at[2];
+                    const float up =
+                        boss_alt + 20.0F + play_mode_ground(&play, boss_xz[0], boss_xz[1]) - at[1];
+                    /* un peu de côté : le personnage, devant la caméra, ne cache pas le boss */
+                    play.orbit.want_yaw = atan2f(-dx, -dz) + 0.3F;
+                    play.orbit.want_pitch = atan2f(up, hypotf(dx, dz) + 1.0F);
+                    play.orbit.yaw = play.orbit.want_yaw;
+                    play.orbit.pitch = play.orbit.want_pitch > ENG_ORBIT_PITCH_MAX
+                                           ? ENG_ORBIT_PITCH_MAX
+                                           : play.orbit.want_pitch;
                 }
                 play_mode_view(&play, &camera);
                 if (use_flow && flow.quit) {
@@ -2369,6 +2489,10 @@ int main(int argc, char **argv)
                      flow.creative ? " en mode créatif" : "",
                      flow.started && !game_flow_in_title(&flow) ? " (en jeu)" : "",
                      (unsigned long long)title.frames);
+        if (flow.creative && play_enabled) {
+            ENG_LOG_INFO("CRÉATIF : vitesse de vol %.2f m/s",
+                         (double)play_mode_creative_speed(&play));
+        }
     }
     if (use_ui) {
         platform.event_hook = NULL;

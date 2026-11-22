@@ -30,6 +30,7 @@
     640U /* sommets de toutes les lignes (crêtes, rivières, chemins)                             \
           */
 #define ENG_WORLDMAP_MAX_REGIONS 16U
+#define ENG_WORLDMAP_MAX_PACKS 96U  /* meutes de petits monstres (lignes « meute x z ») */
 #define ENG_WORLDMAP_MAX_SIZE 4097U /* échantillons par côté */
 
 typedef enum EngMapFeatureKind {
@@ -112,9 +113,11 @@ typedef struct EngWorldMap {
     EngMapFeature features[ENG_WORLDMAP_MAX_FEATURES];
     float points[ENG_WORLDMAP_MAX_POINTS][2];
     EngMapZoneSpot zones[ENG_MAPZONE_COUNT]; /* indice : biome * 3 + genre (map_zones.h) */
+    float packs[ENG_WORLDMAP_MAX_PACKS][2]; /* meutes de petits monstres (x, z), ordre du fichier */
     uint32_t region_count;
     uint32_t feature_count;
     uint32_t point_count;
+    uint32_t pack_count;
     /* trame (eng_worldmap_build) : size x size échantillons, ligne z par ligne z */
     uint32_t size;
     float *heights;   /* m */
@@ -147,6 +150,12 @@ float eng_worldmap_lava(const EngWorldMap *map, double x, double z);
 /* Places des 12 zones de combat : celles de engine/map_zones.h (noms, PV, dégâts, butin), à la
  * position donnée par la carte (`zone ...`) quand elle y figure. */
 bool eng_worldmap_zones(const EngWorldMap *map, EngMapZone out[ENG_MAPZONE_COUNT]);
+
+/* Meutes de petits monstres (lignes « meute x z », au plus ENG_WORLDMAP_MAX_PACKS) : écrit dans
+ * `out` au plus `max` zones de genre ENG_MAPZONE_PACK (engine/map_zones.h), dans l'ordre du
+ * fichier ; chacune a les ennemis du biome qui domine à sa place. Demande la trame
+ * (eng_worldmap_build). Retourne leur nombre. */
+uint32_t eng_worldmap_packs(const EngWorldMap *map, EngMapZone *out, uint32_t max);
 
 /* Arbres, buissons et rochers dont le pied est dans le carré [x0 ; x0 + size[ x [z0 ; z0 + size[
  * (au plus `max`) : forêts et objets épars de la carte (seuls ou par petits groupes), sur une

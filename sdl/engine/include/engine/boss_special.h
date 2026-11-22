@@ -83,4 +83,11 @@ float eng_flame_jet(const EngFlame *f);
 bool eng_flame_reaches(const float src[2], float yaw, const float target[2], float near_m,
                        float far_m, float half_angle);
 
+/* Bande de feu du dragon géant (son souffle au sol est un jet, pas un cône) : vrai si `target` est
+ * devant `src` (avant = (-sin yaw, -cos yaw)), entre `near_m` et `far_m` le long de son axe, à
+ * moins de la demi-largeur de la bande, qui passe de `half_near` à `half_far` d'un bout à
+ * l'autre. Argument absent, non fini, ou bande vide (far_m <= near_m) : false. */
+bool eng_flame_strip(const float src[2], float yaw, const float target[2], float near_m,
+                     float far_m, float half_near, float half_far);
+
 #endif
