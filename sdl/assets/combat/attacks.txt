@@ -1,0 +1,243 @@
+# Jeu d'attaques du mode combat (--play --combat). Rechargé à chaud : enregistre, l'effet est
+# immédiat (une version invalide est refusée et journalisée, l'ancienne reste).
+# Durées en ticks à 60 Hz ; hitbox : os  ax ay az  bx by bz  rayon  (repère du corps, +Z = avant).
+# anim CLIP VITESSE DÉCALAGE (M4) : clip du personnage lu à DÉCALAGE + tick/60 x VITESSE ; calé pour
+# que le passage de l'arme (pic de vitesse de la main) tombe dans les ticks actifs
+# (vérifié par le test engine.attack_sync).
+
+# ── joueur ──
+attack light1
+ startup 8
+ active 4
+ recovery 14
+ damage 10
+ posture 8
+ stamina 10
+ hitstop 3
+ cancel_from 6
+ next light2
+ anim slash_h 1.0 0.075
+ hitbox hand_r 0 0 0.3 0 0 1.4 0.15
+end
+attack light2
+ startup 7
+ active 4
+ recovery 14
+ damage 10
+ posture 8
+ stamina 10
+ hitstop 3
+ cancel_from 6
+ next light3
+ anim slash_d 1.0 0.26
+ hitbox hand_r 0 0 0.3 0 0 1.4 0.15
+end
+attack light3
+ startup 10
+ active 5
+ recovery 20
+ damage 14
+ posture 14
+ stamina 14
+ hitstop 4
+ anim chop 1.0 0.375
+ hitbox hand_r 0 0 0.3 0 0 1.5 0.18
+end
+attack heavy
+ startup 20
+ active 5
+ recovery 24
+ damage 25
+ posture 30
+ stamina 25
+ hitstop 6
+ anim stab 1.0 0
+ hitbox hand_r 0 0 0.3 0 0 1.6 0.2
+end
+
+# ── espadon du joueur (M8-08) : instants d'impact de b_swing / b_slam, anticipation plus courte ──
+attack gs_light1
+ startup 16
+ active 5
+ recovery 24
+ damage 18
+ posture 16
+ stamina 16
+ hitstop 4
+ anim slash_2h 1.4 0
+ hitbox hand_r 0 0 0.3 0 0 1.8 0.18
+end
+attack gs_heavy
+ startup 26
+ active 6
+ recovery 32
+ damage 40
+ posture 45
+ stamina 30
+ hitstop 8
+ anim chop_2h 1.54 0
+ hitbox hand_r 0 0 0.3 0 0 2.0 0.22
+end
+
+# ── ennemis (anticipation >= 18 ticks = 300 ms, vérifiée au chargement) ──
+attack g_slash
+ startup 18
+ active 4
+ recovery 18
+ damage 6
+ posture 8
+ stamina 5
+ hitstop 3
+ cancel_from 6
+ next g_slash2
+ anim slash_d 1.0 0.075
+ hitbox hand_r 0 0 0.3 0 0 1.5 0.15
+end
+attack g_slash2
+ startup 18
+ active 4
+ recovery 20
+ damage 6
+ posture 8
+ stamina 5
+ hitstop 3
+ anim slash_h 0.75 0
+ hitbox hand_r 0 0 0.3 0 0 1.5 0.15
+end
+attack g_lunge
+ startup 24
+ active 6
+ recovery 30
+ damage 10
+ posture 14
+ stamina 5
+ hitstop 4
+ anim stab 0.9 0
+ hitbox hand_r 0 0 0.3 0 0 2.0 0.15
+end
+attack b_swing
+ startup 28
+ active 5
+ recovery 30
+ damage 14
+ posture 20
+ stamina 5
+ hitstop 5
+ anim slash_2h 0.8 0
+ hitbox hand_r 0 0 0.3 0 0 1.8 0.2
+end
+attack b_slam
+ startup 40
+ active 6
+ recovery 40
+ damage 22
+ posture 30
+ stamina 5
+ hitstop 6
+ anim chop_2h 1.0 0
+ hitbox hand_r 0 0 0.3 0 0 2.2 0.25
+end
+attack a_stab
+ startup 24
+ active 4
+ recovery 40
+ damage 8
+ posture 8
+ stamina 5
+ hitstop 3
+ anim shoot 1.0 -0.29
+ hitbox hand_r 0 0 0.5 0 0 5.5 0.12
+end
+attack a_pierce
+ startup 36
+ active 5
+ recovery 50
+ damage 12
+ posture 12
+ stamina 5
+ hitstop 4
+ anim shoot 1.0 -0.49
+ hitbox hand_r 0 0 0.5 0 0 6.5 0.12
+end
+
+# ── boss (M6-09) : animations du brute, plus lentes en phase 1, plus vives en phase 2 ──
+attack boss_l
+ startup 28
+ active 5
+ recovery 26
+ damage 16
+ posture 22
+ stamina 5
+ hitstop 5
+ anim slash_2h 0.8 0
+ hitbox hand_r 0 0 0.3 0 0 2.2 0.25
+end
+attack boss_h
+ startup 40
+ active 6
+ recovery 36
+ damage 28
+ posture 35
+ stamina 5
+ hitstop 7
+ anim chop_2h 1.0 0
+ hitbox hand_r 0 0 0.3 0 0 2.6 0.3
+end
+attack boss_l2
+ startup 22
+ active 5
+ recovery 20
+ damage 18
+ posture 24
+ stamina 5
+ hitstop 5
+ anim slash_2h 1.02 0
+ hitbox hand_r 0 0 0.3 0 0 2.4 0.28
+end
+attack boss_h2
+ startup 30
+ active 6
+ recovery 28
+ damage 32
+ posture 40
+ stamina 5
+ hitstop 7
+ anim chop_2h 1.33 0
+ hitbox hand_r 0 0 0.3 0 0 2.8 0.32
+end
+# Grande carte : l'osselet d'une meute : un coup de lame court et faible, annoncé 0,3 s (mêmes
+# durées que g_slash : le pic du geste `slash_d` tombe dans la fenêtre active).
+attack imp_jab
+ startup 18
+ active 4
+ recovery 24
+ damage 5
+ posture 5
+ stamina 5
+ hitstop 2
+ anim slash_d 1.0 0.075
+ hitbox hand_r 0 0 0.3 0 0 1.2 0.15
+end
+# Grande carte : le dragon (les capsules d'arme viennent de play_boss.c, pas de `hand_r`).
+# dragon_claw : le PIÉTINEMENT : il se cabre 0,9 s puis retombe ; touche à 8 m de ses pattes.
+# dragon_bite : la MORSURE : la gueule s'ouvre 1,1 s, puis la tête s'abat au sol loin devant lui.
+attack dragon_claw
+ startup 54
+ active 8
+ recovery 50
+ damage 14
+ posture 22
+ stamina 5
+ hitstop 5
+ hitbox hand_r 0 0 0.3 0 0 2.6 0.3
+end
+attack dragon_bite
+ startup 66
+ active 8
+ recovery 70
+ damage 22
+ posture 35
+ stamina 5
+ hitstop 7
+ hitbox hand_r 0 0 0.3 0 0 2.6 0.3
+end

@@ -132,22 +132,33 @@ csfml-debug:	$(LIB)
 csfml-tests:	$(LIB)
 	$(Q)$(MAKE) -C $(CSFML_DIR) tests
 
-#version SDL2 (débutant) : compile puis lance ./redstrings_sdl
+#le jeu Red Strings (moteur C + SDL3, dossier sdl/) : compile en Release (CMake + Ninja), puis lance
+#le jeu sur la carte du monde (écran-titre, en plein écran)
+#	make sdl			le jeu
+#	make sdl ARGS="--windowed"	options du lanceur en plus (--windowed, --no-splash,
+#					--new-game --creative...)
 sdl:
-	$(Q)$(MAKE) -C $(SDL_DIR)
-	$(Q)./redstrings_sdl
+	$(LOG) "CMAKE" "$(SDL_DIR)/build/release"
+	$(Q)test -f $(SDL_DIR)/build/release/build.ninja || (cd $(SDL_DIR) && cmake --preset release)
+	$(Q)cd $(SDL_DIR) && cmake --build --preset release --target launcher
+	$(LOG_OK) "jeu compilé : $(SDL_DIR)/build/release/bin/launcher"
+	$(Q)cd $(SDL_DIR)/build/release/bin && ./launcher --world 7 --combat $(ARGS)
 
+#l'ancienne cible sdl, telle quelle : build Debug (sanitizers), puis la scène de démonstration
+sdl-demo:
+	cd sdl && cmake --preset debug && cmake --build --preset debug
+	cd sdl && ./build/debug/bin/launcher
+
+#(sdl/ est construit par CMake dans sdl/build/ : clean et fclean n'y touchent pas)
 clean:
 	$(LOG_RM) "RM" "$(OBJ_DIR)/"
 	$(Q)$(RM) $(OBJ_DIR)
 	$(Q)$(MAKE) -C $(CSFML_DIR) clean
-	$(Q)$(MAKE) -C $(SDL_DIR) clean
 
 fclean:	clean
 	$(LOG_RM) "RM" "$(NAME) $(NAME_DEBUG) $(NAME_TESTS) $(LIB)"
 	$(Q)$(RM) $(NAME) $(NAME_DEBUG) $(NAME_TESTS) $(LIB)
 	$(Q)$(MAKE) -C $(CSFML_DIR) fclean
-	$(Q)$(MAKE) -C $(SDL_DIR) fclean
 
 re:
 	$(Q)$(MAKE) fclean
@@ -168,7 +179,8 @@ help:
 	@printf "  $(C_BLEU)make csfml$(C_RESET)      compile la version graphique\n"
 	@printf "  $(C_BLEU)make csfml-debug$(C_RESET) compile la version graphique avec les sanitizers\n"
 	@printf "  $(C_BLEU)make csfml-tests$(C_RESET) lance les tests de la version graphique\n"
-	@printf "  $(C_BLEU)make sdl$(C_RESET)         compile et lance la version SDL (première fenêtre)\n"
+	@printf "  $(C_BLEU)make sdl$(C_RESET)         compile et lance le jeu (moteur SDL3, dossier sdl/) ; ARGS=\"--windowed\" pour des options\n"
+	@printf "  $(C_BLEU)make sdl-demo$(C_RESET)    l'ancienne cible sdl : build Debug, scène de démonstration du moteur\n"
 	@printf "  $(C_BLEU)make clean$(C_RESET)      supprime les .o\n"
 	@printf "  $(C_BLEU)make fclean$(C_RESET)     supprime aussi les exécutables et $(LIB)\n"
 	@printf "  $(C_BLEU)make re$(C_RESET)         fclean puis make\n"
@@ -176,4 +188,5 @@ help:
 
 -include $(DEPS)
 
-.PHONY: all lib debug tests doc sons csfml csfml-debug csfml-tests sdl clean fclean re build help
+.PHONY: all lib debug tests doc sons csfml csfml-debug csfml-tests sdl sdl-demo clean fclean re build \
+	help

@@ -1,0 +1,131 @@
+{
+ "asset": {
+  "version": "2.0",
+  "generator": "arbres_make.py (RedStrings)"
+ },
+ "scene": 0,
+ "scenes": [
+  {
+   "nodes": [
+    0
+   ]
+  }
+ ],
+ "nodes": [
+  {
+   "mesh": 0,
+   "name": "rock"
+  }
+ ],
+ "meshes": [
+  {
+   "name": "rock",
+   "primitives": [
+    {
+     "attributes": {
+      "POSITION": 0,
+      "NORMAL": 1,
+      "TEXCOORD_0": 2
+     },
+     "indices": 3,
+     "material": 0
+    }
+   ]
+  }
+ ],
+ "materials": [
+  {
+   "name": "trees_palette",
+   "pbrMetallicRoughness": {
+    "baseColorTexture": {
+     "index": 0
+    },
+    "metallicFactor": 0.0,
+    "roughnessFactor": 0.85
+   }
+  }
+ ],
+ "textures": [
+  {
+   "source": 0,
+   "sampler": 0
+  }
+ ],
+ "samplers": [
+  {
+   "magFilter": 9728,
+   "minFilter": 9728
+  }
+ ],
+ "images": [
+  {
+   "uri": "trees_palette.png"
+  }
+ ],
+ "buffers": [
+  {
+   "uri": "rock.bin",
+   "byteLength": 10800
+  }
+ ],
+ "bufferViews": [
+  {
+   "buffer": 0,
+   "byteOffset": 0,
+   "byteLength": 7200,
+   "byteStride": 12,
+   "target": 34962
+  },
+  {
+   "buffer": 0,
+   "byteOffset": 7200,
+   "byteLength": 2400,
+   "byteStride": 8,
+   "target": 34962
+  },
+  {
+   "buffer": 0,
+   "byteOffset": 9600,
+   "byteLength": 1200,
+   "target": 34963
+  }
+ ],
+ "accessors": [
+  {
+   "bufferView": 0,
+   "byteOffset": 0,
+   "componentType": 5126,
+   "count": 300,
+   "type": "VEC3",
+   "min": [
+    -0.5560382015195302,
+    -0.12345787535067587,
+    -0.5740469024771453
+   ],
+   "max": [
+    0.5893607082916628,
+    0.49737128324240376,
+    0.516149618921515
+   ]
+  },
+  {
+   "bufferView": 0,
+   "byteOffset": 3600,
+   "componentType": 5126,
+   "count": 300,
+   "type": "VEC3"
+  },
+  {
+   "bufferView": 1,
+   "componentType": 5126,
+   "count": 300,
+   "type": "VEC2"
+  },
+  {
+   "bufferView": 2,
+   "componentType": 5125,
+   "count": 300,
+   "type": "SCALAR"
+  }
+ ]
+}

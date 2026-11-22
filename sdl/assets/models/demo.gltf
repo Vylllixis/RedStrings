@@ -1,0 +1,237 @@
+{
+ "asset": {
+  "version": "2.0",
+  "generator": "tools/scripts/gen_demo_model.py"
+ },
+ "scene": 0,
+ "scenes": [
+  {
+   "nodes": [
+    0
+   ]
+  }
+ ],
+ "nodes": [
+  {
+   "name": "anneau",
+   "mesh": 0,
+   "rotation": [
+    0.0,
+    0.0,
+    0.17410813759359595,
+    0.9847265389049334
+   ],
+   "children": [
+    1
+   ]
+  },
+  {
+   "name": "bille",
+   "mesh": 1,
+   "translation": [
+    0.0,
+    0.0,
+    0.0
+   ]
+  }
+ ],
+ "meshes": [
+  {
+   "name": "tore",
+   "primitives": [
+    {
+     "attributes": {
+      "POSITION": 0,
+      "NORMAL": 1,
+      "TEXCOORD_0": 2
+     },
+     "indices": 3,
+     "material": 0,
+     "mode": 4
+    }
+   ]
+  },
+  {
+   "name": "sphere",
+   "primitives": [
+    {
+     "attributes": {
+      "POSITION": 4,
+      "NORMAL": 5,
+      "TEXCOORD_0": 6
+     },
+     "indices": 7,
+     "material": 1,
+     "mode": 4
+    }
+   ]
+  }
+ ],
+ "materials": [
+  {
+   "name": "damier",
+   "pbrMetallicRoughness": {
+    "baseColorTexture": {
+     "index": 0
+    },
+    "baseColorFactor": [
+     1,
+     1,
+     1,
+     1
+    ],
+    "metallicFactor": 0.0,
+    "roughnessFactor": 0.5
+   }
+  },
+  {
+   "name": "orange",
+   "pbrMetallicRoughness": {
+    "baseColorFactor": [
+     0.95,
+     0.45,
+     0.1,
+     1.0
+    ],
+    "metallicFactor": 0.0,
+    "roughnessFactor": 0.3
+   }
+  }
+ ],
+ "textures": [
+  {
+   "source": 0
+  }
+ ],
+ "images": [
+  {
+   "uri": "../textures/checker.png"
+  }
+ ],
+ "buffers": [
+  {
+   "uri": "demo.bin",
+   "byteLength": 77120
+  }
+ ],
+ "bufferViews": [
+  {
+   "buffer": 0,
+   "byteOffset": 0,
+   "byteLength": 14700,
+   "target": 34962
+  },
+  {
+   "buffer": 0,
+   "byteOffset": 14700,
+   "byteLength": 14700,
+   "target": 34962
+  },
+  {
+   "buffer": 0,
+   "byteOffset": 29400,
+   "byteLength": 9800,
+   "target": 34962
+  },
+  {
+   "buffer": 0,
+   "byteOffset": 39200,
+   "byteLength": 13824,
+   "target": 34963
+  },
+  {
+   "buffer": 0,
+   "byteOffset": 53024,
+   "byteLength": 6732,
+   "target": 34962
+  },
+  {
+   "buffer": 0,
+   "byteOffset": 59756,
+   "byteLength": 6732,
+   "target": 34962
+  },
+  {
+   "buffer": 0,
+   "byteOffset": 66488,
+   "byteLength": 4488,
+   "target": 34962
+  },
+  {
+   "buffer": 0,
+   "byteOffset": 70976,
+   "byteLength": 6144,
+   "target": 34963
+  }
+ ],
+ "accessors": [
+  {
+   "bufferView": 0,
+   "componentType": 5126,
+   "count": 1225,
+   "type": "VEC3",
+   "min": [
+    -2.1500000000000004,
+    -0.55,
+    -2.1500000000000004
+   ],
+   "max": [
+    2.1500000000000004,
+    0.55,
+    2.1500000000000004
+   ]
+  },
+  {
+   "bufferView": 1,
+   "componentType": 5126,
+   "count": 1225,
+   "type": "VEC3"
+  },
+  {
+   "bufferView": 2,
+   "componentType": 5126,
+   "count": 1225,
+   "type": "VEC2"
+  },
+  {
+   "bufferView": 3,
+   "componentType": 5123,
+   "count": 6912,
+   "type": "SCALAR"
+  },
+  {
+   "bufferView": 4,
+   "componentType": 5126,
+   "count": 561,
+   "type": "VEC3",
+   "min": [
+    -0.9,
+    -0.9,
+    -0.9
+   ],
+   "max": [
+    0.9,
+    0.9,
+    0.9
+   ]
+  },
+  {
+   "bufferView": 5,
+   "componentType": 5126,
+   "count": 561,
+   "type": "VEC3"
+  },
+  {
+   "bufferView": 6,
+   "componentType": 5126,
+   "count": 561,
+   "type": "VEC2"
+  },
+  {
+   "bufferView": 7,
+   "componentType": 5123,
+   "count": 3072,
+   "type": "SCALAR"
+  }
+ ]
+}

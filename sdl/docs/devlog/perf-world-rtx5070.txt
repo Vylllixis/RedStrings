@@ -1,0 +1,11 @@
+benchmark monde ouvert (M7-14)
+trajet            : 10.0 km a 30 m/s, 20000 images a 60 Hz, 16 threads de travail
+prechargement     : 9 ms
+CPU thread princ. : moyenne 0.018 ms, p99 0.412 ms, pire 1.132 ms (budget 25 ms)
+trous sous joueur : 0
+cellules          : 285 chargees, 250 dechargees, 35 emplacements au plus (sur 64)
+memoire streaming : 1131 Ko (fixe)
+origine flottante : 16 recentrages, position finale (8047, 5598) m
+navigation IA     : 614 reconstructions de la fenetre de 64 m
+uploads GPU       : 285 envoyes, 57804 octets au plus par image (budget 65536), attente max 8 images
+resultat          : OK

@@ -1,0 +1,131 @@
+{
+ "asset": {
+  "version": "2.0",
+  "generator": "arbres_make.py (RedStrings)"
+ },
+ "scene": 0,
+ "scenes": [
+  {
+   "nodes": [
+    0
+   ]
+  }
+ ],
+ "nodes": [
+  {
+   "mesh": 0,
+   "name": "pine_snow"
+  }
+ ],
+ "meshes": [
+  {
+   "name": "pine_snow",
+   "primitives": [
+    {
+     "attributes": {
+      "POSITION": 0,
+      "NORMAL": 1,
+      "TEXCOORD_0": 2
+     },
+     "indices": 3,
+     "material": 0
+    }
+   ]
+  }
+ ],
+ "materials": [
+  {
+   "name": "trees_palette",
+   "pbrMetallicRoughness": {
+    "baseColorTexture": {
+     "index": 0
+    },
+    "metallicFactor": 0.0,
+    "roughnessFactor": 0.85
+   }
+  }
+ ],
+ "textures": [
+  {
+   "source": 0,
+   "sampler": 0
+  }
+ ],
+ "samplers": [
+  {
+   "magFilter": 9728,
+   "minFilter": 9728
+  }
+ ],
+ "images": [
+  {
+   "uri": "trees_palette.png"
+  }
+ ],
+ "buffers": [
+  {
+   "uri": "pine_snow.bin",
+   "byteLength": 85320
+  }
+ ],
+ "bufferViews": [
+  {
+   "buffer": 0,
+   "byteOffset": 0,
+   "byteLength": 56880,
+   "byteStride": 12,
+   "target": 34962
+  },
+  {
+   "buffer": 0,
+   "byteOffset": 56880,
+   "byteLength": 18960,
+   "byteStride": 8,
+   "target": 34962
+  },
+  {
+   "buffer": 0,
+   "byteOffset": 75840,
+   "byteLength": 9480,
+   "target": 34963
+  }
+ ],
+ "accessors": [
+  {
+   "bufferView": 0,
+   "byteOffset": 0,
+   "componentType": 5126,
+   "count": 2370,
+   "type": "VEC3",
+   "min": [
+    -0.34244003891944885,
+    -0.09999983757734299,
+    -0.3600638508796692
+   ],
+   "max": [
+    0.34244194626808167,
+    1.1126774549484253,
+    0.360063761472702
+   ]
+  },
+  {
+   "bufferView": 0,
+   "byteOffset": 28440,
+   "componentType": 5126,
+   "count": 2370,
+   "type": "VEC3"
+  },
+  {
+   "bufferView": 1,
+   "componentType": 5126,
+   "count": 2370,
+   "type": "VEC2"
+  },
+  {
+   "bufferView": 2,
+   "componentType": 5125,
+   "count": 2370,
+   "type": "SCALAR"
+  }
+ ]
+}

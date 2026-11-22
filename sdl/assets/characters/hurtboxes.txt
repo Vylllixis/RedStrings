@@ -1,0 +1,14 @@
+# Hurtboxes du rig KayKit (chevalier et squelettes : même squelette), M5-05.
+# hurtbox NOM ZONE ARTICULATION ax ay az bx by bz RAYON   (unité du rig ; x 0,8 au rendu)
+# Les os du rig pointent selon +Y local (convention Blender) : une capsule de 0 à la longueur de l'os.
+hurtbox head    head  head        0 0.05 0    0 0.42 0   0.30
+hurtbox chest   torso chest       0 -0.12 0   0 0.22 0   0.27
+hurtbox hips    torso hips        0 0 0       0 0.18 0   0.24
+hurtbox uarm_l  limb  upperarm.l  0 0 0       0 0.24 0   0.09
+hurtbox farm_l  limb  lowerarm.l  0 0 0       0 0.30 0   0.08
+hurtbox uarm_r  limb  upperarm.r  0 0 0       0 0.24 0   0.09
+hurtbox farm_r  limb  lowerarm.r  0 0 0       0 0.30 0   0.08
+hurtbox thigh_l limb  upperleg.l  0 0 0       0 0.23 0   0.11
+hurtbox shin_l  limb  lowerleg.l  0 0 0       0 0.17 0   0.10
+hurtbox thigh_r limb  upperleg.r  0 0 0       0 0.23 0   0.11
+hurtbox shin_r  limb  lowerleg.r  0 0 0       0 0.17 0   0.10

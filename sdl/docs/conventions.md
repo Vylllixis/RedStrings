@@ -1,0 +1,81 @@
+# Conventions du projet
+
+Ces règles sont vérifiées par les outils quand c'est possible (`tools/scripts/format.sh`,
+`tools/scripts/lint.sh`, `-Werror`). Elles sont modifiables : toute exception ou changement
+passe par un ADR dans `docs/adr/`.
+
+## Langue
+- Identifiants et noms de fichiers en anglais. Commentaires en français ou en anglais.
+
+## Nommage
+| Élément | Règle | Exemple |
+|---|---|---|
+| Fonction | `prefixe_snake_case` | `eng_arena_push`, `gm_player_update` |
+| Préfixes | `eng_` moteur, `gm_` jeu, `tl_` outils | |
+| Type (struct, typedef, enum) | `PascalCase` avec préfixe de module | `EngArena`, `GmPlayer` |
+| Constante d'énumération, macro, constante globale | `UPPER_SNAKE` avec préfixe | `ENG_LOG_INFO` |
+| Variable, paramètre, champ | `snake_case` | `delta_time` |
+
+## Format
+- 4 espaces, pas de tabulation, 100 colonnes au maximum.
+- Accolade de fonction sur sa propre ligne ; accolades des `if`/`for`/`while` sur la même ligne
+  et **obligatoires**, même pour une seule instruction.
+- Un fichier = un module : `engine/src/foo.c` + `engine/include/engine/foo.h`.
+- En-têtes : `#pragma once`. Un en-tête inclut ce dont il a besoin, pas plus.
+- Ordre des `#include` : en-tête du module, puis bibliothèques tierces, puis système.
+- Fonction : viser moins de 50 lignes. C'est un repère, pas une règle bloquante.
+
+## Erreurs
+- Les fonctions qui peuvent échouer retournent `bool` (`true` = succès) ; les résultats
+  sortent par pointeur en dernier paramètre.
+- Erreur de programmation (précondition violée) : `ENG_ASSERT` (M0-11), retiré en Release.
+- Erreur d'exécution (fichier absent, GPU refusé) : retour d'erreur + `ENG_LOG_ERROR` (M0-10).
+- `exit()` et `abort()` uniquement dans `launcher/`, jamais dans le moteur ni dans le jeu.
+
+## Mémoire
+- Pas de `malloc` ni de `free` dans la boucle de frame : on passe par les arènes (M0-12).
+- Toute fonction qui alloue reçoit l'allocateur en paramètre explicite.
+- Propriété indiquée dans le nom : `*_create` / `*_destroy` (alloue, libère), `*_init` /
+  `*_shutdown` (n'alloue pas la structure elle-même).
+- `game/` n'a pas d'état global modifiable : son état vit dans la mémoire fournie par le moteur
+  (condition du rechargement à chaud, M0-17).
+
+## Types et unités
+- `<stdint.h>` pour les tailles fixes (`uint32_t`), `size_t` pour tailles et indices,
+  `<stdbool.h>` pour les booléens.
+- `float` pour le rendu et la physique ; `double` seulement pour l'accumulation du temps.
+- Unités : mètres, secondes, radians. Repère main droite, Y vers le haut (précisé en M1-06).
+
+## Outils
+- Formater : `tools/scripts/format.sh` (vérifier sans modifier : `--check`).
+- Analyser : `cmake --preset debug && tools/scripts/lint.sh`.
+- Compiler : `-Wall -Wextra -Wpedantic -Werror` sur notre code, ASan + UBSan en Debug.
+
+## Code tiers
+- Les implémentations de bibliothèques à en-tête unique (cgltf, stb, plus tard miniaudio...)
+  vont dans `engine/src/third_party_impl.c`, compilé sans `-Werror` ni `/WX`.
+  Ne jamais les inclure avec `*_IMPLEMENTATION` dans un fichier soumis à `project_options`.
+
+## Journal
+- Dans `engine/` et `game/`, jamais `printf`/`fprintf` pour du diagnostic : `ENG_LOG_*`.
+  (Seule exception : l'aide de la ligne de commande du `launcher`, avant l'ouverture du journal.)
+- ERROR : une opération a échoué. WARN : situation anormale mais récupérée. INFO : jalons du
+  cycle de vie, une fois par événement, jamais à chaque image. DEBUG : détail utile au
+  développement. TRACE : très verbeux, y compris par image.
+- Le fichier est vidé à chaque message (pas de perte en cas de plantage) : ne pas journaliser
+  dans une boucle chaude au niveau INFO ou plus.
+
+## Assertions
+- `ENG_ASSERT(cond)` / `ENG_ASSERT_MSG(cond, fmt, ...)` pour les préconditions et invariants
+  (erreur de programmation). Jamais pour une erreur d'exécution (fichier, GPU, entrée).
+- Retirées en Release **et** RelWithDebInfo : la condition n'est pas évaluée, donc aucun
+  effet de bord dedans (`ENG_ASSERT(i++ < n)` est interdit).
+- Vérifier aussi les arguments reçus par les fonctions publiques du moteur (pointeur non NULL,
+  indice dans les bornes), pas seulement les cas « impossibles ».
+
+## Tests
+- Un fichier `tests/test_<module>.c` par module testé, déclaré dans `tests/CMakeLists.txt`
+  avec `ow_add_test(<module> test_<module>.c)`. Lancer : `tools/scripts/test.sh [preset]`.
+- Un test = `UTEST(suite, comportement_attendu)`, un seul comportement, nom en anglais lisible.
+- Les tests ne dépendent ni d'un écran ni d'un GPU. Fichiers temporaires : `tests_tmp/` (build).
+- Un bug corrigé = un test qui le reproduisait d'abord.
