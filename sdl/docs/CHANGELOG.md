@@ -7,7 +7,7 @@ livraisons ; les tags sont posés par Théo après ses tests.
 - Rapport de crash (signal, pile d'appels, système, version) dans `logs/crash-*.txt`.
 - Paquet autonome : `tools/scripts/package.sh` (build Release + LTO, dossier unique, licences).
 
-## v0.8 (M8, en cours) — finition
+## v0.8 (M8, partiel) — finition, 2026-11-23
 - Menu principal, pause, options (volumes par bus, sensibilité, inversion Y, taille du texte,
   contraste élevé, FXAA, bloom), contrôles remappables ; navigation complète au clavier et à la manette.
 - Sauvegarde binaire versionnée « RSSV » (somme de contrôle, migration v1 -> v2, écriture
