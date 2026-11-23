@@ -1,0 +1,200 @@
+# Carte du monde — dessinée à la main, toujours la même (demande de Théo, 2026-11-21).
+# Format : docs/world-map.md. Mètres ; x vers l'est, z vers le SUD (le nord est en haut de l'aperçu) ;
+# le château de départ est au centre (0, 0). Aperçu : build/debug/bin/carte assets/world/carte.txt apercu.ppm
+
+monde 4096 4
+eau 3
+bordure 1750 360
+depart 0 0
+
+# ── Régions : chaque biome domine autour de sa graine (portée en mètres) ──
+region plaine 0 0 1150
+region plaine 1250 1150 700
+region montagne -1300 -1250 900
+region desert -1300 1250 900
+region volcan 1300 -1300 850
+
+# ── Centre : le château de départ sur sa colline (9 m), d'où l'on voit toute la carte ──
+colline 0 0 110 9 40
+aplanir 0 0 45
+
+# ── Plaine : collines douces, un lac, la grande rivière qui descend des montagnes ──
+colline -420 200 180 24
+colline 480 -380 200 22
+colline 700 480 260 34
+colline -380 -560 170 18
+colline 300 820 180 20
+colline -900 100 200 30
+lac -750 450 120 5
+lac -1170 -660 45 3
+riviere 26 5 -1150 -650 -1000 -560 -850 -540 -720 -440 -560 -350 -420 -300 -300 -240 -180 -280 -80 -260 40 -190 150 -170 260 -60 380 30 470 130 560 190 680 260 780 360 880 420 1000 540 1100 640 1180 720
+lac 1250 780 190 6
+aplanir 850 -80 75
+aplanir 250 420 40
+aplanir -560 620 45
+
+# ── Collines du sud-est ──
+colline 1200 1050 300 55
+colline 1550 1350 260 70
+colline 950 1450 220 45
+colline 1600 1000 200 40
+
+# ── Montagne enneigée (nord-ouest) : une grande chaîne et ses pics ──
+crete 520 240 -1750 -350 -1500 -800 -1250 -1250 -950 -1550 -500 -1750
+montagne -1450 -1050 380 300
+montagne -1050 -1500 320 260
+montagne -1700 -1350 300 280
+montagne -600 -1300 240 160
+aplanir -850 -700 45
+aplanir -1050 -950 50
+aplanir -1100 -1250 80
+
+# ── Désert (sud-ouest) : dunes, plateaux de grès, une oasis ──
+dunes -1250 1200 650 9 70 30
+plateau -1550 800 140 48
+plateau -1000 1550 110 38
+plateau -1700 1500 170 60
+plateau -1350 950 80 30
+lac -1500 1180 70 4
+aplanir -800 800 45
+aplanir -1050 1050 50
+aplanir -1300 1350 80
+
+# ── Volcan (nord-est) : le grand cône, son cratère (l'antre du dragon), deux cônes secondaires ──
+volcan 1350 -1350 700 330 170 35
+aplanir 1350 -1350 110
+montagne 1700 -900 250 140
+montagne 900 -1550 230 110
+aplanir 800 -750 45
+aplanir 1050 -1000 50
+# coulées : du bord du cratère vers les flancs, et un anneau autour de l'arène du dragon
+lave 16 1350 -1520 1360 -1650 1330 -1800 1350 -1950
+lave 14 1520 -1350 1650 -1330 1800 -1280 1900 -1200
+lave 12 1480 -1220 1600 -1080 1680 -980
+lave 12 1220 -1470 1100 -1600 1000 -1700
+lave 16 1455 -1350 1424 -1276 1350 -1245 1276 -1276 1245 -1350 1276 -1424 1350 -1455 1424 -1424 1455 -1350
+
+# ── Arbres : forêts de chênes dans la plaine, sapins enneigés en montagne, acacias épars dans le
+#    désert, aucun dans le volcan. foret essence x z rayon espacement ──
+foret chene -650 -150 220 9
+foret chene 560 660 250 9
+foret chene -250 900 200 10
+foret chene 1350 1200 300 10
+foret chene 300 -650 170 9
+foret chene -1150 300 170 10
+foret sapin -800 -900 250 8
+foret sapin -1350 -700 260 8
+foret sapin -650 -1450 220 8
+foret sapin -1500 -1500 200 9
+foret sapin -1150 -1700 200 9
+arbres_epars acacia desert 45
+
+# ── Entre les forêts : quelques arbres isolés (seuls, par deux ou par trois), des buissons et
+#    quelques rochers. arbres_epars essence biome espacement [groupe de 1 à 4].
+#    Ces lignes restent APRÈS les précédentes : l'ordre des lignes d'arbres fixe leur placement
+#    (en insérer une au milieu déplacerait les forêts). ──
+arbres_epars chene plaine 110 3
+arbres_epars buisson plaine 38 3
+arbres_epars rocher plaine 95 2
+arbres_epars sapin montagne 120 3
+arbres_epars buisson_neige montagne 46 2
+arbres_epars rocher montagne 60 3
+arbres_epars buisson_sec desert 32 3
+arbres_epars rocher desert 70 2
+arbres_epars rocher volcan 45 3
+
+# ── Chemins (8 m) depuis le château ──
+chemin 8 0 0 -200 -120 -450 -330 -700 -560 -850 -700 -1050 -950
+# lacets jusqu'au sommet du seigneur du givre
+chemin 7 -1050 -950 -880 -1010 -820 -1100 -930 -1130 -1040 -1100 -1150 -1120 -1180 -1200 -1100 -1250
+chemin 8 0 0 -250 250 -560 620 -800 800 -1050 1050 -1300 1350
+chemin 8 0 0 300 -250 600 -500 800 -750 1046 -1046 1451 -973 1688 -1259 1569 -1569 1280 -1611 1128 -1410 1216 -1216 1310 -1310
+chemin 8 0 0 400 -50 850 -80
+chemin 8 0 0 250 420 500 800 900 1150
+
+# ── Zones de combat : facile, dur, boss par biome ──
+zone plaine facile 250 420
+zone plaine dur -560 620
+zone plaine boss 850 -80
+zone montagne facile -850 -700
+zone montagne dur -1050 -950
+zone montagne boss -1100 -1250
+zone desert facile -800 800
+zone desert dur -1050 1050
+zone desert boss -1300 1350
+zone volcan facile 800 -750
+zone volcan dur 1050 -1000
+zone volcan boss 1350 -1350
+
+# ── Meutes de petits monstres (osselets) : cinq petits squelettes fragiles, qui reviennent 6 s
+#    après avoir été vaincus : de quoi monter de niveau. meute x z : les ennemis sont ceux du biome
+#    qui domine à cet endroit. Garder 200 m entre deux meutes et 210 m avec une zone de combat
+#    (leurs portées ne doivent pas se recouvrir), 520 m avec l'antre du dragon, et les poser sur un
+#    terrain praticable, hors de l'eau, de la lave et des chemins. ──
+# Plaine (26)
+meute 40 -1360
+meute 20 -780
+meute 620 -620
+meute -700 -520
+meute -500 -460
+meute 240 -240
+meute -220 -180
+meute -980 -120
+meute 1260 -120
+meute 640 -100
+meute 360 -80
+meute -1440 40
+meute -140 80
+meute 120 120
+meute -240 280
+meute -960 380
+meute 940 380
+meute 1500 460
+meute -400 480
+meute 100 820
+meute -480 920
+meute 700 920
+meute 820 1120
+meute -60 1440
+meute 460 1500
+meute 1240 1500
+# Montagne (11)
+meute -1420 -1500
+meute -420 -1480
+meute -840 -1240
+meute -340 -1120
+meute -560 -1060
+meute -800 -1020
+meute -600 -800
+meute -1180 -780
+meute -1300 -580
+meute -1180 -360
+meute -1420 -280
+# Désert (15)
+meute -1500 260
+meute -1340 400
+meute -1500 540
+meute -1140 540
+meute -880 600
+meute -1320 640
+meute -1500 740
+meute -1040 760
+meute -540 1120
+meute -760 1140
+meute -300 1160
+meute -480 1340
+meute -860 1500
+meute -640 1500
+meute -300 1500
+# Volcan (11)
+meute 380 -1500
+meute 640 -1500
+meute 440 -1280
+meute 680 -1260
+meute 420 -1040
+meute 760 -960
+meute 1500 -660
+meute 1280 -640
+meute 1060 -600
+meute 1320 -420
+meute 1500 -200

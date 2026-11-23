@@ -12,10 +12,46 @@ set(CMAKE_LIBRARY_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin)
 
 # ── Options de qualité, appliquées à NOTRE code uniquement (jamais à SDL ni aux dépendances) ──
 option(OW_SANITIZE "ASan + UBSan en configuration Debug" ON)
+option(OW_BUILD_SHADERS "Compiler les shaders HLSL (SDL_shadercross, DXC, SPIRV-Cross)" ON)
+# Recompilation des shaders à l'exécution (M1-03) : lie DXC et SPIRV-Cross au moteur, donc réservée
+# par défaut au Debug ; les autres builds chargent les shaders compilés hors ligne.
+if(CMAKE_BUILD_TYPE STREQUAL "Debug")
+  set(ow_hot_default ON)
+else()
+  set(ow_hot_default OFF)
+endif()
+option(OW_SHADER_HOT_RELOAD "Recompiler les shaders HLSL modifiés pendant l'exécution" ${ow_hot_default})
+option(OW_PROFILE "Profileur Tracy (zones CPU, marqueurs de frame)" OFF)
+option(OW_BUILD_TESTS "Compiler les tests unitaires (CTest)" ON)
+# Interface de debug (M1-12) : Dear ImGui + cimgui, téléchargés à la configuration (~145 Mo, une
+# fois) et compilés en C++. Désactivée : le moteur se compile sans C++ ni ImGui (eng_ui_* sont alors
+# des fonctions sans effet).
+option(OW_UI "Interface de debug Dear ImGui (cimgui) : panneau de statistiques et réglages" ON)
+
+# Physique (M4-01) : Jolt Physics via son habillage C « joltc », téléchargés et compilés en C++ à la
+# configuration (voir docs/physics.md et ADR 0024). Désactivée : le moteur se compile sans Jolt et
+# eng_physics_* échoue proprement (eng_physics_available() renvoie false).
+option(OW_PHYSICS "Moteur physique Jolt (via joltc)" ON)
+
+# Tracy, SPIRV-Cross (outil de compilation des shaders) et Dear ImGui sont en C++ : le compilateur
+# C++ n'est requis que si l'une de ces options est active. (enable_language ici, à la racine : un appel
+# dans un sous-dossier ne serait pas visible ailleurs.)
+if(OW_PROFILE OR OW_BUILD_SHADERS OR OW_UI OR OW_PHYSICS)
+  enable_language(CXX)
+endif()
 
 add_library(project_options INTERFACE)
 if(MSVC)
-  target_compile_options(project_options INTERFACE /W4 /WX)
+  # /utf-8 : sources ET chaînes en UTF-8 (sinon MSVC réinterprète les accents du code source).
+  # /W4 /WX comme -Wall -Wextra -Werror, sauf trois avertissements sans équivalent utile ici :
+  #   C4324 : « structure complétée à cause d'un alignement » : informatif ; vient des vec4/mat4 de
+  #           cglm, alignés sur 16 octets (__declspec(align)) dans toute structure qui en contient ;
+  #   C4127 : « expression conditionnelle constante » : faux positifs sur les macros et les tailles ;
+  #   C4996 : fonctions de la CRT dites « non sûres » (fopen, getenv...) : _CRT_SECURE_NO_WARNINGS.
+  # /experimental:c11atomics : <stdatomic.h> en C (jobs.h, M7-02) ; refusé sans cette option.
+  target_compile_options(project_options INTERFACE /W4 /WX /utf-8 /wd4324 /wd4127
+    $<$<COMPILE_LANGUAGE:C>:/experimental:c11atomics>)
+  target_compile_definitions(project_options INTERFACE _CRT_SECURE_NO_WARNINGS)
 else()
   target_compile_options(project_options INTERFACE -Wall -Wextra -Wpedantic -Werror)
   if(OW_SANITIZE)
@@ -28,8 +64,22 @@ else()
   endif()
 endif()
 
+# Configuration d'exemple copiée à côté de l'exécutable, SEULEMENT si elle n'y est pas déjà
+# (pour ne jamais écraser les réglages de l'utilisateur).
+if(NOT EXISTS ${CMAKE_BINARY_DIR}/bin/config.ini)
+  file(COPY ${CMAKE_SOURCE_DIR}/config/config.ini DESTINATION ${CMAKE_BINARY_DIR}/bin)
+endif()
+
+enable_testing()
+
 add_subdirectory(third_party)
+if(OW_SHADERS_OK)
+  add_subdirectory(shaders)
+endif()
 add_subdirectory(engine)
 add_subdirectory(game)
 add_subdirectory(launcher)
 add_subdirectory(tools)
+if(OW_BUILD_TESTS)
+  add_subdirectory(tests)
+endif()

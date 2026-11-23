@@ -50,3 +50,32 @@ passe par un ADR dans `docs/adr/`.
 - Formater : `tools/scripts/format.sh` (vérifier sans modifier : `--check`).
 - Analyser : `cmake --preset debug && tools/scripts/lint.sh`.
 - Compiler : `-Wall -Wextra -Wpedantic -Werror` sur notre code, ASan + UBSan en Debug.
+
+## Code tiers
+- Les implémentations de bibliothèques à en-tête unique (cgltf, stb, plus tard miniaudio...)
+  vont dans `engine/src/third_party_impl.c`, compilé sans `-Werror` ni `/WX`.
+  Ne jamais les inclure avec `*_IMPLEMENTATION` dans un fichier soumis à `project_options`.
+
+## Journal
+- Dans `engine/` et `game/`, jamais `printf`/`fprintf` pour du diagnostic : `ENG_LOG_*`.
+  (Seule exception : l'aide de la ligne de commande du `launcher`, avant l'ouverture du journal.)
+- ERROR : une opération a échoué. WARN : situation anormale mais récupérée. INFO : jalons du
+  cycle de vie, une fois par événement, jamais à chaque image. DEBUG : détail utile au
+  développement. TRACE : très verbeux, y compris par image.
+- Le fichier est vidé à chaque message (pas de perte en cas de plantage) : ne pas journaliser
+  dans une boucle chaude au niveau INFO ou plus.
+
+## Assertions
+- `ENG_ASSERT(cond)` / `ENG_ASSERT_MSG(cond, fmt, ...)` pour les préconditions et invariants
+  (erreur de programmation). Jamais pour une erreur d'exécution (fichier, GPU, entrée).
+- Retirées en Release **et** RelWithDebInfo : la condition n'est pas évaluée, donc aucun
+  effet de bord dedans (`ENG_ASSERT(i++ < n)` est interdit).
+- Vérifier aussi les arguments reçus par les fonctions publiques du moteur (pointeur non NULL,
+  indice dans les bornes), pas seulement les cas « impossibles ».
+
+## Tests
+- Un fichier `tests/test_<module>.c` par module testé, déclaré dans `tests/CMakeLists.txt`
+  avec `ow_add_test(<module> test_<module>.c)`. Lancer : `tools/scripts/test.sh [preset]`.
+- Un test = `UTEST(suite, comportement_attendu)`, un seul comportement, nom en anglais lisible.
+- Les tests ne dépendent ni d'un écran ni d'un GPU. Fichiers temporaires : `tests_tmp/` (build).
+- Un bug corrigé = un test qui le reproduisait d'abord.

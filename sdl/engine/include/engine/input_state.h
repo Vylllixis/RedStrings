@@ -1,0 +1,81 @@
+#pragma once
+
+#include <stdbool.h>
+#include <stdint.h>
+
+/* Ce que le JEU voit des entrées : des actions, jamais des touches. Le même code de jeu marche
+ * donc au clavier, à la souris et à la manette : c'est le moteur (input.h) qui relie chaque
+ * action à ses touches/boutons/sticks. Cet en-tête ne dépend de rien (ni SDL, ni le moteur), le
+ * jeu peut l'inclure. */
+
+typedef enum EngAction {
+    ENG_ACTION_ATTACK,
+    ENG_ACTION_HEAVY_ATTACK,
+    ENG_ACTION_DODGE,
+    ENG_ACTION_JUMP,
+    ENG_ACTION_INTERACT,
+    ENG_ACTION_SPRINT,
+    ENG_ACTION_LOCK_ON,
+    ENG_ACTION_PAUSE,
+    ENG_ACTION_SWITCH_WEAPON, /* M8-08 */
+    ENG_ACTION_FLY_FASTER,    /* vol du mode créatif : accélérer (2026-11-22) */
+    ENG_ACTION_FLY_SLOWER,    /* vol du mode créatif : ralentir */
+    ENG_ACTION_COUNT,         /* au plus 32 : les états sont des masques de bits */
+} EngAction;
+
+typedef enum EngAxis {
+    ENG_AXIS_MOVE, /* x : droite +, y : avant + ; longueur <= 1 */
+    ENG_AXIS_LOOK, /* x : droite +, y : haut + ; en « unités de regard » par pas */
+    ENG_AXIS_COUNT,
+} EngAxis;
+
+/* Touches de MENU : fixes, jamais remappées, en plus des actions (un menu reste utilisable quelles
+ * que soient les liaisons). Flèches du clavier et croix de la manette pour choisir, Entrée pour
+ * valider, Échap pour ouvrir le menu ou revenir en arrière. Masques de bits. */
+#define ENG_MENU_KEY_UP 1u
+#define ENG_MENU_KEY_DOWN 2u
+#define ENG_MENU_KEY_LEFT 4u
+#define ENG_MENU_KEY_RIGHT 8u
+#define ENG_MENU_KEY_OK 16u   /* Entrée (les deux) */
+#define ENG_MENU_KEY_BACK 32u /* Échap */
+
+typedef struct EngAxisValue {
+    float x;
+    float y;
+} EngAxisValue;
+
+/* Photographie des entrées pour UN pas de simulation.
+ *   pressed  : l'action est passée de relâchée à enfoncée depuis le pas précédent
+ *   released : l'inverse, depuis le pas précédent
+ *   held     : l'action est enfoncée maintenant
+ * Une pression plus courte qu'un pas apparaît quand même : pressed ET released sont alors
+ * vrais ensemble, held est faux. Aucune pression n'est perdue. */
+typedef struct EngInputState {
+    uint32_t pressed;
+    uint32_t held;
+    uint32_t released;
+    EngAxisValue axis[ENG_AXIS_COUNT];
+    float wheel; /* crans de molette depuis le pas précédent : vers l'avant (haut) > 0 */
+    uint32_t menu_pressed; /* touches de menu pressées depuis le pas précédent (ENG_MENU_KEY_*) */
+    uint32_t menu_held;    /* touches de menu enfoncées maintenant */
+    /* Actions liées à la molette (un bit par action). Un cran de molette « presse » ces actions
+     * (pressed et released ensemble, jamais held) ; `wheel` garde quand même les crans bruts. Le
+     * jeu sait ainsi à qui va la molette : si une action qu'il écoute y est liée, il ne s'en sert
+     * pas pour autre chose (le zoom de la caméra) ; sinon elle reste libre. */
+    uint32_t wheel_bound;
+} EngInputState;
+
+static inline bool eng_action_pressed(const EngInputState *in, EngAction action)
+{
+    return (in->pressed >> action & 1u) != 0;
+}
+
+static inline bool eng_action_held(const EngInputState *in, EngAction action)
+{
+    return (in->held >> action & 1u) != 0;
+}
+
+static inline bool eng_action_released(const EngInputState *in, EngAction action)
+{
+    return (in->released >> action & 1u) != 0;
+}
